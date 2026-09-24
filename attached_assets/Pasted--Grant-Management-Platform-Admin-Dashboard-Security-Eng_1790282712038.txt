@@ -1,0 +1,78 @@
+# Grant Management Platform - Admin Dashboard & Security Engine (`admin_design.md`)
+
+## 1. Overview & Core Purpose
+Build a high-security, full-featured Administrative Dashboard & Security Command Center for the Grant Management Platform. The admin portal allows authorized staff to configure grant categories, dynamically build application forms/requirements, review and approve grant applications, set ATM card issuance fees and deposit thresholds, manage payout/withdrawal methods, monitor user transactions, evaluate fraud risk scores, and review immutable security audit logs.
+
+---
+
+## 2. Visual Aesthetic & Design System (Fintech Command Center Style)
+
+### Color Palette
+* **App Background:** Off-White / Pale Gray (`#F4F5F8` or `#F9F9F9`)
+* **Cards & Containers:** Crisp Pure White (`#FFFFFF`) with thin borders (`#E5E7EB`) and subtle drop shadows (`shadow-sm` / `shadow-md`).
+* **Dark Contrast Headers & Navigation:** Jet Black / Deep Charcoal (`#111111` or `#18181B`).
+* **Accent & Highlight Color:** Electric Neon/Lime Green (`#C6F432` or `#C0F200`) for primary action buttons, active tab states, and security status indicators.
+* **Alert & Risk Colors:** High Risk / Danger (`#EF4444`), Medium Risk / Warning (`#F59E0B`), Success / Approved (`#10B981`).
+
+### Typography & Structure
+* **Font Family:** Modern Sans-Serif (`Inter`, `Plus Jakarta Sans`, or `Poppins`). Bold typography for financial totals and security scores.
+* **Component Styling:** Heavy border radii (`rounded-2xl` for panels, `rounded-full` for pill buttons and badges).
+* **Layout Density:** High-density desktop view with sticky sidebar navigation, top command bar, multi-column metrics, and interactive data tables with search, filtering, and export capabilities.
+
+---
+
+## 3. Security & Compliance Architecture
+
+### A. Role-Based Access Control (RBAC)
+Support distinct administrative user roles with granular permission levels:
+1. **Super Admin:** Full system control, fee adjustments, category creation, role assignment, and emergency lockout overrides.
+2. **Finance Admin:** Review deposits, process withdrawals, set ATM card fees, manage financial treasury.
+3. **Compliance & Risk Officer:** Review KYC submissions, evaluate fraud risk scores, review flagged applications, inspect audit logs.
+4. **Support Agent:** View user profiles, check application statuses, assist with general non-financial queries (Read-Only on financial operations).
+
+### B. Security & Fraud Risk Engine
+* **Automated Fraud Scoring (0–100):** Calculate risk per user/application based on IP geolocation matches, velocity of deposit/withdrawal attempts, multiple accounts on single device fingerprint, and mismatched identification.
+* **Dual-Control Disbursement (4-Eye Principle):** Require dual admin sign-off (e.g., Compliance Officer + Finance Admin) before disbursing grant payouts above an admin-defined threshold (e.g., > $10,000).
+* **Immutable Audit Logging:** System logs every administrative action (`ADMIN_ID`, `ACTION_TYPE`, `TARGET_USER_ID`, `IP_ADDRESS`, `TIMESTAMP`, `BEFORE_AFTER_STATE_DELTA`). Audit logs cannot be edited or deleted by any admin role.
+* **Session & Emergency Controls:** One-click "System Lockdown" trigger to freeze pending payouts or restrict user withdrawals during suspected breach/attack.
+
+---
+
+## 4. Key Administrative Modules & Features
+
+### Module 1: Executive Dashboard & Security Overview
+* **Top Metric Cards:** Total Active Grants, Total Disbursed Funds, Pending Applications Queue, Flagged Security Alerts, Platform Wallet Reserve.
+* **Live System Feed:** Real-time stream of incoming applications, high-value deposit notices, and automated fraud alerts.
+* **Quick Stats:** Total active users categorized by Account Eligibility Tiers (e.g., Tier 1 Basic, Tier 2 Verified, Tier 3 Enterprise).
+
+### Module 2: Dynamic Grant Category & Form Builder
+* **Category Creator:** Add/edit grant programs (e.g., Tech Innovation, Agriculture & Food Security, Small Business Relief, Green Energy).
+* **Requirement Configurator:** Define mandatory fields and documents required before a user can apply (e.g., Business Registration Number, Pitch Deck PDF, ID Card Upload, 6-Month Bank Statement, Tax ID).
+* **Eligibility Parameters:** Set minimum account tier, maximum grant payout limit, submission deadline, and funding pool cap per category.
+
+### Module 3: Application Review & Pipeline Queue
+* **Kanban / Table View:** Application statuses (`Submitted`, `Under Compliance Review`, `Flagged for Fraud`, `Approved`, `Disbursed`, `Rejected`).
+* **Detail Inspector Modal:** Review applicant details, open/download uploaded PDF/image attachments, view user account age, and check calculated Fraud Score.
+* **Action Center:** Single-click buttons to `Approve & Disburse`, `Request Info/Revision`, `Reject with Reason`, or `Escalate to Security`.
+
+### Module 4: Financial Treasury, Fees & ATM Card Settings
+* **Withdrawal Channel Manager:** Enable/Disable payout options for users (Direct Bank Transfer, USDT/Crypto Wallet, Wire Transfer, Mobile Money) and set minimum/maximum per-transaction limits.
+* **ATM Card Fee Configuration:** Set processing and delivery fees charged to users applying for physical or virtual cards.
+* **Deposit Thresholds:** Set mandatory deposit balances users must maintain before requesting card issuance or executing payouts.
+* **Payout Queue:** Review user cash-out requests with fraud checks and release approved transactions.
+
+### Module 5: User Management & Account Tiers
+* **User Directory:** Searchable table of all registered users, showing verification status, wallet balance, active grants, and account tier.
+* **Manual Override Controls:** Upgrade/Downgrade user account eligibility tiers, temporarily lock/freeze compromised accounts, or force password/2FA resets.
+
+### Module 6: System Audit Trail & Logs
+* Filterable security ledger with columns: `Timestamp`, `Admin User`, `Role`, `Action Taken`, `Entity Affected`, `IP Address`, `Risk Score`.
+* Capability to export compliance logs in CSV or JSON format for legal/audit purposes.
+
+---
+
+## 5. Technical Stack Recommendations
+* **Frontend:** React / Next.js with Tailwind CSS (`@tailwindcss/forms`, `@tailwindcss/typography`).
+* **Icons & Components:** Lucide-React icons, Radix UI or Headless UI for accessible modals, dropdowns, and switch toggles.
+* **Backend Integration:** REST or GraphQL API endpoints protected with JWT or OAuth2 authentication containing encrypted admin claims (`role`, `permissions`).
+* **State Management:** Reactive state for live filters, multi-step modal workflows, and search indexing.

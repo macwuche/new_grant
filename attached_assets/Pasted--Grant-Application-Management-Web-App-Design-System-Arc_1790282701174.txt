@@ -1,0 +1,89 @@
+# Grant Application & Management Web App - Design & System Architecture Specification (`design.md`)
+
+## 1. Overview & Core Purpose
+Build a modern, full-featured Grant & Financial Management Web Application. The platform enables users to browse admin-configured grant categories, review grant eligibility requirements, submit dynamic grant application forms, track real-time application statuses, manage wallet balances, apply for physical/virtual ATM cards (with fee charging), deposit funds, request withdrawals via admin-set payout methods, and track transaction records.
+
+---
+
+## 2. Visual Aesthetic & Design System (Neobank / Modern Fintech Style)
+
+### Color Palette
+* **Primary Background:** Off-White / Pale Gray (`#F4F5F8` or `#F9F9F9`)
+* **Primary Cards & Containers:** Crisp Pure White (`#FFFFFF`) with subtle soft shadows (`shadow-sm` / `shadow-md`) and light gray borders (`#E5E7EB`).
+* **Dark Contrast Surfaces (Header/Sidebar/Accent Cards):** Jet Black / Deep Charcoal (`#111111` or `#18181B`).
+* **Primary Brand Accent Color:** Electric Neon/Lime Green (`#C6F432` or `#C0F200`) used for primary action highlights, status badges, active tab states, and feature cards.
+* **Text Colors:** Primary Black (`#0F172A`), Muted Gray (`#64748B`), and Inverted White (`#FFFFFF`).
+
+### Shape & Typography
+* **Font Family:** Geometric Sans-Serif (`Inter`, `Poppins`, or `Plus Jakarta Sans`). Bold, prominent typography for financial figures and headers.
+* **Border Radii:** Heavy rounded corners across all components:
+  * Buttons: Full pill shape (`rounded-full`)
+  * Cards & Containers: High radius (`rounded-2xl` or `rounded-3xl`)
+  * Input Fields: Soft pill/rounded (`rounded-xl` or `rounded-full`)
+
+---
+
+## 3. Responsive Layout Architecture
+
+### A. Desktop View Architecture (High Density & Multi-Column)
+1. **Persistent Sidebar Navigation (Left):**
+   * Dark theme background (`#111111`).
+   * Company logo & branding at top.
+   * Navigation links: Dashboard, Grant Categories, Applications, ATM Cards, Transactions, Withdrawals, Settings.
+   * Bottom user profile summary snippet.
+2. **Main Workspace Grid (Center & Right):**
+   * **Top Metric Bar:** Total Grant Eligibility Amount, Approved Grants Balance, Deposit Balance, and Account Tier Status.
+   * **Primary Column:** Active Grant Applications status overview table, Grant Category grid/cards, and Transaction History data table (with sorting/filtering).
+   * **Secondary Column (Right Panel):** Digital ATM Card visual graphic, Quick Deposit/Withdraw actions, Fee notices, and Account Tier status card.
+
+### B. Mobile View Architecture (App-Native Feel)
+1. **Top Header:** User avatar, greeting ("Good morning, [User]"), notification bell icon.
+2. **Horizontal Carousels:** Swipeable cards for available Grant Categories and Active ATM Cards.
+3. **Stacked Content Layout:** Vertical cards for quick balance, deposit/withdraw action pills, application status timeline, and recent transactions.
+4. **Bottom Navigation Bar (Fixed):** Fixed 5-icon bottom bar (`Home`, `Grants`, `Cards`, `Activity`, `Profile`) styled with smooth icons and pill indicators.
+
+---
+
+## 4. Key Functional Modules & Features
+
+### 1. Grant Eligibility & Category Explorer
+* Display admin-defined grant categories (e.g., Tech Startup, Small Business Relief, Agriculture & Food, Green Energy).
+* Each category displays max eligible grant funding amount, deadline, and account tier requirement.
+* "Check Eligibility" calculator that evaluates account status and dynamically reveals maximum claimable funds.
+
+### 2. Dynamic Grant Application Form System
+* Modal or dedicated page showing specific admin requirements before applying (e.g., Business Registration No., Identification, Revenue Proof, Pitch Deck, Proposed Budget).
+* Dynamic multi-step form with document upload triggers, input validation, and real-time form submission progress.
+* Status tracking pipeline: `Draft` -> `Submitted` -> `Under Review` -> `Approved / Disbursed` or `Declined`.
+
+### 3. Account Deposit & Fee Management
+* Dedicated flow for users to deposit funds into their wallet.
+* Clear handling of administrative charges (e.g., ATM Card issuance fees, application processing fees).
+* Balance split view: **Grant Balance** (disbursed funds) vs. **Deposit Balance** (user-loaded wallet funds).
+
+### 4. ATM Card Application & Management
+* Graphic visualization of a Neobank debit card (matching neon green or sleek black visual aesthetic).
+* Option to request a physical or virtual debit card.
+* Automated check verifying if user deposit balance covers the ATM card charge before approving request.
+* Card settings: Freeze card, reveal PIN, view daily spending limit.
+
+### 5. Withdrawal Engine
+* Admin-configurable withdrawal channels (e.g., Direct Bank Transfer, Wire Transfer, Crypto/USDT Wallet, Mobile Money).
+* Form validating requested withdrawal amount against eligible user balance.
+* Fee calculation breakdown shown transparently prior to payout submission.
+
+### 6. Transaction & Audit Records
+* Structured data table with tabs: `All`, `Grants`, `Deposits`, `Withdrawals`, `Card Fees`.
+* Search bar, date filter, status badges (`Completed`, `Pending`, `Failed`), and downloadable receipts/CSV support.
+
+### 7. Account & KYC Settings
+* User profile detail manager (Name, Email, Phone, Address).
+* Identity verification (KYC level tracking).
+* Withdrawal payment method presets (saved bank accounts / wallet addresses).
+
+---
+
+## 5. Technical Stack Recommendations
+* **Frontend:** React / Next.js or HTML5 + Tailwind CSS (using `@tailwindcss/forms`).
+* **Icons:** Lucide React or FontAwesome 6 icons.
+* **State Management:** Reactive state for switching between Desktop and Mobile layout previews, updating balance calculation, and processing multi-step application forms.
