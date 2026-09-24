@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Grant Applicant Portal"
+description = "A grant applicant portal for exploring available programs, completing applications, and tracking account activity. This first version is a UI prototype with sample data; live authentication, Supabase persistence, uploads, and money movement are planned for later."
+version = "1.0.0"
+id = "artifacts/grant-user-portal"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23786
+
+[services.development]
+run = "pnpm --filter @workspace/grant-user-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/grant-user-portal", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/grant-user-portal/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23786"
+BASE_PATH = "/"
