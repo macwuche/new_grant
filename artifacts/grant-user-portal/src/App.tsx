@@ -76,6 +76,7 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location)}</h1></div></div>
         <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><button className="icon-btn" aria-label="Notifications" data-testid="button-notifications"><Bell size={17} /><span className="notif-dot" /></button><div className="top-avatar">{initials}</div></div>
       </header>
+      <div className="mobile-demo-note" role="note">DEMO ONLY · Records, balances, and actions are illustrative. Nothing is sent or charged.</div>
       <div className="page-wrap">{children}</div>
       <nav className="mobile-nav">{navItems.slice(0, 5).map(item => <Link key={item.href} href={item.href} className={active(item.href) ? 'active' : ''} data-testid={`mobile-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}><Icon item={item.icon} /><span>{item.label === 'Grant categories' ? 'Grants' : item.label === 'Transactions' ? 'Activity' : item.label}</span></Link>)}</nav>
     </main>
@@ -109,8 +110,8 @@ function Dashboard({ onToast }: { onToast: (message: string) => void }) {
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Recent activity</h2><p className="section-subtitle">Illustrative records from your demo account.</p></div><Link className="link-text" href="/transactions" data-testid="link-view-transactions">See activity</Link></div><TransactionTable rows={transactions.slice(0, 3)} /></section>
   </div>;
 }
-function TimelineRow({ title, text, status, current, done }: { title: string; text: string; status: string; current?: boolean; done?: boolean }) {
-  return <div className="timeline-item"><div className={`timeline-dot ${current ? 'current' : done ? 'done' : ''}`} /><div style={{ flex: 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><h4>{title}</h4><StatusBadge status={status} /></div><p>{text}</p></div></div>;
+function TimelineRow({ title, text, status, current, done }: { title: string; text: string; status?: string; current?: boolean; done?: boolean }) {
+  return <div className="timeline-item"><div className={`timeline-dot ${current ? 'current' : done ? 'done' : ''}`} /><div style={{ flex: 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><h4>{title}</h4>{status && <StatusBadge status={status} />}</div><p>{text}</p></div></div>;
 }
 function CardVisual({ card, revealed = false }: { card: CardData; revealed?: boolean }) {
   return <div className={`card-visual ${card.kind === 'Physical card' ? 'lime-card' : ''}`} data-testid={`card-visual-${card.id}`}><div className="card-visual-top"><span style={{ font: '700 11px var(--app-font-display)' }}>arc.fund</span><div className="card-chip" /></div><div className="card-number">{card.lastFour === '—' ? 'NOT REQUESTED' : `••••  ••••  ••••  ${revealed ? card.lastFour : '••••'}`}</div><div className="card-footer"><div><div className="card-holder">Cardholder</div><div className="card-name">ALEX MORGAN</div></div><div className="card-network">arc</div></div></div>;

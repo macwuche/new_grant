@@ -6,7 +6,7 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 
 ## Build plan
 
-1. **Applicant UI prototype — In progress**
+1. **Applicant UI prototype — Complete**
    - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings.
    - Use illustrative sample data and front-end-only interactions.
    - Clearly identify demo states; do not imply an application was sent or a financial action completed.
@@ -24,7 +24,8 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 
 - Applicant and admin requirements reviewed and separated into distinct product phases.
 - Grant Applicant Portal web artifact scaffolded.
-- Applicant UI implementation started.
+- Applicant UI completed with responsive dashboard, grant explorer, application flow, cards, transactions, withdrawals, and settings screens.
+- Demo-only interactions and sample-data notices added; front-end typecheck passes.
 
 ## Not yet implemented
 
