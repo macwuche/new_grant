@@ -8,7 +8,7 @@
 
 arc.fund is a proposed grant-funding workspace with two experiences: an **applicant portal** for discovering grant programs, preparing applications, and understanding account activity; and an **admin workspace** for a future staff team to manage programs and review requests. The product aims to make eligibility, application progress, and funding activity understandable without losing the trust and controls required for sensitive applicant data and money movement.
 
-**Today, both experiences are illustrative.** The applicant portal and `/admin` use fictional, locally defined records. No visitor is authenticated, no application or document is stored, no grant is awarded, and no card, deposit, or payout is issued. The admin preview is reachable by URL without staff authorization because it contains no real records or operations. **Do not connect real applicant data to this route until server-side staff authorization and privacy controls exist.**
+**Today, both experiences are illustrative.** The applicant portal and `/admin` use fictional, locally defined records. No visitor is authenticated, no application or document is stored, no grant is awarded, and no card, deposit, or payout is issued. The admin preview is reachable by URL without staff authorization because it contains no real records or operations. Its brand-color setting affects only the current browser, not the site for everyone. **Do not connect real applicant records or email to this route until server-side staff authorization and privacy controls exist.**
 
 The current objective is to establish and iterate on the interface. A production implementation requires decisions on policies, identity, eligibility, data ownership, review governance, and any regulated financial partners before operational logic is enabled.
 
@@ -32,15 +32,15 @@ The workspace has a Supabase connection available for future work, but this app 
 
 ### Visual language
 
-- **Brand:** `arc.fund` wordmark, a small rotated `a` mark, charcoal navigation, lime accents, restrained status colors, and soft light surfaces. The applicant layout has a dark vertical sidebar and light content area; the admin workspace uses a related charcoal sidebar with warm paper-like panels.
+- **Brand:** `arc.fund` wordmark, a small rotated `a` mark, charcoal navigation, lime as the original accent, restrained status colors, and soft light surfaces. The applicant layout has a dark vertical sidebar and light content area; the admin workspace uses a related charcoal sidebar with warm paper-like panels. Admin Settings offers preset and custom accent colors with a live preview across both experiences. The choice is stored in this browser only; **Restore original color** clears the override.
 - **Typography:** DM Sans for body/UI, Space Grotesk for headings and prominent numbers; a monospace face for reference-like details. These are defined in `artifacts/grant-user-portal/src/index.css`.
 - **Hierarchy:** Clear page title and context; compact metric cards and status badges; section cards for forms, queues, and supporting information. Use plain-language microcopy to explain eligibility, progress, and the consequence of actions.
-- **Interaction:** Local filters/search update immediately; navigational links lead to the appropriate preview; detail views are read-only. Provide explicit empty states and feedback. Avoid approve, pay, upload, or publish affordances that imply a real operation until the backend is ready.
-- **Trust signals:** Demo labels must remain visible wherever the experience could be mistaken for a live account, legal consent, verification, grant decision, or money movement. Do not show real personal data in the public preview.
+- **Interaction:** Local filters/search update immediately; navigational links lead to the appropriate preview; detail views are read-only. Inbox folders, search, read/star/archive/trash actions, and drafts work only in page memory. The brand-color control updates shared accents immediately and remembers the choice in local browser storage. Provide explicit empty states and feedback. Avoid approve, pay, upload, send, or publish affordances that imply a real operation until the backend is ready.
+- **Trust signals:** Demo labels must remain visible wherever the experience could be mistaken for a live account, legal consent, verification, grant decision, email delivery, or money movement. The former full-width admin preview banner was removed; the topbar preview badge, sidebar note, and inbox-specific disconnected notice remain. Do not show real personal data in the public preview.
 - **Responsive behavior:** The applicant sidebar adapts to viewport height without independently scrolling. On smaller screens, navigation and content reflow; the admin uses a bottom navigation bar and compact record cards for applicants/applications. Test widths down to the site's 320px minimum as well as short desktop viewports.
 - **Accessibility baseline:** Semantic headings, labeled inputs and controls, keyboard-reachable navigation, visible focus, readable status text (not color alone), and reduced-motion handling. For future live dialogs, verify focus trapping and focus restoration rather than assuming visual presentation provides accessible modal behavior.
 
-Current styling lives in `src/index.css`, `src/pages/AuthPages.css`, and `src/pages/AdminPage.css` under `artifacts/grant-user-portal/`. The admin CSS is scoped to its shell so applicant screens retain their own styles. Page titles and description/social metadata update per route in `src/App.tsx`.
+Current styling lives in `src/index.css` and focused page styles under `artifacts/grant-user-portal/src/pages/`. Shared accent variables let the browser-only choice affect both applicant and admin screens while keeping their layouts separate. Page titles and description/social metadata update per route in `src/App.tsx`.
 
 ### Language and content rules
 
@@ -67,8 +67,8 @@ Amounts, deadlines, tiers, statuses, identities, bank details, and sample progra
 
 1. Visit `/admin` directly for an overview of fictional metrics and a sample review queue.
 2. Navigate to `/admin/applicants` or `/admin/applications`; search/filter and open a read-only record preview. These records are **not** the applicant portal's local sample applications or real users.
-3. Explore `/admin/inbox` for fictional conversations, folders, search, and local drafts. Preview send does not transmit anything, and incoming mail does not appear automatically. Reloading resets local mailbox changes.
-4. Inspect `/admin/grants` for example program cards and `/admin/settings` for a browser-only brand color picker and proposed policy and Resend email configuration. The chosen accent is remembered in local browser storage and can be reset. No API key is collected in the public browser preview.
+3. Explore `/admin/inbox` for fictional conversations, folders, search, local read/star/move actions, and drafts. **Preview send** does not transmit anything, and incoming mail does not appear automatically. Reloading resets local mailbox changes.
+4. Inspect `/admin/grants` for example program cards and `/admin/settings` for preset/custom brand colors, the reset control, and proposed policy and Resend email configuration. The chosen accent appears on admin and applicant screens in this browser and survives reloads, but does not affect other visitors. API key, sending domain/address, receiving address, inbound webhook endpoint, and signature verification are shown as **not configured**; inbound MX is **not verified**. None are editable live email settings. No API key is collected in the public browser preview.
 5. No server-side administrative change, approval, publication, or payout can occur. The admin preview has no staff authorization or shared settings.
 
 ### Intended live journeys — design targets, not existing behavior
@@ -102,9 +102,14 @@ The existing service is `artifacts/api-server` (Express); its only route is `/ap
 
 For implementation: specify and review domain contracts in OpenAPI, generate client types, add schema/migrations and server-side validation, then connect real frontend callers with loading/error/empty states and persistence across reloads. Use a single source of truth for records and status; admin and applicant views must reflect the same authorized application while enforcing different permissions. Do not merge live API data into the public admin preview until its access boundary is enforced.
 
+### Making email and branding operational
+
+- **Email:** Protect staff mail views and APIs before connecting Resend. Keep credentials and webhook signing material server-side; verify the sending domain and receiving domain/MX records, validate inbound webhook signatures, retrieve and persist message content, and handle duplicate webhook events safely. Only then replace fictional messages and the non-sending compose/reply preview. The current Settings checklist is not a working provider connection or webhook endpoint.
+- **Branding:** The current color picker is a personal browser preview. To publish a color for all visitors, require staff authorization for writes, validate and store the choice server-side, and expose a read-only theme to the applicant and admin experiences. Include contrast checks and a rollback/reset path. Never treat local browser storage or the public `/admin` route as an authoritative brand setting.
+
 ## 6. Status and suggested delivery order
 
-**Built:** Responsive applicant prototype; demo authentication screens and animation; UI-only admin overview, directory, sample email inbox, queue, grants, and settings; health-only API scaffold. These are interfaces, not completed product workflows.
+**Built:** Responsive applicant prototype; demo authentication screens and animation; UI-only admin overview, directory, sample email inbox, queue, grants, and settings with browser-only color preview; health-only API scaffold. These are interfaces, not completed product workflows.
 
 **Current focus:** The two visual workspaces are available for design review and iteration. This brief captures the gap between that UI and an operational platform. No production auth, domain backend, or secure admin workflow is currently implemented.
 
@@ -113,8 +118,9 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 1. Agree product rules: target users/geography, actual grant programs and eligibility, application fields, reviewer permissions, policy text, data retention, and whether financial features are in scope at all.
 2. Select and implement one authentication model and protected applicant/staff access; design the domain schema, privacy model, and API contracts.
 3. Implement persistent profiles, drafts/submissions, private document handling, and staff review with auditable decisions and notifications.
-4. Connect the existing UI to authorized APIs and replace samples route by route, removing misleading demo states only when the real replacement works end to end.
-5. Treat payment/card/withdrawal functionality as a separate regulated phase, dependent on provider, risk, legal, and accounting decisions.
+4. When staff access is protected, connect Resend for authorized email and create a shared, server-backed brand setting if a site-wide color change is desired.
+5. Connect the remaining UI to authorized APIs and replace samples route by route, removing misleading demo states only when the real replacement works end to end.
+6. Treat payment/card/withdrawal functionality as a separate regulated phase, dependent on provider, risk, legal, and accounting decisions.
 
 `BUILD_STATUS.md` is an older planning snapshot and still says the admin UI has not started. The **current source code and this brief** reflect that the admin *preview UI* has since been built; its real operations remain unbuilt.
 
@@ -124,11 +130,12 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 | Test area | Required coverage before live use |
 | --- | --- |
-| UI and journeys | Route smoke tests for applicant/auth/admin pages; keyboard/mobile/short-viewport checks; search/filter/empty states; form validation and step transitions; save/reload behavior when persistence is introduced; clear error and retry states. |
+| UI and journeys | Route smoke tests for applicant/auth/admin pages; keyboard/mobile/short-viewport checks; search/filter/empty states; form validation and step transitions; brand-color selection/reset across routes and reloads; clear error and retry states. |
 | Authentication | Sign-up, verification, login, recovery, session expiry/revocation, MFA, logout, and account-switching; ensure unauthenticated requests and forged sessions fail. |
 | Authorization and privacy | Applicant A cannot read/edit applicant B; reviewers see only assigned/authorized data; non-staff cannot call admin APIs even by URL; no private files accessible via guessed links; no sensitive values leaked to logs, analytics, client bundles, or exports. |
 | Domain/API | Contract tests generated against actual request/response shapes; input boundaries; state-transition rules; duplicate requests; concurrent edits; idempotency; audit event completeness; failure and rollback behavior. |
 | Documents | Type and size limits, private access, malware handling, expired links, deletion/retention, and inaccessible records after permission revocation. |
+| Email and branding, if enabled | Reject forged/unsigned or duplicate inbound webhooks; restrict mailbox reads/sends to staff; keep secrets out of the client; verify sender/domain setup and delivery failures. Reject unauthorized or invalid brand updates; verify shared color and readable contrast across devices. |
 | Finance, if enabled | Provider sandbox tests for payout success/failure/retries, ledger reconciliation, duplicate prevention, limits, approvals, and exception handling. No production funds in test environments. |
 | Operational security | Threat model; dependency and static scans; security headers, CORS allowlist, rate limits, session/cookie/CSRF settings as applicable, secrets handling, logging/alerting, backup and recovery checks, and a penetration review before exposing real data. The current API uses permissive CORS and has no domain authorization. |
 | Accessibility and quality | Semantic labels and status announcements; contrast and visible focus; dialog keyboard/focus behavior; reduced motion; cross-browser smoke checks; performance on mobile and slow connections. |
@@ -139,8 +146,8 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 - Frontend routes and applicant sample data: `artifacts/grant-user-portal/src/App.tsx`
 - Sign-in/sign-up/reset preview and validation: `artifacts/grant-user-portal/src/pages/AuthPages.tsx`
-- Admin preview and independent sample data: `artifacts/grant-user-portal/src/pages/AdminPage.tsx`; sample mailbox and configuration: `AdminInbox.tsx`, `AdminEmailSettings.tsx`
-- Frontend styling: `artifacts/grant-user-portal/src/index.css`, `artifacts/grant-user-portal/src/pages/AuthPages.css`, `artifacts/grant-user-portal/src/pages/AdminPage.css`
+- Admin preview and independent sample data: `artifacts/grant-user-portal/src/pages/AdminPage.tsx`; sample mailbox and configuration: `AdminInbox.tsx`, `AdminEmailSettings.tsx`; browser-only brand control: `BrandColorSettings.tsx`, `src/lib/brandColor.ts`
+- Frontend styling: `artifacts/grant-user-portal/src/index.css` and the focused CSS files under `artifacts/grant-user-portal/src/pages/`
 - API entry/routes: `artifacts/api-server/src/app.ts`, `src/routes/`
 - API source of truth: `lib/api-spec/openapi.yaml`; data schema location: `lib/db/src/schema/`
 - Workspace commands: `pnpm run typecheck` and `pnpm run build`; portal-specific: `pnpm --filter @workspace/grant-user-portal run typecheck` and `pnpm --filter @workspace/grant-user-portal run build`.
