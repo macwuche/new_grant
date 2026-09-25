@@ -7,9 +7,9 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 ## Build plan
 
 1. **Applicant UI prototype — Complete**
-   - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings.
+   - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings, plus login, sign-up, forgot-password, and 404 screens.
    - Use illustrative sample data and front-end-only interactions.
-   - Clearly identify demo states; do not imply an application was sent or a financial action completed.
+   - Clearly identify demo states; do not imply an account was created, a password reset was sent, an application was submitted, or a financial action completed.
 2. **Supabase foundation — Not started**
    - Connect the Supabase project.
    - Define the data model, authentication, row-level security, and private document storage.
@@ -25,11 +25,12 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 - Applicant and admin requirements reviewed and separated into distinct product phases.
 - Grant Applicant Portal web artifact scaffolded.
 - Applicant UI completed with responsive dashboard, grant explorer, application flow, cards, transactions, withdrawals, and settings screens.
+- UI-only login, sign-up, forgot-password, and 404 pages added; auth forms validate inputs locally but do not sign in, create accounts, or send email.
 - Demo-only interactions and sample-data notices added; front-end typecheck passes.
 
 ## Not yet implemented
 
-- Supabase connection, schema, authentication, or persistence.
+- Supabase is connected to the workspace, but not wired into the app; schema, authentication, and persistence are not implemented.
 - Real file uploads or private document storage.
 - Real application submission, eligibility decisions, or status updates.
 - Real card issuance, deposits, charges, balances, or withdrawals.

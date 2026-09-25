@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import {
   ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Banknote, Bell,
@@ -7,6 +7,7 @@ import {
   MoreHorizontal, Plus, Search, Settings, ShieldCheck, SlidersHorizontal,
   Sparkles, Store, Upload, WalletCards, X, Zap,
 } from 'lucide-react';
+import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
 
 type Status = 'Submitted' | 'Under review' | 'Approved' | 'Draft' | 'Declined' | 'Pending' | 'Completed' | 'Failed';
 type GrantCategory = { id: string; name: string; summary: string; maxFunding: number; deadline: string; minimumTier: string; requirements: string[]; icon: typeof BriefcaseBusiness };
@@ -74,7 +75,7 @@ function Shell({ children }: { children: ReactNode }) {
     <main className="main">
       <header className="topbar">
         <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location)}</h1></div></div>
-        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><button className="icon-btn" aria-label="Notifications" data-testid="button-notifications"><Bell size={17} /><span className="notif-dot" /></button><div className="top-avatar">{initials}</div></div>
+        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><button className="icon-btn" aria-label="Notifications" data-testid="button-notifications"><Bell size={17} /><span className="notif-dot" /></button><Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link></div>
       </header>
       <div className="mobile-demo-note" role="note">DEMO ONLY · Records, balances, and actions are illustrative. Nothing is sent or charged.</div>
       <div className="page-wrap">{children}</div>
@@ -167,15 +168,47 @@ function SettingsPage({ onToast }: { onToast: (message: string) => void }) {
   const [twoFactor, setTwoFactor] = useState(true);
   return <div className="detail-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Your profile and security controls.</p></div></div><div className="settings-nav"><button className="active" data-testid="tab-settings-profile">Profile details</button><button onClick={() => onToast('Verification settings are shown on this page for the demo.')} data-testid="tab-settings-verification">Verification</button><button onClick={() => onToast('Notification preferences will be available in a later phase.')} data-testid="tab-settings-notifications">Notifications</button></div></aside><div className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? (setEditing(false), onToast('Demo profile changes are not saved.')) : setEditing(true)} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid"><div className="field"><label className="field-label" htmlFor="profile-name">Full name</label><input id="profile-name" className="input" disabled={!editing} value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} data-testid="input-profile-name" /></div><div className="field"><label className="field-label" htmlFor="profile-email">Email</label><input id="profile-email" className="input" disabled={!editing} value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} data-testid="input-profile-email" /></div><div className="field"><label className="field-label" htmlFor="profile-phone">Phone</label><input id="profile-phone" className="input" disabled={!editing} value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} data-testid="input-profile-phone" /></div><div className="field"><label className="field-label" htmlFor="profile-address">Address</label><input id="profile-address" className="input" disabled={!editing} value={profile.address} onChange={e => setProfile({ ...profile, address: e.target.value })} data-testid="input-profile-address" /></div></div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>Demo mode: edits are not persisted.</span><button className="btn btn-primary" onClick={() => { setEditing(false); onToast('Demo profile preview updated. Nothing was saved.'); }} data-testid="button-save-profile">Preview changes</button></div>}</div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">Understand the signals behind your Tier 2 account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div><div className="verification-item"><div className="verification-icon"><Check size={15} /></div><div className="verification-copy"><strong>Identity verification</strong><span>Verified · demo status</span></div><StatusBadge status="Completed" /></div><div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier 2 · expanded grant eligibility</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier 2</span></div><div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>Extra protection for account access</span></div><button className={`switch ${twoFactor ? 'on' : ''}`} onClick={() => { setTwoFactor(v => !v); onToast(`Demo two-step sign-in ${twoFactor ? 'disabled' : 'enabled'}.`); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" /></div></div><div className="notice"><Info size={16} />Profile verification is represented for demonstration only. Identity checks, authentication, and persistence arrive in a later phase.</div></div></div>;
 }
-function NotFoundPage() { return <div className="card card-pad empty-state"><div className="empty-icon"><CircleHelp size={20} /></div><h3>That page is not in this workspace</h3><p>Use the navigation to return to your applicant dashboard.</p><Link className="btn btn-primary" href="/" data-testid="link-not-found-home">Back to dashboard</Link></div>; }
 function RouterView({ onToast, applications }: { onToast: (message: string) => void; applications: Application[] }) {
-  return <Switch><Route path="/"><Dashboard onToast={onToast} /></Route><Route path="/dashboard"><Dashboard onToast={onToast} /></Route><Route path="/grants"><GrantsPage onToast={onToast} /></Route><Route path="/applications/new/:grantId"><ApplicationForm onToast={onToast} /></Route><Route path="/applications"><ApplicationsPage applications={applications} onToast={onToast} /></Route><Route path="/cards"><CardsPage onToast={onToast} /></Route><Route path="/transactions"><TransactionsPage /></Route><Route path="/withdrawals"><WithdrawalsPage onToast={onToast} /></Route><Route path="/settings"><SettingsPage onToast={onToast} /></Route><Route><NotFoundPage /></Route></Switch>;
+  const [location] = useLocation();
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      '/': 'Dashboard', '/dashboard': 'Dashboard', '/grants': 'Grant categories',
+      '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
+      '/withdrawals': 'Withdrawals', '/settings': 'Settings',
+      '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
+    };
+    const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : 'Page not found');
+    const description = 'Explore the arc.fund grant applicant workspace UI. This is an illustrative preview; sign-in and applications are not active.';
+    document.title = `${title} | arc.fund demo`;
+    for (const [selector, value] of [
+      ['meta[name="description"]', description],
+      ['meta[property="og:title"]', document.title],
+      ['meta[property="og:description"]', description],
+      ['meta[name="twitter:title"]', document.title],
+      ['meta[name="twitter:description"]', description],
+    ]) document.querySelector(selector)?.setAttribute('content', value);
+  }, [location]);
+  return <Switch>
+    <Route path="/login"><LoginPage /></Route>
+    <Route path="/signup"><SignUpPage /></Route>
+    <Route path="/forgot-password"><ForgotPasswordPage /></Route>
+    <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
+    <Route path="/dashboard"><Shell><Dashboard onToast={onToast} /></Shell></Route>
+    <Route path="/grants"><Shell><GrantsPage onToast={onToast} /></Shell></Route>
+    <Route path="/applications/new/:grantId"><Shell><ApplicationForm onToast={onToast} /></Shell></Route>
+    <Route path="/applications"><Shell><ApplicationsPage applications={applications} onToast={onToast} /></Shell></Route>
+    <Route path="/cards"><Shell><CardsPage onToast={onToast} /></Shell></Route>
+    <Route path="/transactions"><Shell><TransactionsPage /></Shell></Route>
+    <Route path="/withdrawals"><Shell><WithdrawalsPage onToast={onToast} /></Shell></Route>
+    <Route path="/settings"><Shell><SettingsPage onToast={onToast} /></Shell></Route>
+    <Route><NotFoundPage /></Route>
+  </Switch>;
 }
 function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [applications] = useState(initialApplications);
   const onToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(null), 4200); };
-  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Shell><RouterView onToast={onToast} applications={applications} /></Shell>{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter>;
+  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} applications={applications} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter>;
 }
 
 export default App;
