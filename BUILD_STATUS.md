@@ -7,11 +7,11 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 ## Build plan
 
 1. **Applicant UI prototype — Complete**
-   - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings, plus login, sign-up, forgot-password, and 404 screens.
+   - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings, plus login, multi-step sign-up, forgot-password, and 404 screens.
    - Use illustrative sample data and front-end-only interactions.
-   - Clearly identify demo states; do not imply an account was created, a password reset was sent, an application was submitted, or a financial action completed.
-2. **Supabase foundation — Not started**
-   - Connect the Supabase project.
+   - Clearly identify demo states; do not imply an account was created, an email/code was sent or verified, grant matching occurred, an application was submitted, or a financial action completed.
+2. **Supabase foundation — Workspace connection added; app integration not started**
+   - Wire the connected Supabase project into the app when the logic phase begins.
    - Define the data model, authentication, row-level security, and private document storage.
 3. **Applicant workflows — Not started**
    - Implement persistent application drafts, submissions, status tracking, profile/KYC flows, and document uploads.
@@ -25,7 +25,8 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 - Applicant and admin requirements reviewed and separated into distinct product phases.
 - Grant Applicant Portal web artifact scaffolded.
 - Applicant UI completed with responsive dashboard, grant explorer, application flow, cards, transactions, withdrawals, and settings screens.
-- UI-only login, sign-up, forgot-password, and 404 pages added; auth forms validate inputs locally but do not sign in, create accounts, or send email.
+- UI-only login, multi-step sign-up, forgot-password, and 404 pages added; auth forms validate inputs locally but do not sign in, create accounts, send email, or match grants.
+- The sign-up preview uses illustrative industry options and legal-content placeholders; the real industry list, terms, and privacy policy will be set in admin settings later.
 - Demo-only interactions and sample-data notices added; front-end typecheck passes.
 
 ## Not yet implemented
