@@ -68,7 +68,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="nav-label">Your workspace</div>
       <nav className="nav-list">{navItems.map(item => <Link key={item.href} href={item.href} className={`nav-link ${active(item.href) ? 'active' : ''}`} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}><span className="nav-icon"><Icon item={item.icon} /></span>{item.label}</Link>)}</nav>
       <div className="sidebar-bottom">
-        <div className="demo-note"><strong>Illustrative workspace</strong>Records and balances are demo-only. Nothing here moves real money or submits an application.</div>
+        <div className="demo-note"><strong>Illustrative workspace</strong><span>Records and balances are demo-only. Nothing here moves real money or submits an application.</span></div>
         <div className="user-mini"><div className="avatar">{initials}</div><div className="user-mini-text"><div className="user-mini-name">Alex Morgan</div><div className="user-mini-email">alex.morgan@example.com</div></div><MoreHorizontal size={16} color="#858990" /></div>
       </div>
     </aside>
