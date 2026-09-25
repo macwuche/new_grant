@@ -8,6 +8,7 @@ import {
   Sparkles, Store, Upload, WalletCards, X, Zap,
 } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
+import { AdminPage } from './pages/AdminPage';
 
 type Status = 'Submitted' | 'Under review' | 'Approved' | 'Draft' | 'Declined' | 'Pending' | 'Completed' | 'Failed';
 type GrantCategory = { id: string; name: string; summary: string; maxFunding: number; deadline: string; minimumTier: string; requirements: string[]; icon: typeof BriefcaseBusiness };
@@ -176,9 +177,14 @@ function RouterView({ onToast, applications }: { onToast: (message: string) => v
       '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
       '/withdrawals': 'Withdrawals', '/settings': 'Settings',
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
+      '/admin': 'Admin overview', '/admin/applicants': 'Admin applicants',
+      '/admin/applications': 'Admin applications', '/admin/grants': 'Admin grants',
+      '/admin/settings': 'Admin settings',
     };
     const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : 'Page not found');
-    const description = 'Explore the arc.fund grant applicant workspace UI. This is an illustrative preview; sign-in and applications are not active.';
+    const description = location.startsWith('/admin')
+      ? 'Explore the arc.fund admin UI preview. Sample records only; admin access and changes are not active.'
+      : 'Explore the arc.fund grant applicant workspace UI. This is an illustrative preview; sign-in and applications are not active.';
     document.title = `${title} | arc.fund demo`;
     for (const [selector, value] of [
       ['meta[name="description"]', description],
@@ -192,6 +198,11 @@ function RouterView({ onToast, applications }: { onToast: (message: string) => v
     <Route path="/login"><LoginPage /></Route>
     <Route path="/signup"><SignUpPage /></Route>
     <Route path="/forgot-password"><ForgotPasswordPage /></Route>
+    <Route path="/admin"><AdminPage section="overview" /></Route>
+    <Route path="/admin/applicants"><AdminPage section="applicants" /></Route>
+    <Route path="/admin/applications"><AdminPage section="applications" /></Route>
+    <Route path="/admin/grants"><AdminPage section="grants" /></Route>
+    <Route path="/admin/settings"><AdminPage section="settings" /></Route>
     <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/dashboard"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/grants"><Shell><GrantsPage onToast={onToast} /></Shell></Route>

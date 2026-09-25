@@ -1,1 +1,2 @@
 - [Lottie reduced motion](lottie-reduced-motion.md) — player blocks autoplay on reduced-motion devices; this sign-up demo intentionally overrides it for a four-second transition.
+- [Admin preview boundary](admin-preview-boundary.md) — the admin workspace is deliberately UI-only; require staff authorization before exposing real applicant records.
