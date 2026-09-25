@@ -27,6 +27,7 @@ Build the applicant-facing grant portal first. Deliver the interface before conn
 - Applicant UI completed with responsive dashboard, grant explorer, application flow, cards, transactions, withdrawals, and settings screens.
 - UI-only login, multi-step sign-up, forgot-password, and 404 pages added; auth forms validate inputs locally but do not sign in, create accounts, send email, or match grants.
 - The sign-up preview uses illustrative industry options and legal-content placeholders; the real industry list, terms, and privacy policy will be set in admin settings later.
+- The supplied Lottie animation is shown on the grant-matching preview step; it is visual only and does not perform matching.
 - Demo-only interactions and sample-data notices added; front-end typecheck passes.
 
 ## Not yet implemented

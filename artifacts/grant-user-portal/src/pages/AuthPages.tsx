@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -6,6 +6,8 @@ import { Link } from 'wouter';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import './AuthPages.css';
+
+const GrantMatchingAnimation = lazy(() => import('./GrantMatchingAnimation'));
 
 const emailRule = z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address.');
 const loginSchema = z.object({
@@ -329,8 +331,10 @@ export function SignUpPage() {
         <div className="auth-step-index">04 — Grant matching preview</div>
         <h1 id="signup-heading" ref={headingRef} tabIndex={-1}>Connecting you to the best grant.</h1>
         <p className="auth-lede">A preview of the grant-matching moment that will follow confirmation when the full experience is ready.</p>
-        <div className="auth-match-art" aria-hidden="true"><i /><i /><span>Possibility, in motion.</span></div>
-        <div className="auth-signup-note" role="status" data-testid="status-signup-matching-preview"><Info size={16} aria-hidden="true" /><span><strong>Animation placeholder.</strong> A Lottie asset will be provided later. No grant matching is happening, and no account or application was created.</span></div>
+        <div className="auth-match-art" role="img" aria-label="Animated illustration for the grant matching preview" data-testid="animation-signup-matching">
+          <Suspense fallback={<span className="auth-match-loading">Loading illustration…</span>}><GrantMatchingAnimation /></Suspense>
+        </div>
+        <div className="auth-signup-note" role="status" data-testid="status-signup-matching-preview"><Info size={16} aria-hidden="true" /><span><strong>Animation preview only.</strong> No grant matching is happening, and no account or application was created.</span></div>
         <div className="auth-step-actions">
           <button type="button" className="auth-back" onClick={() => setStep(3)} data-testid="button-signup-back-matching"><ArrowLeft size={16} aria-hidden="true" /> Back</button>
           <button type="button" className="auth-button" onClick={restart} data-testid="button-signup-restart">Restart preview <ArrowRight size={18} aria-hidden="true" /></button>

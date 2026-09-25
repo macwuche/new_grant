@@ -172,15 +172,10 @@
 .auth-policy-panel p { margin: 0 0 22px; color: var(--auth-dim); font-size: 13px; line-height: 1.7; }
 .auth-policy-panel .auth-button { width: auto; min-height: 44px; margin: 0; }
 .auth-code-input { font: 700 clamp(24px, 6vw, 32px) var(--app-font-mono) !important; letter-spacing: .35em; text-align: center; }
-.auth-match-art { position: relative; display: grid; place-items: center; height: 180px; margin: 8px 0 23px; overflow: hidden; border-radius: 18px; background: var(--auth-ink); color: hsl(var(--lime)); }
-.auth-match-art::before, .auth-match-art::after { content: ''; position: absolute; width: 150px; height: 150px; border: 1px solid hsl(var(--lime) / .4); border-radius: 50%; animation: auth-breathe 5s ease-in-out infinite alternate; }
-.auth-match-art::after { width: 230px; height: 230px; opacity: .45; animation-delay: -2s; }
-.auth-match-art span { position: relative; z-index: 1; font: 600 13px var(--app-font-display); letter-spacing: .02em; }
-.auth-match-art i { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: hsl(var(--lime)); }
-.auth-match-art i:first-child { transform: translate(-65px, -42px); }
-.auth-match-art i:nth-child(2) { transform: translate(79px, 29px); }
+.auth-match-art { display: grid; place-items: center; min-height: 240px; margin: 8px 0 23px; overflow: hidden; border: 1px solid hsl(220 16% 82%); border-radius: 18px; background: hsl(54 39% 91%); }
+.auth-match-lottie { width: min(100%, 270px); height: 270px; }
+.auth-match-loading { color: var(--auth-dim); font-size: 12px; }
 @keyframes auth-slide { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes auth-breathe { from { transform: scale(.91); opacity: .3; } to { transform: scale(1.08); opacity: .8; } }
 @keyframes auth-enter { from { opacity: 0; transform: translateY(13px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 850px) {
   .auth-page { grid-template-columns: 1fr; }
@@ -206,6 +201,6 @@
   .auth-bottomline { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .auth-form-wrap, .auth-step-pane, .auth-match-art::before, .auth-match-art::after { animation: none; }
+  .auth-form-wrap, .auth-step-pane { animation: none; }
   .auth-page a, .auth-page button, .auth-page input { transition: none !important; }
 }
