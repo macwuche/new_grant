@@ -1,0 +1,1 @@
+- [Lottie reduced motion](lottie-reduced-motion.md) — a rendered SVG can remain still because the player suppresses autoplay for reduced-motion devices.

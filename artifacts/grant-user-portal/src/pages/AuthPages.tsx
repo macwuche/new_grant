@@ -175,6 +175,10 @@ export function SignUpPage() {
     previousStep.current = step;
   }, [step]);
 
+  useEffect(() => {
+    void import('./GrantMatchingAnimation');
+  }, []);
+
   const next = async () => {
     if (step === 1) {
       if (await form.trigger()) {
@@ -331,7 +335,8 @@ export function SignUpPage() {
         <div className="auth-step-index">04 — Grant matching preview</div>
         <h1 id="signup-heading" ref={headingRef} tabIndex={-1}>Connecting you to the best grant.</h1>
         <p className="auth-lede">A preview of the grant-matching moment that will follow confirmation when the full experience is ready.</p>
-        <div className="auth-match-art" role="img" aria-label="Animated illustration for the grant matching preview" data-testid="animation-signup-matching">
+        <div className="auth-match-art" data-testid="animation-signup-matching">
+          <span className="sr-only">Illustration of an applicant discovering funding opportunities.</span>
           <Suspense fallback={<span className="auth-match-loading">Loading illustration…</span>}><GrantMatchingAnimation /></Suspense>
         </div>
         <div className="auth-signup-note" role="status" data-testid="status-signup-matching-preview"><Info size={16} aria-hidden="true" /><span><strong>Animation preview only.</strong> No grant matching is happening, and no account or application was created.</span></div>
