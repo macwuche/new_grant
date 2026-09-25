@@ -178,6 +178,7 @@ function RouterView({ onToast, applications }: { onToast: (message: string) => v
       '/withdrawals': 'Withdrawals', '/settings': 'Settings',
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
       '/admin': 'Admin overview', '/admin/applicants': 'Admin applicants',
+      '/admin/inbox': 'Admin email inbox',
       '/admin/applications': 'Admin applications', '/admin/grants': 'Admin grants',
       '/admin/settings': 'Admin settings',
     };
@@ -200,6 +201,7 @@ function RouterView({ onToast, applications }: { onToast: (message: string) => v
     <Route path="/forgot-password"><ForgotPasswordPage /></Route>
     <Route path="/admin"><AdminPage section="overview" /></Route>
     <Route path="/admin/applicants"><AdminPage section="applicants" /></Route>
+    <Route path="/admin/inbox"><AdminPage section="inbox" /></Route>
     <Route path="/admin/applications"><AdminPage section="applications" /></Route>
     <Route path="/admin/grants"><AdminPage section="grants" /></Route>
     <Route path="/admin/settings"><AdminPage section="settings" /></Route>

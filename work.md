@@ -23,7 +23,7 @@ The current objective is to establish and iterate on the interface. A production
 | Cards and transactions | Example cards, local reveal/freeze/request states; searchable/filterable sample ledger. Export downloads a text file explicitly marked demo-only. | Card issuance or management, real transaction history, accounting, meaningful export. |
 | Withdrawals | Example amount, payout destination selector, illustrative fee preview and read-only confirmation. | Bank/mobile-money integration, payment requests, balance holds, ledger entries, payouts. The displayed 1.25% fee capped at $14 is **demo math**, not an approved commercial rule. |
 | Applicant settings | Local profile editing, example verification/tier, two-step-sign-in toggle. | Persisted profile, KYC/identity checks, actual MFA/security settings. |
-| Admin `/admin` | Overview, applicant directory, application review queue, grant programs, and settings. Fictional records, local search/status filters, responsive mobile cards, and read-only detail panels. Persistent preview notice. | Staff accounts/roles, real applicant data, review decisions, program changes, policies, payouts, audit history. The admin settings page describes future configuration but has no live controls. |
+| Admin `/admin` | Overview, applicant directory, email inbox, application review queue, grant programs, and settings. Fictional records and messages, local search/status filters, responsive mobile cards, read-only detail panels, and a draft-only mailbox preview. Persistent preview notice. Settings lists future Resend email configuration without collecting API keys. | Staff accounts/roles, real applicant data or email, sending/receiving, Resend connection, verified mail domain/MX, signed inbound webhook, review decisions, program changes, policies, payouts, audit history. The admin settings page describes future configuration but has no live controls. |
 | API / data | Express server with `GET /api/healthz` returning `{ "status": "ok" }`; OpenAPI and generated client/schema scaffolding; PostgreSQL/Drizzle connection package. | Domain API endpoints, database tables/migrations, real persistence, authorization middleware, app-to-API integration. |
 
 The workspace has a Supabase connection available for future work, but this app does not use it yet. Clerk-related configuration is present in the environment, but the frontend and API do not currently use Clerk. **Configured integrations and installed packages are not evidence of operational authentication, storage, or security.**
@@ -67,8 +67,9 @@ Amounts, deadlines, tiers, statuses, identities, bank details, and sample progra
 
 1. Visit `/admin` directly for an overview of fictional metrics and a sample review queue.
 2. Navigate to `/admin/applicants` or `/admin/applications`; search/filter and open a read-only record preview. These records are **not** the applicant portal's local sample applications or real users.
-3. Inspect `/admin/grants` for example program cards and `/admin/settings` for proposed locations of policy, sector, review-stage, and criteria controls.
-4. No administrative change, approval, publication, or payout can occur. The preview notice explains that authorization and persistence are absent.
+3. Explore `/admin/inbox` for fictional conversations, folders, search, and local drafts. Preview send does not transmit anything, and incoming mail does not appear automatically. Reloading resets local mailbox changes.
+4. Inspect `/admin/grants` for example program cards and `/admin/settings` for proposed policy and Resend email configuration. No API key is collected in the public browser preview.
+5. No administrative change, approval, publication, or payout can occur. The preview notice explains that authorization and persistence are absent.
 
 ### Intended live journeys — design targets, not existing behavior
 
@@ -103,7 +104,7 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 ## 6. Status and suggested delivery order
 
-**Built:** Responsive applicant prototype; demo authentication screens and animation; UI-only admin overview, directory, queue, grants, and settings; health-only API scaffold. These are interfaces, not completed product workflows.
+**Built:** Responsive applicant prototype; demo authentication screens and animation; UI-only admin overview, directory, sample email inbox, queue, grants, and settings; health-only API scaffold. These are interfaces, not completed product workflows.
 
 **Current focus:** The two visual workspaces are available for design review and iteration. This brief captures the gap between that UI and an operational platform. No production auth, domain backend, or secure admin workflow is currently implemented.
 
@@ -138,7 +139,7 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 - Frontend routes and applicant sample data: `artifacts/grant-user-portal/src/App.tsx`
 - Sign-in/sign-up/reset preview and validation: `artifacts/grant-user-portal/src/pages/AuthPages.tsx`
-- Admin preview and independent sample data: `artifacts/grant-user-portal/src/pages/AdminPage.tsx`
+- Admin preview and independent sample data: `artifacts/grant-user-portal/src/pages/AdminPage.tsx`; sample mailbox and configuration: `AdminInbox.tsx`, `AdminEmailSettings.tsx`
 - Frontend styling: `artifacts/grant-user-portal/src/index.css`, `artifacts/grant-user-portal/src/pages/AuthPages.css`, `artifacts/grant-user-portal/src/pages/AdminPage.css`
 - API entry/routes: `artifacts/api-server/src/app.ts`, `src/routes/`
 - API source of truth: `lib/api-spec/openapi.yaml`; data schema location: `lib/db/src/schema/`

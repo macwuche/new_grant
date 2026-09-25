@@ -2,12 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowRight, Building2, ClipboardList, FileText, FolderOpen, Info,
-  LayoutDashboard, Leaf, Palette, Search, Settings2, ShieldCheck,
+  LayoutDashboard, Leaf, Mail, Palette, Search, Settings2, ShieldCheck,
   Store, Users, X,
 } from 'lucide-react';
+import { AdminInbox } from './AdminInbox';
+import { AdminEmailSettings } from './AdminEmailSettings';
 import './AdminPage.css';
 
-export type AdminSection = 'overview' | 'applicants' | 'applications' | 'grants' | 'settings';
+export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'grants' | 'settings';
 type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string };
 type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string; note: string };
 type Grant = { id: string; title: string; ceiling: number; status: string; focus: string; cycle: string; description: string; icon: typeof Store };
@@ -44,6 +46,7 @@ const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').
 const navItems = [
   { section: 'overview' as const, label: 'Overview', icon: LayoutDashboard, href: '/admin' },
   { section: 'applicants' as const, label: 'Applicants', icon: Users, href: '/admin/applicants' },
+  { section: 'inbox' as const, label: 'Email inbox', icon: Mail, href: '/admin/inbox' },
   { section: 'applications' as const, label: 'Applications', icon: ClipboardList, href: '/admin/applications' },
   { section: 'grants' as const, label: 'Grant programs', icon: FolderOpen, href: '/admin/grants' },
   { section: 'settings' as const, label: 'Settings', icon: Settings2, href: '/admin/settings' },
@@ -164,7 +167,7 @@ function Grants({ openDetail }: { openDetail: (detail: Detail) => void }) {
 }
 
 function Settings() {
-  return <div className="admin-settings-grid">
+  return <><div className="admin-settings-grid">
     <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
@@ -175,12 +178,13 @@ function Settings() {
       <section className="admin-panel"><SectionHead title="Example sectors" subtitle="Illustrative labels, not live choices." /><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div><div className="admin-settings-callout"><strong>Configuration preview only</strong><p>Editing these options would require authenticated admin access and a backend. This screen does not save changes.</p></div></section>
       <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Authorization</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>Local examples</strong></div><div className="admin-mini-stat"><span>Write access</span><strong>None</strong></div></section>
     </div>
-  </div>;
+  </div><AdminEmailSettings /></>;
 }
 
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Browse fictional applicant profiles across sectors and regions. Profiles open as read-only previews.' },
+  inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'An illustrative queue designed to make the shape of each funding request easier to understand.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Explore sample grant categories, their focus, and illustrative funding ceilings.' },
   settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'See where policies, sectors, and review conventions could be managed in a future connected workspace.' },
@@ -194,16 +198,17 @@ export function AdminPage({ section }: { section: AdminSection }) {
   const content: Record<AdminSection, ReactNode> = {
     overview: <Overview openDetail={setDetail} />,
     applicants: <Applicants openDetail={setDetail} />,
+    inbox: <AdminInbox />,
     applications: <Applications openDetail={setDetail} />,
     grants: <Grants openDetail={setDetail} />,
     settings: <Settings />,
   };
   return <div className="admin-shell">
-    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Illustrative records only. No account access, decisions, or changes are available here.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
+    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Illustrative records only. No account access, decisions, or persistent changes are available here.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
     <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
-      <div className="admin-content"><div className="admin-demo-banner" role="note" data-testid="notice-admin-demo"><Info size={17} /><div><strong>Illustrative admin preview — not a live workspace</strong><p>No real applicant information is shown. Nothing here is saved, submitted, approved, or paid out. This page does not provide admin access control.</p></div></div><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2025</span></div>{content[section]}</div>
+      <div className="admin-content"><div className="admin-demo-banner" role="note" data-testid="notice-admin-demo"><Info size={17} /><div><strong>Illustrative admin preview — not a live workspace</strong><p>No real applicant information is shown. Nothing here is stored across reloads, submitted, approved, or paid out. This page does not provide admin access control.</p></div></div><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2025</span></div>{content[section]}</div>
     </main>
-    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
+    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
     {detail && <DetailPanel detail={detail} onClose={closeDetail} />}
   </div>;
 }
