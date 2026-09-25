@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "_sLewWUKMG2M_SDcN97Z3"
+uri = "file://work.md"
+type = "text"
+title = "arc.fund project brief"
+description = "Design specification, user journeys, current and planned functionality, auth/backend architecture, and testing and security gates."
+logical_id = "303731c2-f667-4e4a-aa38-228d44cd51fd"
+content_hash = "sha256:47029aa29f50500fa40664ad6ab0fa6f329edaf1416c90e8cd9b6f56f90dff54"
+size = 19654
+mtime_ms = 1790369354609
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:e0fa9896-85f1-4439-9a51-b0103ce1ec74/303731c2-f667-4e4a-aa38-228d44cd51fd/fdd0fdd1-35cb-4511-8d4b-6d0a9d25a4d3"
+storage_version_token = "1790369371059008"
+content_type = "text/markdown"
