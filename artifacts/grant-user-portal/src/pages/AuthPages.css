@@ -53,7 +53,7 @@
   height: 39px;
   border-radius: 11px;
   background: hsl(var(--lime));
-  color: var(--auth-ink);
+  color: var(--brand-accent-ink);
   font: 700 23px var(--app-font-display);
   transform: rotate(-9deg);
 }
@@ -134,11 +134,11 @@
 .auth-bottomline a { display: inline-flex; align-items: center; gap: 6px; color: var(--auth-ink); font-weight: 700; }
 .auth-bottomline a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .auth-page a:focus-visible, .auth-page button:focus-visible { outline: 3px solid hsl(var(--lime-deep)); outline-offset: 3px; }
-.auth-404 .auth-story { background: hsl(var(--lime)); color: var(--auth-ink); }
+.auth-404 .auth-story { background: hsl(var(--lime)); color: var(--brand-accent-ink); }
 .auth-404 .auth-story::before { border-color: hsl(var(--charcoal) / .17); box-shadow: 0 0 0 65px hsl(var(--charcoal) / .03), 0 0 0 140px hsl(var(--charcoal) / .03), 0 0 0 218px hsl(var(--charcoal) / .025); }
 .auth-404 .auth-story::after { border-color: hsl(var(--charcoal) / .2); }
 .auth-404 .auth-logo-mark { background: var(--auth-ink); color: hsl(var(--lime)); }
-.auth-404 .auth-logo-word span, .auth-404 .auth-story h2 em, .auth-404 .auth-serial { color: hsl(var(--charcoal)); }
+.auth-404 .auth-logo-word span, .auth-404 .auth-story h2 em, .auth-404 .auth-serial { color: var(--brand-accent-ink); }
 .auth-404 .auth-serial::before { background: currentColor; }
 .auth-404 .auth-story-text, .auth-404 .auth-story-bottom { color: hsl(224 29% 13% / .7); }
 .auth-big-number { position: absolute; right: -7%; bottom: 5%; z-index: -1; color: hsl(var(--charcoal) / .085); font: 700 clamp(210px, 29vw, 490px)/.8 var(--app-font-display); letter-spacing: -.13em; transform: rotate(-12deg); user-select: none; }

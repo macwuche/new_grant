@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { AdminInbox } from './AdminInbox';
 import { AdminEmailSettings } from './AdminEmailSettings';
+import { BrandColorSettings } from './BrandColorSettings';
 import './AdminPage.css';
 
 export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'grants' | 'settings';
@@ -167,7 +168,7 @@ function Grants({ openDetail }: { openDetail: (detail: Detail) => void }) {
 }
 
 function Settings() {
-  return <><div className="admin-settings-grid">
+  return <><BrandColorSettings /><div className="admin-settings-grid">
     <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
@@ -187,7 +188,7 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'An illustrative queue designed to make the shape of each funding request easier to understand.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Explore sample grant categories, their focus, and illustrative funding ceilings.' },
-  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'See where policies, sectors, and review conventions could be managed in a future connected workspace.' },
+  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Preview the brand color and see where policies, sectors, and review conventions could be managed.' },
 };
 
 export function AdminPage({ section }: { section: AdminSection }) {
@@ -204,7 +205,7 @@ export function AdminPage({ section }: { section: AdminSection }) {
     settings: <Settings />,
   };
   return <div className="admin-shell">
-    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Illustrative records only. No account access, decisions, or persistent changes are available here.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
+    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Illustrative records only. Brand color is saved in this browser; no server-side changes are available.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
     <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
       <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2025</span></div>{content[section]}</div>
     </main>
