@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'rea
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import './AuthPages.css';
@@ -148,9 +148,11 @@ export function LoginPage() {
 }
 
 export function SignUpPage() {
+  const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [step, setStep] = useState(1);
+  const [animationStarted, setAnimationStarted] = useState(false);
   const [code, setCode] = useState('');
   const [policy, setPolicy] = useState<'terms' | 'privacy' | null>(null);
   const policyDialog = useRef<HTMLDialogElement>(null);
@@ -179,6 +181,12 @@ export function SignUpPage() {
     void import('./GrantMatchingAnimation');
   }, []);
 
+  useEffect(() => {
+    if (step !== 4 || !animationStarted) return;
+    const timeout = window.setTimeout(() => setLocation('/dashboard', { replace: true }), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [step, animationStarted, setLocation]);
+
   const next = async () => {
     if (step === 1) {
       if (await form.trigger()) {
@@ -199,7 +207,7 @@ export function SignUpPage() {
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (!event.altKey || policy || event.ctrlKey || event.metaKey) return;
-      if (event.key === 'ArrowLeft' && step > 1) {
+      if (event.key === 'ArrowLeft' && step > 1 && step < 4) {
         event.preventDefault();
         setStep(value => value - 1);
       }
@@ -211,13 +219,6 @@ export function SignUpPage() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   });
-
-  const restart = () => {
-    form.reset();
-    detailsForm.reset({ phone: '', country: suggestedCountry, sector: '', birthDate: '', acknowledgement: false });
-    setCode('');
-    setStep(1);
-  };
 
   return <AuthFrame mode="signup" topLink={{ href: '/login', prefix: 'Already have an account?', label: 'Sign in', testId: 'link-signup-login' }}>
     <div className="auth-form-wrap auth-signup-wrap">
@@ -332,21 +333,14 @@ export function SignUpPage() {
         </div>
       </section>}
       {step === 4 && <section className="auth-step-pane" aria-labelledby="signup-heading">
-        <div className="auth-step-index">04 — Grant matching preview</div>
+        <div className="auth-step-index">04 — Your workspace</div>
         <h1 id="signup-heading" ref={headingRef} tabIndex={-1}>Connecting you to the best grant.</h1>
-        <p className="auth-lede">A preview of the grant-matching moment that will follow confirmation when the full experience is ready.</p>
         <div className="auth-match-art" data-testid="animation-signup-matching">
           <span className="sr-only">Illustration of an applicant discovering funding opportunities.</span>
-          <Suspense fallback={<span className="auth-match-loading">Loading illustration…</span>}><GrantMatchingAnimation /></Suspense>
-        </div>
-        <div className="auth-signup-note" role="status" data-testid="status-signup-matching-preview"><Info size={16} aria-hidden="true" /><span><strong>Animation preview only.</strong> No grant matching is happening, and no account or application was created.</span></div>
-        <div className="auth-step-actions">
-          <button type="button" className="auth-back" onClick={() => setStep(3)} data-testid="button-signup-back-matching"><ArrowLeft size={16} aria-hidden="true" /> Back</button>
-          <button type="button" className="auth-button" onClick={restart} data-testid="button-signup-restart">Restart preview <ArrowRight size={18} aria-hidden="true" /></button>
+          <Suspense fallback={<span className="auth-match-loading">Loading illustration…</span>}><GrantMatchingAnimation onPlay={() => setAnimationStarted(true)} /></Suspense>
         </div>
       </section>}
-      <p className="auth-help" style={{ marginTop: 18 }} data-testid="status-signup-keyboard">Keyboard: use Alt + Left/Right Arrow to move between steps. Forward steps still validate entered details.</p>
-      <p className="auth-aside">Prefer to look around first? <Link href="/" className="auth-inline-link" data-testid="link-signup-demo-workspace">Enter the demo workspace</Link>.</p>
+      {step !== 4 && <p className="auth-aside">Prefer to look around first? <Link href="/" className="auth-inline-link" data-testid="link-signup-demo-workspace">Enter the demo workspace</Link>.</p>}
     </div>
     <dialog ref={policyDialog} className="auth-policy-panel" onClose={() => setPolicy(null)} aria-labelledby="signup-policy-heading" data-testid="dialog-signup-policy">
       <div className="auth-step-index">Document preview</div>
