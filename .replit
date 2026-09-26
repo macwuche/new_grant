@@ -18,3 +18,13 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_URL = "https://tynjqjukramcmtotgfdw.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_9TfKJrlrzqYmtZBnwUdibw_g2wPKQS8"
+VITE_SUPABASE_URL = "https://tynjqjukramcmtotgfdw.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_9TfKJrlrzqYmtZBnwUdibw_g2wPKQS8"
+INITIAL_SUPER_ADMIN_EMAIL = "benmacwuche+newnovabridgegrant@gmail.com"
+INITIAL_SUPER_ADMIN_NAME = "Super admin"
