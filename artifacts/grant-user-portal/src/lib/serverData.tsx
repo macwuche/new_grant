@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { getAuditLog, listApplicants, listApplications, listMyApplications, listNotifications, listPrograms, listStaffFeed, type ApplicantEntry } from '@workspace/api-client-react';
-import type { Application, AuditEvent, Grant, StaffEvent, Tier } from '@workspace/domain/model';
 import {
-  adoptServerActivity, adoptServerApplicants, adoptServerApplications, adoptServerPrograms, leaveServerActivity, leaveServerApplicants, leaveServerApplications,
+  getAuditLog, getLedger, getMoneySettings, getMyMoney, listApplicants, listApplications, listMyApplications, listNotifications, listPrograms, listStaffFeed,
+  type ApplicantEntry, type LedgerResult, type MoneyResult, type MoneySettingsResult,
+} from '@workspace/api-client-react';
+import type { Application, AuditEvent, DemoState, Grant, Result, StaffEvent, Tier, Transaction, Treasury } from '@workspace/domain/model';
+import {
+  adoptServerActivity, adoptServerApplicants, adoptServerApplications, adoptServerLedger, adoptServerMoney, adoptServerPrograms, adoptServerSettings, adoptServerTransaction,
+  leaveServerActivity, leaveServerApplicants, leaveServerApplications, leaveServerMoney, type ServerMoney,
   type ServerAccount, type ServerApplicant,
 } from '@workspace/domain/sync';
 import { useSession } from './session';
@@ -28,13 +32,14 @@ type ServerData = {
   /** The signed-in account's id: applications with this applicant id are the viewer's own. */
   ownId: string | undefined;
   refreshActivity: () => Promise<void>;
+  refreshMoney: () => Promise<void>;
   /** Staff with audit.view: whether the server's audit hash chain checked out on the last load. */
   auditChain: { intact: boolean; checked: number; brokenAt?: string } | null;
 };
 
 const Ctx = createContext<ServerData>({
   connected: false, programsError: null, refreshPrograms: async () => {}, applicantsError: null, refreshApplicants: async () => {},
-  applicationsError: null, refreshApplications: async () => {}, ownId: undefined, refreshActivity: async () => {}, auditChain: null,
+  applicationsError: null, refreshApplications: async () => {}, ownId: undefined, refreshActivity: async () => {}, refreshMoney: async () => {}, auditChain: null,
 });
 
 /** A directory entry from the API in the shape the store takes. */
@@ -125,7 +130,29 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
     } catch { /* keep the last copy; the next refresh tries again */ }
   }, [canAudit, connected, isStaff, run, session.me]);
 
+  // Applicants get their own ledger, cards, and destinations; staff get the whole ledger and the money settings.
+  const moneyRequest = useRef(0);
+  const refreshMoney = useCallback(async () => {
+    if (!connected || !session.me) return;
+    const id = ++moneyRequest.current;
+    try {
+      if (isStaff) {
+        const [ledger, settings] = await Promise.all([getLedger(), getMoneySettings()]);
+        if (id === moneyRequest.current) run(s => adoptServerLedger(s, ledger as Transaction[], { treasury: settings.treasury as Treasury, lockdown: settings.lockdown ?? null }));
+      } else {
+        const money = await getMyMoney();
+        if (id === moneyRequest.current) run(s => adoptServerMoney(s, money as ServerMoney, ownId));
+      }
+    } catch { /* keep the last copy; the next refresh tries again */ }
+  }, [connected, isStaff, ownId, run, session.me]);
+
   useEffect(() => { void refreshPrograms(); }, [refreshPrograms, who]);
+  useEffect(() => {
+    if (!connected) { if (session.status !== 'loading') run(leaveServerMoney); return; }
+    void refreshMoney();
+    const timer = window.setInterval(() => { void refreshMoney(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [connected, refreshMoney, run, session.status, who]);
   useEffect(() => {
     if (!connected) { if (session.status !== 'loading') run(leaveServerActivity); return; }
     void refreshActivity();
@@ -145,12 +172,72 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   // Pick up changes other staff made while this tab was in the background.
   useEffect(() => {
     if (!connected) return;
-    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); void refreshApplications(); void refreshActivity(); };
+    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); void refreshApplications(); void refreshActivity(); void refreshMoney(); };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [connected, refreshPrograms, refreshApplicants, refreshApplications, refreshActivity]);
+  }, [connected, refreshPrograms, refreshApplicants, refreshApplications, refreshActivity, refreshMoney]);
 
-  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants, applicationsError, refreshApplications, ownId, refreshActivity, auditChain }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants, applicationsError, refreshApplications, ownId, refreshActivity, refreshMoney, auditChain }}>{children}</Ctx.Provider>;
 }
 
 export const useServerData = () => useContext(Ctx);
+
+export type Outcome = { ok: true; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/**
+ * An applicant money action: without sign-in the rule runs on this browser's
+ * store; signed in, the API runs it under the applicant's lock and the store
+ * takes the saved ledger, cards, and destinations.
+ */
+export function useMoneyAction() {
+  const { run } = useDemoStore();
+  const { connected, ownId, refreshActivity } = useServerData();
+  return useCallback(async (local: (state: DemoState) => Result, remote: () => Promise<MoneyResult>): Promise<Outcome> => {
+    if (!connected) {
+      const result = run(local);
+      return result.ok ? { ok: true, message: result.message, id: result.id } : result;
+    }
+    try {
+      const res = await remote();
+      run(s => adoptServerMoney(s, res.money as ServerMoney, ownId));
+      void refreshActivity();
+      return { ok: true, message: res.message, id: res.id };
+    } catch (err) {
+      const failure = apiError(err, "Couldn't reach the server. Nothing was changed; try again.");
+      return { ok: false, error: failure.error, fieldErrors: failure.fieldErrors };
+    }
+  }, [connected, ownId, refreshActivity, run]);
+}
+
+/**
+ * Staff money actions when signed in: the API runs the rule under the
+ * applicant's (or the system) lock; the store takes the saved ledger entry or
+ * settings. Pages use their browser rule instead when `connected` is false.
+ */
+export function useStaffMoney() {
+  const { run } = useDemoStore();
+  const { connected, refreshMoney, refreshActivity } = useServerData();
+  const failed = (err: unknown): Outcome => {
+    const failure = apiError(err, "Couldn't reach the server. Nothing was changed; try again.");
+    if (failure.status === 404 || failure.status === 409) void refreshMoney();
+    return { ok: false, error: failure.error, fieldErrors: failure.fieldErrors };
+  };
+  const entry = useCallback(async (call: () => Promise<LedgerResult>): Promise<Outcome> => {
+    try {
+      const res = await call();
+      run(s => adoptServerTransaction(s, res.transaction as Transaction));
+      void refreshActivity();
+      return { ok: true, message: res.message };
+    } catch (err) { return failed(err); }
+  }, [run, refreshActivity, refreshMoney]);
+  const settings = useCallback(async (call: () => Promise<MoneySettingsResult>): Promise<Outcome & { treasury?: Treasury }> => {
+    try {
+      const res = await call();
+      const saved = { treasury: res.settings.treasury as Treasury, lockdown: res.settings.lockdown ?? null };
+      run(s => adoptServerSettings(s, saved));
+      void refreshActivity();
+      return { ok: true, message: res.message, treasury: saved.treasury };
+    } catch (err) { return failed(err); }
+  }, [run, refreshActivity, refreshMoney]);
+  return { connected, entry, settings };
+}

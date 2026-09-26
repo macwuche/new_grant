@@ -9,6 +9,8 @@ import { addInternalNote, approveApplication, clearEscalation, declineApplicatio
 import { deleteDraft, saveDraft, submitApplication } from "@workspace/domain/rules";
 import { applicantState, applicantView, readApplicantSlot, serverState } from "@workspace/domain/server";
 import type { ApplicationRepo, ProgramScope } from "../lib/applicationRepo";
+import { storeLedgerChanges } from "../lib/ledger";
+import type { MoneyRepo } from "../lib/moneyRepo";
 import { slotApplicant } from "../lib/applicantRules";
 import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
@@ -22,10 +24,11 @@ import { ownProfile } from "./profile";
 // runs the shared rules inside the program's lock (see ../lib/applicationRepo.ts)
 // and stores exactly the applications the rule changed.
 //
-// The notifications and staff activity items the rules create, and an audit
-// entry for each staff action, are stored in the same transaction. Not on the
-// server yet: the award credit to the grant balance and the application fee
-// (slice 5).
+// The notifications and staff activity items the rules create, an audit entry
+// for each staff action, and the ledger entries (the application fee on first
+// submission, the award credit on approval) are stored in the same transaction.
+// Applicant actions also hold the applicant's money lock, so the fee is checked
+// against a balance nothing else can change meanwhile.
 
 const STALE = "This application changed since you opened it. Review the latest version and try again.";
 
@@ -40,7 +43,7 @@ async function storeChanges(scope: ProgramScope, before: Application[], after: A
   for (const app of before) if (!after.some(a => a.id === app.id)) await scope.removeApplication(app.id);
 }
 
-export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo): IRouter {
+export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo, money: MoneyRepo): IRouter {
   const router: IRouter = Router();
 
   // ---------- Applicant ----------
@@ -54,11 +57,14 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
     const record = await ownProfile(profiles, authLocals(res).user);
     const nextId = needsId ? await apps.nextNumber() : 0;
     const outcome = await apps.withProgram(grantId, async (scope): Promise<Outcome> => {
-      const state = applicantState({ grants: scope.grants, applications: scope.applications, nextId }, slotApplicant(record));
+      const ledger = await scope.money(record.authUserId);
+      const state = applicantState({ grants: scope.grants, applications: scope.applications, nextId, ...ledger }, slotApplicant(record));
       const result = command(state);
       if (!result.ok) return { failure: refused(result) };
-      const after = readApplicantSlot(result.state, record.authUserId).applications;
+      const slot = readApplicantSlot(result.state, record.authUserId);
+      const after = slot.applications;
       await storeChanges(scope, scope.applications, after);
+      await storeLedgerChanges(ledger.transactions, slot.transactions, scope.saveTransaction, money.nextBlock);
       await scope.record(effectsOf(state, result.state, new Date(), { slotId: record.authUserId }));
       return { message: result.message, saved: after.find(a => a.id === result.id) };
     });
@@ -110,6 +116,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
         const result = parsed.command(before, actor.name);
         if (!result.ok) return { failure: refused(result) };
         await storeChanges(scope, scope.applications, result.state.applications);
+        await storeLedgerChanges([], result.state.transactions, scope.saveTransaction, money.nextBlock);
         await scope.record(effectsOf(before, result.state, new Date(), { audit: auditContext(req, res, label, found.id), summary: result.message }));
         return { message: result.message, saved: result.state.applications.find(a => a.id === found.id)! };
       });

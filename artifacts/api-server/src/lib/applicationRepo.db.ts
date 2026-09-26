@@ -3,6 +3,7 @@ import { applicationNumberSeq, applicationsTable, db, programsTable, type Applic
 import type { Application } from "@workspace/domain/model";
 import type { ApplicationRepo } from "./applicationRepo";
 import { writeEffects } from "./activity.db";
+import { ledgerIn, lockApplicant, saveTransaction, settingsIn } from "./moneyRepo.db";
 import { toGrant, toProgramRow } from "./programRepo.db";
 
 // jsonb doesn't keep object key order; rebuild nested objects in the domain's order.
@@ -59,6 +60,11 @@ export const dbApplicationRepo: ApplicationRepo = {
         return removed.length ? "ok" : "stale";
       },
       record: effects => writeEffects(tx, effects),
+      money: async applicantId => {
+        await lockApplicant(tx, applicantId);
+        return { transactions: await ledgerIn(tx, applicantId), ...(await settingsIn(tx)) };
+      },
+      saveTransaction: t => saveTransaction(tx, t),
     });
   }),
   get: async id => { const [row] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id)); return row ? toApplication(row) : null; },

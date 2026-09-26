@@ -119,7 +119,7 @@ export type Transaction = {
   /** Withdrawals only: needs a second staff sign-off before it can be paid (set at request time). */
   dualControl?: boolean;
   /** Withdrawals only: the second sign-off, by someone other than whoever marks it paid. */
-  releaseApproval?: { by: string; at: string };
+  releaseApproval?: { by: string; at: string; /** Server records only: the approver's staff id, compared instead of the name. */ byId?: string };
 };
 
 export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
@@ -295,6 +295,12 @@ export type DemoState = {
    * They're reloaded on each visit, so they're never saved to browser storage.
    */
   serverActivity?: boolean;
+  /**
+   * Set once the ledger, cards, payout destinations, money settings, and
+   * lockdown come from the API. The ledger, cards, and destinations are
+   * reloaded on each visit, so they're never saved to browser storage.
+   */
+  serverMoney?: boolean;
 };
 
 export type Result<T = DemoState> = { ok: true; state: T; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };

@@ -1,4 +1,4 @@
-import type { AccountControls, Application, DemoState, Notification, Profile } from './model';
+import type { AccountControls, Application, CardsState, DemoState, Notification, PayoutDestinations, Profile, Transaction } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 /**
@@ -7,13 +7,15 @@ import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
  * Rules read and return whole states, so the server passes in what it loaded
  * and stores what changed.
  */
-export function serverState(loaded: Partial<Pick<DemoState, 'grants' | 'applications' | 'notifications' | 'nextId'>>): DemoState {
+type Loaded = Partial<Pick<DemoState, 'grants' | 'applications' | 'notifications' | 'transactions' | 'treasury' | 'lockdown' | 'nextId'>>;
+
+export function serverState(loaded: Loaded): DemoState {
   const base = createSeedState();
   return {
     ...base,
     grants: [], applications: [], notifications: [], transactions: [], staffFeed: [], otherApplicants: [],
     accounts: {}, staff: [], actingStaffId: '', audit: [], payoutDestinations: {}, lockdown: null,
-    // Money isn't on the server yet (phase 12, slice 5), so no application fee can be charged there.
+    // Callers pass the stored money settings; without them no application fee can be charged.
     treasury: { ...base.treasury, applicationFee: 0 },
     ...loaded,
   };
@@ -27,6 +29,9 @@ export type SlotApplicant = {
   id: string;
   profile: Omit<Profile, 'twoFactor'>;
   account: AccountControls;
+  /** Money routes only: the applicant's cards and saved payout destinations. */
+  cards?: CardsState;
+  payoutDestinations?: PayoutDestinations;
 };
 
 /**
@@ -36,7 +41,7 @@ export type SlotApplicant = {
  * Applicant actions and staff actions on that applicant both use this; staff
  * rules are called with CURRENT_APPLICANT_ID as the applicant id.
  */
-export function applicantState(loaded: Parameters<typeof serverState>[0], applicant: SlotApplicant): DemoState {
+export function applicantState(loaded: Loaded, applicant: SlotApplicant): DemoState {
   const toSlot = <T extends { applicantId: string }>(r: T): T => r.applicantId === applicant.id ? { ...r, applicantId: CURRENT_APPLICANT_ID } : r;
   const state = serverState(loaded);
   return {
@@ -45,12 +50,16 @@ export function applicantState(loaded: Parameters<typeof serverState>[0], applic
     accounts: { [CURRENT_APPLICANT_ID]: applicant.account },
     applications: state.applications.map(toSlot),
     notifications: state.notifications.map(toSlot),
+    transactions: state.transactions.map(toSlot),
+    ...(applicant.cards ? { cards: applicant.cards } : {}),
+    payoutDestinations: applicant.payoutDestinations ?? {},
   };
 }
 
 /** What a rule left in the slot, with the real applicant id put back on their records. */
 export function readApplicantSlot(state: DemoState, applicantId: string): {
   profile: Omit<Profile, 'twoFactor'>; account: AccountControls; applications: Application[]; notifications: Notification[];
+  transactions: Transaction[]; cards: CardsState; payoutDestinations: PayoutDestinations;
 } {
   const fromSlot = <T extends { applicantId: string }>(r: T): T => r.applicantId === CURRENT_APPLICANT_ID ? { ...r, applicantId } : r;
   const { twoFactor: _twoFactor, ...profile } = state.profile;
@@ -59,5 +68,8 @@ export function readApplicantSlot(state: DemoState, applicantId: string): {
     account: state.accounts[CURRENT_APPLICANT_ID]!,
     applications: state.applications.map(fromSlot),
     notifications: state.notifications.map(fromSlot),
+    transactions: state.transactions.map(fromSlot),
+    cards: state.cards,
+    payoutDestinations: state.payoutDestinations,
   };
 }

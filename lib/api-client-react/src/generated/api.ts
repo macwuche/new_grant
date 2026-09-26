@@ -29,9 +29,12 @@ import type {
   AuditLog,
   AwardDecision,
   BadRequestResponse,
+  CardLimit,
   ChangeRequest,
   CredentialReset,
   DeclineDecision,
+  DepositRequest,
+  DestinationInput,
   Error,
   EscalationResolution,
   ForbiddenResponse,
@@ -39,8 +42,15 @@ import type {
   IdentitySubmission,
   InternalNoteInput,
   InvalidResponse,
+  LedgerEntry,
+  LedgerResult,
   Me,
   Message,
+  MoneyResult,
+  MoneySettings,
+  MoneySettingsResult,
+  MoneySettingsUpdate,
+  MyMoney,
   NotFoundResponse,
   NotificationItem,
   Profile,
@@ -57,7 +67,8 @@ import type {
   StaffMemberUpdate,
   StaleResponse,
   TierChange,
-  UnauthorizedResponse
+  UnauthorizedResponse,
+  WithdrawalRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -3622,4 +3633,1627 @@ export function useGetAuditLog<TData = Awaited<ReturnType<typeof getAuditLog>>, 
 
 
 
+
+export const getGetMyMoneyUrl = () => {
+
+
+
+
+  return `/api/money/mine`
+}
+
+/**
+ * Balances are derived from the ledger.
+ * @summary Your ledger, cards, payout destinations, and the money rules
+ */
+export const getMyMoney = async ( options?: Parameters<typeof customFetch>[1]): Promise<MyMoney> => {
+
+  return customFetch<MyMoney>(getGetMyMoneyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyMoneyQueryKey = () => {
+    return [
+    `/api/money/mine`
+    ] as const;
+    }
+
+
+export const getGetMyMoneyQueryOptions = <TData = Awaited<ReturnType<typeof getMyMoney>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyMoney>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyMoneyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyMoney>>> = ({ signal }) => getMyMoney({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyMoney>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyMoneyQueryResult = NonNullable<Awaited<ReturnType<typeof getMyMoney>>>
+export type GetMyMoneyQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary Your ledger, cards, payout destinations, and the money rules
+ */
+
+export function useGetMyMoney<TData = Awaited<ReturnType<typeof getMyMoney>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyMoney>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyMoneyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestDepositUrl = () => {
+
+
+
+
+  return `/api/money/deposits`
+}
+
+/**
+ * Returns a reference to quote with the transfer; finance confirms when it arrives.
+ * @summary Announce a deposit
+ */
+export const requestDeposit = async (depositRequest: DepositRequest, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getRequestDepositUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(depositRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestDepositMutationKey = () => ['requestDeposit'] as const;
+
+export const getRequestDepositMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestDeposit>>, TError,RequestDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestDeposit>>, TError,RequestDepositMutationVariables, TContext> => {
+
+const mutationKey = getRequestDepositMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestDeposit>>, RequestDepositMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestDeposit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestDepositMutationResult = NonNullable<Awaited<ReturnType<typeof requestDeposit>>>
+    export type RequestDepositMutationBody = BodyType<DepositRequest>
+    export type RequestDepositMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type RequestDepositMutationVariables = {data: BodyType<DepositRequest>}
+
+    /**
+ * @summary Announce a deposit
+ */
+export const useRequestDeposit = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestDeposit>>, TError,RequestDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestDeposit>>,
+        TError,
+        RequestDepositMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestDepositMutationOptions(options));
+    }
+
+export const getCancelDepositUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/cancel`
+}
+
+/**
+ * Only a deposit still waiting for confirmation.
+ * @summary Cancel your pending deposit
+ */
+export const cancelDeposit = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getCancelDepositUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelDepositMutationKey = () => ['cancelDeposit'] as const;
+
+export const getCancelDepositMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelDeposit>>, TError,CancelDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelDeposit>>, TError,CancelDepositMutationVariables, TContext> => {
+
+const mutationKey = getCancelDepositMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelDeposit>>, CancelDepositMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelDeposit(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelDepositMutationResult = NonNullable<Awaited<ReturnType<typeof cancelDeposit>>>
+
+    export type CancelDepositMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>
+    export type CancelDepositMutationVariables = {id: string}
+
+    /**
+ * @summary Cancel your pending deposit
+ */
+export const useCancelDeposit = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelDeposit>>, TError,CancelDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelDeposit>>,
+        TError,
+        CancelDepositMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelDepositMutationOptions(options));
+    }
+
+export const getRequestWithdrawalUrl = () => {
+
+
+
+
+  return `/api/money/withdrawals`
+}
+
+/**
+ * From your grant balance to a saved destination on an enabled channel.
+ * @summary Request a payout
+ */
+export const requestWithdrawal = async (withdrawalRequest: WithdrawalRequest, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getRequestWithdrawalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(withdrawalRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestWithdrawalMutationKey = () => ['requestWithdrawal'] as const;
+
+export const getRequestWithdrawalMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWithdrawal>>, TError,RequestWithdrawalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestWithdrawal>>, TError,RequestWithdrawalMutationVariables, TContext> => {
+
+const mutationKey = getRequestWithdrawalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestWithdrawal>>, RequestWithdrawalMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestWithdrawal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestWithdrawalMutationResult = NonNullable<Awaited<ReturnType<typeof requestWithdrawal>>>
+    export type RequestWithdrawalMutationBody = BodyType<WithdrawalRequest>
+    export type RequestWithdrawalMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type RequestWithdrawalMutationVariables = {data: BodyType<WithdrawalRequest>}
+
+    /**
+ * @summary Request a payout
+ */
+export const useRequestWithdrawal = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWithdrawal>>, TError,RequestWithdrawalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestWithdrawal>>,
+        TError,
+        RequestWithdrawalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestWithdrawalMutationOptions(options));
+    }
+
+export const getCancelWithdrawalUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/withdrawals/${id}/cancel`
+}
+
+/**
+ * The held amount returns to your grant balance.
+ * @summary Cancel your pending payout
+ */
+export const cancelWithdrawal = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getCancelWithdrawalUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelWithdrawalMutationKey = () => ['cancelWithdrawal'] as const;
+
+export const getCancelWithdrawalMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelWithdrawal>>, TError,CancelWithdrawalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelWithdrawal>>, TError,CancelWithdrawalMutationVariables, TContext> => {
+
+const mutationKey = getCancelWithdrawalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelWithdrawal>>, CancelWithdrawalMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelWithdrawal(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelWithdrawalMutationResult = NonNullable<Awaited<ReturnType<typeof cancelWithdrawal>>>
+
+    export type CancelWithdrawalMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>
+    export type CancelWithdrawalMutationVariables = {id: string}
+
+    /**
+ * @summary Cancel your pending payout
+ */
+export const useCancelWithdrawal = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelWithdrawal>>, TError,CancelWithdrawalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelWithdrawal>>,
+        TError,
+        CancelWithdrawalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelWithdrawalMutationOptions(options));
+    }
+
+export const getToggleCardFreezeUrl = () => {
+
+
+
+
+  return `/api/money/cards/freeze`
+}
+
+/**
+ * A locked account can freeze but not unfreeze.
+ * @summary Freeze or unfreeze your virtual card
+ */
+export const toggleCardFreeze = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getToggleCardFreezeUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getToggleCardFreezeMutationKey = () => ['toggleCardFreeze'] as const;
+
+export const getToggleCardFreezeMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext> => {
+
+const mutationKey = getToggleCardFreezeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleCardFreeze>>, void> = () => {
+
+
+          return  toggleCardFreeze(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleCardFreezeMutationResult = NonNullable<Awaited<ReturnType<typeof toggleCardFreeze>>>
+
+    export type ToggleCardFreezeMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+
+
+    /**
+ * @summary Freeze or unfreeze your virtual card
+ */
+export const useToggleCardFreeze = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleCardFreeze>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getToggleCardFreezeMutationOptions(options));
+    }
+
+export const getSetCardLimitUrl = () => {
+
+
+
+
+  return `/api/money/cards/limit`
+}
+
+/**
+ * Within your tier's maximum.
+ * @summary Set a card's daily limit
+ */
+export const setCardLimit = async (cardLimit: CardLimit, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getSetCardLimitUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardLimit)
+  }
+);}
+
+
+
+
+
+export const getSetCardLimitMutationKey = () => ['setCardLimit'] as const;
+
+export const getSetCardLimitMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardLimit>>, TError,SetCardLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCardLimit>>, TError,SetCardLimitMutationVariables, TContext> => {
+
+const mutationKey = getSetCardLimitMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCardLimit>>, SetCardLimitMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setCardLimit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetCardLimitMutationResult = NonNullable<Awaited<ReturnType<typeof setCardLimit>>>
+    export type SetCardLimitMutationBody = BodyType<CardLimit>
+    export type SetCardLimitMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type SetCardLimitMutationVariables = {data: BodyType<CardLimit>}
+
+    /**
+ * @summary Set a card's daily limit
+ */
+export const useSetCardLimit = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardLimit>>, TError,SetCardLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setCardLimit>>,
+        TError,
+        SetCardLimitMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetCardLimitMutationOptions(options));
+    }
+
+export const getRequestPhysicalCardUrl = () => {
+
+
+
+
+  return `/api/money/cards/physical`
+}
+
+/**
+ * Fees come from your deposit balance, which must keep the reserve.
+ * @summary Request a physical card
+ */
+export const requestPhysicalCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getRequestPhysicalCardUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRequestPhysicalCardMutationKey = () => ['requestPhysicalCard'] as const;
+
+export const getRequestPhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext> => {
+
+const mutationKey = getRequestPhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestPhysicalCard>>, void> = () => {
+
+
+          return  requestPhysicalCard(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestPhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof requestPhysicalCard>>>
+
+    export type RequestPhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+
+
+    /**
+ * @summary Request a physical card
+ */
+export const useRequestPhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestPhysicalCard>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRequestPhysicalCardMutationOptions(options));
+    }
+
+export const getSavePayoutDestinationUrl = () => {
+
+
+
+
+  return `/api/money/destinations`
+}
+
+/**
+ * Only a masked label is stored.
+ * @summary Save a payout destination
+ */
+export const savePayoutDestination = async (destinationInput: DestinationInput, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getSavePayoutDestinationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(destinationInput)
+  }
+);}
+
+
+
+
+
+export const getSavePayoutDestinationMutationKey = () => ['savePayoutDestination'] as const;
+
+export const getSavePayoutDestinationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext> => {
+
+const mutationKey = getSavePayoutDestinationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePayoutDestination>>, SavePayoutDestinationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  savePayoutDestination(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SavePayoutDestinationMutationResult = NonNullable<Awaited<ReturnType<typeof savePayoutDestination>>>
+    export type SavePayoutDestinationMutationBody = BodyType<DestinationInput>
+    export type SavePayoutDestinationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type SavePayoutDestinationMutationVariables = {data: BodyType<DestinationInput>}
+
+    /**
+ * @summary Save a payout destination
+ */
+export const useSavePayoutDestination = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof savePayoutDestination>>,
+        TError,
+        SavePayoutDestinationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSavePayoutDestinationMutationOptions(options));
+    }
+
+export const getRemovePayoutDestinationUrl = (channel: 'bank' | 'wire' | 'mobile' | 'crypto',) => {
+
+
+
+
+  return `/api/money/destinations/${channel}/remove`
+}
+
+/**
+ * Pending payouts still go where they were sent.
+ * @summary Remove a payout destination
+ */
+export const removePayoutDestination = async (channel: 'bank' | 'wire' | 'mobile' | 'crypto', options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getRemovePayoutDestinationUrl(channel),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemovePayoutDestinationMutationKey = () => ['removePayoutDestination'] as const;
+
+export const getRemovePayoutDestinationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext> => {
+
+const mutationKey = getRemovePayoutDestinationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removePayoutDestination>>, RemovePayoutDestinationMutationVariables> = (props) => {
+          const {channel} = props ?? {};
+
+          return  removePayoutDestination(channel,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemovePayoutDestinationMutationResult = NonNullable<Awaited<ReturnType<typeof removePayoutDestination>>>
+
+    export type RemovePayoutDestinationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type RemovePayoutDestinationMutationVariables = {channel: 'bank' | 'wire' | 'mobile' | 'crypto'}
+
+    /**
+ * @summary Remove a payout destination
+ */
+export const useRemovePayoutDestination = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removePayoutDestination>>,
+        TError,
+        RemovePayoutDestinationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemovePayoutDestinationMutationOptions(options));
+    }
+
+export const getGetLedgerUrl = () => {
+
+
+
+
+  return `/api/money/ledger`
+}
+
+/**
+ * Any active staff member. Newest first.
+ * @summary Every ledger entry
+ */
+export const getLedger = async ( options?: Parameters<typeof customFetch>[1]): Promise<LedgerEntry[]> => {
+
+  return customFetch<LedgerEntry[]>(getGetLedgerUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLedgerQueryKey = () => {
+    return [
+    `/api/money/ledger`
+    ] as const;
+    }
+
+
+export const getGetLedgerQueryOptions = <TData = Awaited<ReturnType<typeof getLedger>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLedger>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLedgerQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLedger>>> = ({ signal }) => getLedger({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLedger>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLedgerQueryResult = NonNullable<Awaited<ReturnType<typeof getLedger>>>
+export type GetLedgerQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Every ledger entry
+ */
+
+export function useGetLedger<TData = Awaited<ReturnType<typeof getLedger>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLedger>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLedgerQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMoneySettingsUrl = () => {
+
+
+
+
+  return `/api/money/settings`
+}
+
+/**
+ * Any active staff member.
+ * @summary Money settings and lockdown
+ */
+export const getMoneySettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneySettings> => {
+
+  return customFetch<MoneySettings>(getGetMoneySettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMoneySettingsQueryKey = () => {
+    return [
+    `/api/money/settings`
+    ] as const;
+    }
+
+
+export const getGetMoneySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getMoneySettings>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMoneySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMoneySettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMoneySettings>>> = ({ signal }) => getMoneySettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMoneySettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMoneySettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getMoneySettings>>>
+export type GetMoneySettingsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Money settings and lockdown
+ */
+
+export function useGetMoneySettings<TData = Awaited<ReturnType<typeof getMoneySettings>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMoneySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMoneySettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateMoneySettingsUrl = () => {
+
+
+
+
+  return `/api/money/settings`
+}
+
+/**
+ * Requires treasury.manage. Applies to new requests only. 409 if the settings changed since `version`.
+ * @summary Change money settings
+ */
+export const updateMoneySettings = async (moneySettingsUpdate: MoneySettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getUpdateMoneySettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moneySettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMoneySettingsMutationKey = () => ['updateMoneySettings'] as const;
+
+export const getUpdateMoneySettingsMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMoneySettings>>, TError,UpdateMoneySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMoneySettings>>, TError,UpdateMoneySettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMoneySettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMoneySettings>>, UpdateMoneySettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMoneySettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMoneySettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateMoneySettings>>>
+    export type UpdateMoneySettingsMutationBody = BodyType<MoneySettingsUpdate>
+    export type UpdateMoneySettingsMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>
+    export type UpdateMoneySettingsMutationVariables = {data: BodyType<MoneySettingsUpdate>}
+
+    /**
+ * @summary Change money settings
+ */
+export const useUpdateMoneySettings = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMoneySettings>>, TError,UpdateMoneySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMoneySettings>>,
+        TError,
+        UpdateMoneySettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMoneySettingsMutationOptions(options));
+    }
+
+export const getStartLockdownUrl = () => {
+
+
+
+
+  return `/api/money/lockdown`
+}
+
+/**
+ * Requires security.lockdown. Freezes payouts; applicants with pending payouts are told.
+ * @summary Start an emergency lockdown
+ */
+export const startLockdown = async (reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getStartLockdownUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getStartLockdownMutationKey = () => ['startLockdown'] as const;
+
+export const getStartLockdownMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startLockdown>>, TError,StartLockdownMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startLockdown>>, TError,StartLockdownMutationVariables, TContext> => {
+
+const mutationKey = getStartLockdownMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startLockdown>>, StartLockdownMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  startLockdown(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartLockdownMutationResult = NonNullable<Awaited<ReturnType<typeof startLockdown>>>
+    export type StartLockdownMutationBody = BodyType<Reason>
+    export type StartLockdownMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type StartLockdownMutationVariables = {data: BodyType<Reason>}
+
+    /**
+ * @summary Start an emergency lockdown
+ */
+export const useStartLockdown = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startLockdown>>, TError,StartLockdownMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startLockdown>>,
+        TError,
+        StartLockdownMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartLockdownMutationOptions(options));
+    }
+
+export const getEndLockdownUrl = () => {
+
+
+
+
+  return `/api/money/lockdown/end`
+}
+
+/**
+ * Requires security.lockdown.
+ * @summary End the lockdown
+ */
+export const endLockdown = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+  return customFetch<MoneySettingsResult>(getEndLockdownUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getEndLockdownMutationKey = () => ['endLockdown'] as const;
+
+export const getEndLockdownMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endLockdown>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof endLockdown>>, TError,void, TContext> => {
+
+const mutationKey = getEndLockdownMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof endLockdown>>, void> = () => {
+
+
+          return  endLockdown(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EndLockdownMutationResult = NonNullable<Awaited<ReturnType<typeof endLockdown>>>
+
+    export type EndLockdownMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+    /**
+ * @summary End the lockdown
+ */
+export const useEndLockdown = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endLockdown>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof endLockdown>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getEndLockdownMutationOptions(options));
+    }
+
+export const getConfirmDepositUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/confirm`
+}
+
+/**
+ * Requires payments.process. Credits the deposit balance.
+ * @summary Confirm a deposit arrived
+ */
+export const confirmDeposit = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+  return customFetch<LedgerResult>(getConfirmDepositUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmDepositMutationKey = () => ['confirmDeposit'] as const;
+
+export const getConfirmDepositMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmDeposit>>, TError,ConfirmDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmDeposit>>, TError,ConfirmDepositMutationVariables, TContext> => {
+
+const mutationKey = getConfirmDepositMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmDeposit>>, ConfirmDepositMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  confirmDeposit(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmDepositMutationResult = NonNullable<Awaited<ReturnType<typeof confirmDeposit>>>
+
+    export type ConfirmDepositMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type ConfirmDepositMutationVariables = {id: string}
+
+    /**
+ * @summary Confirm a deposit arrived
+ */
+export const useConfirmDeposit = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmDeposit>>, TError,ConfirmDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmDeposit>>,
+        TError,
+        ConfirmDepositMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfirmDepositMutationOptions(options));
+    }
+
+export const getRejectDepositUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/reject`
+}
+
+/**
+ * Requires payments.process. The reason is shown to the applicant.
+ * @summary Reject a deposit
+ */
+export const rejectDeposit = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<LedgerResult>(getRejectDepositUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getRejectDepositMutationKey = () => ['rejectDeposit'] as const;
+
+export const getRejectDepositMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectDeposit>>, TError,RejectDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectDeposit>>, TError,RejectDepositMutationVariables, TContext> => {
+
+const mutationKey = getRejectDepositMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectDeposit>>, RejectDepositMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejectDeposit(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectDepositMutationResult = NonNullable<Awaited<ReturnType<typeof rejectDeposit>>>
+    export type RejectDepositMutationBody = BodyType<Reason>
+    export type RejectDepositMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type RejectDepositMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Reject a deposit
+ */
+export const useRejectDeposit = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectDeposit>>, TError,RejectDepositMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejectDeposit>>,
+        TError,
+        RejectDepositMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRejectDepositMutationOptions(options));
+    }
+
+export const getApprovePayoutReleaseUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/withdrawals/${id}/release`
+}
+
+/**
+ * Requires payments.release. The approver can't also mark it paid.
+ * @summary Second sign-off on a large payout
+ */
+export const approvePayoutRelease = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+  return customFetch<LedgerResult>(getApprovePayoutReleaseUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApprovePayoutReleaseMutationKey = () => ['approvePayoutRelease'] as const;
+
+export const getApprovePayoutReleaseMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvePayoutRelease>>, TError,ApprovePayoutReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approvePayoutRelease>>, TError,ApprovePayoutReleaseMutationVariables, TContext> => {
+
+const mutationKey = getApprovePayoutReleaseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvePayoutRelease>>, ApprovePayoutReleaseMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  approvePayoutRelease(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApprovePayoutReleaseMutationResult = NonNullable<Awaited<ReturnType<typeof approvePayoutRelease>>>
+
+    export type ApprovePayoutReleaseMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type ApprovePayoutReleaseMutationVariables = {id: string}
+
+    /**
+ * @summary Second sign-off on a large payout
+ */
+export const useApprovePayoutRelease = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvePayoutRelease>>, TError,ApprovePayoutReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approvePayoutRelease>>,
+        TError,
+        ApprovePayoutReleaseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApprovePayoutReleaseMutationOptions(options));
+    }
+
+export const getMarkPayoutPaidUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/withdrawals/${id}/paid`
+}
+
+/**
+ * Requires payments.process. Records that finance sent it; no provider is connected.
+ * @summary Mark a payout paid
+ */
+export const markPayoutPaid = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+  return customFetch<LedgerResult>(getMarkPayoutPaidUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkPayoutPaidMutationKey = () => ['markPayoutPaid'] as const;
+
+export const getMarkPayoutPaidMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPayoutPaid>>, TError,MarkPayoutPaidMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markPayoutPaid>>, TError,MarkPayoutPaidMutationVariables, TContext> => {
+
+const mutationKey = getMarkPayoutPaidMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markPayoutPaid>>, MarkPayoutPaidMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  markPayoutPaid(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkPayoutPaidMutationResult = NonNullable<Awaited<ReturnType<typeof markPayoutPaid>>>
+
+    export type MarkPayoutPaidMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type MarkPayoutPaidMutationVariables = {id: string}
+
+    /**
+ * @summary Mark a payout paid
+ */
+export const useMarkPayoutPaid = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPayoutPaid>>, TError,MarkPayoutPaidMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markPayoutPaid>>,
+        TError,
+        MarkPayoutPaidMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkPayoutPaidMutationOptions(options));
+    }
+
+export const getMarkPayoutFailedUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/withdrawals/${id}/failed`
+}
+
+/**
+ * Requires payments.process. The amount returns to the applicant's grant balance.
+ * @summary Mark a payout failed
+ */
+export const markPayoutFailed = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<LedgerResult>(getMarkPayoutFailedUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getMarkPayoutFailedMutationKey = () => ['markPayoutFailed'] as const;
+
+export const getMarkPayoutFailedMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPayoutFailed>>, TError,MarkPayoutFailedMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markPayoutFailed>>, TError,MarkPayoutFailedMutationVariables, TContext> => {
+
+const mutationKey = getMarkPayoutFailedMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markPayoutFailed>>, MarkPayoutFailedMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  markPayoutFailed(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkPayoutFailedMutationResult = NonNullable<Awaited<ReturnType<typeof markPayoutFailed>>>
+    export type MarkPayoutFailedMutationBody = BodyType<Reason>
+    export type MarkPayoutFailedMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type MarkPayoutFailedMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Mark a payout failed
+ */
+export const useMarkPayoutFailed = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPayoutFailed>>, TError,MarkPayoutFailedMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markPayoutFailed>>,
+        TError,
+        MarkPayoutFailedMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkPayoutFailedMutationOptions(options));
+    }
 

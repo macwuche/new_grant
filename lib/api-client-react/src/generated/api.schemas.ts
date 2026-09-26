@@ -5,6 +5,209 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ChannelId = typeof ChannelId[keyof typeof ChannelId];
+
+
+export const ChannelId = {
+  bank: 'bank',
+  wire: 'wire',
+  mobile: 'mobile',
+  crypto: 'crypto',
+} as const;
+
+export type LedgerEntryType = typeof LedgerEntryType[keyof typeof LedgerEntryType];
+
+
+export const LedgerEntryType = {
+  Grant: 'Grant',
+  Deposit: 'Deposit',
+  Withdrawal: 'Withdrawal',
+  Card_fee: 'Card fee',
+  Application_fee: 'Application fee',
+} as const;
+
+export type LedgerEntryStatus = typeof LedgerEntryStatus[keyof typeof LedgerEntryStatus];
+
+
+export const LedgerEntryStatus = {
+  Completed: 'Completed',
+  Pending: 'Pending',
+  Failed: 'Failed',
+  Cancelled: 'Cancelled',
+} as const;
+
+export type LedgerEntryReleaseApproval = {
+  by: string;
+  at: string;
+  byId?: string;
+};
+
+export interface LedgerEntry {
+  id: string;
+  applicantId: string;
+  type: LedgerEntryType;
+  description: string;
+  /** Signed; credits positive, debits negative */
+  amount: number;
+  status: LedgerEntryStatus;
+  createdAt: string;
+  method?: string;
+  fee?: number;
+  destination?: string;
+  reference?: string;
+  processedAt?: string;
+  processedBy?: string;
+  failureReason?: string;
+  dualControl?: boolean;
+  releaseApproval?: LedgerEntryReleaseApproval;
+}
+
+export interface PayoutChannel {
+  id: ChannelId;
+  name: string;
+  enabled: boolean;
+  min: number;
+  max: number;
+  feeRate: number;
+  feeFixed: number;
+  feeCap: number;
+}
+
+export interface TreasuryInput {
+  /** @maxItems 10 */
+  channels: PayoutChannel[];
+  physicalCardFee: number;
+  cardDeliveryFee: number;
+  minDeposit: number;
+  maxDeposit: number;
+  depositThreshold: number;
+  highValueDeposit: number;
+  dualControlThreshold: number;
+  applicationFee: number;
+}
+
+export interface ProgramChange {
+  at: string;
+  by: string;
+  summary: string;
+}
+
+export type Treasury = TreasuryInput & {
+  updatedAt: string;
+  /** Staff only; empty for applicants */
+  changeLog: ProgramChange[];
+};
+
+export interface Lockdown {
+  since: string;
+  by: string;
+  reason: string;
+}
+
+export interface MoneySettings {
+  treasury: Treasury;
+  lockdown: Lockdown | null;
+}
+
+export interface MoneySettingsResult {
+  settings: MoneySettings;
+  message: string;
+}
+
+export interface MoneySettingsUpdate {
+  /** @maxLength 40 */
+  version: string;
+  treasury: TreasuryInput;
+}
+
+export type CardsVirtual = {
+  lastFour: string;
+  dailyLimit: number;
+  frozen: boolean;
+  /** Fictional; no card provider is connected */
+  pin: string;
+};
+
+export type CardsPhysicalStatus = typeof CardsPhysicalStatus[keyof typeof CardsPhysicalStatus];
+
+
+export const CardsPhysicalStatus = {
+  Not_requested: 'Not requested',
+  Requested: 'Requested',
+} as const;
+
+export type CardsPhysical = {
+  status: CardsPhysicalStatus;
+  dailyLimit: number;
+};
+
+export interface Cards {
+  virtual: CardsVirtual;
+  physical: CardsPhysical;
+}
+
+export type MyMoneyPayoutDestinations = {[key: string]: string};
+
+export interface MyMoney {
+  transactions: LedgerEntry[];
+  cards: Cards;
+  payoutDestinations: MyMoneyPayoutDestinations;
+  destinationChangedAt?: string;
+  treasury: Treasury;
+  lockdown: Lockdown | null;
+}
+
+export interface MoneyResult {
+  money: MyMoney;
+  message: string;
+  /** The ledger entry the action created or changed, if any */
+  id?: string;
+}
+
+export interface LedgerResult {
+  transaction: LedgerEntry;
+  message: string;
+}
+
+export type DepositRequestMethod = typeof DepositRequestMethod[keyof typeof DepositRequestMethod];
+
+
+export const DepositRequestMethod = {
+  bank: 'bank',
+  mobile: 'mobile',
+} as const;
+
+export interface DepositRequest {
+  amount: number;
+  method: DepositRequestMethod;
+}
+
+export interface WithdrawalRequest {
+  amount: number;
+  channel: ChannelId;
+}
+
+export type CardLimitCard = typeof CardLimitCard[keyof typeof CardLimitCard];
+
+
+export const CardLimitCard = {
+  virtual: 'virtual',
+  physical: 'physical',
+} as const;
+
+export interface CardLimit {
+  card: CardLimitCard;
+  limit: number;
+}
+
+export interface DestinationInput {
+  channel: ChannelId;
+  /** @maxLength 80 */
+  primary: string;
+  /** @maxLength 80 */
+  secondary?: string;
+}
+
 export interface NotificationItem {
   id: string;
   at: string;
@@ -256,12 +459,6 @@ export interface ProgramQuestion {
   label: string;
   type: ProgramQuestionType;
   required: boolean;
-}
-
-export interface ProgramChange {
-  at: string;
-  by: string;
-  summary: string;
 }
 
 export type ProgramInputMinimumTier = typeof ProgramInputMinimumTier[keyof typeof ProgramInputMinimumTier];

@@ -7,6 +7,8 @@ import { applicantName, openEscalations } from '@workspace/domain/review';
 import { findGrant } from '@workspace/domain/rules';
 import { assessRisk } from '@workspace/domain/risk';
 import { endLockdown, startLockdown } from '@workspace/domain/security';
+import * as api from '@workspace/api-client-react';
+import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import type { Result } from '@workspace/domain/model';
 import { RiskBadge } from './AdminRisk';
@@ -68,13 +70,14 @@ export function AdminSecurity({ openApplicant, openReview }: { openApplicant: (i
 function LockdownPanel() {
   const { state } = useDemoStore();
   const command = useStaffCommand();
+  const staffMoney = useStaffMoney();
   const allowed = useCan()('security.lockdown');
   const [reason, setReason] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const pending = state.transactions.filter(t => t.type === 'Withdrawal' && t.status === 'Pending').length;
-  const after = (result: Result) => {
+  const after = (result: Outcome) => {
     setConfirming(false);
     if (!result.ok) { setError(result.fieldErrors?.reason ?? null); setFlash({ tone: 'error', text: result.error }); return; }
     setError(null); setReason(''); setFlash({ tone: 'ok', text: result.message });
@@ -82,6 +85,7 @@ function LockdownPanel() {
   const start = () => {
     if (reason.trim().length < MIN_REASON_LENGTH) { setError(`Write at least ${MIN_REASON_LENGTH} characters.`); return; }
     if (!confirming) { setConfirming(true); return; }
+    if (staffMoney.connected) { void staffMoney.settings(() => api.startLockdown({ reason })).then(after); return; }
     after(command('security.lockdown', { action: 'Start system lockdown', target: 'lockdown' }, (s, actor) => startLockdown(s, reason, actor.name, new Date())));
   };
   return <section className={`admin-panel admin-lockdown ${state.lockdown ? 'active' : ''}`} data-testid="panel-admin-lockdown">
@@ -91,7 +95,7 @@ function LockdownPanel() {
     {state.lockdown ? <>
       <p className="admin-review-text"><strong>Active</strong> since {when(state.lockdown.since)} · started by {state.lockdown.by}</p>
       <p className="admin-review-hint">{state.lockdown.reason}</p>
-      <div className="admin-review-buttons"><button type="button" className="admin-btn primary" disabled={!allowed} onClick={() => after(command('security.lockdown', { action: 'End system lockdown', target: 'lockdown' }, (s, actor) => endLockdown(s, actor.name, new Date())))} data-testid="button-admin-end-lockdown">Lift lockdown</button></div>
+      <div className="admin-review-buttons"><button type="button" className="admin-btn primary" disabled={!allowed} onClick={() => staffMoney.connected ? void staffMoney.settings(api.endLockdown).then(after) : after(command('security.lockdown', { action: 'End system lockdown', target: 'lockdown' }, (s, actor) => endLockdown(s, actor.name, new Date())))} data-testid="button-admin-end-lockdown">Lift lockdown</button></div>
     </> : allowed && <>
       <label className="admin-review-field"><span>Reason (recorded in the audit log)</span><textarea className="admin-input" rows={2} value={reason} onChange={e => { setReason(e.target.value); setError(null); setConfirming(false); }} aria-invalid={!!error} data-testid="textarea-admin-lockdown-reason" /><small className={error ? 'admin-field-error' : ''}>{error ?? `At least ${MIN_REASON_LENGTH} characters. ${pending} pending payout${pending === 1 ? '' : 's'} will be frozen and those applicants notified.`}</small></label>
       <div className="admin-review-buttons">{confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-lockdown">Cancel</button>}<button type="button" className="admin-btn danger" onClick={start} data-testid="button-admin-start-lockdown">{confirming ? 'Confirm lockdown' : 'Start lockdown'}</button></div>

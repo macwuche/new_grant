@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSeedState } from './seed';
 import { applicantRecords } from './applicants';
 import { CURRENT_APPLICANT_ID } from './seed';
-import { adoptServerActivity, leaveServerActivity, adoptServerApplication, adoptServerApplications, leaveServerApplications, adoptServerApplicant, adoptServerApplicants, adoptServerProfile, adoptServerProgram, adoptServerPrograms, dropServerProgram, forStorage, leaveServerApplicants } from './sync';
+import { adoptServerMoney, adoptServerLedger, leaveServerMoney, adoptServerActivity, leaveServerActivity, adoptServerApplication, adoptServerApplications, leaveServerApplications, adoptServerApplicant, adoptServerApplicants, adoptServerProfile, adoptServerProgram, adoptServerPrograms, dropServerProgram, forStorage, leaveServerApplicants } from './sync';
 
 describe('adopting server data', () => {
   it('replaces the catalog, and keeps the same state object when nothing changed', () => {
@@ -75,15 +75,12 @@ describe('applications from the server', () => {
     history: [{ status: 'Approved' as const, at: '2026-09-26T10:00:00.000Z', actor: 'Reviewer' as const, note: 'Approved.' }],
   });
 
-  it("moves an applicant's own applications into the portal slot and credits each award once", () => {
-    const first = adoptServerApplications(createSeedState(), [approved('APP-5001', 'me-uuid')], 'me-uuid');
+  it("moves an applicant's own applications into the portal slot, leaving award credits to the server", () => {
+    const state = createSeedState();
+    const first = adoptServerApplications(state, [approved('APP-5001', 'me-uuid')], 'me-uuid');
     if (!first.ok) throw new Error(first.error);
     expect(first.state.applications.map(a => a.applicantId)).toEqual([CURRENT_APPLICANT_ID]);
-    const credits = first.state.transactions.filter(t => t.description.endsWith('(APP-5001)'));
-    expect(credits).toMatchObject([{ type: 'Grant', amount: 3500, status: 'Completed', createdAt: '2026-09-26T10:00:00.000Z' }]);
-    const again = adoptServerApplication(first.state, approved('APP-5001', 'me-uuid'), 'me-uuid');
-    if (!again.ok) throw new Error(again.error);
-    expect(again.state.transactions.filter(t => t.description.endsWith('(APP-5001)'))).toHaveLength(1);
+    expect(first.state.transactions).toBe(state.transactions);
   });
 
   it("gives staff the queue as is, without crediting anyone's balance", () => {
@@ -128,5 +125,36 @@ describe('activity from the server', () => {
     const left = leaveServerActivity(stored);
     if (!left.ok) throw new Error(left.error);
     expect(left.state.notifications).toEqual(createSeedState().notifications);
+  });
+});
+
+describe('money from the server', () => {
+  const seed = createSeedState();
+  const credit = { id: 'TX-180000', applicantId: 'me-uuid', type: 'Grant' as const, description: 'Award (APP-5001)', amount: 3000, status: 'Completed' as const, createdAt: '2026-09-26T10:00:00.000Z' };
+  const money = { transactions: [credit], cards: seed.cards, payoutDestinations: { bank: 'Meridian · •••• 6789' }, destinationChangedAt: '2026-09-25T10:00:00.000Z', treasury: seed.treasury, lockdown: null };
+
+  it("gives the applicant their own ledger and destinations in the portal slot", () => {
+    const result = adoptServerMoney(seed, money, 'me-uuid');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.state.transactions).toEqual([{ ...credit, applicantId: CURRENT_APPLICANT_ID }]);
+    expect(result.state.payoutDestinations).toEqual({ bank: 'Meridian · •••• 6789' });
+    expect(result.state.accounts[CURRENT_APPLICANT_ID]!.destinationChangedAt).toBe('2026-09-25T10:00:00.000Z');
+  });
+
+  it('gives staff the whole ledger as is', () => {
+    const result = adoptServerLedger(seed, [credit], { treasury: seed.treasury, lockdown: { since: 'x', by: 'Sam', reason: 'Checking.' } });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.state.transactions).toEqual([credit]);
+    expect(result.state.lockdown?.by).toBe('Sam');
+  });
+
+  it('never stores the ledger or destinations in the browser, and restores the demo money after signing out', () => {
+    const loaded = adoptServerMoney(seed, money, 'me-uuid');
+    if (!loaded.ok) throw new Error(loaded.error);
+    const stored = forStorage(loaded.state);
+    expect([stored.transactions, stored.payoutDestinations]).toEqual([[], {}]);
+    const left = leaveServerMoney(stored);
+    if (!left.ok) throw new Error(left.error);
+    expect(left.state.transactions).toEqual(seed.transactions);
   });
 });

@@ -7,6 +7,11 @@ import { boolean, jsonb, pgEnum, pgTable, smallint, text, timestamp, uuid } from
 // `updated_at` is the record version: writes succeed only if it's unchanged.
 // Row-level security is on with no policies (see ./staff.ts).
 
+export type CardsJson = {
+  virtual: { lastFour: string; dailyLimit: number; frozen: boolean; pin: string };
+  physical: { status: "Not requested" | "Requested"; dailyLimit: number };
+};
+
 export const accountStatusEnum = pgEnum("account_status", ["Active", "Locked"]);
 
 /** Identity check; only the last four characters of the document number are kept. Mirrors `Kyc` in @workspace/domain. */
@@ -39,6 +44,11 @@ export const applicantProfilesTable = pgTable("applicant_profiles", {
   passwordResetRequired: boolean("password_reset_required").notNull().default(false),
   twoFactorResetRequired: boolean("two_factor_reset_required").notNull().default(false),
   kyc: jsonb("kyc").$type<KycJson>().notNull().default({ status: "Not submitted" }),
+  /** Virtual and physical card settings (fictional: no card provider is connected). */
+  cards: jsonb("cards").$type<CardsJson | null>(),
+  /** Masked payout destination labels per channel; full numbers are never stored. */
+  payoutDestinations: jsonb("payout_destinations").$type<Partial<Record<"bank" | "wire" | "mobile" | "crypto", string>>>().notNull().default({}),
+  destinationChangedAt: timestamp("destination_changed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

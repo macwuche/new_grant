@@ -1,4 +1,4 @@
-import type { AccountControls, Application, AuditEvent, DemoState, Grant, Notification, Profile, Result, StaffEvent, Transaction } from './model';
+import type { AccountControls, Application, AuditEvent, CardsState, DemoState, Grant, Lockdown, Notification, PayoutDestinations, Profile, Result, StaffEvent, Transaction, Treasury } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 // Merging server records into the browser store. While only some data lives on
@@ -77,14 +77,13 @@ export function leaveServerApplicants(state: DemoState): Result {
 /**
  * Loads applications from the API. For an applicant (`ownId` = their account
  * id) these are their own, moved into the portal's current-applicant slot; for
- * staff, the review queue as it is. Until money moves to the server (slice 5),
- * an approved award is also credited to the demo grant balance here, once.
+ * staff, the review queue as it is. (Approved awards are credited by the
+ * server, in the approval's own transaction.)
  */
 export function adoptServerApplications(state: DemoState, apps: Application[], ownId?: string): Result {
   const applications = ownId ? apps.map(a => a.applicantId === ownId ? { ...a, applicantId: CURRENT_APPLICANT_ID } : a) : apps;
-  const transactions = ownId ? withAwardCredits(state, applications) : state.transactions;
-  if (state.serverApplications && same(applications, state.applications) && transactions === state.transactions) return unchanged(state);
-  return { ok: true, message: '', state: { ...state, applications, transactions, serverApplications: true } };
+  if (state.serverApplications && same(applications, state.applications)) return unchanged(state);
+  return { ok: true, message: '', state: { ...state, applications, serverApplications: true } };
 }
 
 /** Puts one application the server just saved into the store (added or replaced). */
@@ -92,8 +91,7 @@ export function adoptServerApplication(state: DemoState, app: Application, ownId
   const inSlot = ownId && app.applicantId === ownId ? { ...app, applicantId: CURRENT_APPLICANT_ID } : app;
   const exists = state.applications.some(a => a.id === app.id);
   const applications = exists ? state.applications.map(a => a.id === app.id ? inSlot : a) : [inSlot, ...state.applications];
-  const transactions = ownId ? withAwardCredits(state, applications) : state.transactions;
-  return { ok: true, message: '', state: { ...state, applications, transactions, serverApplications: true } };
+  return { ok: true, message: '', state: { ...state, applications, serverApplications: true } };
 }
 
 export function dropServerApplication(state: DemoState, id: string): Result {
@@ -104,20 +102,6 @@ export function dropServerApplication(state: DemoState, id: string): Result {
 export function leaveServerApplications(state: DemoState): Result {
   if (!state.serverApplications) return unchanged(state);
   return { ok: true, message: '', state: { ...state, applications: createSeedState().applications, serverApplications: false } };
-}
-
-/** Adds a demo grant-balance credit for each approved award that doesn't have one yet. */
-function withAwardCredits(state: DemoState, applications: Application[]): Transaction[] {
-  let n = state.nextId;
-  const credits: Transaction[] = [];
-  for (const app of applications) {
-    if (app.applicantId !== CURRENT_APPLICANT_ID || app.status !== 'Approved' || !app.awardedAmount) continue;
-    if (state.transactions.some(t => t.type === 'Grant' && t.description.endsWith(`(${app.id})`))) continue;
-    const grant = state.grants.find(g => g.id === app.grantId);
-    const approvedAt = [...app.history].reverse().find(h => h.status === 'Approved')?.at ?? app.updatedAt;
-    credits.push({ id: `TX-${80000 + n++}`, applicantId: CURRENT_APPLICANT_ID, type: 'Grant', description: `${grant?.name ?? 'Grant'} award (${app.id})`, amount: app.awardedAmount, status: 'Completed', createdAt: approvedAt });
-  }
-  return credits.length ? [...credits, ...state.transactions] : state.transactions;
 }
 
 /** Server notifications, feed items, and audit entries, as the API returns them. */
@@ -149,6 +133,43 @@ export function leaveServerActivity(state: DemoState): Result {
   return { ok: true, message: '', state: { ...state, notifications: seed.notifications, staffFeed: seed.staffFeed, audit: seed.audit, serverActivity: false } };
 }
 
+/** Money as the API returns it to an applicant (their own ledger, with their real account id). */
+export type ServerMoney = { transactions: Transaction[]; cards: CardsState; payoutDestinations: PayoutDestinations; destinationChangedAt?: string; treasury: Treasury; lockdown: Lockdown | null };
+
+/** Loads an applicant's own money from the API into the portal's current-applicant slot. */
+export function adoptServerMoney(state: DemoState, money: ServerMoney, ownId?: string): Result {
+  const transactions = money.transactions.map(t => t.applicantId === ownId ? { ...t, applicantId: CURRENT_APPLICANT_ID } : t);
+  const account = state.accounts[CURRENT_APPLICANT_ID];
+  const accounts = account ? { ...state.accounts, [CURRENT_APPLICANT_ID]: { ...account, destinationChangedAt: money.destinationChangedAt } } : state.accounts;
+  const next = { ...state, transactions, cards: money.cards, payoutDestinations: money.payoutDestinations, accounts, treasury: money.treasury, lockdown: money.lockdown, serverMoney: true };
+  if (state.serverMoney && same(next, state)) return unchanged(state);
+  return { ok: true, message: '', state: next };
+}
+
+/** Staff side: every ledger entry and the money settings. */
+export function adoptServerLedger(state: DemoState, ledger: Transaction[], settings?: { treasury: Treasury; lockdown: Lockdown | null }): Result {
+  const next = { ...state, transactions: ledger, ...(settings ? { treasury: settings.treasury, lockdown: settings.lockdown } : {}), serverMoney: true };
+  if (state.serverMoney && same(next, state)) return unchanged(state);
+  return { ok: true, message: '', state: next };
+}
+
+/** Puts one ledger entry the server just changed into the store (staff). */
+export function adoptServerTransaction(state: DemoState, tx: Transaction): Result {
+  const exists = state.transactions.some(t => t.id === tx.id);
+  return adoptServerLedger(state, exists ? state.transactions.map(t => t.id === tx.id ? tx : t) : [tx, ...state.transactions]);
+}
+
+export function adoptServerSettings(state: DemoState, settings: { treasury: Treasury; lockdown: Lockdown | null }): Result {
+  return { ok: true, message: '', state: { ...state, treasury: settings.treasury, lockdown: settings.lockdown } };
+}
+
+/** Back to the demo money (after signing out, or when sign-in isn't configured). */
+export function leaveServerMoney(state: DemoState): Result {
+  if (!state.serverMoney) return unchanged(state);
+  const seed = createSeedState();
+  return { ok: true, message: '', state: { ...state, transactions: seed.transactions, cards: seed.cards, payoutDestinations: seed.payoutDestinations, treasury: seed.treasury, lockdown: seed.lockdown, serverMoney: false } };
+}
+
 /**
  * What the browser may keep in storage. Real applicants loaded for staff are
  * dropped (they're reloaded from the API on the next visit), so their details
@@ -159,5 +180,6 @@ export function forStorage(state: DemoState): DemoState {
   if (stored.serverApplicants) stored = { ...stored, otherApplicants: [], accounts: { [CURRENT_APPLICANT_ID]: stored.accounts[CURRENT_APPLICANT_ID]! } };
   if (stored.serverApplications) stored = { ...stored, applications: [] };
   if (stored.serverActivity) stored = { ...stored, notifications: [], staffFeed: [], audit: [] };
+  if (stored.serverMoney) { const seed = createSeedState(); stored = { ...stored, transactions: [], cards: seed.cards, payoutDestinations: {} }; }
   return stored;
 }

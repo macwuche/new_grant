@@ -4,7 +4,7 @@ import { NO_EFFECTS } from "./activity";
 import { writeEffects } from "./activity.db";
 import type { AccountPatch, ProfileRecord, ProfileRepo } from "./profileRepo";
 
-const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
+export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
   authUserId: row.authUserId, name: row.name, email: row.email, phone: row.phone, address: row.address,
   sector: row.sector, country: row.country, birthDate: row.birthDate, tier: row.tier as 1 | 2 | 3,
   identityVerified: row.identityVerified,

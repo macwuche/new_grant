@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import type { Treasury, TreasuryInput } from '@workspace/domain/model';
 import { updateTreasury } from '@workspace/domain/treasury';
+import * as api from '@workspace/api-client-react';
+import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 
@@ -26,6 +28,7 @@ const toInput = (f: Form, base: Treasury): TreasuryInput => ({
 export function AdminTreasurySettings() {
   const { state } = useDemoStore();
   const command = useStaffCommand();
+  const staffMoney = useStaffMoney();
   const allowed = useCan()('treasury.manage');
   const { treasury } = state;
   const [seenVersion, setSeenVersion] = useState(treasury.updatedAt);
@@ -40,11 +43,13 @@ export function AdminTreasurySettings() {
     setErrors(({ [`channels.${id}.${key}`]: _, ...rest }) => rest);
   };
   const setField = (key: Exclude<keyof Form, 'channels'>, value: string) => { setForm(f => ({ ...f, [key]: value })); setErrors(({ [key]: _, ...rest }) => rest); };
-  const save = () => {
-    const result = command('treasury.manage', { action: 'Update money settings', target: 'treasury' }, (s, actor) => updateTreasury(s, seenVersion, toInput(form, s.treasury), actor.name, new Date()));
+  const save = async () => {
+    const result = staffMoney.connected
+      ? await staffMoney.settings(() => api.updateMoneySettings({ version: seenVersion, treasury: toInput(form, treasury) as api.TreasuryInput }))
+      : (r => r.ok ? { ...r, treasury: r.state.treasury } : r)(command('treasury.manage', { action: 'Update money settings', target: 'treasury' }, (s, actor) => updateTreasury(s, seenVersion, toInput(form, s.treasury), actor.name, new Date())));
     if (!result.ok) { setErrors(result.fieldErrors ?? {}); setFlash({ tone: 'error', text: result.error }); return; }
     setErrors({}); setFlash({ tone: 'ok', text: result.message });
-    setSeenVersion(result.state.treasury.updatedAt); setForm(toForm(result.state.treasury));
+    if (result.treasury) { setSeenVersion(result.treasury.updatedAt); setForm(toForm(result.treasury)); }
   };
   const cell = (id: string, key: 'min' | 'max' | 'feeRate' | 'feeFixed' | 'feeCap', label: string, value: string) => {
     const err = errors[`channels.${id}.${key}`];

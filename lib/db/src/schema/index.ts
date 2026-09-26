@@ -22,3 +22,4 @@ export * from "./programs";
 export * from "./applicants";
 export * from "./applications";
 export * from "./activity";
+export * from "./money";

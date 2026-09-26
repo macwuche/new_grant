@@ -8,6 +8,8 @@ import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
 import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
 import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRepo";
 import { memoryActivity } from "./lib/activity";
+import { memoryMoneyRepo } from "./lib/moneyRepo";
+import { seedTreasury } from "@workspace/domain/seed";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
@@ -37,14 +39,16 @@ let programs: ProgramRepo;
 let profiles: ProfileRepo;
 let applications: ApplicationRepo;
 let activity: ReturnType<typeof memoryActivity>;
+let money: ReturnType<typeof memoryMoneyRepo>;
 
 async function start(v: TokenVerifier | null = verifier) {
   activity = memoryActivity();
   repo = memoryStaffRepo(SEED, activity);
   programs = memoryProgramRepo(seedGrants(), activity);
   profiles = memoryProfileRepo([], activity);
-  applications = memoryApplicationRepo(programs, [], activity);
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity }, ["https://app.example.org"]).listen(0);
+  money = memoryMoneyRepo(profiles, { treasury: seedTreasury(), lockdown: null }, activity);
+  applications = memoryApplicationRepo(programs, [], activity, money);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -608,5 +612,121 @@ describe("notifications, team activity, and the audit log", () => {
     const [, first] = (await json(await call("/audit", "tok-super"))).events;
     activity.tamper(Number(first.id.slice(3)), "Nothing happened here.");
     expect((await json(await call("/audit", "tok-super"))).chain).toEqual({ intact: false, checked: 2, brokenAt: first.id });
+  });
+});
+
+describe("money", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const mine = async () => json(await call("/money/mine", "tok-maya"));
+  const entry = async (id: string) => (await mine()).transactions.find((t: { id: string }) => t.id === id);
+  const deposit = (amount: number) => post("/money/deposits", { amount, method: "bank" }, "tok-maya");
+  /** Maya verified, awarded `award` on Creative Practice, with a confirmed deposit and a saved bank account. */
+  const fund = async (award: number, deposited = 100) => {
+    await call("/profile", "tok-maya");
+    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const { application } = await json(await post("/applications/submit", { grantId: "creative", application: { ...input, requestedAmount: award } }, "tok-maya"));
+    const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
+    await post(`/applications/${application.id}/approve`, { version: v, award });
+    const d = (await json(await deposit(deposited))).money.transactions.find((t: { type: string; status: string }) => t.type === "Deposit" && t.status === "Pending");
+    await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
+    await post("/money/destinations", { channel: "bank", primary: "Meridian Bank", secondary: "123456789" }, "tok-maya");
+  };
+  const withdraw = (amount: number) => post("/money/withdrawals", { amount, channel: "bank" }, "tok-maya");
+
+  it("starts with fictional cards and no entries, and hides who changed the settings", async () => {
+    const m = await mine();
+    expect(m.transactions).toEqual([]);
+    expect(m.cards.virtual.lastFour).toMatch(/^\d{4}$/);
+    expect(m.treasury.changeLog).toEqual([]);
+  });
+
+  it("takes deposits through announce, confirm, and the pending limit", async () => {
+    await call("/profile", "tok-maya");
+    expect((await deposit(1)).status).toBe(400);
+    const d = (await json(await deposit(50))).money.transactions[0];
+    expect(d).toMatchObject({ type: "Deposit", status: "Pending", amount: 50, reference: expect.stringMatching(/^ARC-\d+$/) });
+    await deposit(60); await deposit(70);
+    expect((await json(await deposit(80))).error).toMatch(/3 deposits waiting/);
+    expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-applicant")).status).toBe(403);
+    expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance")).status).toBe(200);
+    expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance")).status).toBe(400);
+    expect(await entry(d.id)).toMatchObject({ status: "Completed", processedBy: "Jordan Lee" });
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Deposit received");
+  });
+
+  it("credits approved awards to the ledger on the server, once", async () => {
+    await fund(3000);
+    const grants = (await mine()).transactions.filter((t: { type: string }) => t.type === "Grant");
+    expect(grants).toMatchObject([{ amount: 3000, status: "Completed", description: expect.stringMatching(/Creative Practice award \(APP-/) }]);
+  });
+
+  it("pays out within the grant balance, with the fee fixed at request time", async () => {
+    await fund(3000);
+    expect((await json(await withdraw(3500))).error).toMatch(/up to \$3,000/);
+    const res = await json(await withdraw(1000));
+    const w = res.money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
+    expect(w).toMatchObject({ amount: -1000, status: "Pending", destination: "Bank transfer · Meridian Bank · •••• 6789" });
+    expect(w.fee).toBeGreaterThan(0);
+    expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Payout sent");
+  });
+
+  it("never lets two payout requests spend the same grant balance", async () => {
+    await fund(3000);
+    const results = await Promise.all([withdraw(2000), withdraw(2000)]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 400]);
+  });
+
+  it("needs two different staff members for large payouts, compared by id", async () => {
+    await fund(3000);
+    const w = (await json(await withdraw(2600))).money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
+    expect(w.dualControl).toBe(true);
+    expect((await json(await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance"))).error).toMatch(/release approval/);
+    expect((await post(`/money/withdrawals/${w.id}/release`, {}, "tok-finance")).status).toBe(403);
+    expect((await post(`/money/withdrawals/${w.id}/release`, {})).status).toBe(200);
+    expect((await entry(w.id)).releaseApproval).toMatchObject({ by: "Sam Rivera", byId: SEED[0]!.id });
+    expect((await json(await post(`/money/withdrawals/${w.id}/paid`, {}))).error).toMatch(/different staff member/);
+    expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
+  });
+
+  it("freezes payouts during a lockdown, but still lets finance mark them failed", async () => {
+    await fund(3000);
+    const w = (await json(await withdraw(500))).money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
+    expect((await post("/money/lockdown", { reason: "Suspected account takeover." }, "tok-finance")).status).toBe(403);
+    expect((await post("/money/lockdown", { reason: "Suspected account takeover." })).status).toBe(200);
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Payouts paused");
+    expect((await withdraw(100)).status).toBe(400);
+    expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(400);
+    expect((await post(`/money/withdrawals/${w.id}/failed`, { reason: "Held during the security check." }, "tok-finance")).status).toBe(200);
+    expect((await post("/money/lockdown/end", {})).status).toBe(200);
+    expect((await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action)).toEqual(expect.arrayContaining(["Start system lockdown", "End system lockdown", "Mark payout failed"]));
+  });
+
+  it("lets finance change settings with a version check, and charges the application fee from deposits", async () => {
+    const settings = await json(await call("/money/settings", "tok-finance"));
+    const { updatedAt, changeLog: _log, ...treasury } = settings.treasury;
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-applicant")).status).toBe(403);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-finance")).status).toBe(200);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 20 } }, "tok-finance")).status).toBe(409);
+    await call("/profile", "tok-maya");
+    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    expect((await json(await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya"))).error).toMatch(/application fee/);
+    const d = (await json(await deposit(50))).money.transactions[0];
+    await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
+    expect((await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya")).status).toBe(200);
+    expect((await mine()).transactions.find((t: { type: string }) => t.type === "Application fee")).toMatchObject({ amount: -10, id: expect.stringMatching(/^TX-\d+$/) });
+  });
+
+  it("keeps each applicant to their own money, and staff off their own", async () => {
+    await call("/profile", "tok-maya");
+    const d = (await json(await deposit(50))).money.transactions[0];
+    expect((await post(`/money/deposits/${d.id}/cancel`, {}, "tok-applicant")).status).toBe(400);
+    expect(await entry(d.id)).toMatchObject({ status: "Pending" });
+    await call("/profile", "tok-super");
+    const own = (await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-super"))).money.transactions[0];
+    expect((await post(`/money/deposits/${own.id}/confirm`, {})).status).toBe(403);
   });
 });

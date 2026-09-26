@@ -16,7 +16,8 @@ import {
   submitIdentityCheck, updateProfile as saveServerProfile, type ApplicationResult as ApiApplicationResult, type Message as ApiMessage, type Profile as ApiProfile,
 } from '@workspace/api-client-react';
 import { adoptServerApplication, adoptServerProfile, dropServerApplication, type ServerAccount } from '@workspace/domain/sync';
-import { ServerDataProvider, apiError, useServerData } from './lib/serverData';
+import * as api from '@workspace/api-client-react';
+import { ServerDataProvider, apiError, useMoneyAction, useServerData, type Outcome as MoneyOutcome } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
@@ -31,9 +32,9 @@ import {
 import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
   cancelWithdrawal, channelFee, DESTINATION_FIELDS, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
-  requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateWithdrawal, type DestinationInput,
+  requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateCardLimit, validateWithdrawal, type DestinationInput,
 } from '@workspace/domain/money';
-import { cancelDeposit, DEPOSIT_METHODS, requestDeposit } from '@workspace/domain/deposits';
+import { cancelDeposit, DEPOSIT_METHODS, requestDeposit, validateDeposit } from '@workspace/domain/deposits';
 import { NotificationsMenu } from './components/NotificationsMenu';
 
 type Toast = (message: string) => void;
@@ -414,14 +415,18 @@ function CardLimitEditor({ card, onToast }: { card: 'virtual' | 'physical'; onTo
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { setValue(String(current)); }, [current]);
   const max = TIER_CARD_LIMITS[state.profile.tier];
-  const save = () => {
-    const result = run(s => setCardLimit(s, card, value.trim() === '' ? NaN : Number(value)));
+  const moneyAction = useMoneyAction();
+  const save = async () => {
+    const limit = value.trim() === '' ? NaN : Number(value);
+    const problem = validateCardLimit(state, limit);
+    if (problem) { setError(problem); return; }
+    const result = await moneyAction(s => setCardLimit(s, card, limit), () => api.setCardLimit({ card, limit }));
     if (!result.ok) { setError(result.error); return; }
     setError(null); onToast(result.message);
   };
   const id = `limit-${card}`;
   return <div className="field"><label className="field-label" htmlFor={id}>{card === 'virtual' ? 'Virtual card' : 'Physical card'} daily limit (USD)</label>
-    <div style={{ display: 'flex', gap: 8 }}><input id={id} className="input" type="number" inputMode="numeric" min={MIN_CARD_LIMIT} max={max} step="1" value={value} onChange={e => { setValue(e.target.value); setError(null); }} data-testid={`input-card-limit-${card}`} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} /><button className="btn btn-ghost" disabled={value === String(current)} onClick={save} data-testid={`button-save-card-limit-${card}`}>Save</button></div>
+    <div style={{ display: 'flex', gap: 8 }}><input id={id} className="input" type="number" inputMode="numeric" min={MIN_CARD_LIMIT} max={max} step="1" value={value} onChange={e => { setValue(e.target.value); setError(null); }} data-testid={`input-card-limit-${card}`} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} /><button className="btn btn-ghost" disabled={value === String(current)} onClick={() => void save()} data-testid={`button-save-card-limit-${card}`}>Save</button></div>
     {error ? <FieldError id={`${id}-error`} message={error} /> : <span className="field-hint">{money(MIN_CARD_LIMIT)} – {money(max)} for Tier {state.profile.tier} accounts</span>}
   </div>;
 }
@@ -436,15 +441,17 @@ function CardsPage({ onToast }: { onToast: Toast }) {
   const requested = physical.status === 'Requested';
   const locked = !!accountLockReason(state);
   const total = physicalCardTotal(treasury);
-  const act = (result: ReturnType<typeof run>) => onToast(result.ok ? result.message : result.error);
-  return <div className="stack"><div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. Card changes are saved in this browser only; no card network is connected yet.</p></div><section className="grid-2">
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => act(run(toggleCardFreeze))} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Demo PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
+  const moneyAction = useMoneyAction();
+  const cardsNote = useServerData().connected ? 'Card settings are saved to your account, but the cards are fictional: no card network is connected yet.' : 'Card changes are saved in this browser only; no card network is connected yet.';
+  const act = (result: MoneyOutcome) => onToast(result.ok ? result.message : result.error);
+  return <div className="stack"><div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. {cardsNote}</p></div><section className="grid-2">
+    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => void moneyAction(toggleCardFreeze, api.toggleCardFreeze).then(act)} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Demo PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
     <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle">{requested ? 'Requested — delivery tracking arrives with the card provider.' : 'Request a card for in-person spending.'}</p></div>{requested ? <StatusBadge status="Requested" tone="Pending" /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div><CardVisual name={state.profile.name} physical label={requested ? 'REQUESTED' : 'NOT REQUESTED'} /><div style={{ marginTop: 16 }}>
       <div className="fee-row"><span>Issuance fee</span><strong>{money(treasury.physicalCardFee)}</strong></div>
       {treasury.cardDeliveryFee > 0 && <div className="fee-row"><span>Delivery fee</span><strong>{money(treasury.cardDeliveryFee)}</strong></div>}
       <div className="fee-row"><span>Deposit balance</span><strong>{money(balances.deposit)}</strong></div>
       {treasury.depositThreshold > 0 && <div className="fee-row"><span>Required reserve after fees</span><strong>{money(treasury.depositThreshold)}</strong></div>}
-      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested || locked} onClick={() => act(run(s => requestPhysicalCard(s, new Date())))} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
+      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested || locked} onClick={() => void moneyAction(s => requestPhysicalCard(s, new Date()), api.requestPhysicalCard).then(act)} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
       {!requested && balances.deposit - total < treasury.depositThreshold && <p className="field-hint" style={{ marginTop: 8 }}>Your deposit balance is too low. <Link href="/deposits" className="link-text">Add funds</Link></p>}
     </div></div>
   </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Daily spending limits</h2><p className="section-subtitle">Set your own limit up to your tier's maximum. Illustrative — no card network enforces it yet.</p></div></div><div className="field-grid"><CardLimitEditor card="virtual" onToast={onToast} />{requested ? <CardLimitEditor card="physical" onToast={onToast} /> : <div className="field"><span className="field-label">Physical card daily limit</span><span className="field-hint">Available once you request a physical card.</span></div>}</div></section></div>;
@@ -538,15 +545,16 @@ function WithdrawalsPage({ onToast }: { onToast: Toast }) {
   const blocker = payoutBlocker(state);
   const history = ownTransactions(state).filter(t => t.type === 'Withdrawal').sort(byNewest(t => t.createdAt));
   const preview = () => { if (!channel) return; const problem = validateWithdrawal(state, value, channel.id); setError(problem); if (!problem) setShowModal(true); };
-  const confirm = () => {
+  const moneyAction = useMoneyAction();
+  const confirm = async () => {
     if (!channel) return;
-    const result = run(s => requestWithdrawal(s, value, channel.id, new Date()));
+    const result = await moneyAction(s => requestWithdrawal(s, value, channel.id, new Date()), () => api.requestWithdrawal({ amount: value, channel: channel.id }));
     setShowModal(false);
     if (!result.ok) { setError(result.error); return; }
     setAmount('');
     onToast(`${result.message} No money was sent — no payout provider is connected.`);
   };
-  const cancel = (id: string) => { const result = run(s => cancelWithdrawal(s, id, new Date())); onToast(result.ok ? result.message : result.error); };
+  const cancel = async (id: string) => { const result = await moneyAction(s => cancelWithdrawal(s, id, new Date()), () => api.cancelWithdrawal(id)); onToast(result.ok ? result.message : result.error); };
   const feeText = (c: PayoutChannel) => [c.feeRate ? `${+(c.feeRate * 100).toFixed(2)}%` : '', c.feeFixed ? `${money(c.feeFixed)} fixed` : ''].filter(Boolean).join(' + ') + (c.feeCap && c.feeRate ? `, max ${money(c.feeCap)}` : '') || 'No fee';
   return <div className="stack"><div className="detail-layout"><div className="stack"><div className="withdraw-summary"><div className="metric-label"><span>Available to request</span><WalletCards size={15} /></div><div className="metric-value">{money(balances.grant)}</div><div className="metric-helper">Grant balance{balances.pendingWithdrawals > 0 ? ` · ${money(balances.pendingWithdrawals)} held for pending payouts` : ''}</div></div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Request a payout</h2><p className="section-subtitle">Choose a channel and check the fee breakdown.</p></div></div><div className="notice mb"><Info size={16} />Payout requests are recorded in this browser only. No bank, mobile-money, or crypto provider is connected, so no money moves.</div>
     {blocker && <div className="notice mb" role="alert" data-testid="notice-payout-blocked"><Info size={16} /><div>{blocker}{blocker.includes('deposit balance') && <> <Link href="/deposits" className="link-text">Add funds</Link></>}</div></div>}
@@ -571,14 +579,17 @@ function DepositsPage({ onToast }: { onToast: Toast }) {
   const method = DEPOSIT_METHODS.find(m => m.id === methodId)!;
   const deposits = ownTransactions(state).filter(t => t.type === 'Deposit').sort(byNewest(t => t.createdAt));
   const justCreated = latest ? deposits.find(t => t.id === latest && t.status === 'Pending') : undefined;
-  const submit = () => {
+  const moneyAction = useMoneyAction();
+  const submit = async () => {
     const value = amount.trim() === '' ? NaN : Number(amount);
-    const result = run(s => requestDeposit(s, value, methodId, new Date()));
+    const problem = validateDeposit(state, value);
+    if (problem) { setError(problem); return; }
+    const result = await moneyAction(s => requestDeposit(s, value, methodId, new Date()), () => api.requestDeposit({ amount: value, method: methodId }));
     if (!result.ok) { setError(result.error); return; }
     setError(null); setAmount(''); setLatest(result.id ?? null);
     onToast(result.message);
   };
-  const cancel = (id: string) => { const result = run(s => cancelDeposit(s, id, new Date())); onToast(result.ok ? result.message : result.error); };
+  const cancel = async (id: string) => { const result = await moneyAction(s => cancelDeposit(s, id, new Date()), () => api.cancelDeposit(id)); onToast(result.ok ? result.message : result.error); };
   return <div className="stack"><div className="page-intro"><h2>Add funds to your deposit balance.</h2><p>Your deposit balance pays card fees and must hold a small reserve before payouts. Announce a transfer here, send it with the reference, and it's credited once the finance team confirms it arrived.</p></div>
     <div className="detail-layout"><div className="card card-pad">
       <div className="section-head"><div><h2 className="section-title">New deposit</h2><p className="section-subtitle">{money(treasury.minDeposit)} – {money(treasury.maxDeposit)} per deposit.</p></div></div>
@@ -633,13 +644,14 @@ function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
   const [input, setInput] = useState<DestinationInput>({ primary: '', secondary: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const open = (id: ChannelId) => { setEditing(id); setInput({ primary: '', secondary: '' }); setErrors({}); };
-  const save = () => {
+  const moneyAction = useMoneyAction();
+  const save = async () => {
     if (!editing) return;
-    const result = run(s => savePayoutDestination(s, editing, input, new Date()));
+    const result = await moneyAction(s => savePayoutDestination(s, editing, input, new Date()), () => api.savePayoutDestination({ channel: editing, primary: input.primary, ...(input.secondary ? { secondary: input.secondary } : {}) }));
     if (!result.ok) { setErrors(result.fieldErrors ?? {}); if (!result.fieldErrors) onToast(result.error); return; }
     setEditing(null); onToast(result.message);
   };
-  const remove = (id: ChannelId) => { const result = run(s => removePayoutDestination(s, id)); onToast(result.ok ? result.message : result.error); };
+  const remove = async (id: ChannelId) => { const result = await moneyAction(s => removePayoutDestination(s, id), () => api.removePayoutDestination(id)); onToast(result.ok ? result.message : result.error); };
   return <div className="card card-pad" id="payouts" data-testid="section-payout-destinations"><div className="section-head"><div><h2 className="section-title">Payout destinations</h2><p className="section-subtitle">Where payouts go for each channel. Only a masked label is kept. Changing a destination is reviewed by the team for your security.</p></div><Landmark size={19} color="hsl(var(--muted))" /></div>
     {state.treasury.channels.map(c => { const saved = state.payoutDestinations[c.id]; return <div key={c.id} className="verification-item" style={{ flexWrap: 'wrap' }} data-testid={`row-destination-${c.id}`}>
       <div className="verification-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div>
@@ -647,7 +659,7 @@ function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
       <div style={{ display: 'flex', gap: 6 }}><button className="btn btn-ghost" onClick={() => editing === c.id ? setEditing(null) : open(c.id)} data-testid={`button-edit-destination-${c.id}`}>{editing === c.id ? 'Cancel' : saved ? 'Change' : 'Add'}</button>{saved && editing !== c.id && <button className="icon-btn" onClick={() => remove(c.id)} aria-label={`Remove ${c.name} destination`} data-testid={`button-remove-destination-${c.id}`}><Trash2 size={14} /></button>}</div>
       {editing === c.id && <div className="field-grid" style={{ flexBasis: '100%', marginTop: 10 }}>
         {DESTINATION_FIELDS[c.id].map(f => { const id = `dest-${c.id}-${f.key}`; return <div className="field" key={f.key}><label className="field-label" htmlFor={id}>{f.label}</label><input id={id} className="input" autoComplete="off" placeholder={f.placeholder} value={input[f.key] ?? ''} onChange={e => { setInput({ ...input, [f.key]: e.target.value }); setErrors(({ [f.key]: _, ...rest }) => rest); }} data-testid={`input-destination-${c.id}-${f.key}`} aria-invalid={!!errors[f.key]} aria-describedby={errors[f.key] ? `${id}-error` : undefined} /><FieldError id={`${id}-error`} message={errors[f.key]} /></div>; })}
-        <div className="field-full" style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" onClick={save} data-testid={`button-save-destination-${c.id}`}>Save destination</button></div>
+        <div className="field-full" style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" onClick={() => void save()} data-testid={`button-save-destination-${c.id}`}>Save destination</button></div>
       </div>}
     </div>; })}
   </div>;

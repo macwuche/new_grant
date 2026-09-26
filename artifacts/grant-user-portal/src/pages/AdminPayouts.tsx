@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { applicantName } from '@workspace/domain/review';
 import { approvePayoutRelease, markPayoutFailed, markPayoutPaid, MIN_FAILURE_REASON_LENGTH, needsSecondSignOff, payoutAmounts, payoutQueue, pendingPayoutTotal } from '@workspace/domain/payouts';
 import { actingStaff } from '@workspace/domain/staff';
+import * as api from '@workspace/api-client-react';
+import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import type { Result, Transaction } from '@workspace/domain/model';
 import { ReviewFrame } from './AdminReviewPanel';
@@ -54,6 +56,7 @@ export function AdminPayouts() {
 function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
   const { state } = useDemoStore();
   const command = useStaffCommand();
+  const staffMoney = useStaffMoney();
   const can = useCan();
   const me = actingStaff(state);
   const tx = state.transactions.find(t => t.id === txId);
@@ -73,7 +76,7 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
 
   if (!tx || tx.type !== 'Withdrawal') return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={txId}><h2 id="admin-detail-title">Payout not found</h2></ReviewFrame>;
   const amounts = payoutAmounts(tx);
-  const after = (result: Result) => {
+  const after = (result: Outcome) => {
     setConfirming(false);
     if (!result.ok) { setError(result.fieldErrors?.reason ?? null); setFlash({ tone: 'error', text: result.error }); return; }
     setError(null); setReason(''); setFlash({ tone: 'ok', text: result.message });
@@ -81,10 +84,13 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
   const submit = () => {
     if (mode === 'failed' && reason.trim().length < MIN_FAILURE_REASON_LENGTH) { setError(`Write at least ${MIN_FAILURE_REASON_LENGTH} characters; the applicant sees this reason.`); return; }
     if (!confirming) { setConfirming(true); return; }
+    if (staffMoney.connected) { void staffMoney.entry(() => mode === 'paid' ? api.markPayoutPaid(tx.id) : api.markPayoutFailed(tx.id, { reason })).then(after); return; }
     after(command('payments.process', { action: mode === 'paid' ? 'Mark payout paid' : 'Mark payout failed', target: tx.id }, (s, actor) => mode === 'paid' ? markPayoutPaid(s, tx.id, actor.name, new Date()) : markPayoutFailed(s, tx.id, reason, actor.name, new Date())));
   };
   const dual = needsSecondSignOff(state, tx);
-  const release = () => after(command('payments.release', { action: 'Approve payout release', target: tx.id }, (s, actor) => approvePayoutRelease(s, tx.id, actor.name, new Date())));
+  const release = () => staffMoney.connected
+    ? void staffMoney.entry(() => api.approvePayoutRelease(tx.id)).then(after)
+    : after(command('payments.release', { action: 'Approve payout release', target: tx.id }, (s, actor) => approvePayoutRelease(s, tx.id, actor.name, new Date())));
   const pick = (next: 'paid' | 'failed') => { setMode(next); setConfirming(false); setError(null); setFlash(null); };
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${tx.id} / Payout`}>
@@ -115,6 +121,8 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
       </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Recorded as paid. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this request before it was processed. Do not send it.' : `Recorded as failed: ${tx.failureReason}. The amount was returned to the applicant's grant balance.`}</p>}
     </section>
-    <div className="admin-detail-note"><Info size={17} /><span>Demo finance workflow. No bank or mobile-money provider is connected, so no money moves. Results are saved in this browser only and audited against the acting staff member, but there is no real staff sign-in yet.</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>{staffMoney.connected
+      ? 'No payment provider is connected: send the money outside the app, then record it here. Results are saved on the server, role-checked, and audited; large payouts need two different people.'
+      : 'Demo finance workflow. No bank or mobile-money provider is connected, so no money moves. Results are saved in this browser only and audited against the acting staff member, but there is no real staff sign-in yet.'}</span></div>
   </ReviewFrame>;
 }

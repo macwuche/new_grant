@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { applicantName } from '@workspace/domain/review';
 import { confirmDeposit, DEPOSIT_METHODS, depositQueue, MIN_REJECTION_REASON_LENGTH, pendingDepositTotal, rejectDeposit } from '@workspace/domain/deposits';
 import { actingStaff } from '@workspace/domain/staff';
+import * as api from '@workspace/api-client-react';
+import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 import type { Result, Transaction } from '@workspace/domain/model';
@@ -54,6 +56,7 @@ export function AdminDeposits() {
 function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
   const { state } = useDemoStore();
   const command = useStaffCommand();
+  const staffMoney = useStaffMoney();
   const can = useCan();
   const tx = state.transactions.find(t => t.id === txId);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -71,7 +74,7 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
   }, [onClose]);
 
   if (!tx || tx.type !== 'Deposit') return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={txId}><h2 id="admin-detail-title">Deposit not found</h2></ReviewFrame>;
-  const after = (result: Result) => {
+  const after = (result: Outcome) => {
     setConfirming(false);
     if (!result.ok) { setError(result.fieldErrors?.reason ?? null); setFlash({ tone: 'error', text: result.error }); return; }
     setError(null); setReason(''); setFlash({ tone: 'ok', text: result.message });
@@ -79,6 +82,7 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
   const submit = () => {
     if (mode === 'reject' && reason.trim().length < MIN_REJECTION_REASON_LENGTH) { setError(`Write at least ${MIN_REJECTION_REASON_LENGTH} characters; the applicant sees this reason.`); return; }
     if (!confirming) { setConfirming(true); return; }
+    if (staffMoney.connected) { void staffMoney.entry(() => mode === 'confirm' ? api.confirmDeposit(tx.id) : api.rejectDeposit(tx.id, { reason })).then(after); return; }
     after(command('payments.process', { action: mode === 'confirm' ? 'Confirm deposit' : 'Reject deposit', target: tx.id }, (s, actor) => mode === 'confirm' ? confirmDeposit(s, tx.id, actor.name, new Date()) : rejectDeposit(s, tx.id, reason, actor.name, new Date())));
   };
   const pick = (next: 'confirm' | 'reject') => { setMode(next); setConfirming(false); setError(null); setFlash(null); };
@@ -105,6 +109,8 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
       </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Confirmed and credited to the applicant’s deposit balance. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this deposit. If the money arrives anyway, return it outside the app.' : `Rejected: ${tx.failureReason}`}</p>}
     </section>
-    <div className="admin-detail-note"><Info size={17} /><span>Demo finance workflow. No bank or mobile-money feed is connected, so arrival can't be checked automatically. Results are saved in this browser only, and there is no real staff sign-in yet (actions are role-checked and audited).</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>{staffMoney.connected
+      ? 'No bank or mobile-money feed is connected, so check that the money really arrived before confirming. Results are saved on the server, role-checked, and audited.'
+      : 'Demo finance workflow. No bank or mobile-money feed is connected, so arrival can\'t be checked automatically. Results are saved in this browser only, and there is no real staff sign-in yet (actions are role-checked and audited).'}</span></div>
   </ReviewFrame>;
 }

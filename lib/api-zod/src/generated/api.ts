@@ -1890,3 +1890,1342 @@ export const GetAuditLogResponse = zod.object({
 })
 
 
+/**
+ * Balances are derived from the ledger.
+ * @summary Your ledger, cards, payout destinations, and the money rules
+ */
+export const getMyMoneyResponseTreasuryOneChannelsMax = 10;
+
+
+
+export const GetMyMoneyResponse = zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(getMyMoneyResponseTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+})
+
+
+/**
+ * Returns a reference to quote with the transfer; finance confirms when it arrives.
+ * @summary Announce a deposit
+ */
+export const RequestDepositBody = zod.object({
+  "amount": zod.number(),
+  "method": zod.enum(['bank', 'mobile'])
+})
+
+export const requestDepositResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const RequestDepositResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(requestDepositResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Only a deposit still waiting for confirmation.
+ * @summary Cancel your pending deposit
+ */
+export const cancelDepositPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const CancelDepositParams = zod.object({
+  "id": zod.coerce.string().regex(cancelDepositPathIdRegExp)
+})
+
+export const cancelDepositResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const CancelDepositResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(cancelDepositResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * From your grant balance to a saved destination on an enabled channel.
+ * @summary Request a payout
+ */
+export const RequestWithdrawalBody = zod.object({
+  "amount": zod.number(),
+  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
+})
+
+export const requestWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const RequestWithdrawalResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(requestWithdrawalResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * The held amount returns to your grant balance.
+ * @summary Cancel your pending payout
+ */
+export const cancelWithdrawalPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const CancelWithdrawalParams = zod.object({
+  "id": zod.coerce.string().regex(cancelWithdrawalPathIdRegExp)
+})
+
+export const cancelWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const CancelWithdrawalResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(cancelWithdrawalResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * A locked account can freeze but not unfreeze.
+ * @summary Freeze or unfreeze your virtual card
+ */
+export const toggleCardFreezeResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const ToggleCardFreezeResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(toggleCardFreezeResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Within your tier's maximum.
+ * @summary Set a card's daily limit
+ */
+export const SetCardLimitBody = zod.object({
+  "card": zod.enum(['virtual', 'physical']),
+  "limit": zod.number()
+})
+
+export const setCardLimitResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const SetCardLimitResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(setCardLimitResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Fees come from your deposit balance, which must keep the reserve.
+ * @summary Request a physical card
+ */
+export const requestPhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const RequestPhysicalCardResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(requestPhysicalCardResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Only a masked label is stored.
+ * @summary Save a payout destination
+ */
+export const savePayoutDestinationBodyPrimaryMax = 80;
+
+export const savePayoutDestinationBodySecondaryMax = 80;
+
+
+
+export const SavePayoutDestinationBody = zod.object({
+  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "primary": zod.string().max(savePayoutDestinationBodyPrimaryMax),
+  "secondary": zod.string().max(savePayoutDestinationBodySecondaryMax).optional()
+})
+
+export const savePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const SavePayoutDestinationResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(savePayoutDestinationResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Pending payouts still go where they were sent.
+ * @summary Remove a payout destination
+ */
+export const RemovePayoutDestinationParams = zod.object({
+  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
+})
+
+export const removePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const RemovePayoutDestinationResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested']),
+  "dailyLimit": zod.number()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(removePayoutDestinationResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Any active staff member. Newest first.
+ * @summary Every ledger entry
+ */
+export const GetLedgerResponseItem = zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+})
+export const GetLedgerResponse = zod.array(GetLedgerResponseItem)
+
+
+/**
+ * Any active staff member.
+ * @summary Money settings and lockdown
+ */
+export const getMoneySettingsResponseTreasuryOneChannelsMax = 10;
+
+
+
+export const GetMoneySettingsResponse = zod.object({
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(getMoneySettingsResponseTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+})
+
+
+/**
+ * Requires treasury.manage. Applies to new requests only. 409 if the settings changed since `version`.
+ * @summary Change money settings
+ */
+export const updateMoneySettingsBodyVersionMax = 40;
+
+export const updateMoneySettingsBodyTreasuryChannelsMax = 10;
+
+
+
+export const UpdateMoneySettingsBody = zod.object({
+  "version": zod.string().max(updateMoneySettingsBodyVersionMax),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(updateMoneySettingsBodyTreasuryChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+})
+})
+
+export const updateMoneySettingsResponseSettingsTreasuryOneChannelsMax = 10;
+
+
+
+export const UpdateMoneySettingsResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(updateMoneySettingsResponseSettingsTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires security.lockdown. Freezes payouts; applicants with pending payouts are told.
+ * @summary Start an emergency lockdown
+ */
+export const startLockdownBodyReasonMax = 1000;
+
+
+
+export const StartLockdownBody = zod.object({
+  "reason": zod.string().max(startLockdownBodyReasonMax)
+})
+
+export const startLockdownResponseSettingsTreasuryOneChannelsMax = 10;
+
+
+
+export const StartLockdownResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(startLockdownResponseSettingsTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires security.lockdown.
+ * @summary End the lockdown
+ */
+export const endLockdownResponseSettingsTreasuryOneChannelsMax = 10;
+
+
+
+export const EndLockdownResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(endLockdownResponseSettingsTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. Credits the deposit balance.
+ * @summary Confirm a deposit arrived
+ */
+export const confirmDepositPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const ConfirmDepositParams = zod.object({
+  "id": zod.coerce.string().regex(confirmDepositPathIdRegExp)
+})
+
+export const ConfirmDepositResponse = zod.object({
+  "transaction": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. The reason is shown to the applicant.
+ * @summary Reject a deposit
+ */
+export const rejectDepositPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const RejectDepositParams = zod.object({
+  "id": zod.coerce.string().regex(rejectDepositPathIdRegExp)
+})
+
+export const rejectDepositBodyReasonMax = 1000;
+
+
+
+export const RejectDepositBody = zod.object({
+  "reason": zod.string().max(rejectDepositBodyReasonMax)
+})
+
+export const RejectDepositResponse = zod.object({
+  "transaction": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.release. The approver can't also mark it paid.
+ * @summary Second sign-off on a large payout
+ */
+export const approvePayoutReleasePathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const ApprovePayoutReleaseParams = zod.object({
+  "id": zod.coerce.string().regex(approvePayoutReleasePathIdRegExp)
+})
+
+export const ApprovePayoutReleaseResponse = zod.object({
+  "transaction": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. Records that finance sent it; no provider is connected.
+ * @summary Mark a payout paid
+ */
+export const markPayoutPaidPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const MarkPayoutPaidParams = zod.object({
+  "id": zod.coerce.string().regex(markPayoutPaidPathIdRegExp)
+})
+
+export const MarkPayoutPaidResponse = zod.object({
+  "transaction": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. The amount returns to the applicant's grant balance.
+ * @summary Mark a payout failed
+ */
+export const markPayoutFailedPathIdRegExp = new RegExp('^TX-[0-9]{1,15}$');
+
+
+export const MarkPayoutFailedParams = zod.object({
+  "id": zod.coerce.string().regex(markPayoutFailedPathIdRegExp)
+})
+
+export const markPayoutFailedBodyReasonMax = 1000;
+
+
+
+export const MarkPayoutFailedBody = zod.object({
+  "reason": zod.string().max(markPayoutFailedBodyReasonMax)
+})
+
+export const MarkPayoutFailedResponse = zod.object({
+  "transaction": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional()
+}),
+  "message": zod.string()
+})
+
+

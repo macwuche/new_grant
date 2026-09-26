@@ -24,6 +24,8 @@ tags:
     description: Grant applications and review
   - name: activity
     description: Notifications, the staff activity feed, and the audit log
+  - name: money
+    description: The ledger, deposits, payouts, cards, money settings, and the lockdown
 security:
   - bearerAuth: []
 paths:
@@ -1060,6 +1062,441 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /money/mine:
+    get:
+      operationId: getMyMoney
+      tags: [money]
+      summary: Your ledger, cards, payout destinations, and the money rules
+      description: Balances are derived from the ledger.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyMoney"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/deposits:
+    post:
+      operationId: requestDeposit
+      tags: [money]
+      summary: Announce a deposit
+      description: Returns a reference to quote with the transfer; finance confirms when it arrives.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/deposits/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: cancelDeposit
+      tags: [money]
+      summary: Cancel your pending deposit
+      description: Only a deposit still waiting for confirmation.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/withdrawals:
+    post:
+      operationId: requestWithdrawal
+      tags: [money]
+      summary: Request a payout
+      description: From your grant balance to a saved destination on an enabled channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/withdrawals/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: cancelWithdrawal
+      tags: [money]
+      summary: Cancel your pending payout
+      description: The held amount returns to your grant balance.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/cards/freeze:
+    post:
+      operationId: toggleCardFreeze
+      tags: [money]
+      summary: Freeze or unfreeze your virtual card
+      description: A locked account can freeze but not unfreeze.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/cards/limit:
+    post:
+      operationId: setCardLimit
+      tags: [money]
+      summary: Set a card's daily limit
+      description: Within your tier's maximum.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardLimit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/cards/physical:
+    post:
+      operationId: requestPhysicalCard
+      tags: [money]
+      summary: Request a physical card
+      description: Fees come from your deposit balance, which must keep the reserve.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/destinations:
+    post:
+      operationId: savePayoutDestination
+      tags: [money]
+      summary: Save a payout destination
+      description: Only a masked label is stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DestinationInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/destinations/{channel}/remove:
+    parameters:
+      - $ref: "#/components/parameters/ChannelParam"
+    post:
+      operationId: removePayoutDestination
+      tags: [money]
+      summary: Remove a payout destination
+      description: Pending payouts still go where they were sent.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/ledger:
+    get:
+      operationId: getLedger
+      tags: [money]
+      summary: Every ledger entry
+      description: Any active staff member. Newest first.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /money/settings:
+    get:
+      operationId: getMoneySettings
+      tags: [money]
+      summary: Money settings and lockdown
+      description: Any active staff member.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: updateMoneySettings
+      tags: [money]
+      summary: Change money settings
+      description: Requires treasury.manage. Applies to new requests only. 409 if the settings changed since `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoneySettingsUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /money/lockdown:
+    post:
+      operationId: startLockdown
+      tags: [money]
+      summary: Start an emergency lockdown
+      description: Requires security.lockdown. Freezes payouts; applicants with pending payouts are told.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /money/lockdown/end:
+    post:
+      operationId: endLockdown
+      tags: [money]
+      summary: End the lockdown
+      description: Requires security.lockdown.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /money/deposits/{id}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: confirmDeposit
+      tags: [money]
+      summary: Confirm a deposit arrived
+      description: Requires payments.process. Credits the deposit balance.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposits/{id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: rejectDeposit
+      tags: [money]
+      summary: Reject a deposit
+      description: Requires payments.process. The reason is shown to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/withdrawals/{id}/release:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: approvePayoutRelease
+      tags: [money]
+      summary: Second sign-off on a large payout
+      description: Requires payments.release. The approver can't also mark it paid.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/withdrawals/{id}/paid:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: markPayoutPaid
+      tags: [money]
+      summary: Mark a payout paid
+      description: Requires payments.process. Records that finance sent it; no provider is connected.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/withdrawals/{id}/failed:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: markPayoutFailed
+      tags: [money]
+      summary: Mark a payout failed
+      description: Requires payments.process. The amount returns to the applicant's grant balance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     bearerAuth:
@@ -1067,6 +1504,19 @@ components:
       scheme: bearer
       description: Supabase Auth access token
   parameters:
+    LedgerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^TX-[0-9]{1,15}$"
+    ChannelParam:
+      name: channel
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ChannelId"
     NotificationId:
       name: id
       in: path
@@ -1140,6 +1590,263 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    ChannelId:
+      type: string
+      enum: [bank, wire, mobile, crypto]
+    LedgerEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantId:
+          type: string
+        type:
+          type: string
+          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee]
+        description:
+          type: string
+        amount:
+          type: number
+          description: Signed; credits positive, debits negative
+        status:
+          type: string
+          enum: [Completed, Pending, Failed, Cancelled]
+        createdAt:
+          type: string
+        method:
+          type: string
+        fee:
+          type: number
+        destination:
+          type: string
+        reference:
+          type: string
+        processedAt:
+          type: string
+        processedBy:
+          type: string
+        failureReason:
+          type: string
+        dualControl:
+          type: boolean
+        releaseApproval:
+          type: object
+          properties:
+            by:
+              type: string
+            at:
+              type: string
+            byId:
+              type: string
+          required: [by, at]
+      required: [id, applicantId, type, description, amount, status, createdAt]
+    PayoutChannel:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ChannelId"
+        name:
+          type: string
+        enabled:
+          type: boolean
+        min:
+          type: number
+        max:
+          type: number
+        feeRate:
+          type: number
+        feeFixed:
+          type: number
+        feeCap:
+          type: number
+      required: [id, name, enabled, min, max, feeRate, feeFixed, feeCap]
+      additionalProperties: false
+    TreasuryInput:
+      type: object
+      properties:
+        channels:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/PayoutChannel"
+        physicalCardFee:
+          type: number
+        cardDeliveryFee:
+          type: number
+        minDeposit:
+          type: number
+        maxDeposit:
+          type: number
+        depositThreshold:
+          type: number
+        highValueDeposit:
+          type: number
+        dualControlThreshold:
+          type: number
+        applicationFee:
+          type: number
+      required: [channels, physicalCardFee, cardDeliveryFee, minDeposit, maxDeposit, depositThreshold, highValueDeposit, dualControlThreshold, applicationFee]
+      additionalProperties: false
+    Treasury:
+      allOf:
+        - $ref: "#/components/schemas/TreasuryInput"
+        - type: object
+          properties:
+            updatedAt:
+              type: string
+            changeLog:
+              type: array
+              description: Staff only; empty for applicants
+              items:
+                $ref: "#/components/schemas/ProgramChange"
+          required: [updatedAt, changeLog]
+    Lockdown:
+      type: object
+      properties:
+        since:
+          type: string
+        by:
+          type: string
+        reason:
+          type: string
+      required: [since, by, reason]
+    MoneySettings:
+      type: object
+      properties:
+        treasury:
+          $ref: "#/components/schemas/Treasury"
+        lockdown:
+          allOf:
+            - $ref: "#/components/schemas/Lockdown"
+          nullable: true
+      required: [treasury, lockdown]
+    MoneySettingsResult:
+      type: object
+      properties:
+        settings:
+          $ref: "#/components/schemas/MoneySettings"
+        message:
+          type: string
+      required: [settings, message]
+    MoneySettingsUpdate:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        treasury:
+          $ref: "#/components/schemas/TreasuryInput"
+      required: [version, treasury]
+      additionalProperties: false
+    Cards:
+      type: object
+      properties:
+        virtual:
+          type: object
+          properties:
+            lastFour:
+              type: string
+            dailyLimit:
+              type: number
+            frozen:
+              type: boolean
+            pin:
+              type: string
+              description: Fictional; no card provider is connected
+          required: [lastFour, dailyLimit, frozen, pin]
+        physical:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [Not requested, Requested]
+            dailyLimit:
+              type: number
+          required: [status, dailyLimit]
+      required: [virtual, physical]
+    MyMoney:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntry"
+        cards:
+          $ref: "#/components/schemas/Cards"
+        payoutDestinations:
+          type: object
+          additionalProperties:
+            type: string
+        destinationChangedAt:
+          type: string
+        treasury:
+          $ref: "#/components/schemas/Treasury"
+        lockdown:
+          allOf:
+            - $ref: "#/components/schemas/Lockdown"
+          nullable: true
+      required: [transactions, cards, payoutDestinations, treasury, lockdown]
+    MoneyResult:
+      type: object
+      properties:
+        money:
+          $ref: "#/components/schemas/MyMoney"
+        message:
+          type: string
+        id:
+          type: string
+          description: The ledger entry the action created or changed, if any
+      required: [money, message]
+    LedgerResult:
+      type: object
+      properties:
+        transaction:
+          $ref: "#/components/schemas/LedgerEntry"
+        message:
+          type: string
+      required: [transaction, message]
+    DepositRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+        method:
+          type: string
+          enum: [bank, mobile]
+      required: [amount, method]
+      additionalProperties: false
+    WithdrawalRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+        channel:
+          $ref: "#/components/schemas/ChannelId"
+      required: [amount, channel]
+      additionalProperties: false
+    CardLimit:
+      type: object
+      properties:
+        card:
+          type: string
+          enum: [virtual, physical]
+        limit:
+          type: number
+      required: [card, limit]
+      additionalProperties: false
+    DestinationInput:
+      type: object
+      properties:
+        channel:
+          $ref: "#/components/schemas/ChannelId"
+        primary:
+          type: string
+          maxLength: 80
+        secondary:
+          type: string
+          maxLength: 80
+      required: [channel, primary]
+      additionalProperties: false
     NotificationItem:
       type: object
       properties:
