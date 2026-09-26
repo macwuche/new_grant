@@ -22,6 +22,7 @@ import { useSession } from '@/lib/session';
 import { RiskBadge } from './AdminRisk';
 import { staffFeed } from '@workspace/domain/activity';
 import { applicantRecords } from '@workspace/domain/applicants';
+import { useServerData } from '@/lib/serverData';
 import { assessRisk, type RiskAssessment } from '@workspace/domain/risk';
 import { computeBalances } from '@workspace/domain/rules';
 import { pendingDepositTotal } from '@workspace/domain/deposits';
@@ -148,12 +149,14 @@ function Overview({ openReview }: { openReview: (id: string) => void }) {
 
 function Applicants({ openApplicant }: { openApplicant: (id: string) => void }) {
   const applicants = useApplicants();
+  const { connected, applicantsError } = useServerData();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All statuses');
   const matches = (person: Applicant) => filter === 'All statuses' || person.status === filter || (filter === 'Locked' && person.locked) || (filter === 'High risk' && person.risk.level === 'High') || filter === `Tier ${person.tier}`;
   const rows = applicants.filter(person => matches(person) && `${person.name} ${person.email} ${person.sector} ${person.country}`.toLowerCase().includes(query.toLowerCase()));
   return <section className="admin-panel">
-    <SectionHead title="Applicant directory" subtitle="Invented people; the first is the applicant-portal demo user. Open a profile to review identity, risk, tier, and account access." />
+    <SectionHead title="Applicant directory" subtitle={connected ? 'Everyone who has opened the applicant portal with an account. Open a profile to review identity, tier, and account access.' : 'Invented people; the first is the applicant-portal demo user. Open a profile to review identity, risk, tier, and account access.'} />
+    {applicantsError && <div className="admin-review-flash error" role="alert" data-testid="status-admin-applicants-error">{applicantsError}</div>}
     <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people, sector, country" aria-label="Search applicants" data-testid="input-admin-search-applicants" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter applicants by status" data-testid="select-admin-filter-applicants"><option>All statuses</option><option>Verified</option><option>Pending</option><option>Locked</option><option>High risk</option><option>Tier 1</option><option>Tier 2</option><option>Tier 3</option></select></div><span className="admin-count" data-testid="text-admin-applicants-count">{rows.length} of {applicants.length} profiles</span></div>
     {rows.length ? <>
       <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Applicant</th><th>Tier</th><th>Identity</th><th>Wallet</th><th>Active grants</th><th>Risk</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Open</span></th></tr></thead><tbody>{rows.map(person => <tr key={person.id} data-testid={`row-admin-applicant-${person.id}`}><td><div className="admin-person-cell"><span className="admin-initials" aria-hidden="true">{person.name.split(' ').map(part => part[0]).join('')}</span><span><span className="admin-table-primary">{person.name}{person.locked && <span className="admin-flag">Locked</span>}</span><span className="admin-table-secondary">{person.email} · {person.country}</span></span></div></td><td className="admin-table-muted">Tier {person.tier}</td><td><Badge status={person.kyc === 'Not submitted' ? 'Pending' : person.kyc} /></td><td className="admin-table-number">{money(person.wallet)}</td><td className="admin-table-muted">{person.activeGrants} · {person.applications} submitted</td><td><RiskBadge risk={person.risk} /></td><td><button type="button" className="admin-icon-button" onClick={() => openApplicant(person.id)} aria-label={`Open ${person.name} profile`} data-testid={`button-preview-admin-applicant-${person.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>

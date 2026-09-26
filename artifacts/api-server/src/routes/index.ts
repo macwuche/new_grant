@@ -4,6 +4,7 @@ import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
 import type { StaffRepo } from "../lib/staffRepo";
 import { authenticate, loadStaff } from "../middlewares/auth";
+import { applicantsRouter } from "./applicants";
 import healthRouter from "./health";
 import meRouter from "./me";
 import { profileRouter } from "./profile";
@@ -21,5 +22,6 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo }: Api
   router.use(staffRouter(staffRepo));
   router.use(programsRouter(programRepo));
   router.use(profileRouter(profileRepo));
+  router.use(applicantsRouter(profileRepo));
   return router;
 }

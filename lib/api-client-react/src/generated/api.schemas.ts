@@ -120,6 +120,57 @@ export const ProfileTier = {
   NUMBER_3: 3,
 } as const;
 
+export type AccountStatus = typeof AccountStatus[keyof typeof AccountStatus];
+
+
+export const AccountStatus = {
+  Active: 'Active',
+  Locked: 'Locked',
+} as const;
+
+export type KycStatus = typeof KycStatus[keyof typeof KycStatus];
+
+
+export const KycStatus = {
+  Not_submitted: 'Not submitted',
+  Pending: 'Pending',
+  Verified: 'Verified',
+  Rejected: 'Rejected',
+} as const;
+
+export type KycDocumentType = typeof KycDocumentType[keyof typeof KycDocumentType];
+
+
+export const KycDocumentType = {
+  Passport: 'Passport',
+  National_ID: 'National ID',
+  'Driver\'s_licence': 'Driver\'s licence',
+} as const;
+
+export interface Kyc {
+  status: KycStatus;
+  documentType?: KycDocumentType;
+  documentLast4?: string;
+  nameOnDocument?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+}
+
+/**
+ * Staff-managed controls on an applicant account
+ */
+export interface Account {
+  status: AccountStatus;
+  lockReason?: string;
+  lockedAt?: string;
+  lockedBy?: string;
+  passwordResetRequired: boolean;
+  twoFactorResetRequired: boolean;
+  kyc: Kyc;
+}
+
 export interface Profile {
   name: string;
   email: string;
@@ -131,6 +182,66 @@ export interface Profile {
   identityVerified: boolean;
   /** ISO date the profile was created */
   joined: string;
+  account: Account;
+}
+
+export interface ApplicantEntry {
+  id: string;
+  profile: Profile;
+}
+
+export interface ApplicantResult {
+  applicant: ApplicantEntry;
+  message: string;
+}
+
+export interface Reason {
+  /** @maxLength 1000 */
+  reason: string;
+}
+
+export type TierChangeTier = typeof TierChangeTier[keyof typeof TierChangeTier];
+
+
+export const TierChangeTier = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+export interface TierChange {
+  tier: TierChangeTier;
+  /** @maxLength 1000 */
+  reason: string;
+}
+
+export type CredentialResetKind = typeof CredentialResetKind[keyof typeof CredentialResetKind];
+
+
+export const CredentialResetKind = {
+  password: 'password',
+  twoFactor: 'twoFactor',
+} as const;
+
+export interface CredentialReset {
+  kind: CredentialResetKind;
+}
+
+export type IdentitySubmissionDocumentType = typeof IdentitySubmissionDocumentType[keyof typeof IdentitySubmissionDocumentType];
+
+
+export const IdentitySubmissionDocumentType = {
+  Passport: 'Passport',
+  National_ID: 'National ID',
+  'Driver\'s_licence': 'Driver\'s licence',
+} as const;
+
+export interface IdentitySubmission {
+  documentType: IdentitySubmissionDocumentType;
+  /** @maxLength 40 */
+  documentNumber: string;
+  /** @maxLength 120 */
+  nameOnDocument: string;
 }
 
 export interface ProfileUpdate {

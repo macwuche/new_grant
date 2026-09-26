@@ -11,11 +11,11 @@ import {
 import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
-import { getProfile, updateProfile as saveServerProfile } from '@workspace/api-client-react';
-import { adoptServerProfile } from '@workspace/domain/sync';
+import { completeCredentialReset as completeServerReset, getProfile, submitIdentityCheck, updateProfile as saveServerProfile, type Profile as ApiProfile } from '@workspace/api-client-react';
+import { adoptServerProfile, type ServerAccount } from '@workspace/domain/sync';
 import { ServerDataProvider, apiError, useServerData } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
-import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from '@workspace/domain/model';
+import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
 import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
@@ -58,6 +58,9 @@ const navItems = [
   { href: '/deposits', label: 'Add funds', icon: PiggyBank },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
+/** Loads the API's profile (contact details, tier, identity, account controls) into the store. */
+const adoptProfile = (profile: ApiProfile) => (s: DemoState) => adoptServerProfile(s, { ...profile, tier: profile.tier as Tier }, profile.account as ServerAccount);
+
 /**
  * With sign-in configured, applicant pages need a session, and the profile's
  * contact details come from the server (created from the sign-up details on
@@ -72,7 +75,7 @@ function ApplicantGate({ children }: { children: ReactNode }) {
     if (session.status !== 'signedIn' || !accountEmail) return;
     let current = true;
     getProfile()
-      .then(profile => { if (current) run(s => adoptServerProfile(s, profile)); })
+      .then(profile => { if (current) run(adoptProfile(profile)); })
       // If the API is unreachable, at least show the account's own name and email.
       .catch(() => { if (current) run(s => adoptSessionApplicant(s, { name: accountName ?? '', email: accountEmail })); });
     return () => { current = false; };
@@ -564,11 +567,24 @@ function DepositsPage({ onToast }: { onToast: Toast }) {
 }
 function IdentityCheck({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
+  const { connected } = useServerData();
+  const [sending, setSending] = useState(false);
   const kyc = accountOf(state, CURRENT_APPLICANT_ID).kyc;
   const [form, setForm] = useState<KycInput>({ documentType: 'Passport', documentNumber: '', nameOnDocument: state.profile.name });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const canSubmit = kyc.status === 'Not submitted' || kyc.status === 'Rejected';
-  const submit = () => {
+  const submit = async () => {
+    if (connected) {
+      setSending(true);
+      try {
+        run(adoptProfile(await submitIdentityCheck(form)));
+        setErrors({}); setForm(f => ({ ...f, documentNumber: '' })); onToast('Identity details submitted. The compliance team will review them.');
+      } catch (err) {
+        const failure = apiError(err, "Couldn't submit your identity details. Try again.");
+        setErrors(failure.fieldErrors ?? {}); if (!failure.fieldErrors) onToast(failure.error);
+      } finally { setSending(false); }
+      return;
+    }
     const result = run(s => submitKyc(s, form, new Date()));
     if (!result.ok) { setErrors(result.fieldErrors ?? {}); if (!result.fieldErrors) onToast(result.error); return; }
     setErrors({}); setForm(f => ({ ...f, documentNumber: '' })); onToast(result.message);
@@ -580,7 +596,7 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
       <div className="field"><label className="field-label" htmlFor="kyc-type">Document</label><select id="kyc-type" className="select" value={form.documentType} onChange={e => setForm({ ...form, documentType: e.target.value as KycDocumentType })} data-testid="select-kyc-document">{KYC_DOCUMENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
       <div className="field"><label className="field-label" htmlFor="kyc-number">Document number</label><input id="kyc-number" className="input" value={form.documentNumber} onChange={e => { setForm({ ...form, documentNumber: e.target.value }); setErrors(({ documentNumber: _, ...rest }) => rest); }} autoComplete="off" data-testid="input-kyc-number" aria-invalid={!!errors.documentNumber} aria-describedby={errors.documentNumber ? 'kyc-number-error' : undefined} />{errors.documentNumber ? <FieldError id="kyc-number-error" message={errors.documentNumber} /> : <span className="field-hint">Only the last four characters are kept.</span>}</div>
       <div className="field field-full"><label className="field-label" htmlFor="kyc-name">Name exactly as on the document</label><input id="kyc-name" className="input" value={form.nameOnDocument} onChange={e => { setForm({ ...form, nameOnDocument: e.target.value }); setErrors(({ nameOnDocument: _, ...rest }) => rest); }} data-testid="input-kyc-name" aria-invalid={!!errors.nameOnDocument} aria-describedby={errors.nameOnDocument ? 'kyc-name-error' : undefined} /><FieldError id="kyc-name-error" message={errors.nameOnDocument} /></div>
-      <div className="field-full" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="field-hint">Demo: no document image is uploaded or checked.</span><button className="btn btn-primary" onClick={submit} data-testid="button-submit-kyc">Submit for review</button></div>
+      <div className="field-full" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="field-hint">{connected ? 'No document image is uploaded: compliance reviews the details you enter.' : 'Demo: no document image is uploaded or checked.'}</span><button className="btn btn-primary" onClick={() => void submit()} disabled={sending} data-testid="button-submit-kyc">{sending ? 'Submitting…' : 'Submit for review'}</button></div>
     </div>}
   </div><StatusBadge status={kyc.status} tone={tone} /></div>;
 }
@@ -640,7 +656,11 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
     } finally { setSaving(false); }
   };
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const complete = (kind: 'password' | 'twoFactor') => { const r = run(s => completeCredentialReset(s, kind)); onToast(r.ok ? r.message : r.error); };
+  const complete = async (kind: 'password' | 'twoFactor') => {
+    if (!connected) { const r = run(s => completeCredentialReset(s, kind)); onToast(r.ok ? r.message : r.error); return; }
+    try { run(adoptProfile(await completeServerReset({ kind }))); onToast(kind === 'password' ? 'Password reset recorded.' : 'Two-step sign-in reset recorded.'); }
+    catch (err) { onToast(apiError(err, "Couldn't record that. Try again.").error); }
+  };
   const shown = editing ? draft : profile;
   // Signed in, the email is the sign-in account's and can't be edited here.
   const field = (key: keyof ProfileInput, label: string) => <div className="field"><label className="field-label" htmlFor={`profile-${key}`}>{label}</label><input id={`profile-${key}`} className="input" disabled={!editing || (connected && key === 'email')} value={shown[key]} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors(({ [key]: _, ...rest }) => rest); }} data-testid={`input-profile-${key}`} aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `profile-${key}-error` : undefined} /><FieldError id={`profile-${key}-error`} message={errors[key]} /></div>;
@@ -649,8 +669,8 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
     <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
       <IdentityCheck onToast={onToast} />
       <div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for. The grant team changes tiers after review.</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div>
-      <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>
-      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>Requested by the grant team. Sign-in isn't connected, so nothing is stored.</span></div><button className="btn btn-ghost" onClick={() => complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
+      <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => void complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>
+      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>{connected ? 'Requested by the grant team. Change it with “Forgot password?” on the sign-in page, then confirm here.' : "Requested by the grant team. Sign-in isn't connected, so nothing is stored."}</span></div><button className="btn btn-ghost" onClick={() => void complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
     </div>
     <PayoutDestinationsCard onToast={onToast} />
     <div className="card card-pad" id="demo-data"><div className="section-head"><div><h2 className="section-title">Demo data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser. Resetting also clears the staff audit log and settings.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); setEditing(false); onToast('Demo data reset to the original sample records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset demo data</button>}</div></div>

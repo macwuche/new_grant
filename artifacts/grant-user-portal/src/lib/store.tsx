@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { migrateState } from '@workspace/domain/migrate';
 import type { DemoState, Result } from '@workspace/domain/model';
 import { createSeedState } from '@workspace/domain/seed';
+import { forStorage } from '@workspace/domain/sync';
 
 // Browser-only persistence until the API and database exist. Every change goes
 // through a rule function from @workspace/domain/rules; the store only saves accepted results.
@@ -26,7 +27,7 @@ function loadState(): DemoState {
 }
 
 function saveState(state: DemoState): void {
-  try { window.localStorage.setItem(DEMO_STATE_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage unavailable: keep in memory */ }
+  try { window.localStorage.setItem(DEMO_STATE_STORAGE_KEY, JSON.stringify(forStorage(state))); } catch { /* storage unavailable: keep in memory */ }
 }
 
 type Store = {

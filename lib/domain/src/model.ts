@@ -276,6 +276,12 @@ export type DemoState = {
   /** Emergency switch: while set, payouts can't be requested, released, or paid. */
   lockdown: Lockdown | null;
   nextId: number;
+  /**
+   * Set once staff load the real applicant directory from the API: the demo
+   * user (`profile`) is then left out of staff views, and `otherApplicants` and
+   * their accounts are never saved to browser storage.
+   */
+  serverApplicants?: boolean;
 };
 
 export type Result<T = DemoState> = { ok: true; state: T; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };

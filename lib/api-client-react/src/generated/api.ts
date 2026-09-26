@@ -20,10 +20,14 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApplicantEntry,
+  ApplicantResult,
   BadRequestResponse,
+  CredentialReset,
   Error,
   ForbiddenResponse,
   HealthStatus,
+  IdentitySubmission,
   InvalidResponse,
   Me,
   Message,
@@ -35,10 +39,12 @@ import type {
   ProgramResult,
   ProgramUpdate,
   ProgramVersion,
+  Reason,
   StaffMember,
   StaffMemberCreate,
   StaffMemberUpdate,
   StaleResponse,
+  TierChange,
   UnauthorizedResponse
 } from './api.schemas';
 
@@ -1174,5 +1180,861 @@ export const useUpdateProfile = <TError = ErrorType<InvalidResponse | Unauthoriz
         TContext
       > => {
       return useMutation(getUpdateProfileMutationOptions(options));
+    }
+
+export const getSubmitIdentityCheckUrl = () => {
+
+
+
+
+  return `/api/profile/identity`
+}
+
+/**
+ * Only the last four characters of the document number are kept. Compliance reviews the check.
+ * @summary Submit your identity details
+ */
+export const submitIdentityCheck = async (identitySubmission: IdentitySubmission, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Profile>(getSubmitIdentityCheckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(identitySubmission)
+  }
+);}
+
+
+
+
+
+export const getSubmitIdentityCheckMutationKey = () => ['submitIdentityCheck'] as const;
+
+export const getSubmitIdentityCheckMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitIdentityCheck>>, TError,SubmitIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitIdentityCheck>>, TError,SubmitIdentityCheckMutationVariables, TContext> => {
+
+const mutationKey = getSubmitIdentityCheckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitIdentityCheck>>, SubmitIdentityCheckMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitIdentityCheck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitIdentityCheckMutationResult = NonNullable<Awaited<ReturnType<typeof submitIdentityCheck>>>
+    export type SubmitIdentityCheckMutationBody = BodyType<IdentitySubmission>
+    export type SubmitIdentityCheckMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>
+    export type SubmitIdentityCheckMutationVariables = {data: BodyType<IdentitySubmission>}
+
+    /**
+ * @summary Submit your identity details
+ */
+export const useSubmitIdentityCheck = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitIdentityCheck>>, TError,SubmitIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitIdentityCheck>>,
+        TError,
+        SubmitIdentityCheckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitIdentityCheckMutationOptions(options));
+    }
+
+export const getCompleteCredentialResetUrl = () => {
+
+
+
+
+  return `/api/profile/credential-reset`
+}
+
+/**
+ * Records that you chose a new password or set up two-step sign-in again.
+ * @summary Confirm a reset the grant team asked for
+ */
+export const completeCredentialReset = async (credentialReset: CredentialReset, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Profile>(getCompleteCredentialResetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(credentialReset)
+  }
+);}
+
+
+
+
+
+export const getCompleteCredentialResetMutationKey = () => ['completeCredentialReset'] as const;
+
+export const getCompleteCredentialResetMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCredentialReset>>, TError,CompleteCredentialResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeCredentialReset>>, TError,CompleteCredentialResetMutationVariables, TContext> => {
+
+const mutationKey = getCompleteCredentialResetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeCredentialReset>>, CompleteCredentialResetMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  completeCredentialReset(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteCredentialResetMutationResult = NonNullable<Awaited<ReturnType<typeof completeCredentialReset>>>
+    export type CompleteCredentialResetMutationBody = BodyType<CredentialReset>
+    export type CompleteCredentialResetMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>
+    export type CompleteCredentialResetMutationVariables = {data: BodyType<CredentialReset>}
+
+    /**
+ * @summary Confirm a reset the grant team asked for
+ */
+export const useCompleteCredentialReset = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCredentialReset>>, TError,CompleteCredentialResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeCredentialReset>>,
+        TError,
+        CompleteCredentialResetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteCredentialResetMutationOptions(options));
+    }
+
+export const getListApplicantsUrl = () => {
+
+
+
+
+  return `/api/applicants`
+}
+
+/**
+ * Any active staff member. Newest first.
+ * @summary Applicant directory
+ */
+export const listApplicants = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApplicantEntry[]> => {
+
+  return customFetch<ApplicantEntry[]>(getListApplicantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListApplicantsQueryKey = () => {
+    return [
+    `/api/applicants`
+    ] as const;
+    }
+
+
+export const getListApplicantsQueryOptions = <TData = Awaited<ReturnType<typeof listApplicants>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApplicants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListApplicantsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listApplicants>>> = ({ signal }) => listApplicants({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listApplicants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListApplicantsQueryResult = NonNullable<Awaited<ReturnType<typeof listApplicants>>>
+export type ListApplicantsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Applicant directory
+ */
+
+export function useListApplicants<TData = Awaited<ReturnType<typeof listApplicants>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApplicants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListApplicantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetApplicantTierUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/tier`
+}
+
+/**
+ * Requires accounts.tier. A reason is required; the applicant is told.
+ * @summary Change an applicant's tier
+ */
+export const setApplicantTier = async (id: string,
+    tierChange: TierChange, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getSetApplicantTierUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tierChange)
+  }
+);}
+
+
+
+
+
+export const getSetApplicantTierMutationKey = () => ['setApplicantTier'] as const;
+
+export const getSetApplicantTierMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setApplicantTier>>, TError,SetApplicantTierMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setApplicantTier>>, TError,SetApplicantTierMutationVariables, TContext> => {
+
+const mutationKey = getSetApplicantTierMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setApplicantTier>>, SetApplicantTierMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setApplicantTier(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetApplicantTierMutationResult = NonNullable<Awaited<ReturnType<typeof setApplicantTier>>>
+    export type SetApplicantTierMutationBody = BodyType<TierChange>
+    export type SetApplicantTierMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type SetApplicantTierMutationVariables = {id: string;data: BodyType<TierChange>}
+
+    /**
+ * @summary Change an applicant's tier
+ */
+export const useSetApplicantTier = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setApplicantTier>>, TError,SetApplicantTierMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setApplicantTier>>,
+        TError,
+        SetApplicantTierMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetApplicantTierMutationOptions(options));
+    }
+
+export const getLockApplicantUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/lock`
+}
+
+/**
+ * Requires accounts.manage. Blocks applications and money actions until unlocked.
+ * @summary Lock an account
+ */
+export const lockApplicant = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getLockApplicantUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getLockApplicantMutationKey = () => ['lockApplicant'] as const;
+
+export const getLockApplicantMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lockApplicant>>, TError,LockApplicantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof lockApplicant>>, TError,LockApplicantMutationVariables, TContext> => {
+
+const mutationKey = getLockApplicantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lockApplicant>>, LockApplicantMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  lockApplicant(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LockApplicantMutationResult = NonNullable<Awaited<ReturnType<typeof lockApplicant>>>
+    export type LockApplicantMutationBody = BodyType<Reason>
+    export type LockApplicantMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type LockApplicantMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Lock an account
+ */
+export const useLockApplicant = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lockApplicant>>, TError,LockApplicantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof lockApplicant>>,
+        TError,
+        LockApplicantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLockApplicantMutationOptions(options));
+    }
+
+export const getUnlockApplicantUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/unlock`
+}
+
+/**
+ * Requires accounts.manage.
+ * @summary Unlock an account
+ */
+export const unlockApplicant = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+  return customFetch<ApplicantResult>(getUnlockApplicantUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnlockApplicantMutationKey = () => ['unlockApplicant'] as const;
+
+export const getUnlockApplicantMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockApplicant>>, TError,UnlockApplicantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unlockApplicant>>, TError,UnlockApplicantMutationVariables, TContext> => {
+
+const mutationKey = getUnlockApplicantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unlockApplicant>>, UnlockApplicantMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  unlockApplicant(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnlockApplicantMutationResult = NonNullable<Awaited<ReturnType<typeof unlockApplicant>>>
+
+    export type UnlockApplicantMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type UnlockApplicantMutationVariables = {id: string}
+
+    /**
+ * @summary Unlock an account
+ */
+export const useUnlockApplicant = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockApplicant>>, TError,UnlockApplicantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unlockApplicant>>,
+        TError,
+        UnlockApplicantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnlockApplicantMutationOptions(options));
+    }
+
+export const getRequireCredentialResetUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/credential-reset`
+}
+
+/**
+ * Requires accounts.manage. Recorded for the applicant to complete.
+ * @summary Require a new password or two-step setup
+ */
+export const requireCredentialReset = async (id: string,
+    credentialReset: CredentialReset, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getRequireCredentialResetUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(credentialReset)
+  }
+);}
+
+
+
+
+
+export const getRequireCredentialResetMutationKey = () => ['requireCredentialReset'] as const;
+
+export const getRequireCredentialResetMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requireCredentialReset>>, TError,RequireCredentialResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requireCredentialReset>>, TError,RequireCredentialResetMutationVariables, TContext> => {
+
+const mutationKey = getRequireCredentialResetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requireCredentialReset>>, RequireCredentialResetMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requireCredentialReset(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequireCredentialResetMutationResult = NonNullable<Awaited<ReturnType<typeof requireCredentialReset>>>
+    export type RequireCredentialResetMutationBody = BodyType<CredentialReset>
+    export type RequireCredentialResetMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type RequireCredentialResetMutationVariables = {id: string;data: BodyType<CredentialReset>}
+
+    /**
+ * @summary Require a new password or two-step setup
+ */
+export const useRequireCredentialReset = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requireCredentialReset>>, TError,RequireCredentialResetMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requireCredentialReset>>,
+        TError,
+        RequireCredentialResetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequireCredentialResetMutationOptions(options));
+    }
+
+export const getApproveIdentityCheckUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/identity/approve`
+}
+
+/**
+ * Requires kyc.review.
+ * @summary Approve an identity check
+ */
+export const approveIdentityCheck = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+  return customFetch<ApplicantResult>(getApproveIdentityCheckUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApproveIdentityCheckMutationKey = () => ['approveIdentityCheck'] as const;
+
+export const getApproveIdentityCheckMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveIdentityCheck>>, TError,ApproveIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveIdentityCheck>>, TError,ApproveIdentityCheckMutationVariables, TContext> => {
+
+const mutationKey = getApproveIdentityCheckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveIdentityCheck>>, ApproveIdentityCheckMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  approveIdentityCheck(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveIdentityCheckMutationResult = NonNullable<Awaited<ReturnType<typeof approveIdentityCheck>>>
+
+    export type ApproveIdentityCheckMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type ApproveIdentityCheckMutationVariables = {id: string}
+
+    /**
+ * @summary Approve an identity check
+ */
+export const useApproveIdentityCheck = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveIdentityCheck>>, TError,ApproveIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveIdentityCheck>>,
+        TError,
+        ApproveIdentityCheckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveIdentityCheckMutationOptions(options));
+    }
+
+export const getRejectIdentityCheckUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/identity/reject`
+}
+
+/**
+ * Requires kyc.review. The reason is shown to the applicant.
+ * @summary Reject an identity check
+ */
+export const rejectIdentityCheck = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getRejectIdentityCheckUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getRejectIdentityCheckMutationKey = () => ['rejectIdentityCheck'] as const;
+
+export const getRejectIdentityCheckMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectIdentityCheck>>, TError,RejectIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectIdentityCheck>>, TError,RejectIdentityCheckMutationVariables, TContext> => {
+
+const mutationKey = getRejectIdentityCheckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectIdentityCheck>>, RejectIdentityCheckMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejectIdentityCheck(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectIdentityCheckMutationResult = NonNullable<Awaited<ReturnType<typeof rejectIdentityCheck>>>
+    export type RejectIdentityCheckMutationBody = BodyType<Reason>
+    export type RejectIdentityCheckMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type RejectIdentityCheckMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Reject an identity check
+ */
+export const useRejectIdentityCheck = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectIdentityCheck>>, TError,RejectIdentityCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejectIdentityCheck>>,
+        TError,
+        RejectIdentityCheckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRejectIdentityCheckMutationOptions(options));
+    }
+
+export const getRequestReverificationUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/identity/reverify`
+}
+
+/**
+ * Requires kyc.review. The reason is shown to the applicant.
+ * @summary Ask a verified applicant to verify again
+ */
+export const requestReverification = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getRequestReverificationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getRequestReverificationMutationKey = () => ['requestReverification'] as const;
+
+export const getRequestReverificationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestReverification>>, TError,RequestReverificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestReverification>>, TError,RequestReverificationMutationVariables, TContext> => {
+
+const mutationKey = getRequestReverificationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestReverification>>, RequestReverificationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestReverification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestReverificationMutationResult = NonNullable<Awaited<ReturnType<typeof requestReverification>>>
+    export type RequestReverificationMutationBody = BodyType<Reason>
+    export type RequestReverificationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type RequestReverificationMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Ask a verified applicant to verify again
+ */
+export const useRequestReverification = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestReverification>>, TError,RequestReverificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestReverification>>,
+        TError,
+        RequestReverificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestReverificationMutationOptions(options));
     }
 

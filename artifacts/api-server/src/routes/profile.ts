@@ -1,7 +1,10 @@
-import { Router, type IRouter } from "express";
-import { GetProfileResponse, UpdateProfileBody } from "@workspace/api-zod";
+import { Router, type IRouter, type Response } from "express";
+import { CompleteCredentialResetBody, GetProfileResponse, SubmitIdentityCheckBody, UpdateProfileBody } from "@workspace/api-zod";
+import { completeCredentialReset, submitKyc } from "@workspace/domain/accounts";
+import type { DemoState, Result } from "@workspace/domain/model";
 import { validateProfile } from "@workspace/domain/rules";
 import type { AuthUser } from "../lib/auth";
+import { runAccountRule } from "../lib/applicantRules";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { authLocals } from "../middlewares/auth";
 
@@ -16,14 +19,14 @@ const detail = (metadata: Record<string, unknown> | undefined, key: string, max:
 
 export const toProfile = (r: ProfileRecord) => GetProfileResponse.parse({
   name: r.name, email: r.email, phone: r.phone, address: r.address, sector: r.sector, country: r.country,
-  tier: r.tier, identityVerified: r.identityVerified, joined: r.createdAt.slice(0, 10),
+  tier: r.tier, identityVerified: r.identityVerified, joined: r.createdAt.slice(0, 10), account: r.account,
 });
 
 /** Loads the profile, creating it from the sign-up details on first use and keeping the email in step with the account. */
 export async function ownProfile(repo: ProfileRepo, user: AuthUser): Promise<ProfileRecord> {
   const email = user.email ?? "";
   const existing = await repo.get(user.id);
-  if (existing) return existing.email === email ? existing : repo.update(user.id, { email });
+  if (existing) return existing.email === email ? existing : repo.updateContact(user.id, { email });
   const birthDate = detail(user.metadata, "birth_date", 10);
   return repo.create({
     authUserId: user.id, email,
@@ -48,8 +51,26 @@ export function profileRouter(repo: ProfileRepo): IRouter {
     // The email isn't editable here (it's the sign-in account's), so only its three fields are checked.
     const { email: _email, ...fieldErrors } = validateProfile({ ...body.data, email: current.email });
     if (Object.keys(fieldErrors).length) { res.status(400).json({ error: "Fix the highlighted fields.", fieldErrors }); return; }
-    const saved = await repo.update(user.id, { name: body.data.name.trim(), phone: body.data.phone.trim(), address: body.data.address.trim() });
+    const saved = await repo.updateContact(user.id, { name: body.data.name.trim(), phone: body.data.phone.trim(), address: body.data.address.trim() });
     res.json(toProfile(saved));
+  });
+
+  async function ownRule(res: Response, command: (state: DemoState) => Result) {
+    const outcome = await runAccountRule(repo, await ownProfile(repo, authLocals(res).user), command);
+    if (!outcome.ok) { res.status(outcome.status).json(outcome.body); return; }
+    res.json(toProfile(outcome.record));
+  }
+
+  router.post("/profile/identity", async (req, res) => {
+    const body = SubmitIdentityCheckBody.safeParse(req.body);
+    if (!body.success) { res.status(400).json({ error: "Send a document type, document number, and the name on the document." }); return; }
+    await ownRule(res, s => submitKyc(s, body.data, new Date()));
+  });
+
+  router.post("/profile/credential-reset", async (req, res) => {
+    const body = CompleteCredentialResetBody.safeParse(req.body);
+    if (!body.success) { res.status(400).json({ error: "Say which reset you completed." }); return; }
+    await ownRule(res, s => completeCredentialReset(s, body.data.kind));
   });
 
   return router;

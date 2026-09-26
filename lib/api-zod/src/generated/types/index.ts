@@ -6,11 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './account';
+export * from './accountStatus';
+export * from './applicantEntry';
+export * from './applicantResult';
 export * from './badRequestResponse';
+export * from './credentialReset';
+export * from './credentialResetKind';
 export * from './error';
 export * from './forbiddenResponse';
 export * from './healthStatus';
+export * from './identitySubmission';
+export * from './identitySubmissionDocumentType';
 export * from './invalidResponse';
+export * from './kyc';
+export * from './kycDocumentType';
+export * from './kycStatus';
 export * from './me';
 export * from './message';
 export * from './meUser';
@@ -28,11 +39,14 @@ export * from './programResult';
 export * from './programStatus';
 export * from './programUpdate';
 export * from './programVersion';
+export * from './reason';
 export * from './staffMember';
 export * from './staffMemberCreate';
 export * from './staffMemberUpdate';
 export * from './staffRole';
 export * from './staleResponse';
+export * from './tierChange';
+export * from './tierChangeTier';
 export * from './unauthorizedResponse';
 export * from './validationError';
 export * from './validationErrorFieldErrors';

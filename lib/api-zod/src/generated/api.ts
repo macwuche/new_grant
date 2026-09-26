@@ -537,7 +537,25 @@ export const GetProfileResponse = zod.object({
   "country": zod.string(),
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
-  "joined": zod.string().describe('ISO date the profile was created')
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
 })
 
 
@@ -568,7 +586,502 @@ export const UpdateProfileResponse = zod.object({
   "country": zod.string(),
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
-  "joined": zod.string().describe('ISO date the profile was created')
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+
+
+/**
+ * Only the last four characters of the document number are kept. Compliance reviews the check.
+ * @summary Submit your identity details
+ */
+export const submitIdentityCheckBodyDocumentNumberMax = 40;
+
+export const submitIdentityCheckBodyNameOnDocumentMax = 120;
+
+
+
+export const SubmitIdentityCheckBody = zod.object({
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']),
+  "documentNumber": zod.string().max(submitIdentityCheckBodyDocumentNumberMax),
+  "nameOnDocument": zod.string().max(submitIdentityCheckBodyNameOnDocumentMax)
+})
+
+export const SubmitIdentityCheckResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+
+
+/**
+ * Records that you chose a new password or set up two-step sign-in again.
+ * @summary Confirm a reset the grant team asked for
+ */
+export const CompleteCredentialResetBody = zod.object({
+  "kind": zod.enum(['password', 'twoFactor'])
+})
+
+export const CompleteCredentialResetResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+
+
+/**
+ * Any active staff member. Newest first.
+ * @summary Applicant directory
+ */
+export const ListApplicantsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+})
+export const ListApplicantsResponse = zod.array(ListApplicantsResponseItem)
+
+
+/**
+ * Requires accounts.tier. A reason is required; the applicant is told.
+ * @summary Change an applicant's tier
+ */
+export const SetApplicantTierParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const setApplicantTierBodyReasonMax = 1000;
+
+
+
+export const SetApplicantTierBody = zod.object({
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "reason": zod.string().max(setApplicantTierBodyReasonMax)
+})
+
+export const SetApplicantTierResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage. Blocks applications and money actions until unlocked.
+ * @summary Lock an account
+ */
+export const LockApplicantParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const lockApplicantBodyReasonMax = 1000;
+
+
+
+export const LockApplicantBody = zod.object({
+  "reason": zod.string().max(lockApplicantBodyReasonMax)
+})
+
+export const LockApplicantResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage.
+ * @summary Unlock an account
+ */
+export const UnlockApplicantParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const UnlockApplicantResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage. Recorded for the applicant to complete.
+ * @summary Require a new password or two-step setup
+ */
+export const RequireCredentialResetParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const RequireCredentialResetBody = zod.object({
+  "kind": zod.enum(['password', 'twoFactor'])
+})
+
+export const RequireCredentialResetResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires kyc.review.
+ * @summary Approve an identity check
+ */
+export const ApproveIdentityCheckParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const ApproveIdentityCheckResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires kyc.review. The reason is shown to the applicant.
+ * @summary Reject an identity check
+ */
+export const RejectIdentityCheckParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const rejectIdentityCheckBodyReasonMax = 1000;
+
+
+
+export const RejectIdentityCheckBody = zod.object({
+  "reason": zod.string().max(rejectIdentityCheckBodyReasonMax)
+})
+
+export const RejectIdentityCheckResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires kyc.review. The reason is shown to the applicant.
+ * @summary Ask a verified applicant to verify again
+ */
+export const RequestReverificationParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const requestReverificationBodyReasonMax = 1000;
+
+
+
+export const RequestReverificationBody = zod.object({
+  "reason": zod.string().max(requestReverificationBodyReasonMax)
+})
+
+export const RequestReverificationResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
 })
 
 

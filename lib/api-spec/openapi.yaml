@@ -18,6 +18,8 @@ tags:
     description: Grant programs
   - name: profile
     description: The signed-in applicant's profile
+  - name: applicants
+    description: Applicant directory and account controls (staff)
 security:
   - bearerAuth: []
 paths:
@@ -335,6 +337,284 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /profile/identity:
+    post:
+      operationId: submitIdentityCheck
+      tags: [profile]
+      summary: Submit your identity details
+      description: Only the last four characters of the document number are kept. Compliance reviews the check.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentitySubmission"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /profile/credential-reset:
+    post:
+      operationId: completeCredentialReset
+      tags: [profile]
+      summary: Confirm a reset the grant team asked for
+      description: Records that you chose a new password or set up two-step sign-in again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialReset"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants:
+    get:
+      operationId: listApplicants
+      tags: [applicants]
+      summary: Applicant directory
+      description: Any active staff member. Newest first.
+      responses:
+        "200":
+          description: Applicants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicantEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /applicants/{id}/tier:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: setApplicantTier
+      tags: [applicants]
+      summary: Change an applicant's tier
+      description: Requires accounts.tier. A reason is required; the applicant is told.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TierChange"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/lock:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: lockApplicant
+      tags: [applicants]
+      summary: Lock an account
+      description: Requires accounts.manage. Blocks applications and money actions until unlocked.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/unlock:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: unlockApplicant
+      tags: [applicants]
+      summary: Unlock an account
+      description: Requires accounts.manage.
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/credential-reset:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: requireCredentialReset
+      tags: [applicants]
+      summary: Require a new password or two-step setup
+      description: Requires accounts.manage. Recorded for the applicant to complete.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialReset"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/identity/approve:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: approveIdentityCheck
+      tags: [applicants]
+      summary: Approve an identity check
+      description: Requires kyc.review.
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/identity/reject:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: rejectIdentityCheck
+      tags: [applicants]
+      summary: Reject an identity check
+      description: Requires kyc.review. The reason is shown to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applicants/{id}/identity/reverify:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: requestReverification
+      tags: [applicants]
+      summary: Ask a verified applicant to verify again
+      description: Requires kyc.review. The reason is shown to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
 components:
   securitySchemes:
     bearerAuth:
@@ -342,6 +622,13 @@ components:
       scheme: bearer
       description: Supabase Auth access token
   parameters:
+    ApplicantId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ProgramId:
       name: id
       in: path
@@ -539,7 +826,109 @@ components:
         joined:
           type: string
           description: ISO date the profile was created
-      required: [name, email, phone, address, sector, country, tier, identityVerified, joined]
+        account:
+          $ref: "#/components/schemas/Account"
+      required: [name, email, phone, address, sector, country, tier, identityVerified, joined, account]
+    Kyc:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Not submitted, Pending, Verified, Rejected]
+        documentType:
+          type: string
+          enum: [Passport, National ID, Driver's licence]
+        documentLast4:
+          type: string
+        nameOnDocument:
+          type: string
+        submittedAt:
+          type: string
+        reviewedAt:
+          type: string
+        reviewedBy:
+          type: string
+        rejectionReason:
+          type: string
+      required: [status]
+    Account:
+      type: object
+      description: Staff-managed controls on an applicant account
+      properties:
+        status:
+          type: string
+          enum: [Active, Locked]
+        lockReason:
+          type: string
+        lockedAt:
+          type: string
+        lockedBy:
+          type: string
+        passwordResetRequired:
+          type: boolean
+        twoFactorResetRequired:
+          type: boolean
+        kyc:
+          $ref: "#/components/schemas/Kyc"
+      required: [status, passwordResetRequired, twoFactorResetRequired, kyc]
+    ApplicantEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile:
+          $ref: "#/components/schemas/Profile"
+      required: [id, profile]
+    ApplicantResult:
+      type: object
+      properties:
+        applicant:
+          $ref: "#/components/schemas/ApplicantEntry"
+        message:
+          type: string
+      required: [applicant, message]
+    Reason:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+      required: [reason]
+      additionalProperties: false
+    TierChange:
+      type: object
+      properties:
+        tier:
+          type: integer
+          enum: [1, 2, 3]
+        reason:
+          type: string
+          maxLength: 1000
+      required: [tier, reason]
+      additionalProperties: false
+    CredentialReset:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [password, twoFactor]
+      required: [kind]
+      additionalProperties: false
+    IdentitySubmission:
+      type: object
+      properties:
+        documentType:
+          type: string
+          enum: [Passport, National ID, Driver's licence]
+        documentNumber:
+          type: string
+          maxLength: 40
+        nameOnDocument:
+          type: string
+          maxLength: 120
+      required: [documentType, documentNumber, nameOnDocument]
+      additionalProperties: false
     ProfileUpdate:
       type: object
       properties:

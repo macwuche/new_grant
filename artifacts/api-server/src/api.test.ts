@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import type { AuthUser, TokenVerifier } from "./lib/auth";
 import { seedGrants } from "@workspace/domain/seed";
-import { memoryProfileRepo } from "./lib/profileRepo";
+import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
 import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
@@ -32,11 +32,13 @@ let server: Server;
 let base: string;
 let repo: StaffRepo;
 let programs: ProgramRepo;
+let profiles: ProfileRepo;
 
 async function start(v: TokenVerifier | null = verifier) {
   repo = memoryStaffRepo(SEED);
   programs = memoryProgramRepo(seedGrants());
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: memoryProfileRepo() }, ["https://app.example.org"]).listen(0);
+  profiles = memoryProfileRepo();
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -296,5 +298,105 @@ describe("applicant profile", () => {
 
   it("requires a sign-in", async () => {
     expect((await call("/profile")).status).toBe(401);
+  });
+});
+
+describe("account controls and identity checks", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const act = (path: string, body: unknown = {}, token = "tok-super") => post(`/applicants/${MAYA}/${path}`, body, token);
+  const maya = async () => json(await call("/profile", "tok-maya"));
+  const identity = { documentType: "Passport", documentNumber: "AB 1234-5678", nameOnDocument: "Maya Okafor" };
+  beforeEach(async () => { await call("/profile", "tok-maya"); });
+
+  it("starts every applicant active, unverified, and at Tier 1", async () => {
+    expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } });
+  });
+
+  it("keeps only the last four characters of the document number", async () => {
+    const res = await post("/profile/identity", identity, "tok-maya");
+    expect(res.status).toBe(200);
+    const { account } = await json(res);
+    expect(account.kyc).toMatchObject({ status: "Pending", documentType: "Passport", documentLast4: "5678", nameOnDocument: "Maya Okafor" });
+    expect(JSON.stringify(account)).not.toContain("1234");
+    expect((await post("/profile/identity", identity, "tok-maya")).status).toBe(400);
+  });
+
+  it("lets only kyc.review approve, and marks the applicant verified", async () => {
+    await post("/profile/identity", identity, "tok-maya");
+    expect((await act("identity/approve", {}, "tok-finance")).status).toBe(403);
+    expect((await act("identity/approve", {}, "tok-applicant")).status).toBe(403);
+    const res = await act("identity/approve");
+    expect(res.status).toBe(200);
+    expect((await json(res)).applicant.profile).toMatchObject({ identityVerified: true, account: { kyc: { status: "Verified", reviewedBy: "Sam Rivera" } } });
+    expect((await maya()).identityVerified).toBe(true);
+  });
+
+  it("needs a reason to reject, and lets the applicant resubmit", async () => {
+    await post("/profile/identity", identity, "tok-maya");
+    const short = await act("identity/reject", { reason: "No." });
+    expect(short.status).toBe(400);
+    expect((await json(short)).fieldErrors.reason).toBeDefined();
+    expect((await act("identity/reject", { reason: "The name doesn't match the document." })).status).toBe(200);
+    expect((await maya()).account.kyc).toMatchObject({ status: "Rejected", rejectionReason: "The name doesn't match the document." });
+    expect((await post("/profile/identity", identity, "tok-maya")).status).toBe(200);
+  });
+
+  it("asks a verified applicant to verify again", async () => {
+    await post("/profile/identity", identity, "tok-maya");
+    await act("identity/approve");
+    expect((await act("identity/reverify", { reason: "The passport on file has expired." })).status).toBe(200);
+    expect(await maya()).toMatchObject({ identityVerified: false, account: { kyc: { status: "Not submitted" } } });
+  });
+
+  it("changes tiers with a reason, only with accounts.tier", async () => {
+    expect((await act("tier", { tier: 2, reason: "Trading history confirmed." }, "tok-finance")).status).toBe(403);
+    expect((await act("tier", { tier: 2, reason: "" })).status).toBe(400);
+    expect((await act("tier", { tier: 4, reason: "Trading history confirmed." })).status).toBe(400);
+    expect((await act("tier", { tier: 2, reason: "Trading history confirmed." })).status).toBe(200);
+    expect((await maya()).tier).toBe(2);
+  });
+
+  it("locks and unlocks, recording who locked it", async () => {
+    expect((await act("lock", { reason: "Suspicious deposit pattern." })).status).toBe(200);
+    expect((await maya()).account).toMatchObject({ status: "Locked", lockReason: "Suspicious deposit pattern.", lockedBy: "Sam Rivera" });
+    expect((await act("lock", { reason: "Suspicious deposit pattern." })).status).toBe(400);
+    expect((await act("unlock")).status).toBe(200);
+    const after = (await maya()).account;
+    expect(after.status).toBe("Active");
+    expect(after).not.toHaveProperty("lockReason");
+  });
+
+  it("records required resets, which the applicant then completes", async () => {
+    expect((await act("credential-reset", { kind: "password" })).status).toBe(200);
+    expect((await maya()).account.passwordResetRequired).toBe(true);
+    expect((await post("/profile/credential-reset", { kind: "password" }, "tok-maya")).status).toBe(200);
+    expect((await maya()).account.passwordResetRequired).toBe(false);
+    expect((await post("/profile/credential-reset", { kind: "password" }, "tok-maya")).status).toBe(400);
+  });
+
+  it("shows the directory to active staff only", async () => {
+    expect((await call("/applicants", "tok-applicant")).status).toBe(403);
+    const res = await call("/applicants", "tok-finance");
+    expect(res.status).toBe(200);
+    expect((await json(res)).map((a: { id: string }) => a.id)).toContain(MAYA);
+  });
+
+  it("refuses staff actions on their own applicant account", async () => {
+    await call("/profile", "tok-super");
+    const res = await post(`/applicants/${USERS["tok-super"]!.id}/tier`, { tier: 3, reason: "Promoting myself for testing." });
+    expect(res.status).toBe(403);
+  });
+
+  it("answers 404 for unknown applicants", async () => {
+    expect((await post("/applicants/00000000-0000-4000-8000-000000000999/unlock", {})).status).toBe(404);
+    expect((await post("/applicants/not-a-uuid/unlock", {})).status).toBe(404);
+  });
+
+  it("stores account changes only if the record is unchanged", async () => {
+    const record = (await profiles.get(MAYA))!;
+    const first = await profiles.saveAccount(MAYA, { tier: 2 }, record.updatedAt);
+    const second = await profiles.saveAccount(MAYA, { tier: 3 }, record.updatedAt);
+    expect(first).not.toBe("stale");
+    expect(second).toBe("stale");
   });
 });

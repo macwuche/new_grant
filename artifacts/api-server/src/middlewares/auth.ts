@@ -41,6 +41,14 @@ export function loadStaff(repo: StaffRepo) {
   };
 }
 
+/** Any active staff member, whatever their role (e.g. read-only directory views). */
+export function requireStaff(_req: Request, res: Response, next: NextFunction) {
+  const { staff } = authLocals(res);
+  if (!staff) { res.status(403).json({ error: "This area is for grant team staff only." }); return; }
+  if (!staff.active) { res.status(403).json({ error: "Your staff access is disabled." }); return; }
+  next();
+}
+
 export function requirePermission(permission: Permission) {
   return (_req: Request, res: Response, next: NextFunction) => {
     const { staff } = authLocals(res);

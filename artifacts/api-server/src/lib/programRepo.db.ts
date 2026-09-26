@@ -20,6 +20,9 @@ const toRow = (g: Grant) => ({
   questions: g.questions, changeLog: g.changeLog, updatedAt: new Date(g.updatedAt),
 });
 
+// Compare versions at millisecond precision (JavaScript dates); see profileRepo.db.ts.
+const atVersion = (version: string) => sql`date_trunc('milliseconds', ${programsTable.updatedAt}) = ${new Date(version)}`;
+
 /** Maps the unique-name index violation to an outcome; rethrows anything else. */
 async function write(run: () => Promise<number>): Promise<WriteOutcome> {
   try {
@@ -38,7 +41,7 @@ export const dbProgramRepo: ProgramRepo = {
   },
   insert: grant => write(async () => (await db.insert(programsTable).values({ id: grant.id, ...toRow(grant) }).returning({ id: programsTable.id })).length),
   update: (grant, expectedVersion) => write(async () => (await db.update(programsTable).set(toRow(grant))
-    .where(and(eq(programsTable.id, grant.id), eq(programsTable.updatedAt, new Date(expectedVersion)))).returning({ id: programsTable.id })).length),
+    .where(and(eq(programsTable.id, grant.id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),
   remove: (id, expectedVersion) => write(async () => (await db.delete(programsTable)
-    .where(and(eq(programsTable.id, id), eq(programsTable.updatedAt, new Date(expectedVersion)))).returning({ id: programsTable.id })).length),
+    .where(and(eq(programsTable.id, id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),
 };

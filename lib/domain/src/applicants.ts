@@ -28,7 +28,8 @@ export const accountOf = (state: DemoState, applicantId: string): AccountControl
 export function applicantRecords(state: DemoState): ApplicantRecord[] {
   const p = state.profile;
   const me: ApplicantRecord = { id: CURRENT_APPLICANT_ID, name: p.name, email: p.email, sector: p.sector, country: p.country, joined: p.joined, tier: p.tier, identityVerified: p.identityVerified, current: true, account: accountOf(state, CURRENT_APPLICANT_ID) };
-  return [me, ...state.otherApplicants.map(o => ({ id: o.id, name: o.name, email: o.email, sector: o.sector, country: o.country, joined: o.joined, tier: o.tier, identityVerified: o.verified, current: false, account: accountOf(state, o.id) }))];
+  const others = state.otherApplicants.map(o => ({ id: o.id, name: o.name, email: o.email, sector: o.sector, country: o.country, joined: o.joined, tier: o.tier, identityVerified: o.verified, current: false, account: accountOf(state, o.id) }));
+  return state.serverApplicants ? others : [me, ...others];
 }
 
 export const findApplicant = (state: DemoState, applicantId: string) => applicantRecords(state).find(a => a.id === applicantId);

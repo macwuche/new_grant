@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Account } from './account';
 import type { ProfileTier } from './profileTier';
 
 export interface Profile {
@@ -18,4 +19,5 @@ export interface Profile {
   identityVerified: boolean;
   /** ISO date the profile was created */
   joined: string;
+  account: Account;
 }
