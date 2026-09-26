@@ -30,7 +30,7 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - Roles and permissions: `lib/authz/src/index.ts`
 - DB schema: `lib/db/src/schema/`; connection: `lib/db/src/connection.ts`
 - API contract: `lib/api-spec/openapi.yaml`; routes: `artifacts/api-server/src/routes/`; storage: `artifacts/api-server/src/lib/*Repo*.ts`
-- Portal pages: `artifacts/grant-user-portal/src/App.tsx` (applicant), `src/pages/Admin*.tsx` (staff); server data and sync: `src/lib/serverData.tsx`, `lib/domain/src/sync.ts`
+- Portal pages: `artifacts/grant-user-portal/src/App.tsx` (applicant), `src/pages/Admin*.tsx` (staff); admin settings sections: `src/pages/AdminSettings.tsx` (add a new section to `SETTINGS_SECTIONS`); application name: `src/lib/appName.tsx`; server data and sync: `src/lib/serverData.tsx`, `lib/domain/src/sync.ts`
 - Theme: `artifacts/grant-user-portal/src/index.css`
 
 ## Architecture decisions
@@ -43,11 +43,13 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - Server-loaded records are never written to browser storage.
 - Two-step sign-in is Supabase TOTP; the API reads the session's `aal` from the verified token. Staff need aal2; anyone enrolled needs aal2; pending staff-required resets block the account until proven.
 - Email settings saved by a super admin (encrypted) override the email environment variables. Supabase's own auth emails are pointed at Resend's SMTP relay and given the app's wording through the Supabase Management API (Settings → Email). Resend webhooks (received mail, delivery results) arrive at `POST /api/email/webhook`, verified by signature.
+- Sign-in and password-change alerts are reported by the portal (`POST /api/sign-ins`, `POST /api/profile/password-changed`); devices are known by a per-account hash of a random browser id (`sign_in_devices`). Security notices are emailed even when an applicant turned email copies off.
+- The failed sign-in rate limit counts only requests with a token Supabase rejected; public routes (`/api/healthz`, `/api/branding`, the signed webhook) are mounted before sign-in.
 - Outgoing email uses an outbox table written in the same transaction as the change; a worker in the API sends it through Resend with a per-row idempotency key and retries with backoff.
 
 ## Product
 
-Applicants: sign up, verify identity (details plus an uploaded document, reviewed by compliance), upload a file for each application requirement, apply to programs, track reviews, add funds, request payouts, manage fictional cards. Staff: role-based access (super admin, reviewer, finance, compliance, support), program management, review with escalation, account controls, deposits and payouts with two-person sign-off, money settings, emergency lockdown, team activity, audit log. Email copies of notifications and staff invitations go through Resend once its key is set. No payment provider or card network is connected.
+Applicants: sign up, verify identity (details plus an uploaded document, reviewed by compliance), upload a file for each application requirement, apply to programs, track reviews, add funds, request payouts, manage fictional cards. Staff: role-based access (super admin, reviewer, finance, compliance, support), program management, review with escalation, account controls, deposits and payouts with two-person sign-off, money settings, emergency lockdown, team activity, audit log. Applicants are notified in the app and by email of their own actions (deposits, payouts, applications, identity checks, cards, password changes, sign-ins) and of staff decisions; staff get an email when their account signs in from a new device. Super admins rename the application for everyone (Settings → App branding). Admin settings are grouped into sections, one page each. Email goes through Resend once its key is set; Supabase's own sign-in emails can be switched to Resend from Settings → Email (not yet done on the real project). No payment provider or card network is connected.
 
 ## User preferences
 
