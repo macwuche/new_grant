@@ -1,4 +1,5 @@
 import type { Application, Grant } from "@workspace/domain/model";
+import type { Effects } from "./activity";
 import type { ProgramRepo, WriteOutcome } from "./programRepo";
 
 // Storage for applications. Every change happens inside `withProgram`, which
@@ -17,6 +18,8 @@ export type ProgramScope = {
   removeApplication(id: string): Promise<void>;
   saveGrant(grant: Grant, expectedVersion: string): Promise<WriteOutcome>;
   removeGrant(id: string, expectedVersion: string): Promise<WriteOutcome>;
+  /** Notifications, feed items, and audit entries for this change, in the same transaction. */
+  record(effects: Effects): Promise<void>;
 };
 
 export interface ApplicationRepo {
@@ -29,7 +32,7 @@ export interface ApplicationRepo {
 }
 
 /** In-memory repo for tests. Programs are kept in the given program repo. */
-export function memoryApplicationRepo(programs: ProgramRepo, seed: Application[] = []): ApplicationRepo {
+export function memoryApplicationRepo(programs: ProgramRepo, seed: Application[] = [], activity?: { write(effects: Effects): void }): ApplicationRepo {
   const rows = new Map(seed.map(a => [a.id, structuredClone(a)]));
   const locks = new Map<string, Promise<unknown>>();
   let n = 5000;
@@ -43,6 +46,7 @@ export function memoryApplicationRepo(programs: ProgramRepo, seed: Application[]
         removeApplication: async id => { rows.delete(id); },
         saveGrant: (grant, version) => programs.update(grant, version),
         removeGrant: (id, version) => programs.remove(id, version),
+        record: async effects => { activity?.write(effects); },
       }));
       locks.set(grantId, run);
       return run;

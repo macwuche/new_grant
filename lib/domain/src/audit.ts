@@ -83,7 +83,7 @@ export function auditToCsv(events: AuditEvent[]): string {
   return [
     '# arc.fund demo audit export — browser-only records, not a compliance record',
     ['id', 'timestamp', 'admin_id', 'admin_user', 'role', 'action', 'entity', 'target_user_id', 'ip_address', 'risk_score', 'summary', 'changes'].join(','),
-    ...events.map(e => [e.id, e.at, e.staffId, e.staffName, e.role, e.action, e.target, e.applicantId, 'not captured', e.riskScore, e.summary,
+    ...events.map(e => [e.id, e.at, e.staffId, e.staffName, e.role, e.action, e.target, e.applicantId, e.ip ?? 'not captured', e.riskScore, e.summary,
       e.changes.map(c => `${c.field}: ${c.before} → ${c.after}`).join('; ')].map(csvCell).join(',')),
   ].join('\n');
 }

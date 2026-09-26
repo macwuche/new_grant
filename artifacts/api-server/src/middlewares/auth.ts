@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { roleCan, type Permission } from "@workspace/authz";
 import { bearerToken, type AuthUser, type TokenVerifier } from "../lib/auth";
+import type { AuditContext } from "../lib/activity";
 import type { StaffRecord, StaffRepo } from "../lib/staffRepo";
 
 // res.locals.user: the verified user. res.locals.staff: their staff record, if any.
@@ -39,6 +40,12 @@ export function loadStaff(repo: StaffRepo) {
     res.locals.staff = await resolveStaff(repo, authLocals(res).user);
     next();
   };
+}
+
+/** Who is acting and from where, for an audit entry. Call only after a staff check. */
+export function auditContext(req: Request, res: Response, action: string, target: string): AuditContext {
+  const { id, name, role, active } = authLocals(res).staff!;
+  return { actor: { id, name, role, active }, action, target, ip: req.ip ?? null };
 }
 
 /** Any active staff member, whatever their role (e.g. read-only directory views). */

@@ -15,6 +15,9 @@ export function allowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
 
 export function createApp(deps: ApiDeps, origins: string[] = allowedOrigins()): Express {
   const app: Express = express();
+  // The client address comes from the proxy in front of the app (Replit's): trust that many hops, no more,
+  // so a client can't choose the IP recorded in the audit log.
+  app.set("trust proxy", Number(process.env["TRUST_PROXY_HOPS"] ?? 1));
 
   app.use(
     pinoHttp({

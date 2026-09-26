@@ -5,6 +5,74 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface NotificationItem {
+  id: string;
+  at: string;
+  title: string;
+  body: string;
+  href: string;
+  read: boolean;
+}
+
+export type StaffFeedItemKind = typeof StaffFeedItemKind[keyof typeof StaffFeedItemKind];
+
+
+export const StaffFeedItemKind = {
+  application: 'application',
+  deposit: 'deposit',
+  withdrawal: 'withdrawal',
+  card: 'card',
+  security: 'security',
+  account: 'account',
+} as const;
+
+export interface StaffFeedItem {
+  id: string;
+  at: string;
+  kind: StaffFeedItemKind;
+  title: string;
+  body: string;
+  href: string;
+  highlight: boolean;
+  read: boolean;
+}
+
+export type AuditItemChangesItem = {
+  field: string;
+  before: string;
+  after: string;
+};
+
+export interface AuditItem {
+  id: string;
+  at: string;
+  staffId: string;
+  staffName: string;
+  role: string;
+  action: string;
+  target: string;
+  applicantId: string | null;
+  summary: string;
+  changes: AuditItemChangesItem[];
+  riskScore: number | null;
+  ip: string | null;
+}
+
+/**
+ * Whether every entry still matches its hash and links to the one before
+ */
+export type AuditLogChain = {
+  intact: boolean;
+  checked: number;
+  brokenAt?: string;
+};
+
+export interface AuditLog {
+  events: AuditItem[];
+  /** Whether every entry still matches its hash and links to the one before */
+  chain: AuditLogChain;
+}
+
 export type ApplicationStatus = typeof ApplicationStatus[keyof typeof ApplicationStatus];
 
 

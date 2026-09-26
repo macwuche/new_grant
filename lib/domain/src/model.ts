@@ -245,6 +245,8 @@ export type AuditEvent = {
   changes: AuditChange[];
   /** Applicant's risk score at the time, when an applicant is involved. */
   riskScore: number | null;
+  /** Client address the action came from (server-recorded entries only). */
+  ip?: string | null;
 };
 
 export type Lockdown = { since: string; by: string; reason: string };
@@ -288,6 +290,11 @@ export type DemoState = {
    * browser storage.
    */
   serverApplications?: boolean;
+  /**
+   * Set once notifications, the staff feed, or the audit log come from the API.
+   * They're reloaded on each visit, so they're never saved to browser storage.
+   */
+  serverActivity?: boolean;
 };
 
 export type Result<T = DemoState> = { ok: true; state: T; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };

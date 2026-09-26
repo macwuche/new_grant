@@ -21,3 +21,4 @@ export * from "./staff";
 export * from "./programs";
 export * from "./applicants";
 export * from "./applications";
+export * from "./activity";

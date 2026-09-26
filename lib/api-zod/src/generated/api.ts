@@ -1777,3 +1777,116 @@ export const ClearEscalationResponse = zod.object({
 })
 
 
+/**
+ * Newest first (up to 200).
+ * @summary Your notifications
+ */
+export const ListNotificationsResponseItem = zod.object({
+  "id": zod.string(),
+  "at": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "href": zod.string(),
+  "read": zod.boolean()
+})
+export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem)
+
+
+/**
+ * Marks every one of your notifications as read.
+ * @summary Mark all your notifications read
+ */
+export const MarkAllNotificationsReadResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Only your own; anyone else's reads as not found.
+ * @summary Mark one notification read
+ */
+export const markNotificationReadPathIdRegExp = new RegExp('^NT-[0-9]{1,15}$');
+
+
+export const MarkNotificationReadParams = zod.object({
+  "id": zod.coerce.string().regex(markNotificationReadPathIdRegExp)
+})
+
+export const MarkNotificationReadResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Any active staff member. Newest first (up to 200), with your own read state.
+ * @summary Team activity
+ */
+export const ListStaffFeedResponseItem = zod.object({
+  "id": zod.string(),
+  "at": zod.string(),
+  "kind": zod.enum(['application', 'deposit', 'withdrawal', 'card', 'security', 'account']),
+  "title": zod.string(),
+  "body": zod.string(),
+  "href": zod.string(),
+  "highlight": zod.boolean(),
+  "read": zod.boolean()
+})
+export const ListStaffFeedResponse = zod.array(ListStaffFeedResponseItem)
+
+
+/**
+ * Marks every activity item as read for you only; other staff keep their own read state.
+ * @summary Mark all team activity read (for you)
+ */
+export const MarkAllStaffFeedReadResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * For you only; other staff keep their own read state.
+ * @summary Mark one activity item read (for you)
+ */
+export const markStaffFeedReadPathIdRegExp = new RegExp('^FD-[0-9]{1,15}$');
+
+
+export const MarkStaffFeedReadParams = zod.object({
+  "id": zod.coerce.string().regex(markStaffFeedReadPathIdRegExp)
+})
+
+export const MarkStaffFeedReadResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Requires audit.view. Every staff action, newest first, with whether the hash chain is intact.
+ * @summary Audit log
+ */
+export const GetAuditLogResponse = zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.string(),
+  "staffId": zod.string(),
+  "staffName": zod.string(),
+  "role": zod.string(),
+  "action": zod.string(),
+  "target": zod.string(),
+  "applicantId": zod.string().nullable(),
+  "summary": zod.string(),
+  "changes": zod.array(zod.object({
+  "field": zod.string(),
+  "before": zod.string(),
+  "after": zod.string()
+})),
+  "riskScore": zod.number().int().nullable(),
+  "ip": zod.string().nullable()
+})),
+  "chain": zod.object({
+  "intact": zod.boolean(),
+  "checked": zod.number().int(),
+  "brokenAt": zod.string().optional()
+}).describe('Whether every entry still matches its hash and links to the one before')
+})
+
+

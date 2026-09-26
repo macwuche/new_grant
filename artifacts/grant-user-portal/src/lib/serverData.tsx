@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { listApplicants, listApplications, listMyApplications, listPrograms, type ApplicantEntry } from '@workspace/api-client-react';
-import type { Application, Grant, Tier } from '@workspace/domain/model';
+import { getAuditLog, listApplicants, listApplications, listMyApplications, listNotifications, listPrograms, listStaffFeed, type ApplicantEntry } from '@workspace/api-client-react';
+import type { Application, AuditEvent, Grant, StaffEvent, Tier } from '@workspace/domain/model';
 import {
-  adoptServerApplicants, adoptServerApplications, adoptServerPrograms, leaveServerApplicants, leaveServerApplications,
+  adoptServerActivity, adoptServerApplicants, adoptServerApplications, adoptServerPrograms, leaveServerActivity, leaveServerApplicants, leaveServerApplications,
   type ServerAccount, type ServerApplicant,
 } from '@workspace/domain/sync';
 import { useSession } from './session';
@@ -27,11 +27,14 @@ type ServerData = {
   refreshApplications: () => Promise<void>;
   /** The signed-in account's id: applications with this applicant id are the viewer's own. */
   ownId: string | undefined;
+  refreshActivity: () => Promise<void>;
+  /** Staff with audit.view: whether the server's audit hash chain checked out on the last load. */
+  auditChain: { intact: boolean; checked: number; brokenAt?: string } | null;
 };
 
 const Ctx = createContext<ServerData>({
   connected: false, programsError: null, refreshPrograms: async () => {}, applicantsError: null, refreshApplicants: async () => {},
-  applicationsError: null, refreshApplications: async () => {}, ownId: undefined,
+  applicationsError: null, refreshApplications: async () => {}, ownId: undefined, refreshActivity: async () => {}, auditChain: null,
 });
 
 /** A directory entry from the API in the shape the store takes. */
@@ -58,7 +61,10 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   const applicationsRequest = useRef(0);
   const [applicationsError, setApplicationsError] = useState<string | null>(null);
   const ownId = connected ? session.me?.user.id : undefined;
+  const activityRequest = useRef(0);
+  const [auditChain, setAuditChain] = useState<ServerData['auditChain']>(null);
   const isStaff = connected && !!session.me?.staff?.active;
+  const canAudit = isStaff && !!session.me?.permissions.includes('audit.view');
   // Staff see drafts and applicants don't, so reload whenever the signed-in person changes.
   const who = connected ? `${session.accountEmail}|${session.me?.staff?.id ?? ''}` : '';
 
@@ -102,7 +108,30 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
     }
   }, [connected, isStaff, ownId, run, session.me]);
 
+  // Applicants get their notifications; staff get the team feed and, with audit.view, the audit log.
+  const refreshActivity = useCallback(async () => {
+    if (!connected || !session.me) return;
+    const id = ++activityRequest.current;
+    try {
+      if (!isStaff) {
+        const notifications = await listNotifications();
+        if (id === activityRequest.current) run(s => adoptServerActivity(s, { notifications }));
+        return;
+      }
+      const [staffFeed, audit] = await Promise.all([listStaffFeed(), canAudit ? getAuditLog() : Promise.resolve(null)]);
+      if (id !== activityRequest.current) return;
+      run(s => adoptServerActivity(s, { staffFeed: staffFeed as StaffEvent[], ...(audit ? { audit: audit.events as AuditEvent[] } : {}) }));
+      setAuditChain(audit?.chain ?? null);
+    } catch { /* keep the last copy; the next refresh tries again */ }
+  }, [canAudit, connected, isStaff, run, session.me]);
+
   useEffect(() => { void refreshPrograms(); }, [refreshPrograms, who]);
+  useEffect(() => {
+    if (!connected) { if (session.status !== 'loading') run(leaveServerActivity); return; }
+    void refreshActivity();
+    const timer = window.setInterval(() => { void refreshActivity(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [connected, refreshActivity, run, session.status, who]);
   useEffect(() => {
     if (connected) void refreshApplications();
     else if (session.status !== 'loading') run(leaveServerApplications);
@@ -116,12 +145,12 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   // Pick up changes other staff made while this tab was in the background.
   useEffect(() => {
     if (!connected) return;
-    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); void refreshApplications(); };
+    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); void refreshApplications(); void refreshActivity(); };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [connected, refreshPrograms, refreshApplicants, refreshApplications]);
+  }, [connected, refreshPrograms, refreshApplicants, refreshApplications, refreshActivity]);
 
-  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants, applicationsError, refreshApplications, ownId }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants, applicationsError, refreshApplications, ownId, refreshActivity, auditChain }}>{children}</Ctx.Provider>;
 }
 
 export const useServerData = () => useContext(Ctx);

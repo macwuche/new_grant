@@ -2,6 +2,7 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { applicationNumberSeq, applicationsTable, db, programsTable, type ApplicationRow } from "@workspace/db";
 import type { Application } from "@workspace/domain/model";
 import type { ApplicationRepo } from "./applicationRepo";
+import { writeEffects } from "./activity.db";
 import { toGrant, toProgramRow } from "./programRepo.db";
 
 // jsonb doesn't keep object key order; rebuild nested objects in the domain's order.
@@ -57,6 +58,7 @@ export const dbApplicationRepo: ApplicationRepo = {
         const removed = await tx.delete(programsTable).where(programAtVersion(id, version)).returning({ id: programsTable.id });
         return removed.length ? "ok" : "stale";
       },
+      record: effects => writeEffects(tx, effects),
     });
   }),
   get: async id => { const [row] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, id)); return row ? toApplication(row) : null; },

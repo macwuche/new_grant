@@ -1,6 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, programNumberSeq, programsTable, type ProgramRow } from "@workspace/db";
 import type { Grant, Tier } from "@workspace/domain/model";
+import { NO_EFFECTS } from "./activity";
+import { withEffects } from "./activity.db";
 import type { ProgramRepo, WriteOutcome } from "./programRepo";
 
 // jsonb doesn't keep object key order, and the rules compare questions as JSON
@@ -39,7 +41,8 @@ export const dbProgramRepo: ProgramRepo = {
     const { rows } = await db.execute<{ n: string }>(sql`select nextval(${programNumberSeq.seqName}) as n`);
     return Number(rows[0]!.n);
   },
-  insert: grant => write(async () => (await db.insert(programsTable).values({ id: grant.id, ...toProgramRow(grant) }).returning({ id: programsTable.id })).length),
+  insert: (grant, effects = NO_EFFECTS) => write(() => withEffects(effects, async tx =>
+    (await tx.insert(programsTable).values({ id: grant.id, ...toProgramRow(grant) }).returning({ id: programsTable.id })).length)),
   update: (grant, expectedVersion) => write(async () => (await db.update(programsTable).set(toProgramRow(grant))
     .where(and(eq(programsTable.id, grant.id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),
   remove: (id, expectedVersion) => write(async () => (await db.delete(programsTable)

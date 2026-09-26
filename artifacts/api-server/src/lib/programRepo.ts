@@ -1,4 +1,5 @@
 import type { Grant } from "@workspace/domain/model";
+import { NO_EFFECTS, type Effects } from "./activity";
 
 // Storage for grant programs, behind an interface so routes can be tested
 // without a database. The Drizzle implementation lives in ./programRepo.db.ts.
@@ -11,7 +12,8 @@ export interface ProgramRepo {
   list(): Promise<Grant[]>;
   /** A fresh number for the next program id. */
   nextNumber(): Promise<number>;
-  insert(grant: Grant): Promise<WriteOutcome>;
+  /** Adds a program and, in the same transaction, its effects (audit entry). */
+  insert(grant: Grant, effects?: Effects): Promise<WriteOutcome>;
   update(grant: Grant, expectedVersion: string): Promise<WriteOutcome>;
   remove(id: string, expectedVersion: string): Promise<WriteOutcome>;
 }
@@ -19,16 +21,17 @@ export interface ProgramRepo {
 const clone = (g: Grant): Grant => structuredClone(g);
 
 /** In-memory repo for tests and local experiments. */
-export function memoryProgramRepo(seed: Grant[] = []): ProgramRepo {
+export function memoryProgramRepo(seed: Grant[] = [], activity?: { write(effects: Effects): void }): ProgramRepo {
   let rows = seed.map(clone);
   let n = 3000;
   const nameTaken = (g: Grant) => rows.some(r => r.id !== g.id && r.name.toLowerCase() === g.name.toLowerCase());
   return {
     list: async () => rows.map(clone),
     nextNumber: async () => ++n,
-    insert: async grant => {
+    insert: async (grant, effects = NO_EFFECTS) => {
       if (nameTaken(grant)) return "duplicate-name";
       rows.push(clone(grant));
+      activity?.write(effects);
       return "ok";
     },
     update: async (grant, expectedVersion) => {

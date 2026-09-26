@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { markAllStaffFeedRead, markStaffFeedRead } from '@workspace/api-client-react';
+import { useServerData } from '@/lib/serverData';
 import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CreditCard, FileText, ShieldAlert, UserRound } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { markAllStaffEventsRead, markStaffEventRead, staffFeed, staffUnread } from '@workspace/domain/activity';
@@ -18,13 +20,20 @@ export function ActivityItem({ event, onOpen, compact = false }: { event: StaffE
 
 export function useOpenActivity() {
   const { run } = useDemoStore();
+  const { connected, refreshActivity } = useServerData();
   const [, navigate] = useLocation();
-  return (event: StaffEvent) => { run(s => markStaffEventRead(s, event.id)); navigate(event.href); };
+  // Signed in, read state is per staff member and saved on the server.
+  return (event: StaffEvent) => {
+    run(s => markStaffEventRead(s, event.id));
+    if (connected) void markStaffFeedRead(event.id).catch(() => refreshActivity());
+    navigate(event.href);
+  };
 }
 
 /** Topbar bell for staff: applicant actions that may need attention. */
 export function AdminActivityMenu() {
   const { state, run } = useDemoStore();
+  const { connected, refreshActivity } = useServerData();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -47,9 +56,9 @@ export function AdminActivityMenu() {
       <Bell size={16} />{unread > 0 && <span className="admin-activity-count" data-testid="text-admin-activity-count">{unread > 9 ? '9+' : unread}</span>}
     </button>
     {open && <div className="admin-activity-panel" id={panelId} role="region" aria-label="Team activity" data-testid="panel-admin-activity">
-      <div className="admin-activity-head"><strong><Activity size={14} /> Team activity</strong>{unread > 0 && <button type="button" onClick={() => run(markAllStaffEventsRead)} data-testid="button-admin-activity-read-all">Mark all as read</button>}</div>
+      <div className="admin-activity-head"><strong><Activity size={14} /> Team activity</strong>{unread > 0 && <button type="button" onClick={() => { run(markAllStaffEventsRead); if (connected) void markAllStaffFeedRead().catch(() => refreshActivity()); }} data-testid="button-admin-activity-read-all">Mark all as read</button>}</div>
       {items.length ? <div className="admin-activity-list">{items.map(e => <ActivityItem key={e.id} event={e} onOpen={ev => { setOpen(false); openItem(ev); }} />)}</div> : <p className="admin-review-hint" style={{ padding: 16 }}>No activity yet.</p>}
-      <div className="admin-activity-foot"><Link href="/admin" onClick={() => setOpen(false)}>Overview</Link><span>Shared by the demo staff team · browser only</span></div>
+      <div className="admin-activity-foot"><Link href="/admin" onClick={() => setOpen(false)}>Overview</Link><span>{connected ? 'Read status is yours alone' : 'Shared by the demo staff team · browser only'}</span></div>
     </div>}
   </div>;
 }

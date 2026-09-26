@@ -1,4 +1,5 @@
 import type { AccountControls } from "@workspace/domain/model";
+import { NO_EFFECTS, type Effects } from "./activity";
 
 // Storage for applicant profiles and their staff-managed account controls, one
 // per sign-in account, behind an interface so routes can be tested without a
@@ -39,13 +40,13 @@ export interface ProfileRepo {
   /** Contact details: the person's own edits, applied directly. */
   updateContact(authUserId: string, patch: ContactPatch): Promise<ProfileRecord>;
   /** Tier, identity, and account controls: stored only if the record is still at `expectedVersion`. */
-  saveAccount(authUserId: string, patch: AccountPatch, expectedVersion: string): Promise<ProfileRecord | "stale">;
+  saveAccount(authUserId: string, patch: AccountPatch, expectedVersion: string, effects?: Effects): Promise<ProfileRecord | "stale">;
 }
 
 export const NEW_ACCOUNT: StoredAccount = { status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } };
 
 /** In-memory repo for tests and local experiments. */
-export function memoryProfileRepo(seed: ProfileRecord[] = []): ProfileRepo {
+export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write(effects: Effects): void }): ProfileRepo {
   const rows = new Map(seed.map(r => [r.authUserId, structuredClone(r)]));
   let tick = Date.parse("2026-01-01T00:00:00.000Z");
   const stamp = () => new Date(tick += 1000).toISOString();
@@ -66,10 +67,11 @@ export function memoryProfileRepo(seed: ProfileRecord[] = []): ProfileRepo {
       Object.assign(row, patch, { updatedAt: stamp() });
       return structuredClone(row);
     },
-    saveAccount: async (id, patch, expectedVersion) => {
+    saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => {
       const row = rows.get(id);
       if (!row || row.updatedAt !== expectedVersion) return "stale";
       Object.assign(row, structuredClone(patch), { updatedAt: stamp() });
+      activity?.write(effects);
       return structuredClone(row);
     },
   };

@@ -22,6 +22,8 @@ tags:
     description: Applicant directory and account controls (staff)
   - name: applications
     description: Grant applications and review
+  - name: activity
+    description: Notifications, the staff activity feed, and the audit log
 security:
   - bearerAuth: []
 paths:
@@ -933,6 +935,131 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [activity]
+      summary: Your notifications
+      description: Newest first (up to 200).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [activity]
+      summary: Mark all your notifications read
+      description: Marks every one of your notifications as read.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/{id}/read:
+    parameters:
+      - $ref: "#/components/parameters/NotificationId"
+    post:
+      operationId: markNotificationRead
+      tags: [activity]
+      summary: Mark one notification read
+      description: Only your own; anyone else's reads as not found.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /staff-feed:
+    get:
+      operationId: listStaffFeed
+      tags: [activity]
+      summary: Team activity
+      description: Any active staff member. Newest first (up to 200), with your own read state.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffFeedItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /staff-feed/read-all:
+    post:
+      operationId: markAllStaffFeedRead
+      tags: [activity]
+      summary: Mark all team activity read (for you)
+      description: Marks every activity item as read for you only; other staff keep their own read state.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /staff-feed/{id}/read:
+    parameters:
+      - $ref: "#/components/parameters/FeedId"
+    post:
+      operationId: markStaffFeedRead
+      tags: [activity]
+      summary: Mark one activity item read (for you)
+      description: For you only; other staff keep their own read state.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /audit:
+    get:
+      operationId: getAuditLog
+      tags: [activity]
+      summary: Audit log
+      description: Requires audit.view. Every staff action, newest first, with whether the hash chain is intact.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
   securitySchemes:
     bearerAuth:
@@ -940,6 +1067,20 @@ components:
       scheme: bearer
       description: Supabase Auth access token
   parameters:
+    NotificationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^NT-[0-9]{1,15}$"
+    FeedId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^FD-[0-9]{1,15}$"
     ApplicationId:
       name: id
       in: path
@@ -999,6 +1140,103 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: string
+        at:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        href:
+          type: string
+        read:
+          type: boolean
+      required: [id, at, title, body, href, read]
+    StaffFeedItem:
+      type: object
+      properties:
+        id:
+          type: string
+        at:
+          type: string
+        kind:
+          type: string
+          enum: [application, deposit, withdrawal, card, security, account]
+        title:
+          type: string
+        body:
+          type: string
+        href:
+          type: string
+        highlight:
+          type: boolean
+        read:
+          type: boolean
+      required: [id, at, kind, title, body, href, highlight, read]
+    AuditItem:
+      type: object
+      properties:
+        id:
+          type: string
+        at:
+          type: string
+        staffId:
+          type: string
+        staffName:
+          type: string
+        role:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        applicantId:
+          type: string
+          nullable: true
+        summary:
+          type: string
+        changes:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              before:
+                type: string
+              after:
+                type: string
+            required: [field, before, after]
+        riskScore:
+          type: integer
+          nullable: true
+        ip:
+          type: string
+          nullable: true
+      required: [id, at, staffId, staffName, role, action, target, applicantId, summary, changes, riskScore, ip]
+    AuditLog:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditItem"
+        chain:
+          type: object
+          description: Whether every entry still matches its hash and links to the one before
+          properties:
+            intact:
+              type: boolean
+            checked:
+              type: integer
+            brokenAt:
+              type: string
+          required: [intact, checked]
+      required: [events, chain]
     ApplicationStatus:
       type: string
       enum: [Draft, Submitted, Under review, Changes requested, Approved, Declined]

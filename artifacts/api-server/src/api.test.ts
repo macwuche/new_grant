@@ -7,6 +7,7 @@ import { seedGrants } from "@workspace/domain/seed";
 import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
 import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
 import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRepo";
+import { memoryActivity } from "./lib/activity";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
@@ -35,13 +36,15 @@ let repo: StaffRepo;
 let programs: ProgramRepo;
 let profiles: ProfileRepo;
 let applications: ApplicationRepo;
+let activity: ReturnType<typeof memoryActivity>;
 
 async function start(v: TokenVerifier | null = verifier) {
-  repo = memoryStaffRepo(SEED);
-  programs = memoryProgramRepo(seedGrants());
-  profiles = memoryProfileRepo();
-  applications = memoryApplicationRepo(programs);
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications }, ["https://app.example.org"]).listen(0);
+  activity = memoryActivity();
+  repo = memoryStaffRepo(SEED, activity);
+  programs = memoryProgramRepo(seedGrants(), activity);
+  profiles = memoryProfileRepo([], activity);
+  applications = memoryApplicationRepo(programs, [], activity);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -533,5 +536,77 @@ describe("applications and review", () => {
 
   it("keeps the review queue to staff", async () => {
     expect((await call("/applications", "tok-applicant")).status).toBe(403);
+  });
+});
+
+describe("notifications, team activity, and the audit log", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const verifyMaya = async () => {
+    await call("/profile", "tok-maya");
+    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+  };
+  const notes = async (token = "tok-maya") => json(await call("/notifications", token));
+  const feed = async (token = "tok-super") => json(await call("/staff-feed", token));
+
+  it("notifies only the applicant concerned, and lets only them mark it read", async () => {
+    await verifyMaya();
+    const { application } = await json(await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya"));
+    const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
+    await post(`/applications/${application.id}/approve`, { version: v, award: 3000 });
+    const mine = await notes();
+    expect(mine.map((n: { title: string }) => n.title)).toEqual(["Creative Practice was approved", "Creative Practice is under review", "Identity verified"]);
+    expect(await notes("tok-applicant")).toEqual([]);
+    expect((await post(`/notifications/${mine[0].id}/read`, {}, "tok-applicant")).status).toBe(404);
+    expect((await post(`/notifications/${mine[0].id}/read`, {}, "tok-maya")).status).toBe(200);
+    expect((await notes())[0].read).toBe(true);
+    expect((await json(await post("/notifications/read-all", {}, "tok-maya"))).message).toMatch(/2 notifications/);
+  });
+
+  it("tells applicants holding drafts when a program closes", async () => {
+    await verifyMaya();
+    await post("/applications/save", { grantId: "creative", application: input }, "tok-maya");
+    await post("/programs/creative/close", { version: (await program("creative")).updatedAt });
+    expect((await notes())[0]).toMatchObject({ title: "Creative Practice closed", href: expect.stringMatching(/^\/applications\/APP-/) });
+  });
+
+  it("feeds applicant actions to staff, with each person's own read state", async () => {
+    await verifyMaya();
+    await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya");
+    const items = await feed();
+    expect(items.map((e: { title: string }) => e.title)).toEqual(["New application APP-5001", "Identity check submitted"]);
+    expect((await call("/staff-feed", "tok-applicant")).status).toBe(403);
+    await post(`/staff-feed/${items[0].id}/read`, {});
+    expect((await feed())[0].read).toBe(true);
+    expect((await feed("tok-finance"))[0].read).toBe(false);
+  });
+
+  it("audits staff actions with who, where, and field-level changes", async () => {
+    await call("/profile", "tok-maya");
+    await post(`/applicants/${MAYA}/tier`, { tier: 2, reason: "Trading history confirmed." });
+    await post("/staff", { email: "casey@example.org", name: "Casey Brooks", role: "support" });
+    expect((await call("/audit", "tok-finance")).status).toBe(403);
+    const log = await json(await call("/audit", "tok-super"));
+    expect(log.chain).toEqual({ intact: true, checked: 2 });
+    const [staffAdd, tier] = log.events;
+    expect(tier).toMatchObject({ action: "Change account tier", staffName: "Sam Rivera", role: "super", target: MAYA, applicantId: MAYA, ip: expect.stringContaining("127.0.0.1") });
+    expect(tier.changes).toContainEqual({ field: "tier", before: "1", after: "2" });
+    expect(staffAdd).toMatchObject({ action: "Add staff member", target: "casey@example.org" });
+  });
+
+  it("doesn't audit refused actions", async () => {
+    await call("/profile", "tok-maya");
+    await post(`/applicants/${MAYA}/tier`, { tier: 1, reason: "Already tier one, so this fails." });
+    expect((await json(await call("/audit", "tok-super"))).events).toEqual([]);
+  });
+
+  it("detects an edited audit entry", async () => {
+    await call("/profile", "tok-maya");
+    await post(`/applicants/${MAYA}/lock`, { reason: "Suspicious deposit pattern." });
+    await post(`/applicants/${MAYA}/unlock`, {});
+    const [, first] = (await json(await call("/audit", "tok-super"))).events;
+    activity.tamper(Number(first.id.slice(3)), "Nothing happened here.");
+    expect((await json(await call("/audit", "tok-super"))).chain).toEqual({ intact: false, checked: 2, brokenAt: first.id });
   });
 });

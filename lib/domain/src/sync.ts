@@ -1,4 +1,4 @@
-import type { AccountControls, Application, DemoState, Grant, Profile, Result, Transaction } from './model';
+import type { AccountControls, Application, AuditEvent, DemoState, Grant, Notification, Profile, Result, StaffEvent, Transaction } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 // Merging server records into the browser store. While only some data lives on
@@ -120,6 +120,35 @@ function withAwardCredits(state: DemoState, applications: Application[]): Transa
   return credits.length ? [...credits, ...state.transactions] : state.transactions;
 }
 
+/** Server notifications, feed items, and audit entries, as the API returns them. */
+export type ServerActivity = {
+  notifications?: Omit<Notification, 'applicantId'>[];
+  staffFeed?: StaffEvent[];
+  audit?: AuditEvent[];
+};
+
+/**
+ * Loads activity from the API: an applicant's notifications (moved into the
+ * portal's slot), and for staff the team feed with their own read state and,
+ * with audit.view, the audit log.
+ */
+export function adoptServerActivity(state: DemoState, activity: ServerActivity): Result {
+  const next = { ...state, serverActivity: true };
+  if (activity.notifications) next.notifications = activity.notifications.map(n => ({ ...n, applicantId: CURRENT_APPLICANT_ID }));
+  if (activity.staffFeed) next.staffFeed = activity.staffFeed;
+  // The audit log is kept oldest first, like the browser's own.
+  if (activity.audit) next.audit = [...activity.audit].reverse();
+  if (state.serverActivity && same(next, state)) return unchanged(state);
+  return { ok: true, message: '', state: next };
+}
+
+/** Back to the demo activity (after signing out, or when sign-in isn't configured). */
+export function leaveServerActivity(state: DemoState): Result {
+  if (!state.serverActivity) return unchanged(state);
+  const seed = createSeedState();
+  return { ok: true, message: '', state: { ...state, notifications: seed.notifications, staffFeed: seed.staffFeed, audit: seed.audit, serverActivity: false } };
+}
+
 /**
  * What the browser may keep in storage. Real applicants loaded for staff are
  * dropped (they're reloaded from the API on the next visit), so their details
@@ -129,5 +158,6 @@ export function forStorage(state: DemoState): DemoState {
   let stored = state;
   if (stored.serverApplicants) stored = { ...stored, otherApplicants: [], accounts: { [CURRENT_APPLICANT_ID]: stored.accounts[CURRENT_APPLICANT_ID]! } };
   if (stored.serverApplications) stored = { ...stored, applications: [] };
+  if (stored.serverActivity) stored = { ...stored, notifications: [], staffFeed: [], audit: [] };
   return stored;
 }

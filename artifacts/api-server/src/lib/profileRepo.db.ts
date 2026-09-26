@@ -1,5 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, type ApplicantProfileRow } from "@workspace/db";
+import { NO_EFFECTS } from "./activity";
+import { writeEffects } from "./activity.db";
 import type { AccountPatch, ProfileRecord, ProfileRepo } from "./profileRepo";
 
 const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
@@ -49,9 +51,11 @@ export const dbProfileRepo: ProfileRepo = {
     const [row] = await db.update(applicantProfilesTable).set({ ...patch, updatedAt: new Date() }).where(byId(id)).returning();
     return toRecord(row!);
   },
-  saveAccount: async (id, patch, expectedVersion) => {
-    const [row] = await db.update(applicantProfilesTable).set({ ...accountColumns(patch), updatedAt: new Date() })
+  saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => db.transaction(async tx => {
+    const [row] = await tx.update(applicantProfilesTable).set({ ...accountColumns(patch), updatedAt: new Date() })
       .where(and(byId(id), atVersion(expectedVersion))).returning();
-    return row ? toRecord(row) : "stale";
-  },
+    if (!row) return "stale" as const;
+    await writeEffects(tx, effects);
+    return toRecord(row);
+  }),
 };

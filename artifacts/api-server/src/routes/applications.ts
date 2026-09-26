@@ -12,7 +12,8 @@ import type { ApplicationRepo, ProgramScope } from "../lib/applicationRepo";
 import { slotApplicant } from "../lib/applicantRules";
 import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
-import { authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { effectsOf } from "../lib/activity";
+import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 import { ownProfile } from "./profile";
 
 // Grant applications. Applicants act on their own records only (ownership comes
@@ -21,9 +22,10 @@ import { ownProfile } from "./profile";
 // runs the shared rules inside the program's lock (see ../lib/applicationRepo.ts)
 // and stores exactly the applications the rule changed.
 //
-// Not on the server yet: the applicant notifications and staff activity items
-// the rules create (slice 4), the award credit to the grant balance and the
-// application fee (slice 5).
+// The notifications and staff activity items the rules create, and an audit
+// entry for each staff action, are stored in the same transaction. Not on the
+// server yet: the award credit to the grant balance and the application fee
+// (slice 5).
 
 const STALE = "This application changed since you opened it. Review the latest version and try again.";
 
@@ -57,6 +59,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
       if (!result.ok) return { failure: refused(result) };
       const after = readApplicantSlot(result.state, record.authUserId).applications;
       await storeChanges(scope, scope.applications, after);
+      await scope.record(effectsOf(state, result.state, new Date(), { slotId: record.authUserId }));
       return { message: result.message, saved: after.find(a => a.id === result.id) };
     });
     if ("failure" in outcome) { res.status(outcome.failure.status).json(outcome.failure.body); return; }
@@ -89,7 +92,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
 
   type Parsed = { ok: true; version?: string; command: (state: DemoState, by: string) => Result } | { ok: false; error: string };
 
-  const staffAction = (path: string, permission: Permission, parse: (body: unknown, id: string) => Parsed) =>
+  const staffAction = (path: string, permission: Permission, label: string, parse: (body: unknown, id: string) => Parsed) =>
     router.post(`/applications/:id/${path}`, requireStaff, requirePermission(permission), async (req, res) => {
       const params = ApplicationIdParams.safeParse(req.params);
       const found = params.success ? await apps.get(params.data.id) : null;
@@ -103,9 +106,11 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
         const current = scope.applications.find(a => a.id === found.id);
         if (!current) return { failure: { status: 404, body: { error: "That application is not in the review queue." } } };
         if (parsed.version !== undefined && current.updatedAt !== parsed.version) return { failure: { status: 409, body: { error: STALE } } };
-        const result = parsed.command(serverState({ grants: scope.grants, applications: scope.applications }), actor.name);
+        const before = serverState({ grants: scope.grants, applications: scope.applications });
+        const result = parsed.command(before, actor.name);
         if (!result.ok) return { failure: refused(result) };
         await storeChanges(scope, scope.applications, result.state.applications);
+        await scope.record(effectsOf(before, result.state, new Date(), { audit: auditContext(req, res, label, found.id), summary: result.message }));
         return { message: result.message, saved: result.state.applications.find(a => a.id === found.id)! };
       });
       if ("failure" in outcome) { res.status(outcome.failure.status).json(outcome.failure.body); return; }
@@ -115,31 +120,31 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo)
 
   const invalid = (error: string): Parsed => ({ ok: false, error });
 
-  staffAction("start-review", "applications.review", (body, id) => {
+  staffAction("start-review", "applications.review", "Start review", (body, id) => {
     const b = StartReviewBody.safeParse(body);
     return b.success ? { ok: true, version: b.data.version, command: (s, by) => startReview(s, id, b.data.version, by, new Date()) } : invalid("Send the application's version.");
   });
-  staffAction("approve", "applications.review", (body, id) => {
+  staffAction("approve", "applications.review", "Approve application", (body, id) => {
     const b = ApproveApplicationBody.safeParse(body);
     return b.success ? { ok: true, version: b.data.version, command: (s, by) => approveApplication(s, id, b.data.version, b.data.award, by, new Date()) } : invalid("Send the application's version and the award amount.");
   });
-  staffAction("request-changes", "applications.review", (body, id) => {
+  staffAction("request-changes", "applications.review", "Request changes", (body, id) => {
     const b = RequestApplicationChangesBody.safeParse(body);
     return b.success ? { ok: true, version: b.data.version, command: (s, by) => requestChanges(s, id, b.data.version, b.data.message, by, new Date()) } : invalid("Send the application's version and a message.");
   });
-  staffAction("decline", "applications.review", (body, id) => {
+  staffAction("decline", "applications.review", "Decline application", (body, id) => {
     const b = DeclineApplicationBody.safeParse(body);
     return b.success ? { ok: true, version: b.data.version, command: (s, by) => declineApplication(s, id, b.data.version, b.data.reason, by, new Date()) } : invalid("Send the application's version and a reason.");
   });
-  staffAction("notes", "notes.add", (body, id) => {
+  staffAction("notes", "notes.add", "Add internal note", (body, id) => {
     const b = AddInternalNoteBody.safeParse(body);
     return b.success ? { ok: true, command: (s, by) => addInternalNote(s, id, b.data.text, by, new Date()) } : invalid("Write a note.");
   });
-  staffAction("escalate", "applications.escalate", (body, id) => {
+  staffAction("escalate", "applications.escalate", "Escalate to security", (body, id) => {
     const b = EscalateApplicationBody.safeParse(body);
     return b.success ? { ok: true, command: (s, by) => escalateApplication(s, id, b.data.reason, by, new Date()) } : invalid("Explain what compliance should check.");
   });
-  staffAction("clear-escalation", "applications.clearEscalation", (body, id) => {
+  staffAction("clear-escalation", "applications.clearEscalation", "Clear escalation", (body, id) => {
     const b = ClearEscalationBody.safeParse(body);
     return b.success ? { ok: true, command: (s, by) => clearEscalation(s, id, b.data.resolution, by, new Date()) } : invalid("Record what the check found.");
   });

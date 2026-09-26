@@ -3,11 +3,14 @@ import { useLocation } from 'wouter';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { markAllNotificationsRead, markNotificationRead, ownNotifications, unreadCount } from '@workspace/domain/notifications';
+import { markAllNotificationsRead as markAllOnServer, markNotificationRead as markOnServer } from '@workspace/api-client-react';
+import { useServerData } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 
 /** Topbar bell: the applicant's review, payout, and program updates. */
 export function NotificationsMenu() {
   const { state, run } = useDemoStore();
+  const { connected, refreshActivity } = useServerData();
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -25,8 +28,10 @@ export function NotificationsMenu() {
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [open]);
 
+  // Read state shows at once; signed in, it's also saved to the account (a failure is corrected on the next refresh).
   const openItem = (id: string, href: string) => {
     run(s => markNotificationRead(s, id));
+    if (connected) void markOnServer(id).catch(() => refreshActivity());
     setOpen(false);
     navigate(href);
   };
@@ -36,7 +41,7 @@ export function NotificationsMenu() {
       <Bell size={17} />{unread > 0 && <span className="notif-count" data-testid="text-notification-count">{unread > 9 ? '9+' : unread}</span>}
     </button>
     {open && <div className="notif-panel" id={panelId} role="region" aria-label="Notifications" data-testid="panel-notifications">
-      <div className="notif-head"><strong>Notifications</strong>{unread > 0 && <button className="link-text" onClick={() => run(markAllNotificationsRead)} data-testid="button-mark-all-read">Mark all as read</button>}</div>
+      <div className="notif-head"><strong>Notifications</strong>{unread > 0 && <button className="link-text" onClick={() => { run(markAllNotificationsRead); if (connected) void markAllOnServer().catch(() => refreshActivity()); }} data-testid="button-mark-all-read">Mark all as read</button>}</div>
       {items.length ? <ul className="notif-list">{items.map(n => <li key={n.id}>
         <button className={`notif-item ${n.read ? '' : 'unread'}`} onClick={() => openItem(n.id, n.href)} data-testid={`notification-${n.id}`}>
           <span className="notif-item-title">{!n.read && <span className="notif-unread-dot" aria-label="Unread" />}{n.title}</span>

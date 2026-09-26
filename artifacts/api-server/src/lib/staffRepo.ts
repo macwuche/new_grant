@@ -1,4 +1,5 @@
 import type { StaffRole } from "@workspace/authz";
+import { NO_EFFECTS, type Effects } from "./activity";
 
 // Storage for staff members, behind an interface so routes can be tested
 // without a database. The Drizzle implementation lives in ./staffRepo.db.ts.
@@ -10,12 +11,13 @@ export interface StaffRepo {
   findById(id: string): Promise<StaffRecord | null>;
   findByAuthUserId(authUserId: string): Promise<StaffRecord | null>;
   findByEmail(email: string): Promise<StaffRecord | null>;
-  create(member: Pick<StaffRecord, "email" | "name" | "role">): Promise<StaffRecord>;
-  update(id: string, patch: Partial<Pick<StaffRecord, "role" | "active" | "authUserId">>): Promise<StaffRecord>;
+  /** `effects` (an audit entry) are written in the same transaction. */
+  create(member: Pick<StaffRecord, "email" | "name" | "role">, effects?: Effects): Promise<StaffRecord>;
+  update(id: string, patch: Partial<Pick<StaffRecord, "role" | "active" | "authUserId">>, effects?: Effects): Promise<StaffRecord>;
 }
 
 /** In-memory repo for tests and local experiments. */
-export function memoryStaffRepo(seed: StaffRecord[] = []): StaffRepo {
+export function memoryStaffRepo(seed: StaffRecord[] = [], activity?: { write(effects: Effects): void }): StaffRepo {
   const rows = seed.map(r => ({ ...r }));
   let n = rows.length;
   return {
@@ -23,15 +25,17 @@ export function memoryStaffRepo(seed: StaffRecord[] = []): StaffRepo {
     findById: async id => rows.find(r => r.id === id) ?? null,
     findByAuthUserId: async authUserId => rows.find(r => r.authUserId === authUserId) ?? null,
     findByEmail: async email => rows.find(r => r.email === email.toLowerCase()) ?? null,
-    create: async member => {
+    create: async (member, effects = NO_EFFECTS) => {
       const row: StaffRecord = { id: `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`, active: true, authUserId: null, ...member, email: member.email.toLowerCase() };
       rows.push(row);
+      activity?.write(effects);
       return { ...row };
     },
-    update: async (id, patch) => {
+    update: async (id, patch, effects = NO_EFFECTS) => {
       const row = rows.find(r => r.id === id);
       if (!row) throw new Error("not found");
       Object.assign(row, patch);
+      activity?.write(effects);
       return { ...row };
     },
   };

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSeedState } from './seed';
 import { applicantRecords } from './applicants';
 import { CURRENT_APPLICANT_ID } from './seed';
-import { adoptServerApplication, adoptServerApplications, leaveServerApplications, adoptServerApplicant, adoptServerApplicants, adoptServerProfile, adoptServerProgram, adoptServerPrograms, dropServerProgram, forStorage, leaveServerApplicants } from './sync';
+import { adoptServerActivity, leaveServerActivity, adoptServerApplication, adoptServerApplications, leaveServerApplications, adoptServerApplicant, adoptServerApplicants, adoptServerProfile, adoptServerProgram, adoptServerPrograms, dropServerProgram, forStorage, leaveServerApplicants } from './sync';
 
 describe('adopting server data', () => {
   it('replaces the catalog, and keeps the same state object when nothing changed', () => {
@@ -101,5 +101,32 @@ describe('applications from the server', () => {
     const left = leaveServerApplications(loaded.state);
     if (!left.ok) throw new Error(left.error);
     expect(left.state.applications).toEqual(createSeedState().applications);
+  });
+});
+
+describe('activity from the server', () => {
+  const note = { id: 'NT-7', at: '2026-09-26T10:00:00.000Z', title: 'Creative Practice was approved', body: 'Approved.', href: '/applications/APP-5001', read: false };
+  const entry = { id: 'AU-2', at: '2026-09-26T10:00:00.000Z', staffId: 'uuid', staffName: 'Riley Chen', role: 'compliance' as const, action: 'Lock account', target: 'u1', applicantId: 'u1', summary: 'Locked.', changes: [], riskScore: null, ip: '203.0.113.9' };
+
+  it("gives the applicant their notifications in the portal slot, so the bell shows them", () => {
+    const result = adoptServerActivity(createSeedState(), { notifications: [note] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.state.notifications).toEqual([{ ...note, applicantId: CURRENT_APPLICANT_ID }]);
+  });
+
+  it('keeps the audit log oldest first, like the browser log', () => {
+    const result = adoptServerActivity(createSeedState(), { audit: [{ ...entry, id: 'AU-3' }, entry] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.state.audit.map(e => e.id)).toEqual(['AU-2', 'AU-3']);
+  });
+
+  it('never stores server activity in the browser, and restores the demo activity after signing out', () => {
+    const loaded = adoptServerActivity(createSeedState(), { notifications: [note], audit: [entry] });
+    if (!loaded.ok) throw new Error(loaded.error);
+    const stored = forStorage(loaded.state);
+    expect([stored.notifications, stored.staffFeed, stored.audit]).toEqual([[], [], []]);
+    const left = leaveServerActivity(stored);
+    if (!left.ok) throw new Error(left.error);
+    expect(left.state.notifications).toEqual(createSeedState().notifications);
   });
 });

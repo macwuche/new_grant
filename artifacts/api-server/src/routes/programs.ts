@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { CreateProgramBody, PublishProgramBody as ProgramVersionBody, UpdateProgramBody, UpdateProgramParams as ProgramIdParams } from "@workspace/api-zod";
 import type { DemoState, Grant, GrantInput, Result } from "@workspace/domain/model";
 import { closeProgram, createProgram, deleteProgram, publishProgram, updateProgram } from "@workspace/domain/programs";
@@ -6,7 +6,8 @@ import { serverState } from "@workspace/domain/server";
 import { logger } from "../lib/logger";
 import type { ApplicationRepo } from "../lib/applicationRepo";
 import type { ProgramRepo, WriteOutcome } from "../lib/programRepo";
-import { authLocals, requirePermission } from "../middlewares/auth";
+import { effectsOf } from "../lib/activity";
+import { auditContext, authLocals, requirePermission } from "../middlewares/auth";
 
 // Grant programs. Every change runs the same rule functions the portal uses
 // (@workspace/domain/programs) against the programs loaded from the database,
@@ -14,7 +15,8 @@ import { authLocals, requirePermission } from "../middlewares/auth";
 // Changes to an existing program run inside that program's lock with its
 // applications loaded, so criteria lock after the first submission and the
 // budget can't go below what's awarded, even under concurrent requests.
-// Not yet: notifying applicants holding drafts when a program closes (slice 4).
+// Each change is audited, and closing a program notifies applicants holding
+// drafts, in the same transaction.
 
 const STALE = "This program changed since you opened it. Review the latest version and try again.";
 
@@ -30,7 +32,10 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
   });
 
   /** Runs a rule for one existing program (or a new one when `id` is null) and stores the result. */
-  async function apply(res: Response, action: string, id: string | null, version: string | null, command: Command) {
+  // Audit labels match the ones the browser demo uses.
+  const LABELS: Record<string, string> = { create: "Create program", edit: "Edit program", close: "Close program", delete: "Delete program" };
+
+  async function apply(req: Request, res: Response, action: string, id: string | null, version: string | null, command: Command) {
     const actor = authLocals(res).staff!;
     type Done = { saved?: Grant; message: string } | { status: number; body: object };
     const finish = (done: Done) => {
@@ -46,10 +51,12 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
 
     if (!id) {
       const grants = await repo.list();
-      const result = command(serverState({ grants, nextId: await repo.nextNumber() }), actor.name, new Date());
+      const before = serverState({ grants, nextId: await repo.nextNumber() });
+      const now = new Date();
+      const result = command(before, actor.name, now);
       if (!result.ok) { finish(failed(result)); return; }
-      const saved = result.state.grants.find(g => !grants.some(before => before.id === g.id))!;
-      const outcome = await repo.insert(saved);
+      const saved = result.state.grants.find(g => !grants.some(b => b.id === g.id))!;
+      const outcome = await repo.insert(saved, effectsOf(before, result.state, now, { audit: auditContext(req, res, LABELS.create!, saved.id), summary: result.message }));
       finish(outcome === "ok" ? { saved, message: result.message } : refusal(outcome));
       return;
     }
@@ -58,11 +65,16 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
       const existing = scope.grants.find(g => g.id === id);
       if (!existing) return { status: 404, body: { error: "That program could not be found." } };
       if (existing.updatedAt !== version) return { status: 409, body: { error: STALE } };
-      const result = command(serverState({ grants: scope.grants, applications: scope.applications }), actor.name, new Date());
+      const before = serverState({ grants: scope.grants, applications: scope.applications });
+      const now = new Date();
+      const result = command(before, actor.name, now);
       if (!result.ok) return failed(result);
       const saved = result.state.grants.find(g => g.id === id);
       const outcome = saved ? await scope.saveGrant(saved, version) : await scope.removeGrant(id, version);
-      return outcome === "ok" ? { saved, message: result.message } : refusal(outcome);
+      if (outcome !== "ok") return refusal(outcome);
+      const label = action === "publish" ? (existing.status === "Closed" ? "Reopen program" : "Publish program") : LABELS[action]!;
+      await scope.record(effectsOf(before, result.state, now, { audit: auditContext(req, res, label, id), summary: result.message }));
+      return { saved, message: result.message };
     }));
   }
 
@@ -72,7 +84,7 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
   router.post("/programs", async (req, res) => {
     const body = CreateProgramBody.safeParse(req.body);
     if (!body.success) { res.status(400).json({ error: "Send a complete program definition." }); return; }
-    await apply(res, "create", null, null, (s, by, now) => createProgram(s, body.data as GrantInput, by, now));
+    await apply(req, res, "create", null, null, (s, by, now) => createProgram(s, body.data as GrantInput, by, now));
   });
 
   router.put("/programs/:id", async (req, res) => {
@@ -81,7 +93,7 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
     if (!params.success) { res.status(404).json({ error: "That program could not be found." }); return; }
     if (!body.success) { res.status(400).json({ error: "Send the program's version and a complete program definition." }); return; }
     const { version, program } = body.data;
-    await apply(res, "edit", params.data.id, version, (s, by, now) => updateProgram(s, params.data.id, version, program as GrantInput, by, now));
+    await apply(req, res, "edit", params.data.id, version, (s, by, now) => updateProgram(s, params.data.id, version, program as GrantInput, by, now));
   });
 
   const statusRoute = (path: string, action: string, command: (id: string, version: string) => Command) =>
@@ -90,7 +102,7 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
       const body = ProgramVersionBody.safeParse(req.body);
       if (!params.success) { res.status(404).json({ error: "That program could not be found." }); return; }
       if (!body.success) { res.status(400).json({ error: "Send the program's version." }); return; }
-      await apply(res, action, params.data.id, body.data.version, command(params.data.id, body.data.version));
+      await apply(req, res, action, params.data.id, body.data.version, command(params.data.id, body.data.version));
     });
 
   statusRoute("publish", "publish", (id, version) => (s, by, now) => publishProgram(s, id, version, by, now));
