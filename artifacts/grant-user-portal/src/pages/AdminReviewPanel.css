@@ -1,0 +1,39 @@
+.admin-review { width: min(540px, 100%); }
+.admin-review-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.admin-review-title .admin-badge { flex: 0 0 auto; margin-top: 6px; }
+.admin-review-section { margin-top: 26px; }
+.admin-review-section h3 { margin: 0 0 10px; font: 700 13px var(--app-font-display, sans-serif); letter-spacing: -.02em; }
+.admin-review-text { margin: 0; color: var(--admin-ink); font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.admin-review-hint { margin: 6px 0 10px; color: var(--admin-muted); font-size: 11px; line-height: 1.5; }
+.admin-review-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 11px; }
+.admin-review-checklist li { display: flex; align-items: center; gap: 8px; }
+.admin-review-checklist li.ok svg { color: #4f742c; }
+.admin-review-checklist li.missing { color: #9b6051; }
+.admin-review-actions { padding: 18px; border: 1px solid var(--admin-line); border-radius: 14px; background: var(--admin-paper); }
+.admin-segment { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 11px; background: #e9ede4; }
+.admin-shell .admin-segment button { flex: 1 1 auto; min-height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--admin-muted); font-size: 11px; font-weight: 700; }
+.admin-segment button.active { background: var(--admin-panel); color: var(--admin-ink); box-shadow: 0 1px 3px rgba(20,29,33,.12); }
+.admin-review-field { display: grid; gap: 6px; margin-bottom: 12px; font-size: 11px; font-weight: 700; }
+.admin-review-field small { color: var(--admin-muted); font-weight: 500; line-height: 1.45; }
+.admin-shell .admin-input { width: 100%; padding: 10px 12px; border: 1px solid var(--admin-line); border-radius: 10px; background: #fff; color: var(--admin-ink); font-size: 12px; font-weight: 500; resize: vertical; }
+.admin-input[aria-invalid="true"] { border-color: #b4553f; }
+.admin-shell .admin-review-field small.admin-field-error, .admin-field-error { color: #a4412c; }
+.admin-review-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.admin-shell .admin-btn { min-height: 36px; padding: 0 15px; border: 1px solid var(--admin-line); border-radius: 10px; background: var(--admin-panel); color: var(--admin-ink); font-size: 11px; font-weight: 800; }
+.admin-btn.primary { border-color: var(--admin-night); background: var(--admin-night); color: #f5f7ef; }
+.admin-btn.danger { border-color: #a4412c; background: #a4412c; color: #fff; }
+.admin-btn:disabled { opacity: .5; cursor: not-allowed; }
+.admin-review-stale { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; padding: 12px 14px; border-radius: 11px; background: #f7efd9; color: #7a5a1a; font-size: 11px; line-height: 1.45; }
+.admin-shell .admin-review-stale button { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 6px 10px; border: 0; border-radius: 8px; background: #fffaf0; color: #7a5a1a; font-size: 11px; font-weight: 800; }
+.admin-review-flash { margin-bottom: 16px; padding: 12px 14px; border-radius: 11px; font-size: 11px; line-height: 1.45; }
+.admin-review-flash.ok { background: #e7f3dc; color: #3f6224; }
+.admin-review-flash.error { background: #f3e8e5; color: #8f4535; }
+.admin-review-history, .admin-review-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.admin-review-history li, .admin-review-notes li { padding-left: 12px; border-left: 2px solid var(--admin-line); font-size: 11px; }
+.admin-review-history li:first-child { border-left-color: var(--admin-lime); }
+.admin-review-history strong { display: block; font-size: 12px; }
+.admin-review-history span, .admin-review-notes span { display: block; margin-top: 2px; color: var(--admin-muted); font-size: 10px; }
+.admin-review-history p, .admin-review-notes p { margin: 4px 0 0; line-height: 1.5; }
+.admin-review-notes { margin-bottom: 12px; }
+.admin-badge.approved { background: #e7f3dc; color: #4f742c; }
+.admin-badge.changes-requested { background: #fbe9dc; color: #9a5a22; }

@@ -330,3 +330,8 @@ button { cursor: pointer; }
   .form-actions { flex-direction: column-reverse; }
   .form-actions .btn { width: 100%; }
 }
+/* Inline validation for applicant forms */
+.field-error { color: hsl(var(--danger)); font-size: 10px; line-height: 1.4; }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: hsl(var(--danger)); }
+.danger-text { color: hsl(var(--danger)); }
+.status-changes-requested { background: hsl(24 90% 92%); color: hsl(22 80% 38%); }

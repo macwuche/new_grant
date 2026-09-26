@@ -1,6 +1,6 @@
 # arc.fund — project brief and implementation handoff
 
-**Status:** UI prototype; not a live grant, identity, or financial system  
+**Status:** Browser-only working prototype (applicant + admin review logic, no backend); not a live grant, identity, or financial system  
 **Last reviewed:** 25 September 2026  
 **Audience:** Product designers, frontend/backend developers, QA, and security reviewers
 
@@ -8,7 +8,7 @@
 
 arc.fund is a proposed grant-funding workspace with two experiences: an **applicant portal** for discovering grant programs, preparing applications, and understanding account activity; and an **admin workspace** for a future staff team to manage programs and review requests. The product aims to make eligibility, application progress, and funding activity understandable without losing the trust and controls required for sensitive applicant data and money movement.
 
-**Today, both experiences are illustrative.** The applicant portal and `/admin` use fictional, locally defined records. No visitor is authenticated, no application or document is stored, no grant is awarded, and no card, deposit, or payout is issued. The admin preview is reachable by URL without staff authorization because it contains no real records or operations. Its brand-color setting affects only the current browser, not the site for everyone. **Do not connect real applicant records or email to this route until server-side staff authorization and privacy controls exist.**
+**Today, both experiences run on fictional demo data stored in the visitor's own browser (localStorage).** The applicant portal and `/admin` share one local store: an applicant can draft and submit, a reviewer in `/admin` can start a review, request changes, approve (crediting the demo grant balance), or decline, and each side sees the other's changes — even across tabs. Nothing leaves the browser: no visitor is authenticated, nothing is stored on a server, no real grant is awarded, and no card, deposit, or payout is issued. The admin workspace is reachable by URL without staff authorization; that is acceptable only because every record is fictional and local to the viewer. Its brand-color setting affects only the current browser, not the site for everyone. **Do not connect real applicant records or email to this route until server-side staff authorization and privacy controls exist.**
 
 The current objective is to establish and iterate on the interface. A production implementation requires decisions on policies, identity, eligibility, data ownership, review governance, and any regulated financial partners before operational logic is enabled.
 
@@ -17,13 +17,13 @@ The current objective is to establish and iterate on the interface. A production
 | Area | Implemented UI / local behavior | Not implemented |
 | --- | --- | --- |
 | Applicant access | Sign-in, four-step sign-up, password-reset screens; local form validation and feedback. Sign-up plays an illustrative matching animation, then navigates to the demo dashboard after roughly four seconds. | Accounts, login sessions, email or code delivery/verification, actual grant matching, password reset, real consent recording. |
-| Applicant dashboard | Sample eligibility, balances, application pulse, card, and activity with demo labels. | Personalized data or computed balances/eligibility. |
-| Grant discovery | Four example programs, tier filter, requirements/deadlines, navigation to an application preview. | Published program catalog, live availability, actual eligibility evaluation. |
-| Applications | Sample list with status filters; three-step Basics → Requirements → Review form. | Draft persistence, file upload, submission, status updates, reviewer decisions, notifications. The “Choose file” and “Preview submission” controls are demonstrative. |
-| Cards and transactions | Example cards, local reveal/freeze/request states; searchable/filterable sample ledger. Export downloads a text file explicitly marked demo-only. | Card issuance or management, real transaction history, accounting, meaningful export. |
-| Withdrawals | Example amount, payout destination selector, illustrative fee preview and read-only confirmation. | Bank/mobile-money integration, payment requests, balance holds, ledger entries, payouts. The displayed 1.25% fee capped at $14 is **demo math**, not an approved commercial rule. |
-| Applicant settings | Local profile editing, example verification/tier, two-step-sign-in toggle. | Persisted profile, KYC/identity checks, actual MFA/security settings. |
-| Admin `/admin` | Overview, applicant directory, email inbox, application review queue, grant programs, and settings. Fictional records and messages, local search/status filters, responsive mobile cards, read-only detail panels, and a draft-only mailbox preview. Inbox-specific preview notice. Settings lets this browser preview a brand accent across the applicant and admin screens, remembers it locally, and lists future Resend email configuration without collecting API keys. | Staff accounts/roles, site-wide published branding, real applicant data or email, sending/receiving, Resend connection, verified mail domain/MX, signed inbound webhook, review decisions, program changes, policies, payouts, audit history. Other visitors do not see this browser's color choice. |
+| Applicant dashboard | Eligible amount, grant/deposit balances, application pulse, card, and activity computed from the browser-stored demo state (`src/domain/`). | Server-side data; balances are derived from a local ledger, not an authoritative one. |
+| Grant discovery | Four example programs with per-grant eligibility (tier, deadline, identity verification, one active application per grant); Start / Resume draft / View application / Not eligible states; tier filter. | Published program catalog; server-side eligibility. |
+| Applications | Create, save, resume, delete drafts; per-step validation (name, amount within grant min/max, registration when required, 30-char plan, requirements checklist); submit with eligibility re-check; read-only detail with status history (who acted, applicant-visible messages, award amount or decline reason). When a reviewer requests changes, the application reopens with the reviewer's message and can be edited and **resubmitted** (even after the deadline). Saved in this browser (localStorage). | Server persistence, file upload (checklist confirms readiness only), email/in-app notifications. |
+| Cards and transactions | Freeze/unfreeze persisted; physical card request charges an $8.50 fee to the deposit balance (once). Searchable/filterable ledger including new payouts and fees; CSV export marked demo-only. | Card issuance, real transaction history, accounting. |
+| Withdrawals | Validated request ($10 minimum, ≤ grant balance, 2 decimals), fee breakdown, confirmation, pending ledger entry that holds the amount, request history. | Bank/mobile-money integration, actual payouts, status progression. The 1.25% fee capped at $14 is **demo math**, not an approved commercial rule. |
+| Applicant settings | Validated profile editing and two-step preference saved in this browser; tier/verification drive eligibility; **Reset demo data** restores the seed records. | Server-side profile, KYC/identity checks, actual MFA. |
+| Admin `/admin` | Overview, applicant directory, email inbox, application review queue, grant programs, and settings. **Review workflow** (`src/domain/review.ts`, `pages/AdminReviewPanel.tsx`): the queue and overview are computed from the shared store (drafts are never shown to staff); a review panel shows the request, confirmed requirements, program budget left, full history, and staff-only internal notes. Actions: **Start review** (Submitted → Under review, assigns the demo reviewer "Avery Taylor"); **Approve** with an award amount (≤ requested, ≤ program ceiling, ≤ remaining program budget; two-step confirm; credits the applicant's grant ledger); **Request changes** (message ≥ 10 chars, sent to applicant); **Decline** (reason ≥ 10 chars, two-step confirm). Approved/Declined are final. Stale-version guard: if the record changed after the reviewer opened it, actions are blocked until **Load latest**. Grant program cards show budget remaining. The applicant directory includes the portal's demo user and each person's submitted-application count. Email inbox and brand color unchanged (page-memory mailbox; browser-only color). | Staff accounts/roles and authorization, reviewer assignment rules/conflict-of-interest checks, separation of approval and payment authority, document inspection, configurable review stages, program editing, applicant notifications/email, Resend connection, site-wide branding, server-side audit log. Other visitors do not see this browser's decisions or color. |
 | API / data | Express server with `GET /api/healthz` returning `{ "status": "ok" }`; OpenAPI and generated client/schema scaffolding; PostgreSQL/Drizzle connection package. | Domain API endpoints, database tables/migrations, real persistence, authorization middleware, app-to-API integration. |
 
 The workspace has a Supabase connection available for future work, but this app does not use it yet. Clerk-related configuration is present in the environment, but the frontend and API do not currently use Clerk. **Configured integrations and installed packages are not evidence of operational authentication, storage, or security.**
@@ -35,8 +35,8 @@ The workspace has a Supabase connection available for future work, but this app 
 - **Brand:** `arc.fund` wordmark, a small rotated `a` mark, charcoal navigation, lime as the original accent, restrained status colors, and soft light surfaces. The applicant layout has a dark vertical sidebar and light content area; the admin workspace uses a related charcoal sidebar with warm paper-like panels. Admin Settings offers preset and custom accent colors with a live preview across both experiences. The choice is stored in this browser only; **Restore original color** clears the override.
 - **Typography:** DM Sans for body/UI, Space Grotesk for headings and prominent numbers; a monospace face for reference-like details. These are defined in `artifacts/grant-user-portal/src/index.css`.
 - **Hierarchy:** Clear page title and context; compact metric cards and status badges; section cards for forms, queues, and supporting information. Use plain-language microcopy to explain eligibility, progress, and the consequence of actions.
-- **Interaction:** Local filters/search update immediately; navigational links lead to the appropriate preview; detail views are read-only. Inbox folders, search, read/star/archive/trash actions, and drafts work only in page memory. The brand-color control updates shared accents immediately and remembers the choice in local browser storage. Provide explicit empty states and feedback. Avoid approve, pay, upload, send, or publish affordances that imply a real operation until the backend is ready.
-- **Trust signals:** Demo labels must remain visible wherever the experience could be mistaken for a live account, legal consent, verification, grant decision, email delivery, or money movement. The former full-width admin preview banner was removed; the topbar preview badge, sidebar note, and inbox-specific disconnected notice remain. Do not show real personal data in the public preview.
+- **Interaction:** Local filters/search update immediately; navigational links lead to the appropriate preview. Applicant and review actions validate inline, and irreversible review decisions (approve, decline) require a second confirming click. Applicant, grant-program, and inbox detail views remain read-only. Inbox folders, search, read/star/archive/trash actions, and drafts work only in page memory. The brand-color control updates shared accents immediately and remembers the choice in local browser storage. Provide explicit empty states and feedback. Review decisions are the one exception to "no approve affordances": they operate only on browser-local demo records and say so. Avoid pay, upload, send, or publish affordances that imply a real operation until the backend is ready.
+- **Trust signals:** Demo labels must remain visible wherever the experience could be mistaken for a live account, legal consent, verification, grant decision, email delivery, or money movement. The former full-width admin preview banner was removed; the topbar preview badge, sidebar note, inbox-specific disconnected notice, and the review panel's "demo review workflow / browser only / no staff authorization" note remain. Do not show real personal data in the public preview.
 - **Responsive behavior:** The applicant sidebar adapts to viewport height without independently scrolling. On smaller screens, navigation and content reflow; the admin uses a bottom navigation bar and compact record cards for applicants/applications. Test widths down to the site's 320px minimum as well as short desktop viewports.
 - **Accessibility baseline:** Semantic headings, labeled inputs and controls, keyboard-reachable navigation, visible focus, readable status text (not color alone), and reduced-motion handling. For future live dialogs, verify focus trapping and focus restoration rather than assuming visual presentation provides accessible modal behavior.
 
@@ -52,9 +52,10 @@ Amounts, deadlines, tiers, statuses, identities, bank details, and sample progra
 
 1. Visit `/` or `/dashboard` directly; no authentication gate currently exists.
 2. Inspect sample eligibility and activity, then open `/grants`; filter example programs by tier.
-3. Select **Check eligibility** to visit `/applications/new/:grantId`; complete Basics, inspect illustrative requirements, and review the entered values.
-4. Select **Preview submission**. A message confirms that no application was sent or saved. Navigating away loses the form state.
-5. Use `/applications` to browse predefined example statuses, not the form just completed. Other sidebar destinations show demonstration-only financial/profile information.
+3. Select **Start application** (or **Resume draft** / **Update application**) to reach `/applications/new/:grantId` or `/applications/:id`. Each **Continue** validates the step and saves a draft in this browser; confirm each requirement on step 2.
+4. Select **Submit application** on the Review step. The record becomes Submitted, read-only, and appears in `/admin/applications`. Nothing is sent anywhere else.
+5. Track it in `/applications`. If a reviewer requests changes, the application shows **Changes requested** with the reviewer's message; edit and **Resubmit**. Approvals appear in the history and credit the grant balance on the dashboard and Withdrawals page; declines show the reviewer's reason.
+6. Withdrawals, card freeze/physical-card request, and profile edits also persist in this browser. **Settings → Reset demo data** restores the seed records.
 
 ### Applicant: account preview — working UI, no identity operation
 
@@ -63,13 +64,16 @@ Amounts, deadlines, tiers, statuses, identities, bank details, and sample progra
 3. The matching animation plays; after about four seconds the browser goes to `/dashboard`. This is **navigation, not sign-in**.
 4. `/login` locally validates a nonempty password and email and then displays preview feedback; `/forgot-password` locally validates an email and displays preview feedback. Neither sends a request or creates a session.
 
-### Staff: admin preview — working UI, no staff access
+### Staff: admin review — works on browser-local demo data, no staff access control
 
-1. Visit `/admin` directly for an overview of fictional metrics and a sample review queue.
-2. Navigate to `/admin/applicants` or `/admin/applications`; search/filter and open a read-only record preview. These records are **not** the applicant portal's local sample applications or real users.
-3. Explore `/admin/inbox` for fictional conversations, folders, search, local read/star/move actions, and drafts. **Preview send** does not transmit anything, and incoming mail does not appear automatically. Reloading resets local mailbox changes.
-4. Inspect `/admin/grants` for example program cards and `/admin/settings` for preset/custom brand colors, the reset control, and proposed policy and Resend email configuration. The chosen accent appears on admin and applicant screens in this browser and survives reloads, but does not affect other visitors. API key, sending domain/address, receiving address, inbound webhook endpoint, and signature verification are shown as **not configured**; inbound MX is **not verified**. None are editable live email settings. No API key is collected in the public browser preview.
-5. No server-side administrative change, approval, publication, or payout can occur. The admin preview has no staff authorization or shared settings.
+1. Visit `/admin` directly. Metrics and the review queue (oldest submission first) are computed from this browser's demo data.
+2. Open `/admin/applications`, filter by status, and select a request to open the review panel. These are the **same records** the applicant portal uses (the demo user "Alex Morgan" plus six fictional applicants).
+3. For a Submitted request, **Start review**. For one Under review, choose **Approve** (enter the award, confirm), **Request changes** (write the message), or **Decline** (write the reason, confirm). Add staff-only internal notes at any time.
+4. The applicant portal (same browser, any tab) reflects the decision immediately; an approval credits the award to that applicant's grant balance. A Changes-requested application returns to the queue as Submitted when the applicant resubmits.
+5. `/admin/applicants` shows profiles with submitted-application counts (read-only).
+6. Explore `/admin/inbox` for fictional conversations, folders, search, local read/star/move actions, and drafts. **Preview send** does not transmit anything, and incoming mail does not appear automatically. Reloading resets local mailbox changes.
+7. Inspect `/admin/grants` for example program cards (with budget remaining) and `/admin/settings` for preset/custom brand colors, the reset control, and proposed policy and Resend email configuration. The chosen accent appears on admin and applicant screens in this browser and survives reloads, but does not affect other visitors. API key, sending domain/address, receiving address, inbound webhook endpoint, and signature verification are shown as **not configured**; inbound MX is **not verified**. None are editable live email settings. No API key is collected in the public browser preview.
+8. No server-side administrative change, publication, notification, or payout can occur. Decisions exist only in this browser. The admin workspace has no staff authorization or shared settings.
 
 ### Intended live journeys — design targets, not existing behavior
 
@@ -80,6 +84,10 @@ Amounts, deadlines, tiers, statuses, identities, bank details, and sample progra
 ## 5. Proposed system logic and backend (not yet built)
 
 The following is an implementation outline for planning, **not a claim that these rules or endpoints exist**.
+
+### Application status model (implemented client-side in `src/domain/`)
+
+`Draft → Submitted → Under review → Approved | Declined | Changes requested`, and `Changes requested → Submitted` on resubmission. Approved and Declined are final. Only the applicant moves Draft/Changes requested → Submitted; only a reviewer moves anything else. Drafts are private to the applicant. Every transition appends a history event (status, time, actor, applicant-visible note); internal notes are separate and staff-only. `updatedAt` is the record version: reviewer actions carry the version they read and fail if it changed. An approval writes the award to the application and a Completed `Grant` ledger entry for that applicant in the same step; approvals are capped by the program's remaining budget. These rules should move to the server unchanged, with the server deriving the actor from the authenticated identity.
 
 ### Identity and authorization
 
@@ -109,27 +117,28 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 ## 6. Status and suggested delivery order
 
-**Built:** Responsive applicant prototype; demo authentication screens and animation; UI-only admin overview, directory, sample email inbox, queue, grants, and settings with browser-only color preview; health-only API scaffold. These are interfaces, not completed product workflows.
+**Built:** Responsive applicant prototype with working browser-local logic (eligibility, drafts, submission and resubmission, ledger-derived balances, withdrawals, cards, profile); admin review workflow (start review, approve with award and budget checks, request changes, decline, internal notes, stale-version guard) sharing the same local store; demo authentication screens and animation; admin directory, sample email inbox, grants with budget remaining, and settings with browser-only color preview; health-only API scaffold. The business rules are pure functions in `src/domain/` intended to move to the API; the storage is not production.
 
-**Current focus:** The two visual workspaces are available for design review and iteration. This brief captures the gap between that UI and an operational platform. No production auth, domain backend, or secure admin workflow is currently implemented.
+**Current focus:** Application logic is being built client-side first; the database and API come later (user decision, 25 Sep 2026). No production auth, domain backend, or secure admin workflow is implemented.
 
 **Not built / next decisions and work:**
 
 1. Agree product rules: target users/geography, actual grant programs and eligibility, application fields, reviewer permissions, policy text, data retention, and whether financial features are in scope at all.
 2. Select and implement one authentication model and protected applicant/staff access; design the domain schema, privacy model, and API contracts.
-3. Implement persistent profiles, drafts/submissions, private document handling, and staff review with auditable decisions and notifications.
+3. Move `src/domain/rules.ts` and `src/domain/review.ts` behind authorized API endpoints with persistent storage (profiles, drafts/submissions, review decisions, ledger), keeping the same state machine and stale-version checks; add private document handling and applicant notifications for review outcomes.
 4. When staff access is protected, connect Resend for authorized email and create a shared, server-backed brand setting if a site-wide color change is desired.
 5. Connect the remaining UI to authorized APIs and replace samples route by route, removing misleading demo states only when the real replacement works end to end.
 6. Treat payment/card/withdrawal functionality as a separate regulated phase, dependent on provider, risk, legal, and accounting decisions.
 
-`BUILD_STATUS.md` is an older planning snapshot and still says the admin UI has not started. The **current source code and this brief** reflect that the admin *preview UI* has since been built; its real operations remain unbuilt.
+`BUILD_STATUS.md` is a short phase checklist kept in sync with this brief; this brief is the detailed source of truth.
 
 ## 7. Testing and release gates
 
-**Current evidence:** The repository has typecheck and build scripts, but no application unit, integration, end-to-end, accessibility, or security test suites were found. Passing TypeScript/build checks is not proof of user-flow correctness or security. Demo-only interaction checks should confirm that no control claims to perform an operation it cannot perform.
+**Current evidence:** The repository has typecheck and build scripts, but no committed unit, integration, end-to-end, accessibility, or security test suites. The applicant and review rules and the admin → applicant review loop were verified with ad-hoc scripts and a headless-browser run during development (25 Sep 2026); those checks are not in the repo yet — adding a test runner (e.g. Vitest for `src/domain/`) is a recommended next step. Passing TypeScript/build checks is not proof of user-flow correctness or security. Demo-only interaction checks should confirm that no control claims to perform an operation it cannot perform.
 
 | Test area | Required coverage before live use |
 | --- | --- |
+| Domain rules | Unit tests for `src/domain/rules.ts` and `review.ts`: eligibility, amount/budget limits, every allowed and forbidden status transition, stale-version rejection, ledger-derived balances, ID uniqueness. |
 | UI and journeys | Route smoke tests for applicant/auth/admin pages; keyboard/mobile/short-viewport checks; search/filter/empty states; form validation and step transitions; brand-color selection/reset across routes and reloads; clear error and retry states. |
 | Authentication | Sign-up, verification, login, recovery, session expiry/revocation, MFA, logout, and account-switching; ensure unauthenticated requests and forged sessions fail. |
 | Authorization and privacy | Applicant A cannot read/edit applicant B; reviewers see only assigned/authorized data; non-staff cannot call admin APIs even by URL; no private files accessible via guessed links; no sensitive values leaked to logs, analytics, client bundles, or exports. |
@@ -144,9 +153,11 @@ For implementation: specify and review domain contracts in OpenAPI, generate cli
 
 ## 8. Developer orientation
 
-- Frontend routes and applicant sample data: `artifacts/grant-user-portal/src/App.tsx`
+- Frontend routes and applicant pages: `artifacts/grant-user-portal/src/App.tsx`
+- Business rules (pure functions, intended to move to the API): applicant `src/domain/rules.ts`, staff review `src/domain/review.ts`; types `src/domain/model.ts`; seed catalog/records `src/domain/seed.ts` (includes the demo applicant ID and demo reviewer name); browser-storage store with cross-tab sync `src/domain/store.tsx` (key `arc.fund.demoState.v2`; older v1 data is discarded)
+- Admin review panel: `artifacts/grant-user-portal/src/pages/AdminReviewPanel.tsx` / `.css`
 - Sign-in/sign-up/reset preview and validation: `artifacts/grant-user-portal/src/pages/AuthPages.tsx`
-- Admin preview and independent sample data: `artifacts/grant-user-portal/src/pages/AdminPage.tsx`; sample mailbox and configuration: `AdminInbox.tsx`, `AdminEmailSettings.tsx`; browser-only brand control: `BrandColorSettings.tsx`, `src/lib/brandColor.ts`
+- Admin workspace: `artifacts/grant-user-portal/src/pages/AdminPage.tsx` (queue, overview, and directory read the shared store; grant-program descriptions are still local); sample mailbox and configuration: `AdminInbox.tsx`, `AdminEmailSettings.tsx`; browser-only brand control: `BrandColorSettings.tsx`, `src/lib/brandColor.ts`
 - Frontend styling: `artifacts/grant-user-portal/src/index.css` and the focused CSS files under `artifacts/grant-user-portal/src/pages/`
 - API entry/routes: `artifacts/api-server/src/app.ts`, `src/routes/`
 - API source of truth: `lib/api-spec/openapi.yaml`; data schema location: `lib/db/src/schema/`

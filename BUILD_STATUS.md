@@ -1,43 +1,35 @@
 # Grant Platform Build Status
 
+Short phase checklist. `work.md` is the detailed source of truth; keep the two consistent.
+
 ## Current direction
 
-Build the applicant-facing grant portal first. Deliver the interface before connecting Supabase or implementing application and financial business logic. The admin dashboard is a separate later phase.
+Build the application logic first, client-side, against browser-local demo data. The database, API, and authentication come later (decision of 25 Sep 2026). Business rules live as pure functions in `artifacts/grant-user-portal/src/domain/` so they can move to the server unchanged.
 
 ## Build plan
 
 1. **Applicant UI prototype — Complete**
-   - Responsive applicant workspace for dashboard, grants, applications, cards, transactions, withdrawals, and profile settings, plus login, multi-step sign-up, forgot-password, and 404 screens.
-   - Use illustrative sample data and front-end-only interactions.
-   - Clearly identify demo states; do not imply an account was created, an email/code was sent or verified, grant matching occurred, an application was submitted, or a financial action completed.
-2. **Supabase foundation — Workspace connection added; app integration not started**
-   - Wire the connected Supabase project into the app when the logic phase begins.
-   - Define the data model, authentication, row-level security, and private document storage.
-3. **Applicant workflows — Not started**
-   - Implement persistent application drafts, submissions, status tracking, profile/KYC flows, and document uploads.
-4. **Financial operations — Not started**
-   - Define and implement card, deposit, and withdrawal flows only after the payment provider, regulatory/compliance requirements, and user protections are established.
-5. **Admin portal — Not started**
-   - Build a separate admin product for grant configuration, application review, financial operations, and audit/security controls.
-
-## Completed
-
-- Applicant and admin requirements reviewed and separated into distinct product phases.
-- Grant Applicant Portal web artifact scaffolded.
-- Applicant UI completed with responsive dashboard, grant explorer, application flow, cards, transactions, withdrawals, and settings screens.
-- UI-only login, multi-step sign-up, forgot-password, and 404 pages added; auth forms validate inputs locally but do not sign in, create accounts, send email, or match grants.
-- The sign-up preview uses illustrative industry options and legal-content placeholders; the real industry list, terms, and privacy policy will be set in admin settings later.
-- The supplied Lottie animation is shown on the grant-matching preview step; it is visual only and does not perform matching.
-- Demo-only interactions and sample-data notices added; front-end typecheck passes.
+2. **Applicant logic (browser-only) — Complete**
+   - Eligibility, drafts, validated submission and resubmission, ledger-derived balances, withdrawals, card actions, profile edits, reset demo data.
+3. **Admin UI — Complete (preview)**
+   - Overview, applicants, email inbox (page-memory only), review queue, grant programs, settings with browser-only brand color.
+4. **Admin review logic (browser-only) — Complete**
+   - Start review, approve with award (≤ requested, ≤ ceiling, ≤ program budget; credits applicant ledger), request changes (applicant edits and resubmits), decline with reason, internal notes, stale-version guard, cross-tab sync.
+5. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+6. **Database and API — Not started**
+   - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
+7. **Documents, notifications, email (Resend) — Not started**
+8. **Financial operations — Not started**
+   - Cards, deposits, withdrawals only after provider, compliance, and ledger decisions.
 
 ## Not yet implemented
 
-- Supabase is connected to the workspace, but not wired into the app; schema, authentication, and persistence are not implemented.
-- Real file uploads or private document storage.
-- Real application submission, eligibility decisions, or status updates.
-- Real card issuance, deposits, charges, balances, or withdrawals.
-- Admin dashboard and security controls.
+- Any server persistence: all demo data lives in the visitor's browser (`localStorage`).
+- Sign-in, accounts, staff roles, and authorization; `/admin` is open to anyone with the URL (acceptable only because data is fictional and local).
+- File uploads, private document storage, applicant notifications.
+- Real card issuance, deposits, charges, or payouts.
+- Committed automated tests.
 
 ## Frontend foundation
 
-The selected web artifact uses React/Vite. The original stack notes specify Next.js App Router; the current UI artifact is not Next.js, so SSR-specific setup such as `@supabase/ssr` is not part of this UI phase.
+The web artifact uses React/Vite with Wouter routing. The original stack notes specify Next.js App Router; the current app is not Next.js, so SSR-specific setup such as `@supabase/ssr` does not apply.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowRight, Building2, ClipboardList, FileText, FolderOpen, Info,
@@ -8,41 +8,47 @@ import {
 import { AdminInbox } from './AdminInbox';
 import { AdminEmailSettings } from './AdminEmailSettings';
 import { BrandColorSettings } from './BrandColorSettings';
+import { AdminReviewPanel } from './AdminReviewPanel';
+import { findGrant } from '@/domain/rules';
+import { applicantName, awaitingAction, programBudget, reviewQueue } from '@/domain/review';
+import { CURRENT_APPLICANT_ID } from '@/domain/seed';
+import { useDemoStore } from '@/domain/store';
+import type { Application as DomainApplication, DemoState } from '@/domain/model';
+import { format } from 'date-fns';
 import './AdminPage.css';
 
 export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'grants' | 'settings';
-type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string };
-type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string; note: string };
+type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string; applications: number };
+/** Queue row derived from the shared store. */
+type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string };
 type Grant = { id: string; title: string; ceiling: number; status: string; focus: string; cycle: string; description: string; icon: typeof Store };
 type Detail = { title: string; eyebrow: string; description: string; fields: { label: string; value: string }[] };
 
-const applicants: Applicant[] = [
-  { id: 'APL-1042', name: 'Maya Okafor', email: 'maya.okafor@example.org', sector: 'Creative industries', country: 'United Kingdom', status: 'Verified', joined: '18 May 2025' },
-  { id: 'APL-1043', name: 'Elias Navarro', email: 'elias.navarro@example.org', sector: 'Retail', country: 'United States', status: 'Pending', joined: '16 May 2025' },
-  { id: 'APL-1044', name: 'Nia Campbell', email: 'nia.campbell@example.org', sector: 'Community', country: 'Canada', status: 'Verified', joined: '12 May 2025' },
-  { id: 'APL-1045', name: 'Samira Haddad', email: 'samira.haddad@example.org', sector: 'Climate', country: 'United Kingdom', status: 'Verified', joined: '09 May 2025' },
-  { id: 'APL-1046', name: 'Theo Mensah', email: 'theo.mensah@example.org', sector: 'Food & beverage', country: 'Ghana', status: 'Pending', joined: '06 May 2025' },
-  { id: 'APL-1047', name: 'Priya Shah', email: 'priya.shah@example.org', sector: 'Creative industries', country: 'Canada', status: 'Verified', joined: '03 May 2025' },
-];
+const shortDate = (iso: string) => format(new Date(iso.length === 10 ? `${iso}T00:00:00` : iso), 'dd MMM yyyy');
 
-const applications: Application[] = [
-  { id: 'APP-2051', title: 'A neighborhood print studio', applicant: 'Maya Okafor', amount: 7400, status: 'Under review', date: '21 May 2025', program: 'Creative Practice', note: 'Equipment and workshop materials for a shared neighborhood print studio.' },
-  { id: 'APP-2050', title: 'A lower-energy storefront', applicant: 'Samira Haddad', amount: 12800, status: 'Submitted', date: '20 May 2025', program: 'Green Transition', note: 'Practical energy upgrades across a small independent storefront.' },
-  { id: 'APP-2049', title: 'Community kitchen expansion', applicant: 'Nia Campbell', amount: 16250, status: 'Under review', date: '19 May 2025', program: 'Community Roots', note: 'Additional kitchen capacity for local food programming.' },
-  { id: 'APP-2048', title: 'Growing the corner shop', applicant: 'Elias Navarro', amount: 7800, status: 'Shortlisted', date: '14 May 2025', program: 'Business Momentum', note: 'Inventory and equipment to support a second year of trading.' },
-  { id: 'APP-2047', title: 'A mobile ceramics workshop', applicant: 'Priya Shah', amount: 4950, status: 'Submitted', date: '12 May 2025', program: 'Creative Practice', note: 'Portable tools and materials for accessible ceramics sessions.' },
-  { id: 'APP-2046', title: 'Solar-ready food storage', applicant: 'Theo Mensah', amount: 11350, status: 'Draft', date: '08 May 2025', program: 'Green Transition', note: 'Cold storage planning for a neighborhood food business.' },
-];
+function toRow(state: DemoState, app: DomainApplication): Application {
+  return { id: app.id, title: app.businessName, applicant: applicantName(state, app.applicantId), amount: app.requestedAmount, status: app.status, date: shortDate(app.submittedAt ?? app.updatedAt), program: findGrant(app.grantId)?.name ?? 'Unknown program' };
+}
+function useQueue(): Application[] {
+  const { state } = useDemoStore();
+  return reviewQueue(state).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(app => toRow(state, app));
+}
+function useApplicants(): Applicant[] {
+  const { state } = useDemoStore();
+  const count = (id: string) => reviewQueue(state).filter(a => a.applicantId === id).length;
+  const me = { id: CURRENT_APPLICANT_ID, name: state.profile.name, email: state.profile.email, sector: 'Creative industries', country: 'United States', status: state.profile.identityVerified ? 'Verified' : 'Pending', joined: shortDate('2026-06-20'), applications: count(CURRENT_APPLICANT_ID) };
+  return [me, ...state.otherApplicants.map(p => ({ id: p.id, name: p.name, email: p.email, sector: p.sector, country: p.country, status: p.verified ? 'Verified' : 'Pending', joined: shortDate(p.joined), applications: count(p.id) }))];
+}
 
 const grants: Grant[] = [
-  { id: 'momentum', title: 'Business Momentum', ceiling: 12500, status: 'Active', focus: 'Small businesses', cycle: 'Summer 2025', description: 'Working capital for small businesses ready for their next chapter.', icon: Store },
-  { id: 'green', title: 'Green Transition', ceiling: 18000, status: 'Active', focus: 'Climate action', cycle: 'Summer 2025', description: 'Support for practical energy upgrades that reduce operating costs.', icon: Leaf },
-  { id: 'creative', title: 'Creative Practice', ceiling: 8500, status: 'Active', focus: 'Independent makers', cycle: 'Summer 2025', description: 'Flexible funding for independent makers and creative studios.', icon: Palette },
-  { id: 'community', title: 'Community Roots', ceiling: 22000, status: 'Active', focus: 'Local organizations', cycle: 'Summer 2025', description: 'Help local organizations build more resilient neighborhoods.', icon: Building2 },
+  { id: 'momentum', title: 'Business Momentum', ceiling: 12500, status: 'Active', focus: 'Small businesses', cycle: '2026–27', description: 'Working capital for small businesses ready for their next chapter.', icon: Store },
+  { id: 'green', title: 'Green Transition', ceiling: 18000, status: 'Active', focus: 'Climate action', cycle: '2026–27', description: 'Support for practical energy upgrades that reduce operating costs.', icon: Leaf },
+  { id: 'creative', title: 'Creative Practice', ceiling: 8500, status: 'Active', focus: 'Independent makers', cycle: '2026–27', description: 'Flexible funding for independent makers and creative studios.', icon: Palette },
+  { id: 'community', title: 'Community Roots', ceiling: 22000, status: 'Active', focus: 'Local organizations', cycle: '2026–27', description: 'Help local organizations build more resilient neighborhoods.', icon: Building2 },
   { id: 'space', title: 'Shared Spaces', ceiling: 14500, status: 'Draft', focus: 'Civic spaces', cycle: 'Future cycle', description: 'An illustrative concept for welcoming, adaptable community spaces.', icon: FolderOpen },
 ];
 
-const money = (value: number) => `$${value.toLocaleString('en-US')}`;
+const money = (value: number) => `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const navItems = [
   { section: 'overview' as const, label: 'Overview', icon: LayoutDashboard, href: '/admin' },
@@ -84,50 +90,57 @@ function EmptyResults({ onReset }: { onReset: () => void }) {
   return <div className="admin-empty" data-testid="empty-admin-results"><Search size={25} /><h3>Nothing matches this view</h3><p>Try another search or remove the selected filter.</p><button type="button" onClick={onReset} data-testid="button-reset-admin-filters">Clear search and filter</button></div>;
 }
 
-function Overview({ openDetail }: { openDetail: (detail: Detail) => void }) {
+const compact = (value: number) => value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : money(value);
+const pad = (value: number) => String(value).padStart(2, '0');
+
+function Overview({ openReview }: { openReview: (id: string) => void }) {
+  const { state } = useDemoStore();
+  const queue = reviewQueue(state);
+  const waiting = awaitingAction(state);
+  const applicants = useApplicants();
+  const count = (status: string) => queue.filter(a => a.status === status).length;
+  const sectors = new Set(applicants.map(p => p.sector)).size;
   return <>
     <div className="admin-overview-metrics">
-      <div className="admin-metric featured" data-testid="metric-admin-review-queue"><span className="admin-metric-label">In the review queue</span><strong className="admin-metric-value">04</strong><span className="admin-metric-foot">Submitted or under review · sample records</span></div>
-      <div className="admin-metric" data-testid="metric-admin-applicants"><span className="admin-metric-label">Sample applicants</span><strong className="admin-metric-value">06</strong><span className="admin-metric-foot">Across five sectors</span></div>
+      <div className="admin-metric featured" data-testid="metric-admin-review-queue"><span className="admin-metric-label">In the review queue</span><strong className="admin-metric-value">{pad(waiting.length)}</strong><span className="admin-metric-foot">Submitted or under review · demo records</span></div>
+      <div className="admin-metric" data-testid="metric-admin-applicants"><span className="admin-metric-label">Demo applicants</span><strong className="admin-metric-value">{pad(applicants.length)}</strong><span className="admin-metric-foot">Across {sectors} sectors</span></div>
       <div className="admin-metric" data-testid="metric-admin-programs"><span className="admin-metric-label">Active programs</span><strong className="admin-metric-value">04</strong><span className="admin-metric-foot">Plus one draft concept</span></div>
-      <div className="admin-metric" data-testid="metric-admin-requested"><span className="admin-metric-label">Requested in queue</span><strong className="admin-metric-value">$41.4k</strong><span className="admin-metric-foot">Illustrative, not committed funds</span></div>
+      <div className="admin-metric" data-testid="metric-admin-requested"><span className="admin-metric-label">Requested in queue</span><strong className="admin-metric-value">{compact(waiting.reduce((sum, a) => sum + a.requestedAmount, 0))}</strong><span className="admin-metric-foot">Awaiting a decision, not committed funds</span></div>
     </div>
     <div className="admin-overview-main">
-      <section className="admin-panel"><SectionHead title="Review queue" subtitle="A small sample of requests moving through the workspace." href="/admin/applications" link="Open queue" /><div className="admin-list">{applications.slice(0, 4).map(item => <div className="admin-list-item" key={item.id} data-testid={`item-admin-queue-${item.id}`}><span className="admin-list-icon"><FileText size={17} /></span><span className="admin-list-copy"><strong>{item.title}</strong><small>{item.applicant} · {money(item.amount)} · {item.date}</small></span><Badge status={item.status} /><button type="button" className="admin-icon-button" onClick={() => openDetail(applicationDetail(item))} aria-label={`Preview application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></div>)}</div></section>
+      <section className="admin-panel"><SectionHead title="Review queue" subtitle="Oldest submissions first. Open one to review it." href="/admin/applications" link="Open queue" />{waiting.length ? <div className="admin-list">{waiting.slice(0, 4).map(a => toRow(state, a)).map(item => <div className="admin-list-item" key={item.id} data-testid={`item-admin-queue-${item.id}`}><span className="admin-list-icon"><FileText size={17} /></span><span className="admin-list-copy"><strong>{item.title}</strong><small>{item.applicant} · {money(item.amount)} · {item.date}</small></span><Badge status={item.status} /><button type="button" className="admin-icon-button" onClick={() => openReview(item.id)} aria-label={`Review application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></div>)}</div> : <p className="admin-review-hint">Nothing is waiting for review.</p>}</section>
       <div className="admin-grid">
-        <div className="admin-priority"><span className="admin-eyebrow">Workspace focus</span><strong>A clearer view of every request.</strong><p>Explore the illustrative review queue without making a decision or changing a record.</p><Link href="/admin/applications" data-testid="link-admin-explore-review-queue">Explore review queue <ArrowRight size={14} /></Link></div>
-        <section className="admin-panel"><SectionHead title="At a glance" subtitle="A snapshot of this fictional workspace." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>02</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>02</strong></div><div className="admin-mini-stat"><span>Shortlisted</span><strong>01</strong></div></section>
+        <div className="admin-priority"><span className="admin-eyebrow">Workspace focus</span><strong>A clearer view of every request.</strong><p>Start reviews, request changes, and record decisions. Everything is saved in this browser only.</p><Link href="/admin/applications" data-testid="link-admin-explore-review-queue">Explore review queue <ArrowRight size={14} /></Link></div>
+        <section className="admin-panel"><SectionHead title="At a glance" subtitle="Live counts from this browser's demo data." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>{pad(count('Submitted'))}</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>{pad(count('Under review'))}</strong></div><div className="admin-mini-stat"><span>With applicant for changes</span><strong>{pad(count('Changes requested'))}</strong></div><div className="admin-mini-stat"><span>Approved / declined</span><strong>{pad(count('Approved'))} / {pad(count('Declined'))}</strong></div></section>
       </div>
     </div>
     <div className="admin-overview-bottom">
       <section className="admin-panel"><SectionHead title="Recently joined" subtitle="Illustrative applicant profiles." href="/admin/applicants" link="View applicants" />{applicants.slice(0, 3).map(person => <div className="admin-simple-row" key={person.id}><strong>{person.name}</strong><span>{person.sector}</span></div>)}</section>
-      <section className="admin-panel"><SectionHead title="Program landscape" subtitle="Example funding categories in this preview." href="/admin/grants" link="View programs" />{grants.slice(0, 3).map(grant => <div className="admin-simple-row" key={grant.id}><strong>{grant.title}</strong><span>Up to {money(grant.ceiling)}</span></div>)}</section>
+      <section className="admin-panel"><SectionHead title="Program landscape" subtitle="Budget remaining per program." href="/admin/grants" link="View programs" />{grants.filter(g => findGrant(g.id)).slice(0, 4).map(grant => <div className="admin-simple-row" key={grant.id}><strong>{grant.title}</strong><span>{money(programBudget(state, grant.id).remaining)} left</span></div>)}</section>
     </div>
   </>;
 }
 
 function applicantDetail(person: Applicant): Detail {
   return { eyebrow: person.id, title: person.name, description: 'A fictional applicant profile for layout and navigation preview only.', fields: [
-    { label: 'Email', value: person.email }, { label: 'Sector', value: person.sector }, { label: 'Country', value: person.country }, { label: 'Profile status', value: person.status }, { label: 'Joined', value: person.joined }, { label: 'Reference', value: person.id },
+    { label: 'Email', value: person.email }, { label: 'Sector', value: person.sector }, { label: 'Country', value: person.country }, { label: 'Profile status', value: person.status }, { label: 'Submitted applications', value: String(person.applications) }, { label: 'Joined', value: person.joined }, { label: 'Reference', value: person.id },
   ] };
 }
-function applicationDetail(item: Application): Detail {
-  return { eyebrow: item.id, title: item.title, description: item.note, fields: [
-    { label: 'Applicant', value: item.applicant }, { label: 'Grant program', value: item.program }, { label: 'Requested', value: money(item.amount) }, { label: 'Review status', value: item.status }, { label: 'Date', value: item.date }, { label: 'Reference', value: item.id },
-  ] };
-}
-function grantDetail(grant: Grant): Detail {
+function grantDetail(state: DemoState, grant: Grant): Detail {
+  const budget = findGrant(grant.id) ? programBudget(state, grant.id) : null;
   return { eyebrow: 'Grant program', title: grant.title, description: grant.description, fields: [
     { label: 'Funding ceiling', value: money(grant.ceiling) }, { label: 'Focus', value: grant.focus }, { label: 'Cycle', value: grant.cycle }, { label: 'Program status', value: grant.status },
+    ...(budget ? [{ label: 'Budget', value: money(budget.budget) }, { label: 'Awarded', value: money(budget.awarded) }, { label: 'Remaining', value: money(budget.remaining) }] : []),
   ] };
 }
 
 function Applicants({ openDetail }: { openDetail: (detail: Detail) => void }) {
+  const applicants = useApplicants();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All statuses');
   const rows = applicants.filter(person => (filter === 'All statuses' || person.status === filter) && `${person.name} ${person.email} ${person.sector} ${person.country}`.toLowerCase().includes(query.toLowerCase()));
   return <section className="admin-panel">
-    <SectionHead title="Applicant directory" subtitle="Browse example profiles. These are invented names and contact details." />
+    <SectionHead title="Applicant directory" subtitle="Browse demo profiles. These are invented names and contact details; the first is the applicant-portal demo user." />
     <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people, sector, country" aria-label="Search applicants" data-testid="input-admin-search-applicants" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter applicants by status" data-testid="select-admin-filter-applicants"><option>All statuses</option><option>Verified</option><option>Pending</option></select></div><span className="admin-count" data-testid="text-admin-applicants-count">{rows.length} of {applicants.length} profiles</span></div>
     {rows.length ? <>
       <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Applicant</th><th>Sector</th><th>Country</th><th>Status</th><th>Joined</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Explore</span></th></tr></thead><tbody>{rows.map(person => <tr key={person.id} data-testid={`row-admin-applicant-${person.id}`}><td><div className="admin-person-cell"><span className="admin-initials" aria-hidden="true">{person.name.split(' ').map(part => part[0]).join('')}</span><span><span className="admin-table-primary">{person.name}</span><span className="admin-table-secondary">{person.email}</span></span></div></td><td className="admin-table-muted">{person.sector}</td><td className="admin-table-muted">{person.country}</td><td><Badge status={person.status} /></td><td className="admin-table-muted">{person.joined}</td><td><button type="button" className="admin-icon-button" onClick={() => openDetail(applicantDetail(person))} aria-label={`Preview ${person.name} profile`} data-testid={`button-preview-admin-applicant-${person.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
@@ -140,30 +153,32 @@ function Applicants({ openDetail }: { openDetail: (detail: Detail) => void }) {
   </section>;
 }
 
-function Applications({ openDetail }: { openDetail: (detail: Detail) => void }) {
+function Applications({ openReview }: { openReview: (id: string) => void }) {
+  const applications = useQueue();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All statuses');
   const rows = applications.filter(item => (filter === 'All statuses' || item.status === filter) && `${item.title} ${item.applicant} ${item.program} ${item.id}`.toLowerCase().includes(query.toLowerCase()));
   return <section className="admin-panel">
-    <SectionHead title="Review queue" subtitle="Search fictional funding requests and open a read-only summary." />
-    <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search requests or applicants" aria-label="Search applications" data-testid="input-admin-search-applications" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter applications by status" data-testid="select-admin-filter-applications"><option>All statuses</option><option>Submitted</option><option>Under review</option><option>Shortlisted</option><option>Draft</option></select></div><span className="admin-count" data-testid="text-admin-applications-count">{rows.length} of {applications.length} requests</span></div>
+    <SectionHead title="Review queue" subtitle="Submitted requests from this browser's demo data. Open one to review and decide." />
+    <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search requests or applicants" aria-label="Search applications" data-testid="input-admin-search-applications" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter applications by status" data-testid="select-admin-filter-applications"><option>All statuses</option><option>Submitted</option><option>Under review</option><option>Changes requested</option><option>Approved</option><option>Declined</option></select></div><span className="admin-count" data-testid="text-admin-applications-count">{rows.length} of {applications.length} requests</span></div>
     {rows.length ? <>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Program</th><th>Requested</th><th>Status</th><th>Date</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Explore</span></th></tr></thead><tbody>{rows.map(item => <tr key={item.id} data-testid={`row-admin-application-${item.id}`}><td><span className="admin-table-primary">{item.title}</span><span className="admin-table-secondary">{item.applicant} · {item.id}</span></td><td className="admin-table-muted">{item.program}</td><td className="admin-table-number">{money(item.amount)}</td><td><Badge status={item.status} /></td><td className="admin-table-muted">{item.date}</td><td><button type="button" className="admin-icon-button" onClick={() => openDetail(applicationDetail(item))} aria-label={`Preview application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Program</th><th>Requested</th><th>Status</th><th>Date</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Explore</span></th></tr></thead><tbody>{rows.map(item => <tr key={item.id} data-testid={`row-admin-application-${item.id}`}><td><span className="admin-table-primary">{item.title}</span><span className="admin-table-secondary">{item.applicant} · {item.id}</span></td><td className="admin-table-muted">{item.program}</td><td className="admin-table-number">{money(item.amount)}</td><td><Badge status={item.status} /></td><td className="admin-table-muted">{item.date}</td><td><button type="button" className="admin-icon-button" onClick={() => openReview(item.id)} aria-label={`Review application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
       <div className="admin-mobile-records" role="list" aria-label="Funding requests">{rows.map(item => <article className="admin-mobile-record" role="listitem" key={item.id} data-testid={`card-admin-application-${item.id}`}>
         <div className="admin-mobile-record-top"><div className="admin-mobile-record-identity"><strong>{item.title}</strong><span>{item.applicant} · {item.id}</span></div><Badge status={item.status} /></div>
         <dl className="admin-mobile-record-facts"><div><dt>Program</dt><dd>{item.program}</dd></div><div><dt>Requested</dt><dd>{money(item.amount)}</dd></div><div><dt>Date</dt><dd>{item.date}</dd></div></dl>
-        <button type="button" className="admin-mobile-record-action" onClick={() => openDetail(applicationDetail(item))} aria-label={`Preview application ${item.title}`} data-testid={`button-preview-admin-application-mobile-${item.id}`}>Preview request <ArrowRight size={15} /></button>
+        <button type="button" className="admin-mobile-record-action" onClick={() => openReview(item.id)} aria-label={`Review application ${item.title}`} data-testid={`button-preview-admin-application-mobile-${item.id}`}>Review request <ArrowRight size={15} /></button>
       </article>)}</div>
     </> : <EmptyResults onReset={() => { setQuery(''); setFilter('All statuses'); }} />}
   </section>;
 }
 
 function Grants({ openDetail }: { openDetail: (detail: Detail) => void }) {
+  const { state } = useDemoStore();
   const [filter, setFilter] = useState('All programs');
   const visible = grants.filter(grant => filter === 'All programs' || grant.status === filter);
   return <>
     <div className="admin-toolbar"><span className="admin-count" data-testid="text-admin-grants-count">{visible.length} of {grants.length} example programs</span><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter grant programs by status" data-testid="select-admin-filter-grants"><option>All programs</option><option>Active</option><option>Draft</option></select></div>
-    <div className="admin-program-grid">{visible.map(grant => { const Icon = grant.icon; return <article className="admin-program-card" key={grant.id} data-testid={`card-admin-grant-${grant.id}`}><div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><Badge status={grant.status} /></div><h2>{grant.title}</h2><p>{grant.description}</p><div className="admin-program-meta"><div><span>Funding ceiling</span><strong>Up to {money(grant.ceiling)}</strong></div><div><span>Focus</span><strong>{grant.focus}</strong></div></div><button type="button" onClick={() => openDetail(grantDetail(grant))} aria-label={`Preview ${grant.title} program details`} data-testid={`button-preview-admin-grant-${grant.id}`}>View program preview <ArrowRight size={14} /></button></article>; })}</div>
+    <div className="admin-program-grid">{visible.map(grant => { const Icon = grant.icon; return <article className="admin-program-card" key={grant.id} data-testid={`card-admin-grant-${grant.id}`}><div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><Badge status={grant.status} /></div><h2>{grant.title}</h2><p>{grant.description}</p><div className="admin-program-meta"><div><span>Funding ceiling</span><strong>Up to {money(grant.ceiling)}</strong></div><div><span>{findGrant(grant.id) ? 'Budget left' : 'Focus'}</span><strong>{findGrant(grant.id) ? `${money(programBudget(state, grant.id).remaining)} of ${money(programBudget(state, grant.id).budget)}` : grant.focus}</strong></div></div><button type="button" onClick={() => openDetail(grantDetail(state, grant))} aria-label={`Preview ${grant.title} program details`} data-testid={`button-preview-admin-grant-${grant.id}`}>View program preview <ArrowRight size={14} /></button></article>; })}</div>
   </>;
 }
 
@@ -172,12 +187,12 @@ function Settings() {
     <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
-      <div className="admin-setting-item"><ClipboardList size={18} /><div><strong>Review stages</strong><p>A potential place to define queue stages and reviewer handoffs. No decisions can be recorded here.</p></div><span>NOT CONNECTED</span></div>
+      <div className="admin-setting-item"><ClipboardList size={18} /><div><strong>Review stages</strong><p>The review flow is fixed for now: Submitted → Under review → Approved, Declined, or Changes requested (back to the applicant). Configurable stages need a secured backend.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><FileText size={18} /><div><strong>Program criteria</strong><p>Eligibility requirements and application questions would require a secured admin backend.</p></div><span>NOT CONNECTED</span></div>
     </section>
     <div className="admin-grid">
       <section className="admin-panel"><SectionHead title="Example sectors" subtitle="Illustrative labels, not live choices." /><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div><div className="admin-settings-callout"><strong>Configuration preview only</strong><p>Editing these options would require authenticated admin access and a backend. This screen does not save changes.</p></div></section>
-      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Authorization</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>Local examples</strong></div><div className="admin-mini-stat"><span>Write access</span><strong>None</strong></div></section>
+      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Authorization</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>This browser</strong></div><div className="admin-mini-stat"><span>Write access</span><strong>Review decisions (browser only)</strong></div></section>
     </div>
   </div><AdminEmailSettings /></>;
 }
@@ -186,31 +201,34 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Browse fictional applicant profiles across sectors and regions. Profiles open as read-only previews.' },
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
-  applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'An illustrative queue designed to make the shape of each funding request easier to understand.' },
+  applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Explore sample grant categories, their focus, and illustrative funding ceilings.' },
   settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Preview the brand color and see where policies, sectors, and review conventions could be managed.' },
 };
 
 export function AdminPage({ section }: { section: AdminSection }) {
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [reviewId, setReviewId] = useState<string | null>(null);
   const closeDetail = () => setDetail(null);
-  useEffect(() => { setDetail(null); }, [section]);
+  const closeReview = useCallback(() => setReviewId(null), []);
+  useEffect(() => { setDetail(null); setReviewId(null); }, [section]);
   const copy = sectionCopy[section];
   const content: Record<AdminSection, ReactNode> = {
-    overview: <Overview openDetail={setDetail} />,
+    overview: <Overview openReview={setReviewId} />,
     applicants: <Applicants openDetail={setDetail} />,
     inbox: <AdminInbox />,
-    applications: <Applications openDetail={setDetail} />,
+    applications: <Applications openReview={setReviewId} />,
     grants: <Grants openDetail={setDetail} />,
     settings: <Settings />,
   };
   return <div className="admin-shell">
-    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Illustrative records only. Brand color is saved in this browser; no server-side changes are available.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
+    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only. Review decisions and brand color are saved in this browser; there is no staff sign-in or server.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
     <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
-      <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2025</span></div>{content[section]}</div>
+      <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2026</span></div>{content[section]}</div>
     </main>
     <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
     {detail && <DetailPanel detail={detail} onClose={closeDetail} />}
+    {reviewId && <AdminReviewPanel appId={reviewId} onClose={closeReview} />}
   </div>;
 }
 
