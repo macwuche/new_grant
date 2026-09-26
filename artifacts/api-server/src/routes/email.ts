@@ -83,7 +83,10 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     field("appUrl", "Portal address", v => /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(v), "Use the full https:// address of the portal.");
     field("inboxAddress", "Team mailbox", v => EMAIL.test(v), "Enter an email address.");
     field("webhookSecret", "Webhook signing secret", v => /^whsec_[A-Za-z0-9+/=]{16,}$/.test(v), "Resend signing secrets start with whsec_.", true);
-    field("supabaseToken", "Supabase access token", v => /^sbp_[A-Za-z0-9]{20,}$/.test(v), "Supabase access tokens start with sbp_.", true);
+    // Scoped and legacy access tokens differ in format, so only the shape is checked here; Supabase checks the token itself below.
+    // Project API keys (sb_publishable_…, sb_secret_…, JWT anon/service keys) can't call the Management API.
+    if (/^(sb_publishable_|sb_secret_|eyJ)/.test(text("supabaseToken") ?? "")) errors["supabaseToken"] = "That's a project API key. Create an access token in Supabase → Account → Access Tokens.";
+    else field("supabaseToken", "Supabase access token", v => /^[A-Za-z0-9_.-]{20,512}$/.test(v), "Paste the whole access token, with no spaces.", true);
     if (Object.keys(errors).length) { res.status(400).json({ error: "Fix the highlighted fields.", fieldErrors: errors }); return; }
     if (!changes.length) { res.status(400).json({ error: "Nothing to save." }); return; }
 

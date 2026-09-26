@@ -1119,6 +1119,8 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     const ref = /^https:\/\/([a-z0-9]+)\./.exec(process.env["SUPABASE_URL"]!)![1];
     expect((await put("/email/auth-settings", { emailConfirmation: false })).status).toBe(400);
     providerReplies[`GET /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: false } };
+    expect((await json(await put("/email/settings", { supabaseToken: "sb_secret_0123456789abcdefghij" }))).fieldErrors.supabaseToken).toMatch(/project API key/);
+    expect((await put("/email/settings", { supabaseToken: "has spaces in it 0123456789" })).status).toBe(400);
     expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
     expect(await json(await call("/email/auth-settings", "tok-super"))).toMatchObject({ connected: true, emailConfirmation: true, smtp: { viaResend: false }, appTemplates: false });
     providerReplies[`PATCH /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: true } };

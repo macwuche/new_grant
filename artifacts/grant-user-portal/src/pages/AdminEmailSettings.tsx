@@ -86,7 +86,7 @@ function SignupConfirmation({ tokenSet, sending }: { tokenSet: boolean; sending:
         <span className="admin-email-settings-value" data-testid="status-auth-templates">{state.appTemplates ? appName : 'Supabase default'}</span>
         <button type="button" className="admin-btn" disabled={busy} onClick={() => void run(setAuthEmailTemplates, () => `Supabase's emails now use the app's wording as ${appName}.`, "Couldn't update Supabase.")} data-testid="button-auth-templates">{state.appTemplates ? 'Reapply' : 'Use app wording'}</button></div>
     </div>}
-    {state?.connected && <div className="admin-email-settings-banner"><Info size={17} /><span>A Supabase access token can manage every project in its Supabase account, not only this one. Use a token from an account that holds only this project, and remove it under Email connection once setup is done: these settings stay in Supabase.</span></div>}
+    {state?.connected && <div className="admin-email-settings-banner"><Info size={17} /><span>Use a scoped access token limited to this project, with only Auth read & write and a short expiry. A legacy token can manage every project in the Supabase account. Remove the token under Email connection once setup is done: these settings stay in Supabase.</span></div>}
     {flash && <p className={flash.tone === 'error' ? 'admin-field-error' : 'admin-review-hint'} role="status">{flash.text}</p>}
   </section>;
 }
@@ -130,7 +130,7 @@ function ConnectionForm({ settings, onSaved }: { settings: EmailSettings; onSave
     {field('replyTo', 'Reply-to (optional)', 'Where replies to notification emails go. Leave empty to use the sender.', { placeholder: 'info@novabridgegrant.org' })}
     {field('appUrl', 'Portal address', 'Used for links in emails and the webhook address.', { placeholder: 'https://portal.novabridgegrant.org' })}
     {field('webhookSecret', 'Webhook signing secret', 'From Resend → Webhooks → your endpoint → Signing secret (starts with whsec_).', { secret: true, placeholder: 'whsec_…', saved: settings.webhook.secretSet ? '••••' : null, clearable: settings.webhook.secretSet })}
-    {field('supabaseToken', 'Supabase access token', 'Lets this page manage sign-up verification and sign-in emails. Create one at supabase.com → Account → Access Tokens (starts with sbp_). It can manage every project in that account; remove it when you\'re done.', { secret: true, placeholder: 'sbp_…', saved: settings.supabaseToken.set ? '••••' : null, clearable: settings.supabaseToken.set })}
+    {field('supabaseToken', 'Supabase access token', 'Lets this page manage sign-up verification and sign-in emails. Create one at supabase.com → Account → Access Tokens: a Project token for this project only, with Auth set to read & write and everything else None, expiring in 7 days. Remove it when you\'re done.', { secret: true, placeholder: 'Access token', saved: settings.supabaseToken.set ? '••••' : null, clearable: settings.supabaseToken.set })}
     <div className="admin-review-buttons" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
       <span className="admin-review-hint">{settings.updatedBy ? `Last changed by ${settings.updatedBy}${settings.updatedAt ? ` · ${format(new Date(settings.updatedAt), 'dd MMM yyyy, HH:mm')}` : ''}.` : 'Not changed from here yet.'}</span>
       <button type="submit" className="admin-btn primary" disabled={busy} data-testid="button-save-email-settings">{busy ? 'Saving…' : 'Save email settings'}</button>
