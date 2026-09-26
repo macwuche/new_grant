@@ -1,28 +1,39 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import type { Session as AuthSession } from '@supabase/supabase-js';
 import { getMe, setAuthTokenGetter, type Me } from '@workspace/api-client-react';
 import { supabase } from './supabase';
 
-// Staff sign-in state for /admin. The server decides who is staff (GET /api/me);
-// the browser only holds the Supabase session.
+// Sign-in state shared by the applicant portal and /admin. The browser holds the
+// Supabase session; the server decides who is staff (GET /api/me).
 
 export type SessionStatus = 'unconfigured' | 'loading' | 'signedOut' | 'signedIn';
 
-type StaffSession = {
+/** Details collected at sign-up, stored as the Supabase account's profile metadata. */
+export type SignUpDetails = { fullName: string; phone: string; country: string; sector: string; birthDate: string };
+
+type Session = {
   status: SessionStatus;
   me: Me | null;
   /** Set when the session is valid but /api/me failed (e.g. the API is down). */
   meError: string | null;
   /** True after arriving from a password-reset link. */
   recovery: boolean;
+  /** Name saved on the account at sign-up (Supabase user metadata), if any. */
+  accountName: string | null;
+  /** Email of the signed-in account, straight from the Supabase session. */
+  accountEmail: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
+  /** Creates an account. `signedIn` is true when Supabase doesn't require email confirmation. */
+  signUp: (email: string, password: string, details: SignUpDetails) => Promise<{ error: string | null; signedIn: boolean }>;
+  resendConfirmation: (email: string) => Promise<string | null>;
   signOut: () => Promise<void>;
-  sendReset: (email: string) => Promise<string | null>;
+  /** Emails a reset link that opens `path` (e.g. /reset-password or /admin/reset-password). */
+  sendReset: (email: string, path: string) => Promise<string | null>;
   setNewPassword: (password: string) => Promise<string | null>;
   reloadMe: () => void;
 };
 
-const Ctx = createContext<StaffSession | null>(null);
+const Ctx = createContext<Session | null>(null);
 
 const basePath = () => import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -32,6 +43,7 @@ export function authErrorMessage(message: string): string {
   if (/email not confirmed/i.test(message)) return 'Confirm your email address first, using the link we sent you.';
   if (/rate limit|too many/i.test(message)) return 'Too many attempts. Wait a minute and try again.';
   if (/password should be|weak password/i.test(message)) return 'Choose a stronger password: at least 8 characters.';
+  if (/signups not allowed|signup is disabled/i.test(message)) return 'New accounts are switched off right now.';
   if (/failed to fetch|network/i.test(message)) return 'Couldn\'t reach the sign-in service. Check your connection and try again.';
   return message;
 }
@@ -42,17 +54,22 @@ function apiErrorMessage(err: unknown): string {
   return 'Couldn\'t load your staff access. Try again in a moment.';
 }
 
-export function StaffSessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>(supabase ? 'loading' : 'unconfigured');
   const [me, setMe] = useState<Me | null>(null);
   const [meError, setMeError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState(false);
+  const [accountName, setAccountName] = useState<string | null>(null);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const token = useRef<string | null>(null);
   const request = useRef(0);
 
-  const loadMe = useCallback(async (session: Session | null) => {
+  const loadMe = useCallback(async (session: AuthSession | null) => {
     const id = ++request.current;
     token.current = session?.access_token ?? null;
+    const fullName = session?.user.user_metadata?.['full_name'];
+    setAccountName(typeof fullName === 'string' && fullName.trim() ? fullName.trim() : null);
+    setAccountEmail(session?.user.email ?? null);
     if (!session) { setMe(null); setMeError(null); setStatus('signedOut'); return; }
     setStatus('loading');
     try {
@@ -78,17 +95,33 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
     return () => { data.subscription.unsubscribe(); setAuthTokenGetter(null); };
   }, [loadMe]);
 
-  const value: StaffSession = {
-    status, me, meError, recovery,
+  const value: Session = {
+    status, me, meError, recovery, accountName, accountEmail,
     signIn: async (email, password) => {
       if (!supabase) return 'Sign-in isn\'t set up yet.';
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       return error ? authErrorMessage(error.message) : null;
     },
+    signUp: async (email, password, details) => {
+      if (!supabase) return { error: 'Sign-up isn\'t set up yet.', signedIn: false };
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(), password,
+        options: {
+          emailRedirectTo: `${window.location.origin}${basePath()}/`,
+          data: { full_name: details.fullName, phone: details.phone, country: details.country, sector: details.sector, birth_date: details.birthDate, policy_acknowledgement: 'placeholder policies (not legal consent)' },
+        },
+      });
+      return { error: error ? authErrorMessage(error.message) : null, signedIn: !!data.session };
+    },
+    resendConfirmation: async email => {
+      if (!supabase) return 'Sign-up isn\'t set up yet.';
+      const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: `${window.location.origin}${basePath()}/` } });
+      return error ? authErrorMessage(error.message) : null;
+    },
     signOut: async () => { await supabase?.auth.signOut(); setRecovery(false); },
-    sendReset: async email => {
+    sendReset: async (email, path) => {
       if (!supabase) return 'Sign-in isn\'t set up yet.';
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}${basePath()}/admin/reset-password` });
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}${basePath()}${path}` });
       return error ? authErrorMessage(error.message) : null;
     },
     setNewPassword: async password => {
@@ -102,8 +135,8 @@ export function StaffSessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useStaffSession(): StaffSession {
+export function useSession(): Session {
   const value = useContext(Ctx);
-  if (!value) throw new Error('useStaffSession must be used inside StaffSessionProvider');
+  if (!value) throw new Error('useSession must be used inside SessionProvider');
   return value;
 }

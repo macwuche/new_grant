@@ -140,3 +140,15 @@ describe('profile', () => {
     if (!result.ok) expect(Object.keys(result.fieldErrors ?? {}).sort()).toEqual(['address', 'email', 'name', 'phone']);
   });
 });
+
+describe('signed-in applicant', () => {
+  it('uses the account name and email on the profile, keeping the rest', () => {
+    const before = s.profile;
+    accept(R.adoptSessionApplicant(s, { name: 'Rosa Real', email: 'Rosa@Example.org ' }));
+    expect(s.profile).toEqual({ ...before, name: 'Rosa Real', email: 'rosa@example.org' });
+    const same = R.adoptSessionApplicant(s, { name: 'Rosa Real', email: 'rosa@example.org' });
+    expect(same.ok && same.state).toBe(s);
+    accept(R.adoptSessionApplicant(s, { name: ' ', email: 'rosa@example.org' }));
+    expect(s.profile.name).toBe('Rosa Real');
+  });
+});

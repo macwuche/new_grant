@@ -233,6 +233,18 @@ export function updateProfile(state: DemoState, input: ProfileInput): Result {
   return { ok: true, message: 'Profile saved in this browser.', state: { ...state, profile } };
 }
 
+/**
+ * Shows the signed-in applicant's own name and email on the demo profile. Their
+ * applications and balances are still this browser's demo records until the API
+ * stores them (phase 12).
+ */
+export function adoptSessionApplicant(state: DemoState, account: { name: string; email: string }): Result {
+  const name = account.name.trim() || state.profile.name;
+  const email = account.email.trim().toLowerCase();
+  if (state.profile.name === name && state.profile.email === email) return { ok: true, message: '', state };
+  return { ok: true, message: `Signed in as ${name}.`, state: { ...state, profile: { ...state.profile, name, email } } };
+}
+
 export function setTwoFactor(state: DemoState, enabled: boolean): Result {
   return { ok: true, message: `Two-step sign-in ${enabled ? 'enabled' : 'disabled'} (preview setting).`, state: { ...state, profile: { ...state.profile, twoFactor: enabled } } };
 }

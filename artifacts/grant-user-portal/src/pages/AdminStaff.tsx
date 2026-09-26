@@ -6,7 +6,7 @@ import {
   setStaffActive, setStaffRole, switchStaff, type Permission, type StaffAction,
 } from '@/domain/staff';
 import { useDemoStore } from '@/domain/store';
-import { useStaffSession } from '@/lib/staffSession';
+import { useSession } from '@/lib/session';
 import { createStaffMember, listStaff, updateStaffMember, type StaffMember as ApiStaffMember } from '@workspace/api-client-react';
 
 /** Runs a staff command as the acting member: permission check + audit entry, in one step. */
@@ -76,7 +76,7 @@ export function AdminTeamSettings() {
 
 /** Signed-in version of Team & roles: the real staff list from the API (super admins only). */
 export function AdminTeamServer() {
-  const session = useStaffSession();
+  const session = useSession();
   const me = session.me?.staff;
   const allowed = !!session.me?.permissions.includes('staff.manage');
   const [staff, setStaff] = useState<ApiStaffMember[] | null>(null);

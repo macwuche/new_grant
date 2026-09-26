@@ -5,13 +5,13 @@ import {
   ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Banknote,
   BriefcaseBusiness, Building2, Check, ChevronDown, CircleHelp, CreditCard,
   Download, FileCheck2, FileText, Home, Info, Landmark, LayoutGrid, LockKeyhole,
-  MoreHorizontal, Plus, Receipt, RotateCcw, Search, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal,
+  LoaderCircle, LogOut, MoreHorizontal, Plus, Receipt, RotateCcw, Search, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal,
   PiggyBank, Sparkles, Store, Trash2, WalletCards, X, Zap,
 } from 'lucide-react';
-import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
+import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
-import { StaffSessionProvider } from './lib/staffSession';
+import { SessionProvider, useSession } from './lib/session';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from './domain/model';
 import { CURRENT_APPLICANT_ID } from './domain/seed';
 import { accountLockReason, accountOf } from './domain/applicants';
@@ -19,7 +19,7 @@ import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput }
 import { lockdownMessage } from './domain/security';
 import { downloadText } from './lib/download';
 import {
-  checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
+  adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
   saveDraft, setTwoFactor, submitApplication, updateProfile, validateApplication, type ApplicationStep, type ProfileInput,
 } from './domain/rules';
 import { DemoStoreProvider, useDemoStore } from './domain/store';
@@ -55,8 +55,30 @@ const navItems = [
   { href: '/deposits', label: 'Add funds', icon: PiggyBank },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
-function Shell({ children }: { children: ReactNode }) {
+/**
+ * With sign-in configured, applicant pages need a session; the account's name and
+ * email replace the demo profile's. Without it, the demo workspace stays open.
+ */
+function ApplicantGate({ children }: { children: ReactNode }) {
+  const session = useSession();
   const [location] = useLocation();
+  const { run } = useDemoStore();
+  const { accountName, accountEmail } = session;
+  useEffect(() => {
+    if (session.status === 'signedIn' && accountEmail) run(s => adoptSessionApplicant(s, { name: accountName ?? '', email: accountEmail }));
+  }, [session.status, accountEmail, accountName, run]);
+  if (session.status === 'unconfigured') return <>{children}</>;
+  if (session.status === 'signedOut') return <Redirect to={`/login?next=${encodeURIComponent(location)}`} replace />;
+  if (session.status === 'loading') return <div className="gate-loading" role="status" data-testid="status-applicant-gate-loading"><LoaderCircle size={20} className="auth-spin" aria-hidden="true" /> Opening your workspace…</div>;
+  return <>{children}</>;
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  return <ApplicantGate><ShellLayout>{children}</ShellLayout></ApplicantGate>;
+}
+function ShellLayout({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  const session = useSession();
   const { state: { profile } } = useDemoStore();
   const initials = initialsOf(profile.name);
   const active = (href: string) => href === '/' ? location === '/' || location === '/dashboard' : location.startsWith(href);
@@ -73,7 +95,9 @@ function Shell({ children }: { children: ReactNode }) {
     <main className="main">
       <header className="topbar">
         <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
-        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu /><Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link></div>
+        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu />{session.status === 'signedIn'
+          ? <><span className="top-avatar" aria-hidden="true">{initials}</span><button className="icon-btn" onClick={() => void session.signOut()} aria-label="Sign out" title="Sign out" data-testid="button-signout"><LogOut size={16} /></button></>
+          : <Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link>}</div>
       </header>
       <div className="mobile-demo-note" role="note">DEMO ONLY · Saved in this browser only. Nothing is sent, charged, or paid out.</div>
       <div className="page-wrap"><AccountBanner />{children}</div>
@@ -614,7 +638,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/': 'Dashboard', '/dashboard': 'Dashboard', '/grants': 'Grant categories',
       '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
       '/withdrawals': 'Withdrawals', '/deposits': 'Add funds', '/settings': 'Settings',
-      '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
+      '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password', '/reset-password': 'Choose a new password',
       '/admin': 'Admin overview', '/admin/login': 'Staff sign-in', '/admin/reset-password': 'Reset staff password', '/admin/applicants': 'Admin applicants',
       '/admin/inbox': 'Admin email inbox',
       '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
@@ -637,6 +661,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/login"><LoginPage /></Route>
     <Route path="/signup"><SignUpPage /></Route>
     <Route path="/forgot-password"><ForgotPasswordPage /></Route>
+    <Route path="/reset-password"><ResetPasswordPage /></Route>
     <Route path="/admin/login"><AdminLoginPage /></Route>
     <Route path="/admin/reset-password"><AdminResetPasswordPage /></Route>
     <Route path="/admin"><AdminPage section="overview" /></Route>
@@ -666,7 +691,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
 function App() {
   const [toast, setToast] = useState<string | null>(null);
   const onToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(current => current === message ? null : current), 4200); };
-  return <DemoStoreProvider><StaffSessionProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></StaffSessionProvider></DemoStoreProvider>;
+  return <DemoStoreProvider><SessionProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></SessionProvider></DemoStoreProvider>;
 }
 
 export default App;

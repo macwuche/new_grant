@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, Info, LoaderCircle, LogOut, ShieldCheck } from
 import { ROLE_LABELS } from '@workspace/authz';
 import { adoptSessionStaff } from '@/domain/staff';
 import { useDemoStore } from '@/domain/store';
-import { useStaffSession } from '@/lib/staffSession';
+import { useSession } from '@/lib/session';
 import './AuthPages.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,7 +45,7 @@ function PasswordInput({ id, value, onChange, autoComplete, invalid, testId }: {
 
 /** /admin/login: staff sign-in with Supabase, plus "forgot password". */
 export function AdminLoginPage() {
-  const session = useStaffSession();
+  const session = useSession();
   const [mode, setMode] = useState<'signin' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,7 +69,7 @@ export function AdminLoginPage() {
       if (error) setMessage({ tone: 'error', text: error });
       setPassword('');
     } else {
-      const error = await session.sendReset(email);
+      const error = await session.sendReset(email, '/admin/reset-password');
       // Same answer whether or not the address has an account, so this can't be used to find staff emails.
       setMessage(error ? { tone: 'error', text: error } : { tone: 'info', text: `If ${email.trim()} has an account, a reset link is on its way. It expires after an hour.` });
     }
@@ -107,7 +107,7 @@ export function AdminLoginPage() {
 
 /** /admin/reset-password: reached from the emailed link, which signs the person in for this one purpose. */
 export function AdminResetPasswordPage() {
-  const session = useStaffSession();
+  const session = useSession();
   const [, navigate] = useLocation();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -149,7 +149,7 @@ export function AdminResetPasswordPage() {
 }
 
 function NoAccessMessage() {
-  const session = useStaffSession();
+  const session = useSession();
   const text = session.meError ?? (session.me?.staff && !session.me.staff.active
     ? 'Your staff access has been disabled. Ask a super admin if you think this is a mistake.'
     : `${session.me?.user.email ?? 'This account'} isn't on the grant team. If you should have access, ask a super admin to add this email, then sign in again.`);
@@ -162,7 +162,7 @@ function NoAccessMessage() {
  * demo workspace (with its "acting as" switcher) stays open.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const session = useStaffSession();
+  const session = useSession();
   const { state, run } = useDemoStore();
   const staff = session.me?.staff;
   const allowed = session.status === 'signedIn' && !!staff?.active;
@@ -180,7 +180,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
 
 /** Top-bar identity when signed in: name, role, sign out. Replaces the demo switcher. */
 export function AdminSessionMenu() {
-  const session = useStaffSession();
+  const session = useSession();
   const staff = session.me?.staff;
   if (!staff) return null;
   const initials = staff.name.split(' ').map(p => p[0]).join('').slice(0, 2);

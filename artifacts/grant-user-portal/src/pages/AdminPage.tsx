@@ -18,7 +18,7 @@ import { AdminAudit } from './AdminAudit';
 import { AdminSecurity } from './AdminSecurity';
 import { AdminTeamServer, AdminTeamSettings, StaffSwitcher } from './AdminStaff';
 import { AdminGate, AdminSessionMenu } from './AdminLogin';
-import { useStaffSession } from '@/lib/staffSession';
+import { useSession } from '@/lib/session';
 import { RiskBadge } from './AdminRisk';
 import { staffFeed } from '@/domain/activity';
 import { applicantRecords } from '@/domain/applicants';
@@ -187,7 +187,7 @@ function Applications({ openReview }: { openReview: (id: string) => void }) {
 
 
 function Settings() {
-  const signedIn = useStaffSession().status === 'signedIn';
+  const signedIn = useSession().status === 'signedIn';
   return <><AdminTreasurySettings />{signedIn ? <AdminTeamServer /> : <AdminTeamSettings />}<BrandColorSettings /><div className="admin-settings-grid">
     <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
@@ -221,7 +221,7 @@ export function AdminPage({ section }: { section: AdminSection }) {
 
 function AdminWorkspace({ section }: { section: AdminSection }) {
   const { state } = useDemoStore();
-  const signedIn = useStaffSession().status === 'signedIn';
+  const signedIn = useSession().status === 'signedIn';
   const [applicantId, setApplicantId] = useState<string | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const closeApplicant = useCallback(() => setApplicantId(null), []);
