@@ -31,12 +31,15 @@ export function validateTreasury(input: TreasuryInput): Record<string, string> {
   else if (!errors.minDeposit && input.maxDeposit < input.minDeposit) errors.maxDeposit = 'Must be at least the minimum deposit.';
   if (!isAmount(input.depositThreshold, true)) errors.depositThreshold = 'Enter 0 or more.';
   if (!isAmount(input.highValueDeposit)) errors.highValueDeposit = 'Enter a positive amount.';
+  if (!isAmount(input.dualControlThreshold)) errors.dualControlThreshold = 'Enter a positive amount.';
+  if (!isAmount(input.applicationFee, true) || input.applicationFee > MAX_CARD_FEE) errors.applicationFee = `Use 0–${MAX_CARD_FEE}.`;
   return errors;
 }
 
 const LABELS: Record<string, string> = {
   physicalCardFee: 'physical card fee', cardDeliveryFee: 'card delivery fee', minDeposit: 'minimum deposit', maxDeposit: 'maximum deposit',
   depositThreshold: 'deposit reserve', highValueDeposit: 'high-value deposit flag',
+  dualControlThreshold: 'dual-control threshold', applicationFee: 'application fee',
 };
 
 export function describeChanges(before: Treasury, after: TreasuryInput): string[] {

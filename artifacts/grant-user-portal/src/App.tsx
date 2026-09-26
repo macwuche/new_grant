@@ -5,19 +5,26 @@ import {
   ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Banknote,
   BriefcaseBusiness, Building2, Check, ChevronDown, CircleHelp, CreditCard,
   Download, FileCheck2, FileText, Home, Info, Landmark, LayoutGrid, LockKeyhole,
-  MoreHorizontal, Plus, RotateCcw, Search, Settings, ShieldCheck, SlidersHorizontal,
+  MoreHorizontal, Plus, Receipt, RotateCcw, Search, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal,
   PiggyBank, Sparkles, Store, Trash2, WalletCards, X, Zap,
 } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
-import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, PayoutChannel, Transaction } from './domain/model';
-import { payoutDestinations } from './domain/seed';
+import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from './domain/model';
+import { CURRENT_APPLICANT_ID } from './domain/seed';
+import { accountLockReason, accountOf } from './domain/applicants';
+import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from './domain/accounts';
+import { lockdownMessage } from './domain/security';
+import { downloadText } from './lib/download';
 import {
   checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
   saveDraft, setTwoFactor, submitApplication, updateProfile, validateApplication, type ApplicationStep, type ProfileInput,
 } from './domain/rules';
 import { DemoStoreProvider, useDemoStore } from './domain/store';
-import { cancelWithdrawal, channelFee, enabledChannels, payoutBlocker, physicalCardTotal, requestPhysicalCard, requestWithdrawal, toggleCardFreeze, validateWithdrawal } from './domain/money';
+import {
+  cancelWithdrawal, channelFee, DESTINATION_FIELDS, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
+  requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateWithdrawal, type DestinationInput,
+} from './domain/money';
 import { cancelDeposit, DEPOSIT_METHODS, requestDeposit } from './domain/deposits';
 import { NotificationsMenu } from './components/NotificationsMenu';
 
@@ -67,9 +74,22 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu /><Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link></div>
       </header>
       <div className="mobile-demo-note" role="note">DEMO ONLY · Saved in this browser only. Nothing is sent, charged, or paid out.</div>
-      <div className="page-wrap">{children}</div>
+      <div className="page-wrap"><AccountBanner />{children}</div>
       <nav className="mobile-nav">{navItems.slice(0, 5).map(item => <Link key={item.href} href={item.href} className={active(item.href) ? 'active' : ''} data-testid={`mobile-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}><Icon item={item.icon} /><span>{item.label === 'Grant categories' ? 'Grants' : item.label === 'Transactions' ? 'Activity' : item.label}</span></Link>)}</nav>
     </main>
+  </div>;
+}
+/** Staff-imposed restrictions the applicant needs to know about, on every page. */
+function AccountBanner() {
+  const { state } = useDemoStore();
+  const locked = accountLockReason(state);
+  const account = accountOf(state, CURRENT_APPLICANT_ID);
+  const resets = [account.passwordResetRequired && 'choose a new password', account.twoFactorResetRequired && 'set up two-step sign-in again'].filter(Boolean);
+  if (!locked && !state.lockdown && !resets.length) return null;
+  return <div className="stack" style={{ gap: 8, marginBottom: 16 }}>
+    {locked && <div className="notice notice-danger" role="alert" data-testid="notice-account-locked"><ShieldAlert size={16} /><div>{locked}</div></div>}
+    {state.lockdown && <div className="notice" role="status" data-testid="notice-lockdown"><ShieldAlert size={16} /><div>{lockdownMessage(state)} Pending requests are safe.</div></div>}
+    {resets.length > 0 && <div className="notice" role="status" data-testid="notice-credential-reset"><LockKeyhole size={16} /><div>The grant team asked you to {resets.join(' and ')}. <Link href="/settings" className="link-text">Go to Settings</Link></div></div>}
   </div>;
 }
 function pageTitle(location: string, name: string) {
@@ -195,7 +215,7 @@ function MissingRecord({ title, text }: { title: string; text: string }) {
   return <div className="card card-pad empty-state"><div className="empty-icon"><FileText size={20} /></div><h3>{title}</h3><p>{text}</p><Link className="btn btn-primary" href="/applications" data-testid="link-missing-back">Go to applications</Link></div>;
 }
 
-type FormState = { businessName: string; amount: string; registrationNumber: string; purpose: string; checklist: string[] };
+type FormState = { businessName: string; amount: string; registrationNumber: string; purpose: string; checklist: string[]; answers: Record<string, string> };
 const STEP_ONE_FIELDS = ['businessName', 'requestedAmount', 'registrationNumber', 'purpose'];
 
 function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Application; onToast: Toast }) {
@@ -212,9 +232,11 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
     registrationNumber: draft?.registrationNumber ?? '',
     purpose: draft?.purpose ?? '',
     checklist: draft?.checklist ?? [],
+    answers: { ...(draft?.answers ?? {}) },
   }));
-  const input: ApplicationInput = { businessName: form.businessName, requestedAmount: form.amount.trim() === '' ? NaN : Number(form.amount), registrationNumber: form.registrationNumber, purpose: form.purpose, checklist: form.checklist };
-  const setField = (key: keyof FormState, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
+  const input: ApplicationInput = { businessName: form.businessName, requestedAmount: form.amount.trim() === '' ? NaN : Number(form.amount), registrationNumber: form.registrationNumber, purpose: form.purpose, checklist: form.checklist, answers: form.answers };
+  const setAnswer = (id: string, value: string) => { setForm(v => ({ ...v, answers: { ...v.answers, [id]: value } })); setErrors(({ [`answers.${id}`]: _, ...rest }) => rest); };
+  const setField = (key: Exclude<keyof FormState, 'checklist' | 'answers'>, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
   const toggleRequirement = (req: string) => { setForm(v => ({ ...v, checklist: v.checklist.includes(req) ? v.checklist.filter(r => r !== req) : [...v.checklist, req] })); setErrors(({ checklist: _, ...rest }) => rest); };
 
   const persistDraft = (quiet = false) => {
@@ -227,7 +249,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const next = () => {
     const stepErrors = validateApplication(input, grant, step === 1 ? 1 : 2);
     if (step < 3) {
-      const relevant = Object.fromEntries(Object.entries(stepErrors).filter(([k]) => step === 1 ? STEP_ONE_FIELDS.includes(k) : k === 'checklist'));
+      const relevant = Object.fromEntries(Object.entries(stepErrors).filter(([k]) => step === 1 ? STEP_ONE_FIELDS.includes(k) : k === 'checklist' || k.startsWith('answers.')));
       if (Object.keys(relevant).length) { setErrors(relevant); return; }
       if (persistDraft(true)) setStep((step + 1) as ApplicationStep);
       return;
@@ -266,6 +288,13 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       <div className="notice"><Info size={16} />Confirm you have each document ready. Secure document upload will be added with private storage; nothing is uploaded yet.</div>
       {grant.requirements.map((req, i) => <label className="upload" key={req} style={{ cursor: 'pointer' }}><div className="upload-icon">{form.checklist.includes(req) ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{form.checklist.includes(req) ? 'Marked as ready' : 'Required'}</span></div><input type="checkbox" checked={form.checklist.includes(req)} onChange={() => toggleRequirement(req)} aria-label={`I have ${req} ready`} data-testid={`checkbox-requirement-${i}`} /></label>)}
       <FieldError id="checklist-error" message={errors.checklist} />
+      {grant.questions.length > 0 && <div className="stack" style={{ gap: 12, marginTop: 8 }} data-testid="section-program-questions"><h3 className="section-title" style={{ fontSize: 14 }}>A few questions from the program team</h3>{grant.questions.map(q => { const id = `question-${q.id}`; const err = errors[`answers.${q.id}`]; const value = form.answers[q.id] ?? ''; return <div className="field" key={q.id}>
+        <label className="field-label" htmlFor={id}>{q.label}{q.required ? '' : ' (optional)'}</label>
+        {q.type === 'yesno'
+          ? <select id={id} className="select" value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`select-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined}><option value="">Choose…</option><option>Yes</option><option>No</option></select>
+          : <input id={id} className="input" inputMode={q.type === 'number' ? 'decimal' : undefined} value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`input-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />}
+        <FieldError id={`${id}-error`} message={err} />
+      </div>; })}</div>}
     </div>}
     {step === 3 && <div className="stack">
       <div className="notice"><ShieldCheck size={16} />Review your details. Submitting records the application in this browser only — it is not sent to a reviewer yet.</div>
@@ -275,6 +304,8 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
         <div className="fee-row"><span>Project or business</span><strong>{form.businessName.trim()}</strong></div>
         <div className="fee-row"><span>Registration number</span><strong>{form.registrationNumber.trim() || 'Not provided'}</strong></div>
         <div className="fee-row"><span>Requirements ready</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>
+        {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{form.answers[q.id]?.trim() || '—'}</strong></div>)}
+        {!changeRequest && state.treasury.applicationFee > 0 && <div className="fee-row"><span>Application fee (from deposit balance)</span><strong>{money(state.treasury.applicationFee)}</strong></div>}
         <div className="fee-row"><span>Current state</span><StatusBadge status={draft?.status ?? 'Draft'} /></div>
       </div>
       <div><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{form.purpose.trim()}</p></div>
@@ -302,6 +333,7 @@ function ApplicationDetail({ app, grant }: { app: Application; grant: Grant }) {
       <div className="fee-row"><span>Project or business</span><strong>{app.businessName}</strong></div>
       <div className="fee-row"><span>Registration number</span><strong>{app.registrationNumber || 'Not provided'}</strong></div>
       <div className="fee-row"><span>Requirements ready</span><strong>{app.checklist.length} of {grant.requirements.length}</strong></div>
+      {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{app.answers[q.id] || '—'}</strong></div>)}
     </div>
     <div className="mt"><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{app.purpose}</p></div>
     <div className="notice mt"><Info size={16} />{app.status === 'Approved' ? 'This decision is final. The award is in your grant balance and can be requested as a payout.' : app.status === 'Declined' ? `This decision is final. ${app.history[app.history.length - 1]!.note}` : 'Submitted applications are read-only while the grant team reviews them. If they need anything, the application will reopen for your changes.'}</div>
@@ -309,26 +341,47 @@ function ApplicationDetail({ app, grant }: { app: Application; grant: Grant }) {
   <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">History</h2><p className="section-subtitle">Every status change, newest first.</p></div></div><div className="timeline">{history.map((h, i) => <TimelineRow key={`${h.status}-${h.at}`} title={h.status} text={`${fmtDate(h.at)} · ${h.actor === 'Reviewer' ? 'Grant team' : 'You'} · ${h.note}`} current={i === 0 && h.status !== 'Approved' && h.status !== 'Declined'} done={i > 0 || h.status === 'Approved'} />)}</div></div><Link className="btn btn-ghost" href="/applications" data-testid="link-back-to-applications"><ArrowLeft size={15} /> All applications</Link></aside></div>;
 }
 
+function CardLimitEditor({ card, onToast }: { card: 'virtual' | 'physical'; onToast: Toast }) {
+  const { state, run } = useDemoStore();
+  const current = state.cards[card].dailyLimit;
+  const [value, setValue] = useState(String(current));
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setValue(String(current)); }, [current]);
+  const max = TIER_CARD_LIMITS[state.profile.tier];
+  const save = () => {
+    const result = run(s => setCardLimit(s, card, value.trim() === '' ? NaN : Number(value)));
+    if (!result.ok) { setError(result.error); return; }
+    setError(null); onToast(result.message);
+  };
+  const id = `limit-${card}`;
+  return <div className="field"><label className="field-label" htmlFor={id}>{card === 'virtual' ? 'Virtual card' : 'Physical card'} daily limit (USD)</label>
+    <div style={{ display: 'flex', gap: 8 }}><input id={id} className="input" type="number" inputMode="numeric" min={MIN_CARD_LIMIT} max={max} step="1" value={value} onChange={e => { setValue(e.target.value); setError(null); }} data-testid={`input-card-limit-${card}`} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} /><button className="btn btn-ghost" disabled={value === String(current)} onClick={save} data-testid={`button-save-card-limit-${card}`}>Save</button></div>
+    {error ? <FieldError id={`${id}-error`} message={error} /> : <span className="field-hint">{money(MIN_CARD_LIMIT)} – {money(max)} for Tier {state.profile.tier} accounts</span>}
+  </div>;
+}
 function CardsPage({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
   const [revealed, setRevealed] = useState(false);
+  const [pinShown, setPinShown] = useState(false);
+  useEffect(() => { if (!pinShown) return; const timer = window.setTimeout(() => setPinShown(false), 10_000); return () => window.clearTimeout(timer); }, [pinShown]);
   const { virtual, physical } = state.cards;
   const { treasury } = state;
   const balances = computeBalances(ownTransactions(state));
   const requested = physical.status === 'Requested';
+  const locked = !!accountLockReason(state);
   const total = physicalCardTotal(treasury);
   const act = (result: ReturnType<typeof run>) => onToast(result.ok ? result.message : result.error);
   return <div className="stack"><div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. Card changes are saved in this browser only; no card network is connected yet.</p></div><section className="grid-2">
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={virtual.frozen ? 'Frozen' : 'Active'} tone={virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => act(run(toggleCardFreeze))} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button></div></div>
+    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => act(run(toggleCardFreeze))} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Demo PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
     <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle">{requested ? 'Requested — delivery tracking arrives with the card provider.' : 'Request a card for in-person spending.'}</p></div>{requested ? <StatusBadge status="Requested" tone="Pending" /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div><CardVisual name={state.profile.name} physical label={requested ? 'REQUESTED' : 'NOT REQUESTED'} /><div style={{ marginTop: 16 }}>
       <div className="fee-row"><span>Issuance fee</span><strong>{money(treasury.physicalCardFee)}</strong></div>
       {treasury.cardDeliveryFee > 0 && <div className="fee-row"><span>Delivery fee</span><strong>{money(treasury.cardDeliveryFee)}</strong></div>}
       <div className="fee-row"><span>Deposit balance</span><strong>{money(balances.deposit)}</strong></div>
       {treasury.depositThreshold > 0 && <div className="fee-row"><span>Required reserve after fees</span><strong>{money(treasury.depositThreshold)}</strong></div>}
-      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested} onClick={() => act(run(s => requestPhysicalCard(s, new Date())))} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
+      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested || locked} onClick={() => act(run(s => requestPhysicalCard(s, new Date())))} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
       {!requested && balances.deposit - total < treasury.depositThreshold && <p className="field-hint" style={{ marginTop: 8 }}>Your deposit balance is too low. <Link href="/deposits" className="link-text">Add funds</Link></p>}
     </div></div>
-  </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Card limits</h2><p className="section-subtitle">Illustrative controls for your account tier.</p></div></div><div className="grid-3"><Metric label="Daily card limit" value={money(virtual.dailyLimit)} helper="Virtual card" /><Metric label="Deposit balance" value={money(balances.deposit)} helper="Covers card fees" /><Metric label="Card status" value={virtual.frozen ? 'Frozen' : 'Active'} helper="Virtual card" /></div></section></div>;
+  </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Daily spending limits</h2><p className="section-subtitle">Set your own limit up to your tier's maximum. Illustrative — no card network enforces it yet.</p></div></div><div className="field-grid"><CardLimitEditor card="virtual" onToast={onToast} />{requested ? <CardLimitEditor card="physical" onToast={onToast} /> : <div className="field"><span className="field-label">Physical card daily limit</span><span className="field-hint">Available once you request a physical card.</span></div>}</div></section></div>;
 }
 function TransactionNote({ tx }: { tx: Transaction }) {
   if (tx.status === 'Failed' && tx.failureReason) return <div className="secondary-cell danger-text">{tx.type === 'Deposit' ? 'Not credited' : 'Failed'}: {tx.failureReason}{tx.type === 'Withdrawal' ? ' The amount was returned to your grant balance.' : ''}</div>;
@@ -348,17 +401,54 @@ function exportCsv(rows: Transaction[]) {
     ['id', 'date', 'type', 'description', 'amount', 'status'].join(','),
     ...rows.map(t => [t.id, t.createdAt, t.type, t.description, t.amount.toFixed(2), t.status].map(escape).join(',')),
   ];
-  const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-  const a = document.createElement('a');
-  a.href = url; a.download = 'arc-fund-demo-activity.csv'; a.click();
-  URL.revokeObjectURL(url);
+  downloadText('arc-fund-demo-activity.csv', lines.join('\n'), 'text/csv');
 }
+/** Receipt lines for one ledger entry (shared by the modal and the downloaded text). */
+function receiptLines(tx: Transaction, name: string): [string, string][] {
+  const lines: [string, string][] = [['Reference', tx.reference ?? tx.id], ['Account holder', name], ['Date', format(new Date(tx.createdAt), 'MMM dd, yyyy HH:mm')], ['Type', tx.type], ['Description', tx.description], ['Amount', money(tx.amount)], ['Status', tx.status]];
+  if (tx.fee) lines.push(['Processing fee', money(tx.fee)], ['Net received', money(Math.abs(tx.amount) - tx.fee)]);
+  if (tx.destination) lines.push(['Destination', tx.destination]);
+  if (tx.processedAt) lines.push([tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', format(new Date(tx.processedAt), 'MMM dd, yyyy HH:mm')]);
+  if (tx.failureReason) lines.push(['Reason', tx.failureReason]);
+  return lines;
+}
+function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
+  const { state } = useDemoStore();
+  const lines = receiptLines(tx, state.profile.name);
+  const download = () => downloadText(`arc-fund-receipt-${tx.id}.txt`, ['arc.fund demo receipt — browser-only sample record, not proof of payment', '', ...lines.map(([k, v]) => `${k}: ${v}`)].join('\n'));
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [onClose]);
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="receipt-title" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><div className="modal" data-testid="modal-receipt"><div className="modal-head"><div><h2 id="receipt-title">Receipt</h2><p>Demo record from this browser. Not proof of payment.</p></div><button className="icon-btn" onClick={onClose} aria-label="Close receipt" data-testid="button-close-receipt" autoFocus><X size={16} /></button></div>
+    {lines.map(([k, v]) => <div className="fee-row" key={k}><span>{k}</span><strong>{v}</strong></div>)}
+    <div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Close</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={download} data-testid="button-download-receipt"><Download size={14} /> Download</button></div>
+  </div></div>;
+}
+const TRANSACTION_TABS: { label: string; types: Transaction['type'][] | null }[] = [
+  { label: 'All', types: null }, { label: 'Grants', types: ['Grant'] }, { label: 'Deposits', types: ['Deposit'] },
+  { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
+];
 function TransactionsPage() {
   const { state } = useDemoStore();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('All');
-  const filtered = useMemo(() => ownTransactions(state).sort(byNewest(t => t.createdAt)).filter(t => (filter === 'All' || t.type === filter) && `${t.description} ${t.id}`.toLowerCase().includes(query.toLowerCase())), [state, query, filter]);
-  return <div className="stack"><div className="page-intro"><h2>Every movement, easy to follow.</h2><p>Grants, deposits, card fees, and payout requests in one activity ledger. Balances are calculated from these entries.</p></div><div className="card card-pad"><div className="toolbar"><div className="search-wrap"><Search size={16} /><input className="input" type="search" placeholder="Search activity" value={query} onChange={e => setQuery(e.target.value)} data-testid="input-search-transactions" /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><SlidersHorizontal size={15} color="hsl(var(--muted))" /><select className="select" style={{ width: 145 }} value={filter} onChange={e => setFilter(e.target.value)} data-testid="select-transaction-filter"><option>All</option><option>Grant</option><option>Deposit</option><option>Withdrawal</option><option>Card fee</option></select><button className="btn btn-ghost" disabled={!filtered.length} onClick={() => exportCsv(filtered)} data-testid="button-export-transactions"><Download size={14} /> Export</button></div></div>{filtered.length ? <TransactionTable rows={filtered} /> : <div className="empty-state"><div className="empty-icon"><Search size={19} /></div><h3>No activity found</h3><p>Try a different search term or reset the activity filter.</p></div>}</div></div>;
+  const [tab, setTab] = useState('All');
+  const [status, setStatus] = useState('All statuses');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [receipt, setReceipt] = useState<Transaction | null>(null);
+  const types = TRANSACTION_TABS.find(t => t.label === tab)?.types ?? null;
+  const filtered = useMemo(() => {
+    const start = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity;
+    const end = to ? new Date(`${to}T23:59:59.999`).getTime() : Infinity;
+    return ownTransactions(state).sort(byNewest(t => t.createdAt)).filter(t => {
+      const at = new Date(t.createdAt).getTime();
+      return (!types || types.includes(t.type)) && (status === 'All statuses' || t.status === status) && at >= start && at <= end && `${t.description} ${t.id} ${t.reference ?? ''}`.toLowerCase().includes(query.toLowerCase());
+    });
+  }, [state, query, types, status, from, to]);
+  const clear = () => { setQuery(''); setTab('All'); setStatus('All statuses'); setFrom(''); setTo(''); };
+  return <div className="stack"><div className="page-intro"><h2>Every movement, easy to follow.</h2><p>Grants, deposits, fees, and payout requests in one activity ledger. Balances are calculated from these entries.</p></div><div className="card card-pad">
+    <div className="tabs mb" role="tablist" aria-label="Transaction type">{TRANSACTION_TABS.map(t => <button key={t.label} role="tab" aria-selected={tab === t.label} className={`tab ${tab === t.label ? 'active' : ''}`} onClick={() => setTab(t.label)} data-testid={`tab-transactions-${t.label.toLowerCase()}`}>{t.label}</button>)}</div>
+    <div className="toolbar"><div className="search-wrap"><Search size={16} /><input className="input" type="search" placeholder="Search activity or reference" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search activity" data-testid="input-search-transactions" /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SlidersHorizontal size={15} color="hsl(var(--muted))" /><select className="select" style={{ width: 140 }} value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by status" data-testid="select-transaction-status"><option>All statuses</option><option>Completed</option><option>Pending</option><option>Failed</option><option>Cancelled</option></select><input className="input" style={{ width: 150 }} type="date" value={from} onChange={e => setFrom(e.target.value)} aria-label="From date" data-testid="input-transactions-from" /><input className="input" style={{ width: 150 }} type="date" value={to} onChange={e => setTo(e.target.value)} aria-label="To date" data-testid="input-transactions-to" /><button className="btn btn-ghost" disabled={!filtered.length} onClick={() => exportCsv(filtered)} data-testid="button-export-transactions"><Download size={14} /> Export</button></div></div>
+    {filtered.length ? <TransactionTable rows={filtered} action={tx => <button className="icon-btn" onClick={() => setReceipt(tx)} aria-label={`Receipt for ${tx.reference ?? tx.id}`} data-testid={`button-receipt-${tx.id}`}><Receipt size={15} /></button>} /> : <div className="empty-state"><div className="empty-icon"><Search size={19} /></div><h3>No activity found</h3><p>Try a different search, date range, or filter.</p><button className="btn btn-ghost" onClick={clear} data-testid="button-clear-transaction-filters">Clear filters</button></div>}
+  </div>{receipt && <ReceiptModal tx={receipt} onClose={() => setReceipt(null)} />}</div>;
 }
 
 function CancelButton({ tx, onCancel, label }: { tx: Transaction; onCancel: (id: string) => void; label: string }) {
@@ -395,11 +485,13 @@ function WithdrawalsPage({ onToast }: { onToast: Toast }) {
   return <div className="stack"><div className="detail-layout"><div className="stack"><div className="withdraw-summary"><div className="metric-label"><span>Available to request</span><WalletCards size={15} /></div><div className="metric-value">{money(balances.grant)}</div><div className="metric-helper">Grant balance{balances.pendingWithdrawals > 0 ? ` · ${money(balances.pendingWithdrawals)} held for pending payouts` : ''}</div></div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Request a payout</h2><p className="section-subtitle">Choose a channel and check the fee breakdown.</p></div></div><div className="notice mb"><Info size={16} />Payout requests are recorded in this browser only. No bank, mobile-money, or crypto provider is connected, so no money moves.</div>
     {blocker && <div className="notice mb" role="alert" data-testid="notice-payout-blocked"><Info size={16} /><div>{blocker}{blocker.includes('deposit balance') && <> <Link href="/deposits" className="link-text">Add funds</Link></>}</div></div>}
     {channel && <><div className="field mb"><label className="field-label" htmlFor="withdrawal-amount">Amount (USD)</label><input id="withdrawal-amount" type="number" inputMode="decimal" min={channel.min} max={channel.max} step="0.01" className="input" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-withdrawal-amount" aria-invalid={!!error} aria-describedby={error ? 'withdrawal-error' : undefined} />{error ? <FieldError id="withdrawal-error" message={error} /> : <span className="field-hint">{channel.name}: {money(channel.min)} – {money(Math.min(channel.max, Math.max(balances.grant, 0)))}</span>}</div>
-    <div className="field"><span className="field-label">Payout channel</span><div className="stack" style={{ gap: 8 }}>{channels.map(c => <label key={c.id} className={`payout-method ${channel.id === c.id ? 'active' : ''}`}><input type="radio" name="payout" checked={channel.id === c.id} onChange={() => { setChannelId(c.id); setError(null); }} data-testid={`radio-payout-${c.id}`} /><div className="payout-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{c.name}</strong><span>{payoutDestinations[c.id]} · fee {feeText(c)}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div></>}
+    <div className="field"><span className="field-label">Payout channel</span><div className="stack" style={{ gap: 8 }}>{channels.map(c => <label key={c.id} className={`payout-method ${channel.id === c.id ? 'active' : ''}`}><input type="radio" name="payout" checked={channel.id === c.id} onChange={() => { setChannelId(c.id); setError(null); }} data-testid={`radio-payout-${c.id}`} /><div className="payout-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{c.name}</strong><span>{state.payoutDestinations[c.id] ?? 'No destination saved'} · fee {feeText(c)}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div></>}
+    {channel && !state.payoutDestinations[channel.id] && <div className="notice mt" role="note" data-testid="notice-missing-destination"><Info size={16} /><div>Add your {channel.name} details before requesting a payout. <Link href="/settings#payouts" className="link-text">Payout destinations</Link></div></div>}
+    {channel && channel.max >= state.treasury.dualControlThreshold && <p className="field-hint mt">Requests of {money(state.treasury.dualControlThreshold)} or more need two members of the finance and compliance team to sign off, so they can take longer.</p>}
     <div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>No real payout will be created.</span><button className="btn btn-primary" onClick={preview} disabled={!channel || !!blocker || balances.grant <= 0} data-testid="button-preview-withdrawal">Review request <ArrowRight size={15} /></button></div></div></div>
     <aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Fee breakdown</h2><p className="section-subtitle">{channel ? `${channel.name}: ${feeText(channel)}` : 'No channel available'}</p></div></div><div className="fee-row"><span>Requested amount</span><strong>{money(value || 0)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(Math.max(0, (value || 0) - fee))}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The fee is deducted from the payout. Rates are set by the finance team and apply to new requests.</p></aside></div>
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Payout requests</h2><p className="section-subtitle">Pending requests are held from your grant balance until the finance team marks them paid or failed. You can cancel a request while it's pending.</p></div></div><TransactionTable rows={history} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
-    {showModal && channel && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="withdrawal-modal-title"><div className="modal"><div className="modal-head"><div><h2 id="withdrawal-modal-title">Confirm payout request</h2><p>The request is recorded as pending in this browser. No money moves.</p></div><button className="icon-btn" onClick={() => setShowModal(false)} aria-label="Close" data-testid="button-close-withdrawal-modal"><X size={16} /></button></div><div className="fee-row"><span>Destination</span><strong>{channel.name} · {payoutDestinations[channel.id]}</strong></div><div className="fee-row"><span>Amount</span><strong>{money(value)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(value - fee)}</strong></div><div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)} data-testid="button-cancel-withdrawal">Cancel</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={confirm} data-testid="button-confirm-withdrawal">Submit request</button></div></div></div>}
+    {showModal && channel && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="withdrawal-modal-title"><div className="modal"><div className="modal-head"><div><h2 id="withdrawal-modal-title">Confirm payout request</h2><p>The request is recorded as pending in this browser. No money moves.</p></div><button className="icon-btn" onClick={() => setShowModal(false)} aria-label="Close" data-testid="button-close-withdrawal-modal"><X size={16} /></button></div><div className="fee-row"><span>Destination</span><strong>{channel.name} · {state.payoutDestinations[channel.id]}</strong></div><div className="fee-row"><span>Amount</span><strong>{money(value)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(value - fee)}</strong></div><div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)} data-testid="button-cancel-withdrawal">Cancel</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={confirm} data-testid="button-confirm-withdrawal">Submit request</button></div></div></div>}
   </div>;
 }
 function DepositsPage({ onToast }: { onToast: Toast }) {
@@ -434,25 +526,82 @@ function DepositsPage({ onToast }: { onToast: Toast }) {
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your deposits</h2><p className="section-subtitle">Cancel a deposit if you decide not to send it.</p></div></div><TransactionTable rows={deposits} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
   </div>;
 }
+function IdentityCheck({ onToast }: { onToast: Toast }) {
+  const { state, run } = useDemoStore();
+  const kyc = accountOf(state, CURRENT_APPLICANT_ID).kyc;
+  const [form, setForm] = useState<KycInput>({ documentType: 'Passport', documentNumber: '', nameOnDocument: state.profile.name });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const canSubmit = kyc.status === 'Not submitted' || kyc.status === 'Rejected';
+  const submit = () => {
+    const result = run(s => submitKyc(s, form, new Date()));
+    if (!result.ok) { setErrors(result.fieldErrors ?? {}); if (!result.fieldErrors) onToast(result.error); return; }
+    setErrors({}); setForm(f => ({ ...f, documentNumber: '' })); onToast(result.message);
+  };
+  const tone = kyc.status === 'Verified' ? 'Completed' : kyc.status === 'Pending' ? 'Pending' : kyc.status === 'Rejected' ? 'Failed' : 'Draft';
+  return <div className="verification-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }} data-testid="section-identity-check"><div className="verification-icon"><Check size={15} /></div><div className="verification-copy" style={{ flex: '1 1 240px' }}><strong>Identity verification</strong>
+    <span>{kyc.status === 'Verified' ? `Verified${kyc.documentType ? ` with ${kyc.documentType.toLowerCase()} ending ${kyc.documentLast4}` : ''}.` : kyc.status === 'Pending' ? `Submitted ${kyc.submittedAt ? fmtDate(kyc.submittedAt) : ''} · waiting for the compliance team.` : kyc.status === 'Rejected' ? `Not approved: ${kyc.rejectionReason}` : kyc.rejectionReason ? `Please verify again: ${kyc.rejectionReason}` : 'Required before you can apply for grants.'}</span>
+    {canSubmit && <div className="field-grid" style={{ marginTop: 12 }}>
+      <div className="field"><label className="field-label" htmlFor="kyc-type">Document</label><select id="kyc-type" className="select" value={form.documentType} onChange={e => setForm({ ...form, documentType: e.target.value as KycDocumentType })} data-testid="select-kyc-document">{KYC_DOCUMENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+      <div className="field"><label className="field-label" htmlFor="kyc-number">Document number</label><input id="kyc-number" className="input" value={form.documentNumber} onChange={e => { setForm({ ...form, documentNumber: e.target.value }); setErrors(({ documentNumber: _, ...rest }) => rest); }} autoComplete="off" data-testid="input-kyc-number" aria-invalid={!!errors.documentNumber} aria-describedby={errors.documentNumber ? 'kyc-number-error' : undefined} />{errors.documentNumber ? <FieldError id="kyc-number-error" message={errors.documentNumber} /> : <span className="field-hint">Only the last four characters are kept.</span>}</div>
+      <div className="field field-full"><label className="field-label" htmlFor="kyc-name">Name exactly as on the document</label><input id="kyc-name" className="input" value={form.nameOnDocument} onChange={e => { setForm({ ...form, nameOnDocument: e.target.value }); setErrors(({ nameOnDocument: _, ...rest }) => rest); }} data-testid="input-kyc-name" aria-invalid={!!errors.nameOnDocument} aria-describedby={errors.nameOnDocument ? 'kyc-name-error' : undefined} /><FieldError id="kyc-name-error" message={errors.nameOnDocument} /></div>
+      <div className="field-full" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="field-hint">Demo: no document image is uploaded or checked.</span><button className="btn btn-primary" onClick={submit} data-testid="button-submit-kyc">Submit for review</button></div>
+    </div>}
+  </div><StatusBadge status={kyc.status} tone={tone} /></div>;
+}
+function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
+  const { state, run } = useDemoStore();
+  const [editing, setEditing] = useState<ChannelId | null>(null);
+  const [input, setInput] = useState<DestinationInput>({ primary: '', secondary: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const open = (id: ChannelId) => { setEditing(id); setInput({ primary: '', secondary: '' }); setErrors({}); };
+  const save = () => {
+    if (!editing) return;
+    const result = run(s => savePayoutDestination(s, editing, input, new Date()));
+    if (!result.ok) { setErrors(result.fieldErrors ?? {}); if (!result.fieldErrors) onToast(result.error); return; }
+    setEditing(null); onToast(result.message);
+  };
+  const remove = (id: ChannelId) => { const result = run(s => removePayoutDestination(s, id)); onToast(result.ok ? result.message : result.error); };
+  return <div className="card card-pad" id="payouts" data-testid="section-payout-destinations"><div className="section-head"><div><h2 className="section-title">Payout destinations</h2><p className="section-subtitle">Where payouts go for each channel. Only a masked label is kept. Changing a destination is reviewed by the team for your security.</p></div><Landmark size={19} color="hsl(var(--muted))" /></div>
+    {state.treasury.channels.map(c => { const saved = state.payoutDestinations[c.id]; return <div key={c.id} className="verification-item" style={{ flexWrap: 'wrap' }} data-testid={`row-destination-${c.id}`}>
+      <div className="verification-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div>
+      <div className="verification-copy" style={{ flex: '1 1 200px' }}><strong>{c.name}{!c.enabled && <span className="muted" style={{ fontWeight: 500 }}> · not offered right now</span>}</strong><span>{saved ?? 'Not set'}</span></div>
+      <div style={{ display: 'flex', gap: 6 }}><button className="btn btn-ghost" onClick={() => editing === c.id ? setEditing(null) : open(c.id)} data-testid={`button-edit-destination-${c.id}`}>{editing === c.id ? 'Cancel' : saved ? 'Change' : 'Add'}</button>{saved && editing !== c.id && <button className="icon-btn" onClick={() => remove(c.id)} aria-label={`Remove ${c.name} destination`} data-testid={`button-remove-destination-${c.id}`}><Trash2 size={14} /></button>}</div>
+      {editing === c.id && <div className="field-grid" style={{ flexBasis: '100%', marginTop: 10 }}>
+        {DESTINATION_FIELDS[c.id].map(f => { const id = `dest-${c.id}-${f.key}`; return <div className="field" key={f.key}><label className="field-label" htmlFor={id}>{f.label}</label><input id={id} className="input" autoComplete="off" placeholder={f.placeholder} value={input[f.key] ?? ''} onChange={e => { setInput({ ...input, [f.key]: e.target.value }); setErrors(({ [f.key]: _, ...rest }) => rest); }} data-testid={`input-destination-${c.id}-${f.key}`} aria-invalid={!!errors[f.key]} aria-describedby={errors[f.key] ? `${id}-error` : undefined} /><FieldError id={`${id}-error`} message={errors[f.key]} /></div>; })}
+        <div className="field-full" style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" onClick={save} data-testid={`button-save-destination-${c.id}`}>Save destination</button></div>
+      </div>}
+    </div>; })}
+  </div>;
+}
 function SettingsPage({ onToast }: { onToast: Toast }) {
   const { state, run, reset } = useDemoStore();
   const { profile } = state;
+  const account = accountOf(state, CURRENT_APPLICANT_ID);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileInput>(profile);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => { if (window.location.hash === '#payouts') document.getElementById('payouts')?.scrollIntoView(); }, []);
   const startEdit = () => { setDraft({ name: profile.name, email: profile.email, phone: profile.phone, address: profile.address }); setErrors({}); setEditing(true); };
   const save = () => {
     const result = run(s => updateProfile(s, draft));
     if (!result.ok) { setErrors(result.fieldErrors ?? {}); return; }
     setEditing(false); onToast(result.message);
   };
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const complete = (kind: 'password' | 'twoFactor') => { const r = run(s => completeCredentialReset(s, kind)); onToast(r.ok ? r.message : r.error); };
   const shown = editing ? draft : profile;
   const field = (key: keyof ProfileInput, label: string) => <div className="field"><label className="field-label" htmlFor={`profile-${key}`}>{label}</label><input id={`profile-${key}`} className="input" disabled={!editing} value={shown[key]} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors(({ [key]: _, ...rest }) => rest); }} data-testid={`input-profile-${key}`} aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `profile-${key}-error` : undefined} /><FieldError id={`profile-${key}-error`} message={errors[key]} /></div>;
-  return <div className="detail-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Your profile and security controls.</p></div></div><div className="settings-nav"><button className="active" data-testid="tab-settings-profile">Profile details</button><button onClick={() => onToast('Verification status is shown on this page.')} data-testid="tab-settings-verification">Verification</button><button onClick={() => onToast('Notification preferences will be available in a later phase.')} data-testid="tab-settings-notifications">Notifications</button></div></aside><div className="stack">
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? setEditing(false) : startEdit()} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid">{field('name', 'Full name')}{field('email', 'Email')}{field('phone', 'Phone')}{field('address', 'Address')}</div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>Saved in this browser only.</span><button className="btn btn-primary" onClick={save} data-testid="button-save-profile">Save changes</button></div>}</div>
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div><div className="verification-item"><div className="verification-icon"><Check size={15} /></div><div className="verification-copy"><strong>Identity verification</strong><span>{profile.identityVerified ? 'Verified' : 'Not verified'} · demo status</span></div><StatusBadge status={profile.identityVerified ? 'Completed' : 'Pending'} /></div><div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div><div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>Preference only until sign-in is connected</span></div><button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" /></div></div>
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Demo data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); setEditing(false); onToast('Demo data reset to the original sample records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset demo data</button>}</div></div>
+  return <div className="detail-layout settings-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Your profile and security controls.</p></div></div><div className="settings-nav"><button onClick={() => jump('profile')} data-testid="tab-settings-profile">Profile details</button><button onClick={() => jump('verification')} data-testid="tab-settings-verification">Verification & security</button><button onClick={() => jump('payouts')} data-testid="tab-settings-payouts">Payout destinations</button><button onClick={() => jump('demo-data')} data-testid="tab-settings-demo">Demo data</button></div></aside><div className="stack">
+    <div className="card card-pad" id="profile"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? setEditing(false) : startEdit()} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid">{field('name', 'Full name')}{field('email', 'Email')}{field('phone', 'Phone')}{field('address', 'Address')}</div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>Saved in this browser only.</span><button className="btn btn-primary" onClick={save} data-testid="button-save-profile">Save changes</button></div>}</div>
+    <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
+      <IdentityCheck onToast={onToast} />
+      <div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for. The grant team changes tiers after review.</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div>
+      <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>
+      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>Requested by the grant team. Sign-in isn't connected, so nothing is stored.</span></div><button className="btn btn-ghost" onClick={() => complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
+    </div>
+    <PayoutDestinationsCard onToast={onToast} />
+    <div className="card card-pad" id="demo-data"><div className="section-head"><div><h2 className="section-title">Demo data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser. Resetting also clears the staff audit log and settings.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); setEditing(false); onToast('Demo data reset to the original sample records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset demo data</button>}</div></div>
   </div></div>;
 }
 
@@ -466,7 +615,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
       '/admin': 'Admin overview', '/admin/applicants': 'Admin applicants',
       '/admin/inbox': 'Admin email inbox',
-      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants',
+      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
       '/admin/settings': 'Admin settings',
     };
     const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
@@ -493,6 +642,8 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/admin/payouts"><AdminPage section="payouts" /></Route>
     <Route path="/admin/deposits"><AdminPage section="deposits" /></Route>
     <Route path="/admin/grants"><AdminPage section="grants" /></Route>
+    <Route path="/admin/security"><AdminPage section="security" /></Route>
+    <Route path="/admin/audit"><AdminPage section="audit" /></Route>
     <Route path="/admin/settings"><AdminPage section="settings" /></Route>
     <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/dashboard"><Shell><Dashboard onToast={onToast} /></Shell></Route>

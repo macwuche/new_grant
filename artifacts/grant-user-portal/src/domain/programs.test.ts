@@ -12,8 +12,8 @@ const PM = 'Sam Rivera';
 
 let s: DemoState;
 const program = (id: string) => s.grants.find(g => g.id === id)!;
-const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration });
-const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, budget: 60000, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false };
+const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration, questions: g.questions.map(q => ({ ...q })) });
+const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, budget: 60000, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false, questions: [] };
 function accept(result: Result): Result & { ok: true } {
   if (!result.ok) throw new Error(`expected success, got: ${result.error} ${JSON.stringify(result.fieldErrors ?? {})}`);
   s = result.state;
@@ -130,11 +130,13 @@ describe('editing', () => {
 });
 
 describe('saved-data migration', () => {
-  it('upgrades v2 data through v4, keeping applications and adding the catalog and money settings', () => {
+  it('upgrades v2 data through v5, keeping applications and adding the catalog, money settings, and staff', () => {
     const { grants: _g, notifications: _n, treasury: _t, staffFeed: _f, ...rest } = createSeedState();
     const v2 = { ...rest, version: 2, applications: rest.applications.slice(0, 1) };
     const migrated = migrateState(JSON.parse(JSON.stringify(v2)))!;
-    expect(migrated.version).toBe(4);
+    expect(migrated.version).toBe(5);
+    expect(migrated.staff.length).toBeGreaterThan(0);
+    expect(migrated.audit).toEqual([]);
     expect(migrated.treasury.channels.length).toBeGreaterThan(0);
     expect(migrated.staffFeed).toEqual([]);
     expect(migrated.applications).toHaveLength(1);

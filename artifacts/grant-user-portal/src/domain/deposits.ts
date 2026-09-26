@@ -1,6 +1,7 @@
 import type { DemoState, DepositMethodId, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
-import { logStaff } from './activity';
+import { alertIfHighRisk, logStaff } from './activity';
+import { accountLockReason } from './applicants';
 import { notify } from './notifications';
 import { ownTransactions } from './rules';
 import { CURRENT_APPLICANT_ID } from './seed';
@@ -24,6 +25,8 @@ export const DEPOSIT_METHODS: DepositMethod[] = [
 const isDeposit = (tx: Transaction) => tx.type === 'Deposit';
 
 export function validateDeposit(state: DemoState, amount: number): string | null {
+  const locked = accountLockReason(state);
+  if (locked) return locked;
   const { minDeposit, maxDeposit } = state.treasury;
   if (!Number.isFinite(amount) || amount <= 0) return 'Enter an amount to deposit.';
   if (roundCents(amount) !== amount) return 'Use at most two decimal places.';
@@ -47,7 +50,7 @@ export function requestDeposit(state: DemoState, amount: number, methodId: Depos
     title: `${highValue ? 'High-value deposit' : 'Deposit'} announced: ${usd(amount)}`,
     body: `${state.profile.name} · ${method.name} · reference ${tx.reference}`, href: '/admin/deposits',
   }, now);
-  return { ok: true, id: tx.id, message: `Deposit ${tx.reference} recorded. Send ${usd(amount)} with that reference; it's added once finance confirms it arrived.`, state: next };
+  return { ok: true, id: tx.id, message: `Deposit ${tx.reference} recorded. Send ${usd(amount)} with that reference; it's added once finance confirms it arrived.`, state: alertIfHighRisk(state, next, CURRENT_APPLICANT_ID, now) };
 }
 
 export function cancelDeposit(state: DemoState, txId: string, now: Date): Result {

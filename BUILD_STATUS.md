@@ -24,20 +24,23 @@ Build the application logic first, client-side, against browser-local demo data.
    - Applicant bell for review outcomes, payouts, deposits, and program closures. Email delivery not connected.
 9. **Deposits, money settings, withdrawal upgrades, staff activity feed (browser-only) — Complete**
    - Applicants announce deposits with a reference; finance confirms or rejects. Finance sets payout channels (on/off, limits, fees), card fees, deposit limits, the deposit reserve, and the high-value flag. Only enabled channels are offered; applicants can cancel pending deposits and payouts. Staff bell and overview feed of applicant actions.
-10. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
-11. **Database and API — Not started**
+10. **Spec gaps, browser-only — Complete** (26 Sep 2026)
+   - Staff roles (super admin, reviewer, finance, compliance, support) with per-action permission checks via a demo "acting as" switcher; append-only audit log with field-level changes, filters, and CSV/JSON export; automated fraud risk score (0–100) with explained factors and staff alerts; identity checks (applicant submits, compliance approves/rejects/asks again); applicant tier changes, account lock, forced password/2FA resets; escalation of applications to security (blocks approval); two-person sign-off on payouts at or above a threshold; emergency system lockdown; custom questions per program; application processing fee; saved payout destinations; card daily limits and PIN reveal; transaction tabs, date filter, and receipts; spec overview metrics.
+11. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+12. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
-12. **Documents, email notifications (Resend) — Not started**
-13. **Real financial operations — Not started**
+13. **Documents, email notifications (Resend) — Not started**
+14. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
 
 ## Not yet implemented
 
 - Any server persistence: all demo data lives in the visitor's browser (`localStorage`).
-- Sign-in, accounts, staff roles, and authorization; `/admin` is open to anyone with the URL (acceptable only because data is fictional and local).
-- File uploads, private document storage, applicant notifications.
+- Sign-in, accounts, and enforced authorization. Staff roles exist as rules, but anyone can pick any staff member in the "acting as" switcher; `/admin` is open to anyone with the URL (acceptable only because data is fictional and local).
+- Real risk signals (IP, device fingerprint), document inspection for identity checks, and IP capture in the audit log.
+- File uploads, private document storage, email/SMS notifications (in-app notifications exist).
 - Real card issuance, deposits, charges, or payouts.
-- End-to-end, accessibility, and security test suites (domain unit tests exist).
+- Committed end-to-end, accessibility, and security test suites (domain unit tests exist: 137 tests in 12 files).
 
 ## Frontend foundation
 

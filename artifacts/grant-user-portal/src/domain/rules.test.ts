@@ -76,7 +76,7 @@ describe('eligibility', () => {
 });
 
 describe('application validation', () => {
-  const base: ApplicationInput = { businessName: 'Morgan Studio', requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: [] };
+  const base: ApplicationInput = { businessName: 'Morgan Studio', requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: [], answers: {} };
 
   it('enforces the grant amount range', () => {
     expect(R.validateApplication({ ...base, requestedAmount: 100 }, grant('green'), 1).requestedAmount).toMatch(/minimum/);

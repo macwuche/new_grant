@@ -354,3 +354,10 @@ button { cursor: pointer; }
 .notif-foot { margin: 0; padding: 10px 16px; border-top: 1px solid hsl(var(--line)); color: hsl(var(--muted)); font-size: 10px; }
 @media (max-width: 560px) { .notif-panel { position: fixed; top: 64px; right: 16px; left: 16px; width: auto; } }
 .status-cancelled { background: hsl(var(--surface-soft)); color: hsl(var(--muted)); text-decoration: line-through; }
+
+/* Staff-imposed account restrictions */
+.notice.notice-danger { background: hsl(8 60% 94%); color: hsl(8 55% 34%); }
+/* Settings: short section nav on the left, content in the wide column. */
+.detail-layout.settings-layout { grid-template-columns: 230px minmax(0, 1fr); }
+.settings-layout > aside { position: sticky; top: 16px; }
+@media (max-width: 820px) { .detail-layout.settings-layout { grid-template-columns: minmax(0, 1fr); } .settings-layout > aside { position: static; } }

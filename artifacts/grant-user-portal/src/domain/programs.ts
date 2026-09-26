@@ -1,4 +1,4 @@
-import type { DemoState, Grant, GrantInput, ProgramStatus, Result, Tier } from './model';
+import type { DemoState, Grant, GrantInput, ProgramQuestion, ProgramStatus, Result, Tier } from './model';
 import { fail, nextIds, roundCents } from './rules';
 import { notify } from './notifications';
 import { programBudget } from './review';
@@ -8,13 +8,15 @@ import { programBudget } from './review';
 
 export const MAX_REQUIREMENTS = 8;
 export const MAX_REQUIREMENT_LENGTH = 80;
+export const MAX_QUESTIONS = 6;
+export const QUESTION_TYPES: { id: ProgramQuestion['type']; label: string }[] = [{ id: 'text', label: 'Short text' }, { id: 'number', label: 'Number' }, { id: 'yesno', label: 'Yes / no' }];
 
 /** Eligibility criteria that can't change once someone has submitted, so in-flight applications stay valid. */
-export const LOCKED_WHEN_SUBMITTED: (keyof GrantInput)[] = ['minimumTier', 'requirements', 'requiresRegistration', 'minimumRequest'];
+export const LOCKED_WHEN_SUBMITTED: (keyof GrantInput)[] = ['minimumTier', 'requirements', 'requiresRegistration', 'minimumRequest', 'questions'];
 
 const FIELD_LABELS: Record<keyof GrantInput, string> = {
   name: 'name', summary: 'summary', focus: 'focus', maxFunding: 'maximum award', minimumRequest: 'minimum request',
-  budget: 'budget', deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement',
+  budget: 'budget', deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'questions',
 };
 
 const todayIso = (now: Date) => {
@@ -27,6 +29,20 @@ const isMoney = (value: number) => Number.isFinite(value) && value > 0 && roundC
 /** True once any application for the program has left draft. */
 export const hasSubmissions = (state: DemoState, grantId: string) => state.applications.some(a => a.grantId === grantId && a.status !== 'Draft');
 
+/** Blank questions are dropped; new ones get a stable id derived from their label. */
+function normalizeQuestions(questions: ProgramQuestion[]): ProgramQuestion[] {
+  const kept = questions.map(q => ({ ...q, label: q.label.trim() })).filter(q => q.label);
+  const used = new Set(kept.map(q => q.id).filter(Boolean));
+  return kept.map(q => {
+    if (q.id) return q;
+    const base = q.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'question';
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return { ...q, id };
+  });
+}
+
 export function normalizeProgram(input: GrantInput): GrantInput {
   return {
     ...input,
@@ -34,6 +50,7 @@ export function normalizeProgram(input: GrantInput): GrantInput {
     summary: input.summary.trim(),
     focus: input.focus.trim(),
     requirements: input.requirements.map(r => r.trim()).filter(Boolean),
+    questions: normalizeQuestions(input.questions ?? []),
   };
 }
 
@@ -64,6 +81,11 @@ export function validateProgram(state: DemoState, raw: GrantInput, now: Date, ex
   else if (input.requirements.length > MAX_REQUIREMENTS) errors.requirements = `Use at most ${MAX_REQUIREMENTS} requirements.`;
   else if (input.requirements.some(r => r.length > MAX_REQUIREMENT_LENGTH)) errors.requirements = `Keep each requirement under ${MAX_REQUIREMENT_LENGTH} characters.`;
   else if (new Set(input.requirements.map(r => r.toLowerCase())).size !== input.requirements.length) errors.requirements = 'Each requirement must be different.';
+
+  if (input.questions.length > MAX_QUESTIONS) errors.questions = `Use at most ${MAX_QUESTIONS} questions.`;
+  else if (input.questions.some(q => q.label.length < 5 || q.label.length > 120)) errors.questions = 'Keep each question between 5 and 120 characters.';
+  else if (input.questions.some(q => !QUESTION_TYPES.some(t => t.id === q.type))) errors.questions = 'Choose a type for each question.';
+  else if (new Set(input.questions.map(q => q.label.toLowerCase())).size !== input.questions.length) errors.questions = 'Each question must be different.';
 
   if (existing && hasSubmissions(state, existing.id)) {
     for (const key of LOCKED_WHEN_SUBMITTED) {
@@ -150,5 +172,5 @@ export function deleteProgram(state: DemoState, id: string, expectedVersion: str
 
 export const emptyProgram = (now: Date): GrantInput => {
   const deadline = new Date(now.getTime() + 90 * 86_400_000);
-  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, budget: 100000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [''], requiresRegistration: false };
+  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, budget: 100000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [''], requiresRegistration: false, questions: [] };
 };

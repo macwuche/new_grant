@@ -1,5 +1,6 @@
 import type { DemoState, Result, Transaction } from './model';
 import { fail, roundCents } from './rules';
+import { usd } from './core';
 import { notify } from './notifications';
 
 // Finance payout processing. Pure, like ./rules and ./review. No payment
@@ -29,6 +30,11 @@ export function pendingPayoutTotal(state: DemoState): number {
   return roundCents(state.transactions.filter(t => isWithdrawal(t) && t.status === 'Pending').reduce((sum, t) => sum + payoutAmounts(t).gross, 0));
 }
 
+/** Four-eyes rule: large payouts need a release approval from someone other than whoever marks them paid. */
+export const needsSecondSignOff = (state: DemoState, tx: Transaction) => !!tx.dualControl || payoutAmounts(tx).gross >= state.treasury.dualControlThreshold;
+
+const LOCKDOWN_ERROR = 'Payouts are frozen during the system lockdown. A super admin must lift it first.';
+
 /** Only a pending payout can be processed, and only once; repeating the action is rejected. */
 function loadPending(state: DemoState, txId: string): { ok: true; tx: Transaction } | { ok: false; result: Result } {
   const tx = state.transactions.find(t => t.id === txId);
@@ -41,9 +47,26 @@ function update(state: DemoState, tx: Transaction): DemoState {
   return { ...state, transactions: state.transactions.map(t => t.id === tx.id ? tx : t) };
 }
 
-export function markPayoutPaid(state: DemoState, txId: string, operator: string, now: Date): Result {
+/** Second sign-off on a large payout. The approver can't also be the one who marks it paid. */
+export function approvePayoutRelease(state: DemoState, txId: string, approver: string, now: Date): Result {
+  if (state.lockdown) return fail(LOCKDOWN_ERROR);
   const loaded = loadPending(state, txId);
   if (!loaded.ok) return loaded.result;
+  if (!needsSecondSignOff(state, loaded.tx)) return fail(`${txId} is below the ${usd(state.treasury.dualControlThreshold)} dual-control threshold, so no second sign-off is needed.`);
+  if (loaded.tx.releaseApproval) return fail(`${txId} was already approved for release by ${loaded.tx.releaseApproval.by}.`);
+  const tx: Transaction = { ...loaded.tx, releaseApproval: { by: approver, at: now.toISOString() } };
+  return { ok: true, id: txId, message: `${txId} approved for release. A different staff member with payment rights can now mark it paid.`, state: update(state, tx) };
+}
+
+export function markPayoutPaid(state: DemoState, txId: string, operator: string, now: Date): Result {
+  if (state.lockdown) return fail(LOCKDOWN_ERROR);
+  const loaded = loadPending(state, txId);
+  if (!loaded.ok) return loaded.result;
+  if (needsSecondSignOff(state, loaded.tx)) {
+    const approval = loaded.tx.releaseApproval;
+    if (!approval) return fail(`${txId} is ${usd(payoutAmounts(loaded.tx).gross)}, at or above the dual-control threshold. It needs a release approval from a second staff member (compliance or a super admin) before it can be paid.`);
+    if (approval.by === operator) return fail(`You approved the release of ${txId}, so a different staff member must mark it paid.`);
+  }
   const tx: Transaction = { ...loaded.tx, status: 'Completed', processedAt: now.toISOString(), processedBy: operator };
   const net = payoutAmounts(tx).net.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   const next = notify(update(state, tx), tx.applicantId, 'Payout sent', `${net} was sent to ${tx.destination ?? 'your payout destination'} (${txId}).`, '/withdrawals', now);

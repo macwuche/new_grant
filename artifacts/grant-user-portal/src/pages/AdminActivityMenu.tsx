@@ -1,18 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CreditCard, FileText } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CreditCard, FileText, ShieldAlert, UserRound } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { markAllStaffEventsRead, markStaffEventRead, staffFeed, staffUnread } from '@/domain/activity';
 import { useDemoStore } from '@/domain/store';
 import type { StaffEvent } from '@/domain/model';
 
-const kindIcon: Record<StaffEvent['kind'], typeof Bell> = { application: FileText, deposit: ArrowDownLeft, withdrawal: ArrowUpRight, card: CreditCard };
+const kindIcon: Record<StaffEvent['kind'], typeof Bell> = { application: FileText, deposit: ArrowDownLeft, withdrawal: ArrowUpRight, card: CreditCard, security: ShieldAlert, account: UserRound };
 
 export function ActivityItem({ event, onOpen, compact = false }: { event: StaffEvent; onOpen: (event: StaffEvent) => void; compact?: boolean }) {
   const Icon = kindIcon[event.kind];
   return <button type="button" className={`admin-activity-item ${event.read ? '' : 'unread'} ${event.highlight ? 'highlight' : ''} ${compact ? 'compact' : ''}`} onClick={() => onOpen(event)} data-testid={`activity-${event.id}`}>
     <span className="admin-activity-icon"><Icon size={14} /></span>
-    <span className="admin-activity-copy"><strong>{event.title}{event.highlight && <span className="admin-flag">High value</span>}</strong><span>{event.body}</span><small>{formatDistanceToNow(new Date(event.at), { addSuffix: true })}</small></span>
+    <span className="admin-activity-copy"><strong>{event.title}{event.highlight && <span className="admin-flag">{event.kind === 'security' ? 'Security' : event.kind === 'withdrawal' ? 'Two sign-offs' : 'High value'}</span>}</strong><span>{event.body}</span><small>{formatDistanceToNow(new Date(event.at), { addSuffix: true })}</small></span>
   </button>;
 }
 

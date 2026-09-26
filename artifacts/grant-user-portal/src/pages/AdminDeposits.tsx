@@ -3,8 +3,9 @@ import { ArrowRight, Info, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { applicantName } from '@/domain/review';
 import { confirmDeposit, DEPOSIT_METHODS, depositQueue, MIN_REJECTION_REASON_LENGTH, pendingDepositTotal, rejectDeposit } from '@/domain/deposits';
-import { DEMO_FINANCE } from '@/domain/seed';
+import { actingStaff } from '@/domain/staff';
 import { useDemoStore } from '@/domain/store';
+import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 import type { Result, Transaction } from '@/domain/model';
 import { ReviewFrame } from './AdminReviewPanel';
 
@@ -51,7 +52,9 @@ export function AdminDeposits() {
 }
 
 function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
-  const { state, run } = useDemoStore();
+  const { state } = useDemoStore();
+  const command = useStaffCommand();
+  const can = useCan();
   const tx = state.transactions.find(t => t.id === txId);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<'confirm' | 'reject'>('confirm');
@@ -76,7 +79,7 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
   const submit = () => {
     if (mode === 'reject' && reason.trim().length < MIN_REJECTION_REASON_LENGTH) { setError(`Write at least ${MIN_REJECTION_REASON_LENGTH} characters; the applicant sees this reason.`); return; }
     if (!confirming) { setConfirming(true); return; }
-    after(run(s => mode === 'confirm' ? confirmDeposit(s, tx.id, DEMO_FINANCE, new Date()) : rejectDeposit(s, tx.id, reason, DEMO_FINANCE, new Date())));
+    after(command('payments.process', { action: mode === 'confirm' ? 'Confirm deposit' : 'Reject deposit', target: tx.id }, (s, actor) => mode === 'confirm' ? confirmDeposit(s, tx.id, actor.name, new Date()) : rejectDeposit(s, tx.id, reason, actor.name, new Date())));
   };
   const pick = (next: 'confirm' | 'reject') => { setMode(next); setConfirming(false); setError(null); setFlash(null); };
   const high = tx.amount >= state.treasury.highValueDeposit;
@@ -92,16 +95,16 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
     <section className="admin-review-section admin-review-actions" aria-label="Process deposit">
       <h3>Process</h3>
       {tx.status === 'Pending' ? <>
-        <p className="admin-review-hint">Look for {usd(tx.amount)} with reference <strong>{tx.reference}</strong> in the receiving account. Acting as <strong>{DEMO_FINANCE}</strong> (finance).</p>
+        <p className="admin-review-hint">Look for {usd(tx.amount)} with reference <strong>{tx.reference}</strong> in the receiving account. {actingStaff(state) ? <> Acting as <strong>{actingStaff(state)!.name}</strong>.</> : null}</p><RoleNotice permission="payments.process" />
         <div className="admin-segment" role="tablist" aria-label="Deposit result">{([['confirm', 'Confirm received'], ['reject', 'Reject']] as const).map(([key, text]) => <button type="button" role="tab" key={key} aria-selected={mode === key} className={mode === key ? 'active' : ''} onClick={() => pick(key)} data-testid={`tab-admin-deposit-${key}`}>{text}</button>)}</div>
         {mode === 'reject' && <label className="admin-review-field"><span>Why wasn't it credited? (sent to applicant)</span><textarea className="admin-input" rows={3} value={reason} onChange={e => { setReason(e.target.value); setConfirming(false); setError(null); }} aria-invalid={!!error} data-testid="textarea-admin-deposit-reason" /><small className={error ? 'admin-field-error' : ''}>{error ?? `At least ${MIN_REJECTION_REASON_LENGTH} characters, e.g. "No transfer with this reference arrived within 5 days."`}</small></label>}
         <div className="admin-review-buttons">
           {confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-deposit">Cancel</button>}
-          <button type="button" className={`admin-btn ${mode === 'reject' ? 'danger' : 'primary'}`} onClick={submit} data-testid="button-admin-submit-deposit">{confirming ? (mode === 'confirm' ? `Confirm: credit ${usd(tx.amount)}` : 'Confirm rejection') : mode === 'confirm' ? 'Confirm received' : 'Reject deposit'}</button>
+          <button type="button" className={`admin-btn ${mode === 'reject' ? 'danger' : 'primary'}`} disabled={!can('payments.process')} onClick={submit} data-testid="button-admin-submit-deposit">{confirming ? (mode === 'confirm' ? `Confirm: credit ${usd(tx.amount)}` : 'Confirm rejection') : mode === 'confirm' ? 'Confirm received' : 'Reject deposit'}</button>
         </div>
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
       </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Confirmed and credited to the applicant’s deposit balance. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this deposit. If the money arrives anyway, return it outside the app.' : `Rejected: ${tx.failureReason}`}</p>}
     </section>
-    <div className="admin-detail-note"><Info size={17} /><span>Demo finance workflow. No bank or mobile-money feed is connected, so arrival can't be checked automatically. Results are saved in this browser only, and there is no staff sign-in or authorization yet.</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>Demo finance workflow. No bank or mobile-money feed is connected, so arrival can't be checked automatically. Results are saved in this browser only, and there is no real staff sign-in yet (actions are role-checked and audited).</span></div>
   </ReviewFrame>;
 }

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Building2, FolderOpen, Info, Leaf, Lock, Palette, Plus, Store, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Grant, GrantInput, Result, Tier } from '@/domain/model';
+import type { DemoState, GrantInput, ProgramQuestion, Result, Tier } from '@/domain/model';
 import {
   closeProgram, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
-  MAX_REQUIREMENTS, publishProgram, updateProgram,
+  MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@/domain/programs';
 import { programBudget } from '@/domain/review';
-import { DEMO_PROGRAM_MANAGER } from '@/domain/seed';
 import { useDemoStore } from '@/domain/store';
 import { ReviewFrame } from './AdminReviewPanel';
+import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 
 const icons: Record<string, typeof Store> = { momentum: Store, green: Leaf, creative: Palette, community: Building2 };
 const usd = (value: number) => `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
@@ -41,14 +41,17 @@ export function AdminPrograms() {
   </>;
 }
 
-type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[] };
+type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[] };
 
-const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: g.requirements.length ? [...g.requirements] : [''] });
+const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: g.requirements.length ? [...g.requirements] : [''], questions: g.questions.map(q => ({ ...q })) });
 const num = (value: string) => value.trim() === '' ? NaN : Number(value);
-const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), budget: num(f.budget), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements });
+const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), budget: num(f.budget), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements, questions: f.questions });
 
 function ProgramPanel({ programId, onClose, onCreated }: { programId: string | null; onClose: () => void; onCreated: (id: string) => void }) {
-  const { state, run } = useDemoStore();
+  const { state } = useDemoStore();
+  const staffCommand = useStaffCommand();
+  const allowed = useCan()('programs.manage');
+  const run = (action: string, target: string, fn: (s: DemoState, by: string) => Result) => staffCommand('programs.manage', { action, target }, (s, actor) => fn(s, actor.name));
   const grant = programId ? state.grants.find(g => g.id === programId) : undefined;
   const closeRef = useRef<HTMLButtonElement>(null);
   const [seenVersion, setSeenVersion] = useState(grant?.updatedAt ?? '');
@@ -84,8 +87,9 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   };
   const now = () => new Date();
   const saveForm = () => grant
-    ? after(run(s => updateProgram(s, grant.id, seenVersion, toInput(form), DEMO_PROGRAM_MANAGER, now())))
-    : after(run(s => createProgram(s, toInput(form), DEMO_PROGRAM_MANAGER, now())), r => r.id && onCreated(r.id));
+    ? after(run('Edit program', grant.id, (s, by) => updateProgram(s, grant.id, seenVersion, toInput(form), by, now())))
+    : after(run('Create program', '', (s, by) => createProgram(s, toInput(form), by, now())), r => r.id && onCreated(r.id));
+  const setQuestion = (i: number, patch: Partial<ProgramQuestion>) => set('questions', form.questions.map((q, j) => j === i ? { ...q, ...patch } : q));
 
   const field = (key: keyof Form, label: string, input: React.ReactNode, hint?: string) => <label className="admin-review-field" key={key}>
     <span>{label}{locked.has(key) && <Lock size={11} style={{ marginLeft: 5, verticalAlign: '-1px' }} aria-label="Locked" />}</span>
@@ -96,6 +100,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={grant ? `${grant.id} / Program` : 'New program'}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{grant.status}</span>}</div>
+    <RoleNotice permission="programs.manage" />
     <p className="admin-detail-lead">{grant ? `${grant.focus} · last changed ${when(grant.updatedAt)}` : 'New programs start as drafts. Applicants see them only after you publish.'}</p>
 
     {stale && <div className="admin-review-stale" role="alert" data-testid="notice-admin-program-stale"><span>This program changed since you opened it.</span><button type="button" onClick={() => { setSeenVersion(grant!.updatedAt); setForm(toForm(grant!)); setErrors({}); setFlash(null); }} data-testid="button-admin-program-load-latest">Load latest</button></div>}
@@ -115,10 +120,10 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
       {dirty && grant.status !== 'Open' && <p className="admin-review-hint">Save or discard your edits before changing the status.</p>}
       <div className="admin-review-buttons">
         {confirm && <button type="button" className="admin-btn" onClick={() => setConfirm(null)} data-testid="button-admin-program-cancel">Cancel</button>}
-        {grant.status === 'Draft' && !apps.length && !drafts && <button type="button" className="admin-btn" disabled={stale} onClick={() => confirm === 'delete' ? after(run(s => deleteProgram(s, grant.id, seenVersion)), onClose) : setConfirm('delete')} data-testid="button-admin-program-delete"><Trash2 size={13} style={{ verticalAlign: '-2px' }} /> {confirm === 'delete' ? 'Confirm delete' : 'Delete'}</button>}
+        {grant.status === 'Draft' && !apps.length && !drafts && <button type="button" className="admin-btn" disabled={stale || !allowed} onClick={() => confirm === 'delete' ? after(run('Delete program', grant.id, s => deleteProgram(s, grant.id, seenVersion)), onClose) : setConfirm('delete')} data-testid="button-admin-program-delete"><Trash2 size={13} style={{ verticalAlign: '-2px' }} /> {confirm === 'delete' ? 'Confirm delete' : 'Delete'}</button>}
         {grant.status === 'Open'
-          ? <button type="button" className="admin-btn danger" disabled={stale} onClick={() => confirm === 'close' ? after(run(s => closeProgram(s, grant.id, seenVersion, DEMO_PROGRAM_MANAGER, now()))) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm close' : 'Close to new applications'}</button>
-          : <button type="button" className="admin-btn primary" disabled={stale || dirty} onClick={() => after(run(s => publishProgram(s, grant.id, seenVersion, DEMO_PROGRAM_MANAGER, now())))} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Reopen'}</button>}
+          ? <button type="button" className="admin-btn danger" disabled={stale || !allowed} onClick={() => confirm === 'close' ? after(run('Close program', grant.id, (s, by) => closeProgram(s, grant.id, seenVersion, by, now()))) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm close' : 'Close to new applications'}</button>
+          : <button type="button" className="admin-btn primary" disabled={stale || dirty || !allowed} onClick={() => after(run(grant.status === 'Draft' ? 'Publish program' : 'Reopen program', grant.id, (s, by) => publishProgram(s, grant.id, seenVersion, by, now())))} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Reopen'}</button>}
       </div>
     </section>}
 
@@ -146,14 +151,26 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
         {form.requirements.length < MAX_REQUIREMENTS && <button type="button" className="admin-btn" onClick={() => set('requirements', [...form.requirements, ''])} data-testid="button-admin-program-add-requirement"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add requirement</button>}
         {errors.requirements && <small className="admin-field-error">{errors.requirements}</small>}
       </fieldset>
+      <fieldset className="admin-review-field admin-requirements" disabled={locked.has('questions')} data-testid="fieldset-admin-program-questions">
+        <legend>Application questions {locked.has('questions') && <Lock size={11} aria-label="Locked" />}</legend>
+        <small>Extra questions applicants answer on the requirements step. Up to {MAX_QUESTIONS}; blank ones are dropped.</small>
+        {form.questions.map((q, i) => <div className="admin-question" key={q.id || `new-${i}`}>
+          <input className="admin-input" value={q.label} placeholder="e.g. How many people will this help?" onChange={e => setQuestion(i, { label: e.target.value })} aria-label={`Question ${i + 1}`} data-testid={`input-admin-program-question-${i}`} />
+          <select className="admin-input" value={q.type} onChange={e => setQuestion(i, { type: e.target.value as ProgramQuestion['type'] })} aria-label={`Answer type for question ${i + 1}`} data-testid={`select-admin-program-question-type-${i}`}>{QUESTION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
+          <label className="admin-check-row"><input type="checkbox" checked={q.required} onChange={e => setQuestion(i, { required: e.target.checked })} data-testid={`checkbox-admin-program-question-required-${i}`} /> Required</label>
+          <button type="button" className="admin-icon-button" onClick={() => set('questions', form.questions.filter((_, j) => j !== i))} aria-label={`Remove question ${i + 1}`} data-testid={`button-admin-program-remove-question-${i}`}><X size={14} /></button>
+        </div>)}
+        {form.questions.length < MAX_QUESTIONS && <button type="button" className="admin-btn" onClick={() => set('questions', [...form.questions, { id: '', label: '', type: 'text', required: true }])} data-testid="button-admin-program-add-question"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add question</button>}
+        {errors.questions && <small className="admin-field-error">{errors.questions}</small>}
+      </fieldset>
       <div className="admin-review-buttons">
         {grant && dirty && <button type="button" className="admin-btn" onClick={() => { setForm(toForm(grant)); setErrors({}); setFlash(null); }} data-testid="button-admin-program-discard">Discard edits</button>}
-        <button type="button" className="admin-btn primary" disabled={stale || (!!grant && !dirty)} onClick={saveForm} data-testid="button-admin-program-save">{grant ? 'Save changes' : 'Create draft'}</button>
+        <button type="button" className="admin-btn primary" disabled={stale || (!!grant && !dirty) || !allowed} onClick={saveForm} data-testid="button-admin-program-save">{grant ? 'Save changes' : 'Create draft'}</button>
       </div>
     </section>
 
     {grant && <section className="admin-review-section"><h3>Change log</h3><ol className="admin-review-history">{[...grant.changeLog].reverse().map(c => <li key={`${c.at}-${c.summary}`}><strong>{c.summary}</strong><span>{when(c.at)} · {c.by}</span></li>)}</ol></section>}
 
-    <div className="admin-detail-note"><Info size={17} /><span>Demo program management. Changes are saved in this browser only and apply to the applicant preview here. There is no staff sign-in or authorization yet.</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>Demo program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.</span></div>
   </ReviewFrame>;
 }

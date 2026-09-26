@@ -1,6 +1,7 @@
 import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, Result, Transaction } from './model';
-import { fail, nextIds, roundCents } from './core';
+import { fail, nextIds, roundCents, usd } from './core';
 import { logStaff } from './activity';
+import { accountLockReason } from './applicants';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // Pure business rules. Everything here takes state in and returns state out so it
@@ -10,6 +11,7 @@ import { CURRENT_APPLICANT_ID } from './seed';
 export { fail, nextIds, roundCents };
 
 export const MIN_PURPOSE_LENGTH = 30;
+export const MAX_ANSWER_LENGTH = 500;
 
 /** Statuses the applicant can still edit and (re)submit. */
 export const EDITABLE_STATUSES: ApplicationStatus[] = ['Draft', 'Changes requested'];
@@ -93,6 +95,14 @@ export function validateApplication(input: ApplicationInput, grant: Grant, upToS
   if (upToStep >= 2) {
     const missing = grant.requirements.filter(r => !input.checklist.includes(r));
     if (missing.length) errors.checklist = `Confirm you have every requirement ready (${missing.length} remaining).`;
+    for (const q of grant.questions) {
+      const value = (input.answers?.[q.id] ?? '').trim();
+      const key = `answers.${q.id}`;
+      if (!value) { if (q.required) errors[key] = 'Answer this question.'; continue; }
+      if (q.type === 'number' && !/^\d+(\.\d{1,2})?$/.test(value.replace(/,/g, ''))) errors[key] = 'Enter a number (digits only).';
+      else if (q.type === 'yesno' && value !== 'Yes' && value !== 'No') errors[key] = 'Choose yes or no.';
+      else if (value.length > MAX_ANSWER_LENGTH) errors[key] = `Keep answers under ${MAX_ANSWER_LENGTH} characters.`;
+    }
   }
   return errors;
 }
@@ -104,6 +114,7 @@ function normalizeInput(input: ApplicationInput, grant: Grant): ApplicationInput
     registrationNumber: input.registrationNumber.trim(),
     purpose: input.purpose.trim(),
     checklist: grant.requirements.filter(r => input.checklist.includes(r)),
+    answers: Object.fromEntries(grant.questions.map(q => [q.id, (input.answers?.[q.id] ?? '').trim()]).filter(([, v]) => v)),
   };
 }
 
@@ -111,6 +122,8 @@ function normalizeInput(input: ApplicationInput, grant: Grant): ApplicationInput
 export function saveDraft(state: DemoState, grantId: string, input: ApplicationInput, now: Date, draftId?: string): Result {
   const grant = findGrant(state, grantId);
   if (!grant) return fail('This grant program no longer exists.');
+  const locked = accountLockReason(state);
+  if (locked) return fail(locked);
   const at = now.toISOString();
   const fields = normalizeInput(input, grant);
 
@@ -126,7 +139,7 @@ export function saveDraft(state: DemoState, grantId: string, input: ApplicationI
   if (eligibility.existing && isEditable(eligibility.existing)) return saveDraft(state, grantId, input, now, eligibility.existing.id);
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
   const ids = nextIds(state);
-  const draft: Application = { id: ids.app, applicantId: CURRENT_APPLICANT_ID, grantId, status: 'Draft', ...fields, createdAt: at, updatedAt: at, submittedAt: null, reviewer: null, awardedAmount: null, history: [{ status: 'Draft', at, actor: 'Applicant', note: 'Draft started.' }], internalNotes: [] };
+  const draft: Application = { id: ids.app, applicantId: CURRENT_APPLICANT_ID, grantId, status: 'Draft', ...fields, createdAt: at, updatedAt: at, submittedAt: null, reviewer: null, awardedAmount: null, history: [{ status: 'Draft', at, actor: 'Applicant', note: 'Draft started.' }], internalNotes: [], escalation: null };
   return { ok: true, id: draft.id, message: 'Draft saved in this browser.', state: { ...state, nextId: ids.nextId, applications: [draft, ...state.applications] } };
 }
 
@@ -141,6 +154,9 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
   const resubmitting = ownApplications(state).find(a => a.id === draftId)?.status === 'Changes requested';
   const eligibility = checkEligibility(grant, state.profile, others, now, { allowClosed: resubmitting });
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
+  // A processing fee (if finance set one) is charged once, on first submission, from the deposit balance.
+  const fee = resubmitting ? 0 : state.treasury.applicationFee;
+  if (fee > 0 && computeBalances(ownTransactions(state)).deposit < fee) return fail(`Submitting needs ${usd(fee)} in your deposit balance for the application fee. Add funds first.`);
 
   const saved = saveDraft(state, grantId, input, now, draftId);
   if (!saved.ok) return saved;
@@ -153,13 +169,19 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
     ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at,
     history: [...a.history, { status: 'Submitted' as const, at, actor: 'Applicant' as const, note: resubmission ? 'Application resubmitted with the requested changes.' : 'Application submitted.' }],
   });
-  const logged = logStaff({ ...saved.state, applications: next }, {
+  let charged: DemoState = { ...saved.state, applications: next };
+  if (fee > 0) {
+    const ids = nextIds(charged);
+    const tx: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Application fee', description: `${grant.name} application fee (${id})`, amount: -fee, status: 'Completed', createdAt: at };
+    charged = { ...charged, nextId: ids.nextId, transactions: [tx, ...charged.transactions] };
+  }
+  const logged = logStaff(charged, {
     kind: 'application',
     title: resubmission ? `${id} resubmitted with changes` : `New application ${id}`,
     body: `${state.profile.name} · ${grant.name} · $${input.requestedAmount.toLocaleString('en-US')}`,
     href: '/admin/applications',
   }, now);
-  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.`, state: logged };
+  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.${fee > 0 ? ` ${usd(fee)} application fee charged to your deposit balance.` : ''}`, state: logged };
 }
 
 export function deleteDraft(state: DemoState, id: string): Result {
@@ -175,7 +197,7 @@ export type Balances = { grant: number; deposit: number; pendingWithdrawals: num
 
 /**
  * Balances are derived from the ledger, never stored. Grant awards fund payouts;
- * deposits fund card fees. Pending withdrawals are held (already deducted);
+ * deposits fund card and application fees. Pending withdrawals are held (already deducted);
  * pending deposits don't count until finance confirms them. Failed and
  * cancelled entries are ignored.
  */
@@ -186,7 +208,7 @@ export function computeBalances(transactions: Transaction[]): Balances {
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
     if (tx.type === 'Withdrawal') { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; }
     if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
-    if (tx.type === 'Card fee') deposit += tx.amount;
+    if (tx.type === 'Card fee' || tx.type === 'Application fee') deposit += tx.amount;
   }
   return { grant: roundCents(grant), deposit: roundCents(deposit), pendingWithdrawals: roundCents(pendingWithdrawals), pendingDeposits: roundCents(pendingDeposits) };
 }

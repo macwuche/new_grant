@@ -2,6 +2,7 @@ import type { Application, ApplicationStatus, DemoState, Result, Transaction } f
 import { canTransition, fail, findGrant, nextIds, roundCents } from './rules';
 import { CURRENT_APPLICANT_ID } from './seed';
 import { notify } from './notifications';
+import { logStaff } from './activity';
 
 // Staff review rules. Like ./rules, these are pure so they can move behind an
 // authorized API later. There is NO staff authorization today: whoever opens
@@ -101,6 +102,7 @@ export function validateAward(state: DemoState, app: Application, amount: number
 export function approveApplication(state: DemoState, appId: string, expectedVersion: string, awardAmount: number, reviewer: string, now: Date): Result {
   const g = guard(state, appId, expectedVersion, 'Approved');
   if (!g.ok) return g.result;
+  if (g.app.escalation?.status === 'Open') return fail(`${appId} is escalated to security. Compliance must clear it before it can be approved.`);
   const error = validateAward(state, g.app, awardAmount);
   if (error) return fail(error, { award: error });
   const grant = findGrant(state, g.app.grantId)!;
@@ -123,3 +125,41 @@ export function addInternalNote(state: DemoState, appId: string, text: string, r
   const updated = { ...app, internalNotes: [...app.internalNotes, { at: now.toISOString(), author: reviewer, text: body }] };
   return { ok: true, id: appId, message: 'Internal note added.', state: { ...state, applications: state.applications.map(a => a.id === appId ? updated : a) } };
 }
+
+// ---------- Security escalation ----------
+
+/** Statuses where an application can still be sent to compliance. */
+const ESCALATABLE: ApplicationStatus[] = ['Submitted', 'Under review', 'Changes requested'];
+
+function setEscalation(state: DemoState, app: Application, escalation: Application['escalation'], note: string, author: string, now: Date): DemoState {
+  const updated = { ...app, escalation, internalNotes: [...app.internalNotes, { at: now.toISOString(), author, text: note }] };
+  return { ...state, applications: state.applications.map(a => a.id === app.id ? updated : a) };
+}
+
+/**
+ * Flags an application for a security/fraud check. Staff-only (the applicant
+ * isn't told). Approval is blocked until compliance clears it; like internal
+ * notes, it doesn't change the record version.
+ */
+export function escalateApplication(state: DemoState, appId: string, reason: string, by: string, now: Date): Result {
+  const text = reason.trim();
+  if (text.length < MIN_MESSAGE_LENGTH) return fail('Explain what compliance should check.', { escalation: `Write at least ${MIN_MESSAGE_LENGTH} characters.` });
+  const app = state.applications.find(a => a.id === appId);
+  if (!app || app.status === 'Draft') return fail('That application is not in the review queue.');
+  if (!ESCALATABLE.includes(app.status)) return fail(`A ${app.status.toLowerCase()} application can't be escalated.`);
+  if (app.escalation?.status === 'Open') return fail(`${appId} is already escalated.`);
+  const next = setEscalation(state, app, { at: now.toISOString(), by, reason: text, status: 'Open' }, `Escalated to security: ${text}`, by, now);
+  const logged = logStaff(next, { kind: 'security', highlight: true, title: `${appId} escalated to security`, body: `${by}: ${text}`, href: '/admin/security' }, now);
+  return { ok: true, id: appId, message: `${appId} escalated. It can't be approved until compliance clears it.`, state: logged };
+}
+
+export function clearEscalation(state: DemoState, appId: string, resolution: string, by: string, now: Date): Result {
+  const text = resolution.trim();
+  if (text.length < MIN_MESSAGE_LENGTH) return fail('Record what the check found.', { resolution: `Write at least ${MIN_MESSAGE_LENGTH} characters.` });
+  const app = state.applications.find(a => a.id === appId);
+  if (!app?.escalation || app.escalation.status !== 'Open') return fail(`${appId} has no open escalation.`);
+  const cleared = { ...app.escalation, status: 'Cleared' as const, clearedAt: now.toISOString(), clearedBy: by, resolution: text };
+  return { ok: true, id: appId, message: `${appId} cleared by compliance. It can be decided normally.`, state: setEscalation(state, app, cleared, `Security check cleared: ${text}`, by, now) };
+}
+
+export const openEscalations = (state: DemoState) => state.applications.filter(a => a.escalation?.status === 'Open');

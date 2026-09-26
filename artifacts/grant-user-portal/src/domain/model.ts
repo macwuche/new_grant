@@ -8,6 +8,10 @@ export type ProgramStatus = 'Draft' | 'Open' | 'Closed';
 
 export type ProgramChange = { at: string; by: string; summary: string };
 
+export type QuestionType = 'text' | 'number' | 'yesno';
+/** A program-specific question applicants answer (configured by staff). */
+export type ProgramQuestion = { id: string; label: string; type: QuestionType; required: boolean };
+
 export type Grant = {
   id: string;
   /** Draft programs are staff-only; Closed programs take no new applications. */
@@ -26,6 +30,8 @@ export type Grant = {
   requirements: string[];
   /** Whether a business/organization registration number is mandatory. */
   requiresRegistration: boolean;
+  /** Extra questions applicants answer; locked once anyone submits. */
+  questions: ProgramQuestion[];
   /** Record version for stale-write checks. */
   updatedAt: string;
   /** Who changed what, newest last. */
@@ -33,7 +39,7 @@ export type Grant = {
 };
 
 /** Fields a program manager edits directly. */
-export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration'>;
+export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration' | 'questions'>;
 
 /** In-app message for an applicant. Created by review and payout rules. */
 export type Notification = {
@@ -57,6 +63,9 @@ export type ApplicationEvent = { status: ApplicationStatus; at: string; actor: A
 /** Staff-only note; never shown in the applicant portal. */
 export type InternalNote = { at: string; author: string; text: string };
 
+/** Staff-only: an application sent to compliance for a security check. Blocks approval while open. */
+export type Escalation = { at: string; by: string; reason: string; status: 'Open' | 'Cleared'; clearedAt?: string; clearedBy?: string; resolution?: string };
+
 export type Application = {
   id: string;
   applicantId: string;
@@ -68,6 +77,8 @@ export type Application = {
   purpose: string;
   /** Requirements the applicant has confirmed they have ready. */
   checklist: string[];
+  /** Answers to the program's questions, keyed by question id. */
+  answers: Record<string, string>;
   createdAt: string;
   /** Doubles as the record version for stale-write checks. */
   updatedAt: string;
@@ -76,11 +87,12 @@ export type Application = {
   awardedAmount: number | null;
   history: ApplicationEvent[];
   internalNotes: InternalNote[];
+  escalation: Escalation | null;
 };
 
-export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist'>;
+export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
 
-export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee';
+export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee';
 export type TransactionStatus = 'Completed' | 'Pending' | 'Failed' | 'Cancelled';
 
 export type Transaction = {
@@ -104,6 +116,10 @@ export type Transaction = {
   processedBy?: string;
   /** Shown to the applicant when a payout or deposit fails. */
   failureReason?: string;
+  /** Withdrawals only: needs a second staff sign-off before it can be paid (set at request time). */
+  dualControl?: boolean;
+  /** Withdrawals only: the second sign-off, by someone other than whoever marks it paid. */
+  releaseApproval?: { by: string; at: string };
 };
 
 export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
@@ -135,6 +151,10 @@ export type Treasury = {
   depositThreshold: number;
   /** Deposits at or above this amount are flagged in the staff feed. */
   highValueDeposit: number;
+  /** Payouts at or above this amount need two different staff members (release approval + paid). */
+  dualControlThreshold: number;
+  /** Charged to the deposit balance on first submission of an application; 0 for none. */
+  applicationFee: number;
   updatedAt: string;
   changeLog: ProgramChange[];
 };
@@ -145,7 +165,7 @@ export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog'>;
 export type StaffEvent = {
   id: string;
   at: string;
-  kind: 'application' | 'deposit' | 'withdrawal' | 'card';
+  kind: 'application' | 'deposit' | 'withdrawal' | 'card' | 'security' | 'account';
   title: string;
   body: string;
   /** Admin route to open. */
@@ -154,7 +174,8 @@ export type StaffEvent = {
   read: boolean;
 };
 
-export type PayoutMethod = { id: string; type: string; label: string };
+/** The applicant's saved payout destination per channel (display label, masked). */
+export type PayoutDestinations = Partial<Record<ChannelId, string>>;
 
 export type Profile = {
   name: string;
@@ -164,18 +185,76 @@ export type Profile = {
   tier: Tier;
   identityVerified: boolean;
   twoFactor: boolean;
+  sector: string;
+  country: string;
+  /** ISO date the account was created. */
+  joined: string;
 };
 
 /** Other (fictional) applicants visible in the admin directory. */
-export type ApplicantSummary = { id: string; name: string; email: string; sector: string; country: string; verified: boolean; joined: string };
+export type ApplicantSummary = { id: string; name: string; email: string; sector: string; country: string; verified: boolean; joined: string; tier: Tier };
+
+export type KycStatus = 'Not submitted' | 'Pending' | 'Verified' | 'Rejected';
+export type KycDocumentType = 'Passport' | 'National ID' | "Driver's licence";
+/** Identity check. Only the last four characters of the document number are kept. */
+export type Kyc = {
+  status: KycStatus;
+  documentType?: KycDocumentType;
+  documentLast4?: string;
+  nameOnDocument?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+};
+
+/** Fictional device/network signals a real platform would collect at sign-in. */
+export type RiskSignals = { ipCountry: string; sharedDeviceWith: string[] };
+
+/** Staff-managed controls on an applicant account. */
+export type AccountControls = {
+  status: 'Active' | 'Locked';
+  lockReason?: string;
+  lockedAt?: string;
+  lockedBy?: string;
+  passwordResetRequired: boolean;
+  twoFactorResetRequired: boolean;
+  kyc: Kyc;
+  signals: RiskSignals;
+  /** Last time a payout destination was added or changed (a fraud signal). */
+  destinationChangedAt?: string;
+};
+
+export type StaffRole = 'super' | 'reviewer' | 'finance' | 'compliance' | 'support';
+export type StaffMember = { id: string; name: string; role: StaffRole; active: boolean };
+
+export type AuditChange = { field: string; before: string; after: string };
+/** Append-only record of a staff action. No rule edits or deletes these. */
+export type AuditEvent = {
+  id: string;
+  at: string;
+  staffId: string;
+  staffName: string;
+  role: StaffRole;
+  action: string;
+  /** Record acted on: application, transaction, program, applicant, staff id, or 'treasury' / 'security'. */
+  target: string;
+  applicantId: string | null;
+  summary: string;
+  changes: AuditChange[];
+  /** Applicant's risk score at the time, when an applicant is involved. */
+  riskScore: number | null;
+};
+
+export type Lockdown = { since: string; by: string; reason: string };
 
 export type CardsState = {
-  virtual: { lastFour: string; dailyLimit: number; frozen: boolean };
+  virtual: { lastFour: string; dailyLimit: number; frozen: boolean; pin: string };
   physical: { status: 'Not requested' | 'Requested'; dailyLimit: number };
 };
 
 export type DemoState = {
-  version: 4;
+  version: 5;
   grants: Grant[];
   notifications: Notification[];
   treasury: Treasury;
@@ -186,6 +265,15 @@ export type DemoState = {
   applications: Application[];
   transactions: Transaction[];
   cards: CardsState;
+  payoutDestinations: PayoutDestinations;
+  /** Keyed by applicant id, for every applicant including the demo user. */
+  accounts: Record<string, AccountControls>;
+  staff: StaffMember[];
+  /** Which staff member the admin workspace acts as. Stands in for a staff session. */
+  actingStaffId: string;
+  audit: AuditEvent[];
+  /** Emergency switch: while set, payouts can't be requested, released, or paid. */
+  lockdown: Lockdown | null;
   nextId: number;
 };
 
