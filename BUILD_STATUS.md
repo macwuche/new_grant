@@ -37,6 +37,8 @@ Build the application logic first, client-side, against browser-local demo data.
 12. **Database and API — In progress** (started 26 Sep 2026)
    - Plan, in slices: (1) shared rules package; (2) grant programs and applicant profiles; (3) applications and review; (4) notifications, staff feed, audit log; (5) money (ledger, deposits, payouts, settings), still without a payment provider. Each slice: tables with row-level security, OpenAPI contract, API with permission tests, portal switched over.
    - Done (26 Sep 2026): (1) the business rules and their 139 tests moved from the portal to `lib/domain` (`@workspace/domain`), used by the portal and bundled into the API server (not yet called there). The browser store stays in the portal (`src/lib/store.tsx`); the saved-data upgrade moved to `lib/domain/src/migrate.ts`.
+   - Done (26 Sep 2026): (2) grant programs and applicant profiles on the server. Tables `programs` and `applicant_profiles` (row-level security on) in Supabase; the 5 sample programs are added, with their ids, when the table is empty. API: `GET /api/programs` (drafts for staff only), create / edit / publish / close / delete with `programs.manage`, each running the shared rules and saved only if the version is unchanged (409 otherwise); `GET`/`PATCH /api/profile`, created from the sign-up details, email always the sign-in account's. Signed in, the portal loads programs and the applicant's contact details from the API, and admin program changes and profile edits go to the API; without sign-in it's the browser demo as before. Checked against the real Supabase database (13 checks), plus 15 new API tests.
+   - Gaps until slice 3 (applications are still in each browser): the server can't lock criteria after the first submission, keep the budget above what's awarded, or notify applicants holding drafts when a program closes (the portal still checks the first two in the browser). Tier, identity status, and the two-step preference stay in the browser until account controls move. Program changes made through the API aren't in the browser audit log yet (slice 4).
 13. **Documents, email notifications (Resend) — Not started**
 14. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
@@ -48,7 +50,7 @@ Build the application logic first, client-side, against browser-local demo data.
 - Real risk signals (IP, device fingerprint), document inspection for identity checks, and IP capture in the audit log.
 - File uploads, private document storage, email/SMS notifications (in-app notifications exist).
 - Real card issuance, deposits, charges, or payouts.
-- Committed end-to-end, accessibility, and security test suites (domain unit tests exist: 139 tests in 12 files).
+- Committed end-to-end, accessibility, and security test suites (domain unit tests exist: 143 tests in 14 files; API tests: 31).
 
 ## Frontend foundation
 

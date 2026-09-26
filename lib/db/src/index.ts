@@ -5,7 +5,7 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-const { target: _target, ...connection } = dbConnection();
+const { target: _target, url: _url, ...connection } = dbConnection();
 
 export const pool = new Pool(connection);
 export const db = drizzle(pool, { schema });

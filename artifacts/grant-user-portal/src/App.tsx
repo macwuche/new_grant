@@ -11,6 +11,9 @@ import {
 import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
+import { getProfile, updateProfile as saveServerProfile } from '@workspace/api-client-react';
+import { adoptServerProfile } from '@workspace/domain/sync';
+import { ServerDataProvider, apiError, useServerData } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
@@ -56,8 +59,9 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 /**
- * With sign-in configured, applicant pages need a session; the account's name and
- * email replace the demo profile's. Without it, the demo workspace stays open.
+ * With sign-in configured, applicant pages need a session, and the profile's
+ * contact details come from the server (created from the sign-up details on
+ * first visit). Without it, the demo workspace stays open.
  */
 function ApplicantGate({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -65,7 +69,13 @@ function ApplicantGate({ children }: { children: ReactNode }) {
   const { run } = useDemoStore();
   const { accountName, accountEmail } = session;
   useEffect(() => {
-    if (session.status === 'signedIn' && accountEmail) run(s => adoptSessionApplicant(s, { name: accountName ?? '', email: accountEmail }));
+    if (session.status !== 'signedIn' || !accountEmail) return;
+    let current = true;
+    getProfile()
+      .then(profile => { if (current) run(s => adoptServerProfile(s, profile)); })
+      // If the API is unreachable, at least show the account's own name and email.
+      .catch(() => { if (current) run(s => adoptSessionApplicant(s, { name: accountName ?? '', email: accountEmail })); });
+    return () => { current = false; };
   }, [session.status, accountEmail, accountName, run]);
   if (session.status === 'unconfigured') return <>{children}</>;
   if (session.status === 'signedOut') return <Redirect to={`/login?next=${encodeURIComponent(location)}`} replace />;
@@ -601,6 +611,8 @@ function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
 }
 function SettingsPage({ onToast }: { onToast: Toast }) {
   const { state, run, reset } = useDemoStore();
+  const { connected } = useServerData();
+  const [saving, setSaving] = useState(false);
   const { profile } = state;
   const account = accountOf(state, CURRENT_APPLICANT_ID);
   const [editing, setEditing] = useState(false);
@@ -609,17 +621,31 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
   const [confirmReset, setConfirmReset] = useState(false);
   useEffect(() => { if (window.location.hash === '#payouts') document.getElementById('payouts')?.scrollIntoView(); }, []);
   const startEdit = () => { setDraft({ name: profile.name, email: profile.email, phone: profile.phone, address: profile.address }); setErrors({}); setEditing(true); };
-  const save = () => {
-    const result = run(s => updateProfile(s, draft));
-    if (!result.ok) { setErrors(result.fieldErrors ?? {}); return; }
-    setEditing(false); onToast(result.message);
+  const save = async () => {
+    if (!connected) {
+      const result = run(s => updateProfile(s, draft));
+      if (!result.ok) { setErrors(result.fieldErrors ?? {}); return; }
+      setEditing(false); onToast(result.message);
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveServerProfile({ name: draft.name, phone: draft.phone, address: draft.address });
+      run(s => adoptServerProfile(s, saved));
+      setEditing(false); onToast('Profile saved.');
+    } catch (err) {
+      const failure = apiError(err, "Couldn't save your profile. Try again.");
+      setErrors(failure.fieldErrors ?? {});
+      if (!failure.fieldErrors) onToast(failure.error);
+    } finally { setSaving(false); }
   };
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const complete = (kind: 'password' | 'twoFactor') => { const r = run(s => completeCredentialReset(s, kind)); onToast(r.ok ? r.message : r.error); };
   const shown = editing ? draft : profile;
-  const field = (key: keyof ProfileInput, label: string) => <div className="field"><label className="field-label" htmlFor={`profile-${key}`}>{label}</label><input id={`profile-${key}`} className="input" disabled={!editing} value={shown[key]} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors(({ [key]: _, ...rest }) => rest); }} data-testid={`input-profile-${key}`} aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `profile-${key}-error` : undefined} /><FieldError id={`profile-${key}-error`} message={errors[key]} /></div>;
+  // Signed in, the email is the sign-in account's and can't be edited here.
+  const field = (key: keyof ProfileInput, label: string) => <div className="field"><label className="field-label" htmlFor={`profile-${key}`}>{label}</label><input id={`profile-${key}`} className="input" disabled={!editing || (connected && key === 'email')} value={shown[key]} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors(({ [key]: _, ...rest }) => rest); }} data-testid={`input-profile-${key}`} aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `profile-${key}-error` : undefined} /><FieldError id={`profile-${key}-error`} message={errors[key]} /></div>;
   return <div className="detail-layout settings-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Your profile and security controls.</p></div></div><div className="settings-nav"><button onClick={() => jump('profile')} data-testid="tab-settings-profile">Profile details</button><button onClick={() => jump('verification')} data-testid="tab-settings-verification">Verification & security</button><button onClick={() => jump('payouts')} data-testid="tab-settings-payouts">Payout destinations</button><button onClick={() => jump('demo-data')} data-testid="tab-settings-demo">Demo data</button></div></aside><div className="stack">
-    <div className="card card-pad" id="profile"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? setEditing(false) : startEdit()} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid">{field('name', 'Full name')}{field('email', 'Email')}{field('phone', 'Phone')}{field('address', 'Address')}</div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>Saved in this browser only.</span><button className="btn btn-primary" onClick={save} data-testid="button-save-profile">Save changes</button></div>}</div>
+    <div className="card card-pad" id="profile"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? setEditing(false) : startEdit()} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid">{field('name', 'Full name')}{field('email', 'Email')}{field('phone', 'Phone')}{field('address', 'Address')}</div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>{connected ? 'Saved to your account. Your email is your sign-in address.' : 'Saved in this browser only.'}</span><button className="btn btn-primary" onClick={() => void save()} disabled={saving} data-testid="button-save-profile">{saving ? 'Saving…' : 'Save changes'}</button></div>}</div>
     <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
       <IdentityCheck onToast={onToast} />
       <div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for. The grant team changes tiers after review.</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div>
@@ -691,7 +717,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
 function App() {
   const [toast, setToast] = useState<string | null>(null);
   const onToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(current => current === message ? null : current), 4200); };
-  return <DemoStoreProvider><SessionProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></SessionProvider></DemoStoreProvider>;
+  return <DemoStoreProvider><SessionProvider><ServerDataProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></ServerDataProvider></SessionProvider></DemoStoreProvider>;
 }
 
 export default App;

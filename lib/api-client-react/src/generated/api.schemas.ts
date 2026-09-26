@@ -5,6 +5,143 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ValidationErrorFieldErrors = {[key: string]: string};
+
+export interface ValidationError {
+  error: string;
+  fieldErrors?: ValidationErrorFieldErrors;
+}
+
+export interface Message {
+  message: string;
+}
+
+export type ProgramStatus = typeof ProgramStatus[keyof typeof ProgramStatus];
+
+
+export const ProgramStatus = {
+  Draft: 'Draft',
+  Open: 'Open',
+  Closed: 'Closed',
+} as const;
+
+export type ProgramQuestionType = typeof ProgramQuestionType[keyof typeof ProgramQuestionType];
+
+
+export const ProgramQuestionType = {
+  text: 'text',
+  number: 'number',
+  yesno: 'yesno',
+} as const;
+
+export interface ProgramQuestion {
+  /**
+     * Empty for a new question; the server derives one from the label
+     * @maxLength 40
+     */
+  id: string;
+  /** @maxLength 200 */
+  label: string;
+  type: ProgramQuestionType;
+  required: boolean;
+}
+
+export interface ProgramChange {
+  at: string;
+  by: string;
+  summary: string;
+}
+
+export type ProgramInputMinimumTier = typeof ProgramInputMinimumTier[keyof typeof ProgramInputMinimumTier];
+
+
+export const ProgramInputMinimumTier = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+export interface ProgramInput {
+  /** @maxLength 200 */
+  name: string;
+  /** @maxLength 1000 */
+  summary: string;
+  /** @maxLength 200 */
+  focus: string;
+  maxFunding: number;
+  minimumRequest: number;
+  budget: number;
+  /**
+     * ISO date (YYYY-MM-DD)
+     * @maxLength 10
+     */
+  deadline: string;
+  minimumTier: ProgramInputMinimumTier;
+  /**
+     * @maxItems 20
+     * @items.maxLength 200
+     */
+  requirements: string[];
+  requiresRegistration: boolean;
+  /** @maxItems 20 */
+  questions: ProgramQuestion[];
+}
+
+export type Program = ProgramInput & {
+  id: string;
+  status: ProgramStatus;
+  /** Record version; send it back with changes */
+  updatedAt: string;
+  changeLog: ProgramChange[];
+};
+
+export interface ProgramResult {
+  program: Program;
+  message: string;
+}
+
+export interface ProgramVersion {
+  /** @maxLength 40 */
+  version: string;
+}
+
+export interface ProgramUpdate {
+  /** @maxLength 40 */
+  version: string;
+  program: ProgramInput;
+}
+
+export type ProfileTier = typeof ProfileTier[keyof typeof ProfileTier];
+
+
+export const ProfileTier = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+export interface Profile {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  sector: string;
+  country: string;
+  tier: ProfileTier;
+  identityVerified: boolean;
+  /** ISO date the profile was created */
+  joined: string;
+}
+
+export interface ProfileUpdate {
+  /** @maxLength 120 */
+  name: string;
+  /** @maxLength 40 */
+  phone: string;
+  /** @maxLength 300 */
+  address: string;
+}
+
 export interface Error {
   error: string;
 }
@@ -61,6 +198,16 @@ export interface Me {
 export interface HealthStatus {
   status: string;
 }
+
+/**
+ * The change was refused; `fieldErrors` names the fields to fix
+ */
+export type InvalidResponse = ValidationError;
+
+/**
+ * The record changed since it was read; reload it and try again
+ */
+export type StaleResponse = Error;
 
 /**
  * The request was not valid

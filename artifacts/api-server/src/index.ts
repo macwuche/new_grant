@@ -3,6 +3,10 @@ import { supabaseVerifier } from "./lib/auth";
 import { logger } from "./lib/logger";
 import { ensureInitialSuperAdmin } from "./lib/staffRepo";
 import { dbStaffRepo } from "./lib/staffRepo.db";
+import { ensureSeedPrograms } from "./lib/programRepo";
+import { dbProgramRepo } from "./lib/programRepo.db";
+import { dbProfileRepo } from "./lib/profileRepo.db";
+import { seedGrants } from "@workspace/domain/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -28,7 +32,13 @@ if (initialEmail) {
   if (created) logger.info({ email: created.email }, "initial super admin created");
 }
 
-const app = createApp({ verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null, staffRepo: dbStaffRepo });
+const seeded = await ensureSeedPrograms(dbProgramRepo, seedGrants());
+if (seeded) logger.info({ count: seeded }, "sample grant programs added to the empty programs table");
+
+const app = createApp({
+  verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
+  staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo,
+});
 
 app.listen(port, (err) => {
   if (err) {

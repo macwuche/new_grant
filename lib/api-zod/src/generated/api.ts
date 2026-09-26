@@ -102,3 +102,473 @@ export const UpdateStaffMemberResponse = zod.object({
 })
 
 
+/**
+ * Active staff see every program, drafts included. Everyone else sees open and closed programs only.
+ * @summary List grant programs
+ */
+export const listProgramsResponseOneNameMax = 200;
+
+export const listProgramsResponseOneSummaryMax = 1000;
+
+export const listProgramsResponseOneFocusMax = 200;
+
+export const listProgramsResponseOneDeadlineMax = 10;
+
+export const listProgramsResponseOneRequirementsItemMax = 200;
+
+export const listProgramsResponseOneRequirementsMax = 20;
+
+export const listProgramsResponseOneQuestionsItemIdMax = 40;
+
+export const listProgramsResponseOneQuestionsItemLabelMax = 200;
+
+export const listProgramsResponseOneQuestionsMax = 20;
+
+
+
+export const ListProgramsResponseItem = zod.object({
+  "name": zod.string().max(listProgramsResponseOneNameMax),
+  "summary": zod.string().max(listProgramsResponseOneSummaryMax),
+  "focus": zod.string().max(listProgramsResponseOneFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(listProgramsResponseOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(listProgramsResponseOneRequirementsItemMax)).max(listProgramsResponseOneRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(listProgramsResponseOneQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(listProgramsResponseOneQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(listProgramsResponseOneQuestionsMax)
+}).and(zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['Draft', 'Open', 'Closed']),
+  "updatedAt": zod.string().describe('Record version; send it back with changes'),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+}))
+}))
+export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
+
+
+/**
+ * Requires the programs.manage permission. New programs start as drafts, visible to staff only.
+ * @summary Create a draft program
+ */
+export const createProgramBodyNameMax = 200;
+
+export const createProgramBodySummaryMax = 1000;
+
+export const createProgramBodyFocusMax = 200;
+
+export const createProgramBodyDeadlineMax = 10;
+
+export const createProgramBodyRequirementsItemMax = 200;
+
+export const createProgramBodyRequirementsMax = 20;
+
+export const createProgramBodyQuestionsItemIdMax = 40;
+
+export const createProgramBodyQuestionsItemLabelMax = 200;
+
+export const createProgramBodyQuestionsMax = 20;
+
+
+
+export const CreateProgramBody = zod.object({
+  "name": zod.string().max(createProgramBodyNameMax),
+  "summary": zod.string().max(createProgramBodySummaryMax),
+  "focus": zod.string().max(createProgramBodyFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(createProgramBodyDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(createProgramBodyRequirementsItemMax)).max(createProgramBodyRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(createProgramBodyQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(createProgramBodyQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(createProgramBodyQuestionsMax)
+})
+
+export const createProgramResponseProgramOneNameMax = 200;
+
+export const createProgramResponseProgramOneSummaryMax = 1000;
+
+export const createProgramResponseProgramOneFocusMax = 200;
+
+export const createProgramResponseProgramOneDeadlineMax = 10;
+
+export const createProgramResponseProgramOneRequirementsItemMax = 200;
+
+export const createProgramResponseProgramOneRequirementsMax = 20;
+
+export const createProgramResponseProgramOneQuestionsItemIdMax = 40;
+
+export const createProgramResponseProgramOneQuestionsItemLabelMax = 200;
+
+export const createProgramResponseProgramOneQuestionsMax = 20;
+
+
+
+export const CreateProgramResponse = zod.object({
+  "program": zod.object({
+  "name": zod.string().max(createProgramResponseProgramOneNameMax),
+  "summary": zod.string().max(createProgramResponseProgramOneSummaryMax),
+  "focus": zod.string().max(createProgramResponseProgramOneFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(createProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(createProgramResponseProgramOneRequirementsItemMax)).max(createProgramResponseProgramOneRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(createProgramResponseProgramOneQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(createProgramResponseProgramOneQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(createProgramResponseProgramOneQuestionsMax)
+}).and(zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['Draft', 'Open', 'Closed']),
+  "updatedAt": zod.string().describe('Record version; send it back with changes'),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+}))
+})),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires the programs.manage permission. Fails with 409 if the program changed after `version` was read.
+ * @summary Edit a program
+ */
+export const updateProgramPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const UpdateProgramParams = zod.object({
+  "id": zod.coerce.string().regex(updateProgramPathIdRegExp)
+})
+
+export const updateProgramBodyVersionMax = 40;
+
+export const updateProgramBodyProgramNameMax = 200;
+
+export const updateProgramBodyProgramSummaryMax = 1000;
+
+export const updateProgramBodyProgramFocusMax = 200;
+
+export const updateProgramBodyProgramDeadlineMax = 10;
+
+export const updateProgramBodyProgramRequirementsItemMax = 200;
+
+export const updateProgramBodyProgramRequirementsMax = 20;
+
+export const updateProgramBodyProgramQuestionsItemIdMax = 40;
+
+export const updateProgramBodyProgramQuestionsItemLabelMax = 200;
+
+export const updateProgramBodyProgramQuestionsMax = 20;
+
+
+
+export const UpdateProgramBody = zod.object({
+  "version": zod.string().max(updateProgramBodyVersionMax),
+  "program": zod.object({
+  "name": zod.string().max(updateProgramBodyProgramNameMax),
+  "summary": zod.string().max(updateProgramBodyProgramSummaryMax),
+  "focus": zod.string().max(updateProgramBodyProgramFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(updateProgramBodyProgramDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(updateProgramBodyProgramRequirementsItemMax)).max(updateProgramBodyProgramRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(updateProgramBodyProgramQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(updateProgramBodyProgramQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(updateProgramBodyProgramQuestionsMax)
+})
+})
+
+export const updateProgramResponseProgramOneNameMax = 200;
+
+export const updateProgramResponseProgramOneSummaryMax = 1000;
+
+export const updateProgramResponseProgramOneFocusMax = 200;
+
+export const updateProgramResponseProgramOneDeadlineMax = 10;
+
+export const updateProgramResponseProgramOneRequirementsItemMax = 200;
+
+export const updateProgramResponseProgramOneRequirementsMax = 20;
+
+export const updateProgramResponseProgramOneQuestionsItemIdMax = 40;
+
+export const updateProgramResponseProgramOneQuestionsItemLabelMax = 200;
+
+export const updateProgramResponseProgramOneQuestionsMax = 20;
+
+
+
+export const UpdateProgramResponse = zod.object({
+  "program": zod.object({
+  "name": zod.string().max(updateProgramResponseProgramOneNameMax),
+  "summary": zod.string().max(updateProgramResponseProgramOneSummaryMax),
+  "focus": zod.string().max(updateProgramResponseProgramOneFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(updateProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(updateProgramResponseProgramOneRequirementsItemMax)).max(updateProgramResponseProgramOneRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(updateProgramResponseProgramOneQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(updateProgramResponseProgramOneQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(updateProgramResponseProgramOneQuestionsMax)
+}).and(zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['Draft', 'Open', 'Closed']),
+  "updatedAt": zod.string().describe('Record version; send it back with changes'),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+}))
+})),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires the programs.manage permission. Only drafts without applications can be deleted; published programs are closed instead.
+ * @summary Delete an unused draft
+ */
+export const deleteProgramPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const DeleteProgramParams = zod.object({
+  "id": zod.coerce.string().regex(deleteProgramPathIdRegExp)
+})
+
+export const deleteProgramBodyVersionMax = 40;
+
+
+
+export const DeleteProgramBody = zod.object({
+  "version": zod.string().max(deleteProgramBodyVersionMax)
+})
+
+export const DeleteProgramResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Requires the programs.manage permission. The program must be valid with a deadline today or later.
+ * @summary Publish a draft or reopen a closed program
+ */
+export const publishProgramPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const PublishProgramParams = zod.object({
+  "id": zod.coerce.string().regex(publishProgramPathIdRegExp)
+})
+
+export const publishProgramBodyVersionMax = 40;
+
+
+
+export const PublishProgramBody = zod.object({
+  "version": zod.string().max(publishProgramBodyVersionMax)
+})
+
+export const publishProgramResponseProgramOneNameMax = 200;
+
+export const publishProgramResponseProgramOneSummaryMax = 1000;
+
+export const publishProgramResponseProgramOneFocusMax = 200;
+
+export const publishProgramResponseProgramOneDeadlineMax = 10;
+
+export const publishProgramResponseProgramOneRequirementsItemMax = 200;
+
+export const publishProgramResponseProgramOneRequirementsMax = 20;
+
+export const publishProgramResponseProgramOneQuestionsItemIdMax = 40;
+
+export const publishProgramResponseProgramOneQuestionsItemLabelMax = 200;
+
+export const publishProgramResponseProgramOneQuestionsMax = 20;
+
+
+
+export const PublishProgramResponse = zod.object({
+  "program": zod.object({
+  "name": zod.string().max(publishProgramResponseProgramOneNameMax),
+  "summary": zod.string().max(publishProgramResponseProgramOneSummaryMax),
+  "focus": zod.string().max(publishProgramResponseProgramOneFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(publishProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(publishProgramResponseProgramOneRequirementsItemMax)).max(publishProgramResponseProgramOneRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(publishProgramResponseProgramOneQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(publishProgramResponseProgramOneQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(publishProgramResponseProgramOneQuestionsMax)
+}).and(zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['Draft', 'Open', 'Closed']),
+  "updatedAt": zod.string().describe('Record version; send it back with changes'),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+}))
+})),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires the programs.manage permission. Applications already submitted continue through review.
+ * @summary Close a program to new applications
+ */
+export const closeProgramPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const CloseProgramParams = zod.object({
+  "id": zod.coerce.string().regex(closeProgramPathIdRegExp)
+})
+
+export const closeProgramBodyVersionMax = 40;
+
+
+
+export const CloseProgramBody = zod.object({
+  "version": zod.string().max(closeProgramBodyVersionMax)
+})
+
+export const closeProgramResponseProgramOneNameMax = 200;
+
+export const closeProgramResponseProgramOneSummaryMax = 1000;
+
+export const closeProgramResponseProgramOneFocusMax = 200;
+
+export const closeProgramResponseProgramOneDeadlineMax = 10;
+
+export const closeProgramResponseProgramOneRequirementsItemMax = 200;
+
+export const closeProgramResponseProgramOneRequirementsMax = 20;
+
+export const closeProgramResponseProgramOneQuestionsItemIdMax = 40;
+
+export const closeProgramResponseProgramOneQuestionsItemLabelMax = 200;
+
+export const closeProgramResponseProgramOneQuestionsMax = 20;
+
+
+
+export const CloseProgramResponse = zod.object({
+  "program": zod.object({
+  "name": zod.string().max(closeProgramResponseProgramOneNameMax),
+  "summary": zod.string().max(closeProgramResponseProgramOneSummaryMax),
+  "focus": zod.string().max(closeProgramResponseProgramOneFocusMax),
+  "maxFunding": zod.number(),
+  "minimumRequest": zod.number(),
+  "budget": zod.number(),
+  "deadline": zod.string().max(closeProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
+  "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "requirements": zod.array(zod.string().max(closeProgramResponseProgramOneRequirementsItemMax)).max(closeProgramResponseProgramOneRequirementsMax),
+  "requiresRegistration": zod.boolean(),
+  "questions": zod.array(zod.object({
+  "id": zod.string().max(closeProgramResponseProgramOneQuestionsItemIdMax).describe('Empty for a new question; the server derives one from the label'),
+  "label": zod.string().max(closeProgramResponseProgramOneQuestionsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'yesno']),
+  "required": zod.boolean()
+})).max(closeProgramResponseProgramOneQuestionsMax)
+}).and(zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['Draft', 'Open', 'Closed']),
+  "updatedAt": zod.string().describe('Record version; send it back with changes'),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+}))
+})),
+  "message": zod.string()
+})
+
+
+/**
+ * Created on first request from the details given at sign-up. The email always matches the sign-in account.
+ * @summary The signed-in person's applicant profile
+ */
+export const GetProfileResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created')
+})
+
+
+/**
+ * The email is the sign-in account's; tier and identity status are set by staff.
+ * @summary Edit your name, phone, and address
+ */
+export const updateProfileBodyNameMax = 120;
+
+export const updateProfileBodyPhoneMax = 40;
+
+export const updateProfileBodyAddressMax = 300;
+
+
+
+export const UpdateProfileBody = zod.object({
+  "name": zod.string().max(updateProfileBodyNameMax),
+  "phone": zod.string().max(updateProfileBodyPhoneMax),
+  "address": zod.string().max(updateProfileBodyAddressMax)
+})
+
+export const UpdateProfileResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created')
+})
+
+

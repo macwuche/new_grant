@@ -3,7 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 // Sign-in tokens are issued by Supabase Auth. The API never trusts a user id or
 // role sent by the client: it verifies the bearer token and derives the user.
 
-export type AuthUser = { id: string; email: string | null; emailConfirmed: boolean };
+export type AuthUser = {
+  id: string;
+  email: string | null;
+  emailConfirmed: boolean;
+  /** Details the person gave at sign-up (Supabase user metadata). They can edit these, so treat as untrusted input. */
+  metadata?: Record<string, unknown>;
+};
 
 /** Resolves a bearer token to its user, or null if the token is invalid or expired. */
 export type TokenVerifier = (token: string) => Promise<AuthUser | null>;
@@ -14,7 +20,7 @@ export function supabaseVerifier(url: string, anonKey: string): TokenVerifier {
   return async (token) => {
     const { data, error } = await client.auth.getUser(token);
     if (error || !data.user) return null;
-    return { id: data.user.id, email: data.user.email?.toLowerCase() ?? null, emailConfirmed: !!data.user.email_confirmed_at };
+    return { id: data.user.id, email: data.user.email?.toLowerCase() ?? null, emailConfirmed: !!data.user.email_confirmed_at, metadata: data.user.user_metadata ?? {} };
   };
 }
 

@@ -14,6 +14,10 @@ tags:
     description: The signed-in user
   - name: staff
     description: Staff members and roles
+  - name: programs
+    description: Grant programs
+  - name: profile
+    description: The signed-in applicant's profile
 security:
   - bearerAuth: []
 paths:
@@ -129,13 +133,235 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /programs:
+    get:
+      operationId: listPrograms
+      tags: [programs]
+      summary: List grant programs
+      description: Active staff see every program, drafts included. Everyone else sees open and closed programs only.
+      responses:
+        "200":
+          description: Programs, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Program"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createProgram
+      tags: [programs]
+      summary: Create a draft program
+      description: Requires the programs.manage permission. New programs start as drafts, visible to staff only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramInput"
+      responses:
+        "201":
+          description: Created program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /programs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    put:
+      operationId: updateProgram
+      tags: [programs]
+      summary: Edit a program
+      description: Requires the programs.manage permission. Fails with 409 if the program changed after `version` was read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramUpdate"
+      responses:
+        "200":
+          description: Saved program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /programs/{id}/delete:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: deleteProgram
+      tags: [programs]
+      summary: Delete an unused draft
+      description: Requires the programs.manage permission. Only drafts without applications can be deleted; published programs are closed instead.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramVersion"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /programs/{id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: publishProgram
+      tags: [programs]
+      summary: Publish a draft or reopen a closed program
+      description: Requires the programs.manage permission. The program must be valid with a deadline today or later.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramVersion"
+      responses:
+        "200":
+          description: Open program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /programs/{id}/close:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: closeProgram
+      tags: [programs]
+      summary: Close a program to new applications
+      description: Requires the programs.manage permission. Applications already submitted continue through review.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramVersion"
+      responses:
+        "200":
+          description: Closed program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: The signed-in person's applicant profile
+      description: Created on first request from the details given at sign-up. The email always matches the sign-in account.
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Edit your name, phone, and address
+      description: The email is the sign-in account's; tier and identity status are set by staff.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       description: Supabase Auth access token
+  parameters:
+    ProgramId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9-]{1,40}$"
   responses:
+    Invalid:
+      description: The change was refused; `fieldErrors` names the fields to fix
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    Stale:
+      description: The record changed since it was read; reload it and try again
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     BadRequest:
       description: The request was not valid
       content:
@@ -161,6 +387,173 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string
+      required: [error]
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    ProgramStatus:
+      type: string
+      enum: [Draft, Open, Closed]
+    ProgramQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 40
+          description: Empty for a new question; the server derives one from the label
+        label:
+          type: string
+          maxLength: 200
+        type:
+          type: string
+          enum: [text, number, yesno]
+        required:
+          type: boolean
+      required: [id, label, type, required]
+      additionalProperties: false
+    ProgramChange:
+      type: object
+      properties:
+        at:
+          type: string
+        by:
+          type: string
+        summary:
+          type: string
+      required: [at, by, summary]
+    ProgramInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 1000
+        focus:
+          type: string
+          maxLength: 200
+        maxFunding:
+          type: number
+        minimumRequest:
+          type: number
+        budget:
+          type: number
+        deadline:
+          type: string
+          maxLength: 10
+          description: ISO date (YYYY-MM-DD)
+        minimumTier:
+          type: integer
+          enum: [1, 2, 3]
+        requirements:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 200
+        requiresRegistration:
+          type: boolean
+        questions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ProgramQuestion"
+      required: [name, summary, focus, maxFunding, minimumRequest, budget, deadline, minimumTier, requirements, requiresRegistration, questions]
+      additionalProperties: false
+    Program:
+      allOf:
+        - $ref: "#/components/schemas/ProgramInput"
+        - type: object
+          properties:
+            id:
+              type: string
+            status:
+              $ref: "#/components/schemas/ProgramStatus"
+            updatedAt:
+              type: string
+              description: Record version; send it back with changes
+            changeLog:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProgramChange"
+          required: [id, status, updatedAt, changeLog]
+    ProgramResult:
+      type: object
+      properties:
+        program:
+          $ref: "#/components/schemas/Program"
+        message:
+          type: string
+      required: [program, message]
+    ProgramVersion:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+      required: [version]
+      additionalProperties: false
+    ProgramUpdate:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        program:
+          $ref: "#/components/schemas/ProgramInput"
+      required: [version, program]
+      additionalProperties: false
+    Profile:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        sector:
+          type: string
+        country:
+          type: string
+        tier:
+          type: integer
+          enum: [1, 2, 3]
+        identityVerified:
+          type: boolean
+        joined:
+          type: string
+          description: ISO date the profile was created
+      required: [name, email, phone, address, sector, country, tier, identityVerified, joined]
+    ProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          maxLength: 40
+        address:
+          type: string
+          maxLength: 300
+      required: [name, phone, address]
+      additionalProperties: false
     Error:
       type: object
       properties:

@@ -24,11 +24,21 @@ import type {
   Error,
   ForbiddenResponse,
   HealthStatus,
+  InvalidResponse,
   Me,
+  Message,
   NotFoundResponse,
+  Profile,
+  ProfileUpdate,
+  Program,
+  ProgramInput,
+  ProgramResult,
+  ProgramUpdate,
+  ProgramVersion,
   StaffMember,
   StaffMemberCreate,
   StaffMemberUpdate,
+  StaleResponse,
   UnauthorizedResponse
 } from './api.schemas';
 
@@ -470,5 +480,699 @@ export const useUpdateStaffMember = <TError = ErrorType<BadRequestResponse | Una
         TContext
       > => {
       return useMutation(getUpdateStaffMemberMutationOptions(options));
+    }
+
+export const getListProgramsUrl = () => {
+
+
+
+
+  return `/api/programs`
+}
+
+/**
+ * Active staff see every program, drafts included. Everyone else sees open and closed programs only.
+ * @summary List grant programs
+ */
+export const listPrograms = async ( options?: Parameters<typeof customFetch>[1]): Promise<Program[]> => {
+
+  return customFetch<Program[]>(getListProgramsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProgramsQueryKey = () => {
+    return [
+    `/api/programs`
+    ] as const;
+    }
+
+
+export const getListProgramsQueryOptions = <TData = Awaited<ReturnType<typeof listPrograms>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrograms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProgramsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPrograms>>> = ({ signal }) => listPrograms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPrograms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProgramsQueryResult = NonNullable<Awaited<ReturnType<typeof listPrograms>>>
+export type ListProgramsQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary List grant programs
+ */
+
+export function useListPrograms<TData = Awaited<ReturnType<typeof listPrograms>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPrograms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProgramsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProgramUrl = () => {
+
+
+
+
+  return `/api/programs`
+}
+
+/**
+ * Requires the programs.manage permission. New programs start as drafts, visible to staff only.
+ * @summary Create a draft program
+ */
+export const createProgram = async (programInput: ProgramInput, options?: Parameters<typeof customFetch>[1]): Promise<ProgramResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ProgramResult>(getCreateProgramUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(programInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProgramMutationKey = () => ['createProgram'] as const;
+
+export const getCreateProgramMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProgram>>, TError,CreateProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProgram>>, TError,CreateProgramMutationVariables, TContext> => {
+
+const mutationKey = getCreateProgramMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProgram>>, CreateProgramMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProgram(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProgramMutationResult = NonNullable<Awaited<ReturnType<typeof createProgram>>>
+    export type CreateProgramMutationBody = BodyType<ProgramInput>
+    export type CreateProgramMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type CreateProgramMutationVariables = {data: BodyType<ProgramInput>}
+
+    /**
+ * @summary Create a draft program
+ */
+export const useCreateProgram = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProgram>>, TError,CreateProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProgram>>,
+        TError,
+        CreateProgramMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateProgramMutationOptions(options));
+    }
+
+export const getUpdateProgramUrl = (id: string,) => {
+
+
+
+
+  return `/api/programs/${id}`
+}
+
+/**
+ * Requires the programs.manage permission. Fails with 409 if the program changed after `version` was read.
+ * @summary Edit a program
+ */
+export const updateProgram = async (id: string,
+    programUpdate: ProgramUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ProgramResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ProgramResult>(getUpdateProgramUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(programUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProgramMutationKey = () => ['updateProgram'] as const;
+
+export const getUpdateProgramMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProgram>>, TError,UpdateProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProgram>>, TError,UpdateProgramMutationVariables, TContext> => {
+
+const mutationKey = getUpdateProgramMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProgram>>, UpdateProgramMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProgram(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProgramMutationResult = NonNullable<Awaited<ReturnType<typeof updateProgram>>>
+    export type UpdateProgramMutationBody = BodyType<ProgramUpdate>
+    export type UpdateProgramMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type UpdateProgramMutationVariables = {id: string;data: BodyType<ProgramUpdate>}
+
+    /**
+ * @summary Edit a program
+ */
+export const useUpdateProgram = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProgram>>, TError,UpdateProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProgram>>,
+        TError,
+        UpdateProgramMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateProgramMutationOptions(options));
+    }
+
+export const getDeleteProgramUrl = (id: string,) => {
+
+
+
+
+  return `/api/programs/${id}/delete`
+}
+
+/**
+ * Requires the programs.manage permission. Only drafts without applications can be deleted; published programs are closed instead.
+ * @summary Delete an unused draft
+ */
+export const deleteProgram = async (id: string,
+    programVersion: ProgramVersion, options?: Parameters<typeof customFetch>[1]): Promise<Message> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Message>(getDeleteProgramUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(programVersion)
+  }
+);}
+
+
+
+
+
+export const getDeleteProgramMutationKey = () => ['deleteProgram'] as const;
+
+export const getDeleteProgramMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProgram>>, TError,DeleteProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProgram>>, TError,DeleteProgramMutationVariables, TContext> => {
+
+const mutationKey = getDeleteProgramMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProgram>>, DeleteProgramMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  deleteProgram(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProgramMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProgram>>>
+    export type DeleteProgramMutationBody = BodyType<ProgramVersion>
+    export type DeleteProgramMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type DeleteProgramMutationVariables = {id: string;data: BodyType<ProgramVersion>}
+
+    /**
+ * @summary Delete an unused draft
+ */
+export const useDeleteProgram = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProgram>>, TError,DeleteProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProgram>>,
+        TError,
+        DeleteProgramMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteProgramMutationOptions(options));
+    }
+
+export const getPublishProgramUrl = (id: string,) => {
+
+
+
+
+  return `/api/programs/${id}/publish`
+}
+
+/**
+ * Requires the programs.manage permission. The program must be valid with a deadline today or later.
+ * @summary Publish a draft or reopen a closed program
+ */
+export const publishProgram = async (id: string,
+    programVersion: ProgramVersion, options?: Parameters<typeof customFetch>[1]): Promise<ProgramResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ProgramResult>(getPublishProgramUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(programVersion)
+  }
+);}
+
+
+
+
+
+export const getPublishProgramMutationKey = () => ['publishProgram'] as const;
+
+export const getPublishProgramMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishProgram>>, TError,PublishProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishProgram>>, TError,PublishProgramMutationVariables, TContext> => {
+
+const mutationKey = getPublishProgramMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishProgram>>, PublishProgramMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  publishProgram(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishProgramMutationResult = NonNullable<Awaited<ReturnType<typeof publishProgram>>>
+    export type PublishProgramMutationBody = BodyType<ProgramVersion>
+    export type PublishProgramMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type PublishProgramMutationVariables = {id: string;data: BodyType<ProgramVersion>}
+
+    /**
+ * @summary Publish a draft or reopen a closed program
+ */
+export const usePublishProgram = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishProgram>>, TError,PublishProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishProgram>>,
+        TError,
+        PublishProgramMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPublishProgramMutationOptions(options));
+    }
+
+export const getCloseProgramUrl = (id: string,) => {
+
+
+
+
+  return `/api/programs/${id}/close`
+}
+
+/**
+ * Requires the programs.manage permission. Applications already submitted continue through review.
+ * @summary Close a program to new applications
+ */
+export const closeProgram = async (id: string,
+    programVersion: ProgramVersion, options?: Parameters<typeof customFetch>[1]): Promise<ProgramResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ProgramResult>(getCloseProgramUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(programVersion)
+  }
+);}
+
+
+
+
+
+export const getCloseProgramMutationKey = () => ['closeProgram'] as const;
+
+export const getCloseProgramMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeProgram>>, TError,CloseProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeProgram>>, TError,CloseProgramMutationVariables, TContext> => {
+
+const mutationKey = getCloseProgramMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeProgram>>, CloseProgramMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closeProgram(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseProgramMutationResult = NonNullable<Awaited<ReturnType<typeof closeProgram>>>
+    export type CloseProgramMutationBody = BodyType<ProgramVersion>
+    export type CloseProgramMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type CloseProgramMutationVariables = {id: string;data: BodyType<ProgramVersion>}
+
+    /**
+ * @summary Close a program to new applications
+ */
+export const useCloseProgram = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeProgram>>, TError,CloseProgramMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeProgram>>,
+        TError,
+        CloseProgramMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCloseProgramMutationOptions(options));
+    }
+
+export const getGetProfileUrl = () => {
+
+
+
+
+  return `/api/profile`
+}
+
+/**
+ * Created on first request from the details given at sign-up. The email always matches the sign-in account.
+ * @summary The signed-in person's applicant profile
+ */
+export const getProfile = async ( options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+  return customFetch<Profile>(getGetProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProfileQueryKey = () => {
+    return [
+    `/api/profile`
+    ] as const;
+    }
+
+
+export const getGetProfileQueryOptions = <TData = Awaited<ReturnType<typeof getProfile>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProfileQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProfile>>> = ({ signal }) => getProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getProfile>>>
+export type GetProfileQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary The signed-in person's applicant profile
+ */
+
+export function useGetProfile<TData = Awaited<ReturnType<typeof getProfile>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateProfileUrl = () => {
+
+
+
+
+  return `/api/profile`
+}
+
+/**
+ * The email is the sign-in account's; tier and identity status are set by staff.
+ * @summary Edit your name, phone, and address
+ */
+export const updateProfile = async (profileUpdate: ProfileUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Profile>(getUpdateProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(profileUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProfileMutationKey = () => ['updateProfile'] as const;
+
+export const getUpdateProfileMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProfile>>, TError,UpdateProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProfile>>, TError,UpdateProfileMutationVariables, TContext> => {
+
+const mutationKey = getUpdateProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProfile>>, UpdateProfileMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateProfile>>>
+    export type UpdateProfileMutationBody = BodyType<ProfileUpdate>
+    export type UpdateProfileMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type UpdateProfileMutationVariables = {data: BodyType<ProfileUpdate>}
+
+    /**
+ * @summary Edit your name, phone, and address
+ */
+export const useUpdateProfile = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProfile>>, TError,UpdateProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProfile>>,
+        TError,
+        UpdateProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateProfileMutationOptions(options));
     }
 

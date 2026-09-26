@@ -3,6 +3,9 @@ import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import type { AuthUser, TokenVerifier } from "./lib/auth";
+import { seedGrants } from "@workspace/domain/seed";
+import { memoryProfileRepo } from "./lib/profileRepo";
+import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
@@ -12,6 +15,10 @@ const USERS: Record<string, AuthUser> = {
   "tok-applicant": { id: "33333333-3333-4333-8333-333333333333", email: "alex@example.com", emailConfirmed: true },
   "tok-unconfirmed": { id: "44444444-4444-4444-8444-444444444444", email: "riley@example.org", emailConfirmed: false },
   "tok-riley": { id: "55555555-5555-4555-8555-555555555555", email: "riley@example.org", emailConfirmed: true },
+  "tok-maya": {
+    id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true,
+    metadata: { full_name: "  Maya Okafor ", phone: "+44 20 7946 0000", country: "United Kingdom", sector: "Creative industries", birth_date: "1990-04-02", role: "super" },
+  },
 };
 const verifier: TokenVerifier = async token => USERS[token] ?? null;
 
@@ -24,10 +31,12 @@ const SEED: StaffRecord[] = [
 let server: Server;
 let base: string;
 let repo: StaffRepo;
+let programs: ProgramRepo;
 
 async function start(v: TokenVerifier | null = verifier) {
   repo = memoryStaffRepo(SEED);
-  server = createApp({ verifier: v, staffRepo: repo }, ["https://app.example.org"]).listen(0);
+  programs = memoryProgramRepo(seedGrants());
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: memoryProfileRepo() }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -151,5 +160,141 @@ describe("initial super admin", () => {
     const empty = memoryStaffRepo();
     expect(await ensureInitialSuperAdmin(empty, "Owner@Example.org", "Owner")).toMatchObject({ email: "owner@example.org", role: "super" });
     expect(await ensureInitialSuperAdmin(empty, "other@example.org", "Other")).toBeNull();
+  });
+});
+
+// A valid new program; the deadline is always about three months out.
+const newProgram = (overrides: Record<string, unknown> = {}) => ({
+  name: "Rural Makers", summary: "Tools and training for rural workshops.", focus: "Rural makers",
+  maxFunding: 5000, minimumRequest: 500, budget: 50000, deadline: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
+  minimumTier: 1, requirements: ["Workshop photos"], requiresRegistration: false, questions: [], ...overrides,
+});
+const post = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "POST", body: JSON.stringify(body) });
+const put = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "PUT", body: JSON.stringify(body) });
+const program = async (id: string, token = "tok-super") => (await json(await call("/programs", token))).find((g: { id: string }) => g.id === id);
+
+describe("grant programs", () => {
+  it("hides drafts from applicants but shows them to staff", async () => {
+    const applicant = (await json(await call("/programs", "tok-applicant"))).map((g: { id: string }) => g.id);
+    const staff = (await json(await call("/programs", "tok-finance"))).map((g: { id: string }) => g.id);
+    expect(applicant).not.toContain("space");
+    expect(staff).toContain("space");
+    expect(staff).toHaveLength(5);
+  });
+
+  it("lets only programs.manage change programs", async () => {
+    expect((await post("/programs", newProgram(), "tok-applicant")).status).toBe(403);
+    expect((await post("/programs", newProgram(), "tok-finance")).status).toBe(403);
+    const version = (await program("momentum")).updatedAt;
+    expect((await post("/programs/momentum/close", { version }, "tok-finance")).status).toBe(403);
+    expect((await program("momentum")).status).toBe("Open");
+  });
+
+  it("creates a draft with a server id and records who created it", async () => {
+    const res = await post("/programs", newProgram());
+    expect(res.status).toBe(201);
+    const body = await json(res);
+    expect(body.program).toMatchObject({ id: "PRG-3001", status: "Draft", name: "Rural Makers" });
+    expect(body.program.changeLog).toEqual([expect.objectContaining({ by: "Sam Rivera", summary: "Created as draft." })]);
+    expect(await program("PRG-3001", "tok-applicant")).toBeUndefined();
+  });
+
+  it("runs the shared validation rules and reports field errors", async () => {
+    const res = await post("/programs", newProgram({ name: "x", minimumRequest: 9000 }));
+    expect(res.status).toBe(400);
+    const body = await json(res);
+    expect(body.fieldErrors).toMatchObject({ name: expect.any(String), maxFunding: expect.any(String) });
+    const duplicate = await json(await post("/programs", newProgram({ name: "business momentum" })));
+    expect(duplicate.fieldErrors.name).toMatch(/already uses this name/);
+  });
+
+  it("rejects edits made against an outdated version", async () => {
+    const before = await program("creative");
+    const edited = { ...newProgram(), name: before.name, summary: "A clearer summary for makers and studios." };
+    const ok = await put("/programs/creative", { version: before.updatedAt, program: edited });
+    expect(ok.status).toBe(200);
+    const saved = (await json(ok)).program;
+    expect(saved.updatedAt).not.toBe(before.updatedAt);
+    expect(saved.changeLog.at(-1).summary).toMatch(/^Edited /);
+    const again = await put("/programs/creative", { version: before.updatedAt, program: { ...edited, summary: "Another summary entirely." } });
+    expect(again.status).toBe(409);
+    expect((await program("creative")).summary).toBe("A clearer summary for makers and studios.");
+  });
+
+  it("stores only if the version is unchanged, even when two writes race", async () => {
+    const grant = await program("green");
+    const first = await programs.update({ ...grant, summary: "First writer wins the race.", updatedAt: new Date(Date.now() + 1000).toISOString() }, grant.updatedAt);
+    const second = await programs.update({ ...grant, summary: "Second writer loses the race." }, grant.updatedAt);
+    expect([first, second]).toEqual(["ok", "stale"]);
+  });
+
+  it("publishes, closes, and reopens, following the status rules", async () => {
+    let version = (await program("space")).updatedAt;
+    let res = await post("/programs/space/publish", { version });
+    expect(res.status).toBe(200);
+    expect((await json(res)).program.status).toBe("Open");
+    version = (await program("space")).updatedAt;
+    expect((await post("/programs/space/publish", { version })).status).toBe(400);
+    res = await post("/programs/space/close", { version });
+    expect((await json(res)).program.status).toBe("Closed");
+    version = (await program("space")).updatedAt;
+    res = await post("/programs/space/publish", { version });
+    expect((await json(res)).message).toMatch(/reopened/);
+  });
+
+  it("deletes unused drafts only", async () => {
+    const open = await program("momentum");
+    expect((await post("/programs/momentum/delete", { version: open.updatedAt })).status).toBe(400);
+    const draft = await program("space");
+    const res = await post("/programs/space/delete", { version: draft.updatedAt });
+    expect(res.status).toBe(200);
+    expect(await program("space")).toBeUndefined();
+  });
+
+  it("answers 404 for unknown programs and 400 for missing versions", async () => {
+    expect((await post("/programs/nope/close", { version: "2026-01-01T00:00:00.000Z" })).status).toBe(404);
+    expect((await post("/programs/momentum/close", {})).status).toBe(400);
+    expect((await post("/programs/bad%20id/close", { version: "x" })).status).toBe(404);
+  });
+
+  it("seeds the sample catalog only into an empty table", async () => {
+    const empty = memoryProgramRepo();
+    expect(await ensureSeedPrograms(empty, seedGrants())).toBe(5);
+    expect(await ensureSeedPrograms(empty, seedGrants())).toBe(0);
+    expect(await empty.list()).toHaveLength(5);
+  });
+});
+
+describe("applicant profile", () => {
+  it("is created on first use from the sign-up details, ignoring anything else in them", async () => {
+    const res = await call("/profile", "tok-maya");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body).toMatchObject({ name: "Maya Okafor", email: "maya@example.com", phone: "+44 20 7946 0000", country: "United Kingdom", tier: 1, identityVerified: false, address: "" });
+    expect(body).not.toHaveProperty("role");
+    expect((await json(await call("/me", "tok-maya"))).staff).toBeNull();
+  });
+
+  it("falls back to the email's name when there are no sign-up details", async () => {
+    expect((await json(await call("/profile", "tok-applicant"))).name).toBe("alex");
+  });
+
+  it("saves valid edits, never the email, and reports invalid fields", async () => {
+    const bad = await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "M", phone: "12", address: "" }) });
+    expect(bad.status).toBe(400);
+    expect(Object.keys((await json(bad)).fieldErrors).sort()).toEqual(["address", "name", "phone"]);
+    const ok = await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "Maya O.", phone: "+44 20 7946 0001", address: "1 High Street, Leeds", email: "evil@example.com" }) });
+    expect(ok.status).toBe(200);
+    expect(await json(ok)).toMatchObject({ name: "Maya O.", address: "1 High Street, Leeds", email: "maya@example.com" });
+  });
+
+  it("keeps each person's profile separate", async () => {
+    await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "Maya O.", phone: "+44 20 7946 0001", address: "1 High Street, Leeds" }) });
+    const alex = await json(await call("/profile", "tok-applicant"));
+    expect(alex).toMatchObject({ name: "alex", email: "alex@example.com", address: "" });
+  });
+
+  it("requires a sign-in", async () => {
+    expect((await call("/profile")).status).toBe(401);
   });
 });

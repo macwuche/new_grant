@@ -34,6 +34,8 @@ o/bKiIz+Fq8=
 
 export type DbConnection = {
   target: "supabase" | "replit";
+  /** The URL as given (drizzle-kit needs this form for Replit's database). */
+  url: string;
   host: string;
   port: number;
   user: string;
@@ -53,6 +55,7 @@ export function dbConnection(env: NodeJS.ProcessEnv = process.env): DbConnection
   const url = new URL(raw);
   return {
     target: supabase ? "supabase" : "replit",
+    url: raw,
     host: url.hostname,
     port: Number(url.port || 5432),
     user: decodeURIComponent(url.username),

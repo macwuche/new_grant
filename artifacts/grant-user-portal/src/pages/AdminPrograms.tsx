@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Building2, FolderOpen, Info, Leaf, Lock, Palette, Plus, Store, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
-import type { DemoState, GrantInput, ProgramQuestion, Result, Tier } from '@workspace/domain/model';
+import * as api from '@workspace/api-client-react';
+import type { DemoState, Grant, GrantInput, ProgramQuestion, Result, Tier } from '@workspace/domain/model';
 import {
   closeProgram, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@workspace/domain/programs';
 import { programBudget } from '@workspace/domain/review';
+import { adoptServerProgram, dropServerProgram } from '@workspace/domain/sync';
+import { apiError, useServerData } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
@@ -19,12 +22,14 @@ const STATUS_ORDER = { Open: 0, Draft: 1, Closed: 2 } as const;
 
 export function AdminPrograms() {
   const { state } = useDemoStore();
+  const { programsError } = useServerData();
   const [filter, setFilter] = useState('All programs');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const close = useCallback(() => setEditing(null), []);
   const all = [...state.grants].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name));
   const visible = all.filter(g => filter === 'All programs' || g.status === filter);
   return <>
+    {programsError && <div className="admin-review-flash error" role="alert" data-testid="status-admin-programs-error">{programsError}</div>}
     <div className="admin-toolbar"><span className="admin-count" data-testid="text-admin-grants-count">{visible.length} of {all.length} programs</span><div className="admin-toolbar-left" style={{ flex: '0 1 auto' }}><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter grant programs by status" data-testid="select-admin-filter-grants"><option>All programs</option><option>Open</option><option>Draft</option><option>Closed</option></select><button type="button" className="admin-btn primary" onClick={() => setEditing('new')} data-testid="button-admin-new-program"><Plus size={14} style={{ verticalAlign: '-2px' }} /> New program</button></div></div>
     <div className="admin-program-grid">{visible.map(grant => {
       const Icon = icons[grant.id] ?? FolderOpen;
@@ -41,6 +46,8 @@ export function AdminPrograms() {
   </>;
 }
 
+type Outcome = { ok: true; message: string; program?: Grant } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
 type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[] };
 
 const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: g.requirements.length ? [...g.requirements] : [''], questions: g.questions.map(q => ({ ...q })) });
@@ -51,7 +58,28 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   const { state } = useDemoStore();
   const staffCommand = useStaffCommand();
   const allowed = useCan()('programs.manage');
-  const run = (action: string, target: string, fn: (s: DemoState, by: string) => Result) => staffCommand('programs.manage', { action, target }, (s, actor) => fn(s, actor.name));
+  const { run: runStore } = useDemoStore();
+  const { connected, refreshPrograms } = useServerData();
+  const [busy, setBusy] = useState(false);
+  // Without sign-in: rules run on this browser's store, role-checked and audited there.
+  const local = (action: string, target: string, fn: (s: DemoState, by: string) => Result): Outcome => {
+    const result = staffCommand('programs.manage', { action, target }, (s, actor) => fn(s, actor.name));
+    return result.ok ? { ok: true, message: result.message, program: result.state.grants.find(g => g.id === (result.id ?? target)) } : result;
+  };
+  // Signed in: the API runs the same rules and stores the program; the store takes the saved copy.
+  const remote = async (call: () => Promise<api.ProgramResult | api.Message>, removedId?: string): Promise<Outcome> => {
+    setBusy(true);
+    try {
+      const res = await call();
+      if ('program' in res) runStore(s => adoptServerProgram(s, res.program as Grant));
+      else if (removedId) runStore(s => dropServerProgram(s, removedId));
+      return { ok: true, message: res.message, program: 'program' in res ? res.program as Grant : undefined };
+    } catch (err) {
+      const failure = apiError(err, "Couldn't reach the server. Your changes weren't saved; try again.");
+      if (failure.status === 409 || failure.status === 404) void refreshPrograms();
+      return { ok: false, error: failure.error, fieldErrors: failure.fieldErrors };
+    } finally { setBusy(false); }
+  };
   const grant = programId ? state.grants.find(g => g.id === programId) : undefined;
   const closeRef = useRef<HTMLButtonElement>(null);
   const [seenVersion, setSeenVersion] = useState(grant?.updatedAt ?? '');
@@ -77,18 +105,26 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   const drafts = grant ? state.applications.filter(a => a.grantId === grant.id && a.status === 'Draft').length : 0;
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => { setForm(f => ({ ...f, [key]: value })); setErrors(({ [key]: _, ...rest }) => rest); setConfirm(null); };
-  const after = (result: Result, onOk?: (result: Result & { ok: true }) => void) => {
+  const after = async (pending: Outcome | Promise<Outcome>, onOk?: (outcome: Outcome & { ok: true }) => void) => {
+    const outcome = await pending;
     setConfirm(null);
-    if (!result.ok) { setErrors(result.fieldErrors ?? {}); setFlash({ tone: 'error', text: result.error }); return; }
-    setErrors({}); setFlash({ tone: 'ok', text: result.message });
-    const saved = result.state.grants.find(g => g.id === (result.id ?? programId));
-    if (saved) { setSeenVersion(saved.updatedAt); setForm(toForm(saved)); }
-    onOk?.(result);
+    if (!outcome.ok) { setErrors(outcome.fieldErrors ?? {}); setFlash({ tone: 'error', text: outcome.error }); return; }
+    setErrors({}); setFlash({ tone: 'ok', text: outcome.message });
+    if (outcome.program) { setSeenVersion(outcome.program.updatedAt); setForm(toForm(outcome.program)); }
+    onOk?.(outcome);
   };
   const now = () => new Date();
+  const version = { version: seenVersion };
   const saveForm = () => grant
-    ? after(run('Edit program', grant.id, (s, by) => updateProgram(s, grant.id, seenVersion, toInput(form), by, now())))
-    : after(run('Create program', '', (s, by) => createProgram(s, toInput(form), by, now())), r => r.id && onCreated(r.id));
+    ? after(connected
+      ? remote(() => api.updateProgram(grant.id, { version: seenVersion, program: toInput(form) as api.ProgramInput }))
+      : local('Edit program', grant.id, (s, by) => updateProgram(s, grant.id, seenVersion, toInput(form), by, now())))
+    : after(connected
+      ? remote(() => api.createProgram(toInput(form) as api.ProgramInput))
+      : local('Create program', '', (s, by) => createProgram(s, toInput(form), by, now())), o => o.program && onCreated(o.program.id));
+  const doDelete = (id: string) => after(connected ? remote(() => api.deleteProgram(id, version), id) : local('Delete program', id, s => deleteProgram(s, id, seenVersion)), onClose);
+  const doClose = (id: string) => after(connected ? remote(() => api.closeProgram(id, version)) : local('Close program', id, (s, by) => closeProgram(s, id, seenVersion, by, now())));
+  const doPublish = (id: string, action: string) => after(connected ? remote(() => api.publishProgram(id, version)) : local(action, id, (s, by) => publishProgram(s, id, seenVersion, by, now())));
   const setQuestion = (i: number, patch: Partial<ProgramQuestion>) => set('questions', form.questions.map((q, j) => j === i ? { ...q, ...patch } : q));
 
   const field = (key: keyof Form, label: string, input: React.ReactNode, hint?: string) => <label className="admin-review-field" key={key}>
@@ -120,10 +156,10 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
       {dirty && grant.status !== 'Open' && <p className="admin-review-hint">Save or discard your edits before changing the status.</p>}
       <div className="admin-review-buttons">
         {confirm && <button type="button" className="admin-btn" onClick={() => setConfirm(null)} data-testid="button-admin-program-cancel">Cancel</button>}
-        {grant.status === 'Draft' && !apps.length && !drafts && <button type="button" className="admin-btn" disabled={stale || !allowed} onClick={() => confirm === 'delete' ? after(run('Delete program', grant.id, s => deleteProgram(s, grant.id, seenVersion)), onClose) : setConfirm('delete')} data-testid="button-admin-program-delete"><Trash2 size={13} style={{ verticalAlign: '-2px' }} /> {confirm === 'delete' ? 'Confirm delete' : 'Delete'}</button>}
+        {grant.status === 'Draft' && !apps.length && !drafts && <button type="button" className="admin-btn" disabled={stale || !allowed || busy} onClick={() => confirm === 'delete' ? doDelete(grant.id) : setConfirm('delete')} data-testid="button-admin-program-delete"><Trash2 size={13} style={{ verticalAlign: '-2px' }} /> {confirm === 'delete' ? 'Confirm delete' : 'Delete'}</button>}
         {grant.status === 'Open'
-          ? <button type="button" className="admin-btn danger" disabled={stale || !allowed} onClick={() => confirm === 'close' ? after(run('Close program', grant.id, (s, by) => closeProgram(s, grant.id, seenVersion, by, now()))) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm close' : 'Close to new applications'}</button>
-          : <button type="button" className="admin-btn primary" disabled={stale || dirty || !allowed} onClick={() => after(run(grant.status === 'Draft' ? 'Publish program' : 'Reopen program', grant.id, (s, by) => publishProgram(s, grant.id, seenVersion, by, now())))} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Reopen'}</button>}
+          ? <button type="button" className="admin-btn danger" disabled={stale || !allowed || busy} onClick={() => confirm === 'close' ? doClose(grant.id) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm close' : 'Close to new applications'}</button>
+          : <button type="button" className="admin-btn primary" disabled={stale || dirty || !allowed || busy} onClick={() => doPublish(grant.id, grant.status === 'Draft' ? 'Publish program' : 'Reopen program')} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Reopen'}</button>}
       </div>
     </section>}
 
@@ -165,12 +201,14 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
       </fieldset>
       <div className="admin-review-buttons">
         {grant && dirty && <button type="button" className="admin-btn" onClick={() => { setForm(toForm(grant)); setErrors({}); setFlash(null); }} data-testid="button-admin-program-discard">Discard edits</button>}
-        <button type="button" className="admin-btn primary" disabled={stale || (!!grant && !dirty) || !allowed} onClick={saveForm} data-testid="button-admin-program-save">{grant ? 'Save changes' : 'Create draft'}</button>
+        <button type="button" className="admin-btn primary" disabled={stale || (!!grant && !dirty) || !allowed || busy} onClick={saveForm} data-testid="button-admin-program-save">{grant ? 'Save changes' : 'Create draft'}</button>
       </div>
     </section>
 
     {grant && <section className="admin-review-section"><h3>Change log</h3><ol className="admin-review-history">{[...grant.changeLog].reverse().map(c => <li key={`${c.at}-${c.summary}`}><strong>{c.summary}</strong><span>{when(c.at)} · {c.by}</span></li>)}</ol></section>}
 
-    <div className="admin-detail-note"><Info size={17} /><span>Demo program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>{connected
+      ? 'Programs are saved on the server and shown to every applicant. Until applications move to the server, locked criteria and the awarded budget are checked in this browser only.'
+      : 'Demo program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.'}</span></div>
   </ReviewFrame>;
 }
