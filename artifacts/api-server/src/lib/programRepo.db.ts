@@ -5,7 +5,7 @@ import type { ProgramRepo, WriteOutcome } from "./programRepo";
 
 // jsonb doesn't keep object key order, and the rules compare questions as JSON
 // text, so rebuild nested objects with the domain's key order.
-const toGrant = (row: ProgramRow): Grant => ({
+export const toGrant = (row: ProgramRow): Grant => ({
   id: row.id, status: row.status, name: row.name, summary: row.summary, focus: row.focus,
   maxFunding: row.maxFunding, minimumRequest: row.minimumRequest, budget: row.budget, deadline: row.deadline,
   minimumTier: row.minimumTier as Tier, requirements: row.requirements, requiresRegistration: row.requiresRegistration,
@@ -13,7 +13,7 @@ const toGrant = (row: ProgramRow): Grant => ({
   changeLog: row.changeLog.map(c => ({ at: c.at, by: c.by, summary: c.summary })), updatedAt: row.updatedAt.toISOString(),
 });
 
-const toRow = (g: Grant) => ({
+export const toProgramRow = (g: Grant) => ({
   status: g.status, name: g.name, summary: g.summary, focus: g.focus,
   maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline,
   minimumTier: g.minimumTier, requirements: g.requirements, requiresRegistration: g.requiresRegistration,
@@ -39,8 +39,8 @@ export const dbProgramRepo: ProgramRepo = {
     const { rows } = await db.execute<{ n: string }>(sql`select nextval(${programNumberSeq.seqName}) as n`);
     return Number(rows[0]!.n);
   },
-  insert: grant => write(async () => (await db.insert(programsTable).values({ id: grant.id, ...toRow(grant) }).returning({ id: programsTable.id })).length),
-  update: (grant, expectedVersion) => write(async () => (await db.update(programsTable).set(toRow(grant))
+  insert: grant => write(async () => (await db.insert(programsTable).values({ id: grant.id, ...toProgramRow(grant) }).returning({ id: programsTable.id })).length),
+  update: (grant, expectedVersion) => write(async () => (await db.update(programsTable).set(toProgramRow(grant))
     .where(and(eq(programsTable.id, grant.id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),
   remove: (id, expectedVersion) => write(async () => (await db.delete(programsTable)
     .where(and(eq(programsTable.id, id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),

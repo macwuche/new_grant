@@ -132,7 +132,7 @@ export function saveDraft(state: DemoState, grantId: string, input: ApplicationI
     if (!draft || draft.grantId !== grantId) return fail('That draft could not be found.');
     if (!isEditable(draft)) return fail('This application can no longer be edited.');
     const updated: Application = { ...draft, ...fields, updatedAt: at };
-    return { ok: true, id: draft.id, message: draft.status === 'Draft' ? 'Draft saved in this browser.' : 'Changes saved. Resubmit when ready.', state: { ...state, applications: state.applications.map(a => a.id === draft.id ? updated : a) } };
+    return { ok: true, id: draft.id, message: draft.status === 'Draft' ? 'Draft saved.' : 'Changes saved. Resubmit when ready.', state: { ...state, applications: state.applications.map(a => a.id === draft.id ? updated : a) } };
   }
 
   const eligibility = checkEligibility(grant, state.profile, ownApplications(state), now);
@@ -140,7 +140,7 @@ export function saveDraft(state: DemoState, grantId: string, input: ApplicationI
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
   const ids = nextIds(state);
   const draft: Application = { id: ids.app, applicantId: CURRENT_APPLICANT_ID, grantId, status: 'Draft', ...fields, createdAt: at, updatedAt: at, submittedAt: null, reviewer: null, awardedAmount: null, history: [{ status: 'Draft', at, actor: 'Applicant', note: 'Draft started.' }], internalNotes: [], escalation: null };
-  return { ok: true, id: draft.id, message: 'Draft saved in this browser.', state: { ...state, nextId: ids.nextId, applications: [draft, ...state.applications] } };
+  return { ok: true, id: draft.id, message: 'Draft saved.', state: { ...state, nextId: ids.nextId, applications: [draft, ...state.applications] } };
 }
 
 export function submitApplication(state: DemoState, grantId: string, input: ApplicationInput, now: Date, draftId?: string): Result {

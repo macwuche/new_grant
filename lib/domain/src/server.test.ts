@@ -3,7 +3,7 @@ import { closeProgram } from './programs';
 import { createSeedState } from './seed';
 import { lockAccount, submitKyc } from './accounts';
 import { CURRENT_APPLICANT_ID } from './seed';
-import { applicantState, readApplicantSlot, serverState } from './server';
+import { applicantState, applicantView, readApplicantSlot, serverState } from './server';
 
 describe('serverState', () => {
   it('holds only what the server loaded, so no demo record reaches a server decision', () => {
@@ -33,5 +33,11 @@ describe('serverState', () => {
     expect(slot.account).toMatchObject({ status: 'Locked', lockedBy: 'Riley Chen', kyc: { status: 'Pending', documentLast4: '5678' } });
     expect(slot.notifications.every(n => n.applicantId === 'real-uuid')).toBe(true);
     expect(slot.profile).not.toHaveProperty('twoFactor');
+  });
+
+  it('charges no application fee on the server, and hides staff-only fields from applicants', () => {
+    expect(serverState({}).treasury.applicationFee).toBe(0);
+    const app = { ...createSeedState().applications[0]!, reviewer: 'Avery Taylor', internalNotes: [{ at: 'x', author: 'Avery', text: 'secret' }] };
+    expect(applicantView(app)).toMatchObject({ reviewer: null, internalNotes: [], escalation: null });
   });
 });

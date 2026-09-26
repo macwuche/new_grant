@@ -1085,3 +1085,695 @@ export const RequestReverificationResponse = zod.object({
 })
 
 
+/**
+ * The signed-in applicant's own applications, drafts included. Staff-only fields (reviewer, internal notes, escalation) are left out.
+ * @summary Your applications
+ */
+export const ListMyApplicationsResponseItem = zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+})
+export const ListMyApplicationsResponse = zod.array(ListMyApplicationsResponseItem)
+
+
+/**
+ * Any active staff member. Every application except drafts, with internal notes and escalations.
+ * @summary Review queue
+ */
+export const ListApplicationsResponseItem = zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+})
+export const ListApplicationsResponse = zod.array(ListApplicationsResponseItem)
+
+
+/**
+ * Creates or updates your draft for a program (or your application while changes are requested).
+ * @summary Save a draft
+ */
+export const saveApplicationDraftBodyGrantIdMax = 40;
+
+export const saveApplicationDraftBodyDraftIdMax = 40;
+
+export const saveApplicationDraftBodyApplicationBusinessNameMax = 200;
+
+export const saveApplicationDraftBodyApplicationRegistrationNumberMax = 80;
+
+export const saveApplicationDraftBodyApplicationPurposeMax = 5000;
+
+export const saveApplicationDraftBodyApplicationChecklistItemMax = 200;
+
+export const saveApplicationDraftBodyApplicationChecklistMax = 20;
+
+export const saveApplicationDraftBodyApplicationAnswersMaxOne = 1000;
+
+
+
+export const SaveApplicationDraftBody = zod.object({
+  "grantId": zod.string().max(saveApplicationDraftBodyGrantIdMax),
+  "draftId": zod.string().max(saveApplicationDraftBodyDraftIdMax).optional().describe('Your existing draft (or application with changes requested), if any'),
+  "application": zod.object({
+  "businessName": zod.string().max(saveApplicationDraftBodyApplicationBusinessNameMax),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string().max(saveApplicationDraftBodyApplicationRegistrationNumberMax),
+  "purpose": zod.string().max(saveApplicationDraftBodyApplicationPurposeMax),
+  "checklist": zod.array(zod.string().max(saveApplicationDraftBodyApplicationChecklistItemMax)).max(saveApplicationDraftBodyApplicationChecklistMax),
+  "answers": zod.record(zod.string(), zod.string().max(saveApplicationDraftBodyApplicationAnswersMaxOne))
+})
+})
+
+export const SaveApplicationDraftResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Validates, re-checks eligibility, and submits. Resubmits an application that has changes requested.
+ * @summary Submit or resubmit
+ */
+export const submitApplicationBodyGrantIdMax = 40;
+
+export const submitApplicationBodyDraftIdMax = 40;
+
+export const submitApplicationBodyApplicationBusinessNameMax = 200;
+
+export const submitApplicationBodyApplicationRegistrationNumberMax = 80;
+
+export const submitApplicationBodyApplicationPurposeMax = 5000;
+
+export const submitApplicationBodyApplicationChecklistItemMax = 200;
+
+export const submitApplicationBodyApplicationChecklistMax = 20;
+
+export const submitApplicationBodyApplicationAnswersMaxOne = 1000;
+
+
+
+export const SubmitApplicationBody = zod.object({
+  "grantId": zod.string().max(submitApplicationBodyGrantIdMax),
+  "draftId": zod.string().max(submitApplicationBodyDraftIdMax).optional().describe('Your existing draft (or application with changes requested), if any'),
+  "application": zod.object({
+  "businessName": zod.string().max(submitApplicationBodyApplicationBusinessNameMax),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string().max(submitApplicationBodyApplicationRegistrationNumberMax),
+  "purpose": zod.string().max(submitApplicationBodyApplicationPurposeMax),
+  "checklist": zod.array(zod.string().max(submitApplicationBodyApplicationChecklistItemMax)).max(submitApplicationBodyApplicationChecklistMax),
+  "answers": zod.record(zod.string(), zod.string().max(submitApplicationBodyApplicationAnswersMaxOne))
+})
+})
+
+export const SubmitApplicationResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Only drafts can be deleted.
+ * @summary Delete your draft
+ */
+export const deleteApplicationDraftPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const DeleteApplicationDraftParams = zod.object({
+  "id": zod.coerce.string().regex(deleteApplicationDraftPathIdRegExp)
+})
+
+export const DeleteApplicationDraftResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.review. Submitted → Under review, assigned to you.
+ * @summary Start review
+ */
+export const startReviewPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const StartReviewParams = zod.object({
+  "id": zod.coerce.string().regex(startReviewPathIdRegExp)
+})
+
+export const startReviewBodyVersionMax = 40;
+
+
+
+export const StartReviewBody = zod.object({
+  "version": zod.string().max(startReviewBodyVersionMax)
+})
+
+export const StartReviewResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+ * @summary Approve with an award
+ */
+export const approveApplicationPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const ApproveApplicationParams = zod.object({
+  "id": zod.coerce.string().regex(approveApplicationPathIdRegExp)
+})
+
+export const approveApplicationBodyVersionMax = 40;
+
+
+
+export const ApproveApplicationBody = zod.object({
+  "version": zod.string().max(approveApplicationBodyVersionMax),
+  "award": zod.number()
+})
+
+export const ApproveApplicationResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.review. The message is shown to the applicant, who can edit and resubmit.
+ * @summary Request changes
+ */
+export const requestApplicationChangesPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const RequestApplicationChangesParams = zod.object({
+  "id": zod.coerce.string().regex(requestApplicationChangesPathIdRegExp)
+})
+
+export const requestApplicationChangesBodyVersionMax = 40;
+
+export const requestApplicationChangesBodyMessageMax = 2000;
+
+
+
+export const RequestApplicationChangesBody = zod.object({
+  "version": zod.string().max(requestApplicationChangesBodyVersionMax),
+  "message": zod.string().max(requestApplicationChangesBodyMessageMax)
+})
+
+export const RequestApplicationChangesResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.review. The reason is shown to the applicant.
+ * @summary Decline
+ */
+export const declineApplicationPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const DeclineApplicationParams = zod.object({
+  "id": zod.coerce.string().regex(declineApplicationPathIdRegExp)
+})
+
+export const declineApplicationBodyVersionMax = 40;
+
+export const declineApplicationBodyReasonMax = 2000;
+
+
+
+export const DeclineApplicationBody = zod.object({
+  "version": zod.string().max(declineApplicationBodyVersionMax),
+  "reason": zod.string().max(declineApplicationBodyReasonMax)
+})
+
+export const DeclineApplicationResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires notes.add. Staff-only; doesn't change the record version.
+ * @summary Add an internal note
+ */
+export const addInternalNotePathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const AddInternalNoteParams = zod.object({
+  "id": zod.coerce.string().regex(addInternalNotePathIdRegExp)
+})
+
+export const addInternalNoteBodyTextMax = 2000;
+
+
+
+export const AddInternalNoteBody = zod.object({
+  "text": zod.string().max(addInternalNoteBodyTextMax)
+})
+
+export const AddInternalNoteResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.escalate. Staff-only; blocks approval until cleared.
+ * @summary Escalate to security
+ */
+export const escalateApplicationPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const EscalateApplicationParams = zod.object({
+  "id": zod.coerce.string().regex(escalateApplicationPathIdRegExp)
+})
+
+export const escalateApplicationBodyReasonMax = 1000;
+
+
+
+export const EscalateApplicationBody = zod.object({
+  "reason": zod.string().max(escalateApplicationBodyReasonMax)
+})
+
+export const EscalateApplicationResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires applications.clearEscalation.
+ * @summary Clear an escalation
+ */
+export const clearEscalationPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');
+
+
+export const ClearEscalationParams = zod.object({
+  "id": zod.coerce.string().regex(clearEscalationPathIdRegExp)
+})
+
+export const clearEscalationBodyResolutionMax = 2000;
+
+
+
+export const ClearEscalationBody = zod.object({
+  "resolution": zod.string().max(clearEscalationBodyResolutionMax)
+})
+
+export const ClearEscalationResponse = zod.object({
+  "application": zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "grantId": zod.string(),
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "businessName": zod.string(),
+  "requestedAmount": zod.number(),
+  "registrationNumber": zod.string(),
+  "purpose": zod.string(),
+  "checklist": zod.array(zod.string()),
+  "answers": zod.record(zod.string(), zod.string()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().describe('Record version; send it back with review decisions'),
+  "submittedAt": zod.string().nullable(),
+  "reviewer": zod.string().nullable(),
+  "awardedAmount": zod.number().nullable(),
+  "history": zod.array(zod.object({
+  "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
+  "at": zod.string(),
+  "actor": zod.enum(['Applicant', 'Reviewer']),
+  "note": zod.string()
+})),
+  "internalNotes": zod.array(zod.object({
+  "at": zod.string(),
+  "author": zod.string(),
+  "text": zod.string()
+})),
+  "escalation": zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['Open', 'Cleared']),
+  "clearedAt": zod.string().optional(),
+  "clearedBy": zod.string().optional(),
+  "resolution": zod.string().optional()
+}).nullable()
+}),
+  "message": zod.string()
+})
+
+

@@ -20,6 +20,8 @@ tags:
     description: The signed-in applicant's profile
   - name: applicants
     description: Applicant directory and account controls (staff)
+  - name: applications
+    description: Grant applications and review
 security:
   - bearerAuth: []
 paths:
@@ -615,6 +617,322 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Stale"
+  /applications/mine:
+    get:
+      operationId: listMyApplications
+      tags: [applications]
+      summary: Your applications
+      description: The signed-in applicant's own applications, drafts included. Staff-only fields (reviewer, internal notes, escalation) are left out.
+      responses:
+        "200":
+          description: Applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [applications]
+      summary: Review queue
+      description: Any active staff member. Every application except drafts, with internal notes and escalations.
+      responses:
+        "200":
+          description: Applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /applications/save:
+    post:
+      operationId: saveApplicationDraft
+      tags: [applications]
+      summary: Save a draft
+      description: Creates or updates your draft for a program (or your application while changes are requested).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationSubmission"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /applications/submit:
+    post:
+      operationId: submitApplication
+      tags: [applications]
+      summary: Submit or resubmit
+      description: Validates, re-checks eligibility, and submits. Resubmits an application that has changes requested.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationSubmission"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /applications/{id}/delete:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: deleteApplicationDraft
+      tags: [applications]
+      summary: Delete your draft
+      description: Only drafts can be deleted.
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /applications/{id}/start-review:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: startReview
+      tags: [applications]
+      summary: Start review
+      description: Requires applications.review. Submitted → Under review, assigned to you.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationVersion"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applications/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: approveApplication
+      tags: [applications]
+      summary: Approve with an award
+      description: Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AwardDecision"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applications/{id}/request-changes:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: requestApplicationChanges
+      tags: [applications]
+      summary: Request changes
+      description: Requires applications.review. The message is shown to the applicant, who can edit and resubmit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequest"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applications/{id}/decline:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: declineApplication
+      tags: [applications]
+      summary: Decline
+      description: Requires applications.review. The reason is shown to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeclineDecision"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /applications/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: addInternalNote
+      tags: [applications]
+      summary: Add an internal note
+      description: Requires notes.add. Staff-only; doesn't change the record version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalNoteInput"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /applications/{id}/escalate:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: escalateApplication
+      tags: [applications]
+      summary: Escalate to security
+      description: Requires applications.escalate. Staff-only; blocks approval until cleared.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /applications/{id}/clear-escalation:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      operationId: clearEscalation
+      tags: [applications]
+      summary: Clear an escalation
+      description: Requires applications.clearEscalation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscalationResolution"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     bearerAuth:
@@ -622,6 +940,13 @@ components:
       scheme: bearer
       description: Supabase Auth access token
   parameters:
+    ApplicationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9-]{1,40}$"
     ApplicantId:
       name: id
       in: path
@@ -674,6 +999,211 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    ApplicationStatus:
+      type: string
+      enum: [Draft, Submitted, Under review, Changes requested, Approved, Declined]
+    ApplicationInput:
+      type: object
+      properties:
+        businessName:
+          type: string
+          maxLength: 200
+        requestedAmount:
+          type: number
+        registrationNumber:
+          type: string
+          maxLength: 80
+        purpose:
+          type: string
+          maxLength: 5000
+        checklist:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 200
+        answers:
+          type: object
+          maxProperties: 20
+          additionalProperties:
+            type: string
+            maxLength: 1000
+      required: [businessName, requestedAmount, registrationNumber, purpose, checklist, answers]
+      additionalProperties: false
+    ApplicationSubmission:
+      type: object
+      properties:
+        grantId:
+          type: string
+          maxLength: 40
+        draftId:
+          type: string
+          maxLength: 40
+          description: Your existing draft (or application with changes requested), if any
+        application:
+          $ref: "#/components/schemas/ApplicationInput"
+      required: [grantId, application]
+      additionalProperties: false
+    ApplicationEvent:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        at:
+          type: string
+        actor:
+          type: string
+          enum: [Applicant, Reviewer]
+        note:
+          type: string
+      required: [status, at, actor, note]
+    InternalNote:
+      type: object
+      properties:
+        at:
+          type: string
+        author:
+          type: string
+        text:
+          type: string
+      required: [at, author, text]
+    Escalation:
+      type: object
+      properties:
+        at:
+          type: string
+        by:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [Open, Cleared]
+        clearedAt:
+          type: string
+        clearedBy:
+          type: string
+        resolution:
+          type: string
+      required: [at, by, reason, status]
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantId:
+          type: string
+        grantId:
+          type: string
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        businessName:
+          type: string
+        requestedAmount:
+          type: number
+        registrationNumber:
+          type: string
+        purpose:
+          type: string
+        checklist:
+          type: array
+          items:
+            type: string
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+          description: Record version; send it back with review decisions
+        submittedAt:
+          type: string
+          nullable: true
+        reviewer:
+          type: string
+          nullable: true
+        awardedAmount:
+          type: number
+          nullable: true
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApplicationEvent"
+        internalNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalNote"
+        escalation:
+          allOf:
+            - $ref: "#/components/schemas/Escalation"
+          nullable: true
+      required: [id, applicantId, grantId, status, businessName, requestedAmount, registrationNumber, purpose, checklist, answers, createdAt, updatedAt, submittedAt, reviewer, awardedAmount, history, internalNotes, escalation]
+    ApplicationResult:
+      type: object
+      properties:
+        application:
+          $ref: "#/components/schemas/Application"
+        message:
+          type: string
+      required: [application, message]
+    ApplicationVersion:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+      required: [version]
+      additionalProperties: false
+    AwardDecision:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        award:
+          type: number
+      required: [version, award]
+      additionalProperties: false
+    ChangeRequest:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        message:
+          type: string
+          maxLength: 2000
+      required: [version, message]
+      additionalProperties: false
+    DeclineDecision:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        reason:
+          type: string
+          maxLength: 2000
+      required: [version, reason]
+      additionalProperties: false
+    InternalNoteInput:
+      type: object
+      properties:
+        text:
+          type: string
+          maxLength: 2000
+      required: [text]
+      additionalProperties: false
+    EscalationResolution:
+      type: object
+      properties:
+        resolution:
+          type: string
+          maxLength: 2000
+      required: [resolution]
+      additionalProperties: false
     ValidationError:
       type: object
       properties:

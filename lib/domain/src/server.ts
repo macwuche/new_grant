@@ -13,9 +13,14 @@ export function serverState(loaded: Partial<Pick<DemoState, 'grants' | 'applicat
     ...base,
     grants: [], applications: [], notifications: [], transactions: [], staffFeed: [], otherApplicants: [],
     accounts: {}, staff: [], actingStaffId: '', audit: [], payoutDestinations: {}, lockdown: null,
+    // Money isn't on the server yet (phase 12, slice 5), so no application fee can be charged there.
+    treasury: { ...base.treasury, applicationFee: 0 },
     ...loaded,
   };
 }
+
+/** What an applicant may see of their own application: no reviewer name, internal notes, or escalation. */
+export const applicantView = (app: Application): Application => ({ ...app, reviewer: null, internalNotes: [], escalation: null });
 
 /** One real applicant as the server stores them. */
 export type SlotApplicant = {

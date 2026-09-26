@@ -1,4 +1,4 @@
-import type { AccountControls, DemoState, Grant, Profile, Result } from './model';
+import type { AccountControls, Application, DemoState, Grant, Profile, Result, Transaction } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 // Merging server records into the browser store. While only some data lives on
@@ -75,11 +75,59 @@ export function leaveServerApplicants(state: DemoState): Result {
 }
 
 /**
+ * Loads applications from the API. For an applicant (`ownId` = their account
+ * id) these are their own, moved into the portal's current-applicant slot; for
+ * staff, the review queue as it is. Until money moves to the server (slice 5),
+ * an approved award is also credited to the demo grant balance here, once.
+ */
+export function adoptServerApplications(state: DemoState, apps: Application[], ownId?: string): Result {
+  const applications = ownId ? apps.map(a => a.applicantId === ownId ? { ...a, applicantId: CURRENT_APPLICANT_ID } : a) : apps;
+  const transactions = ownId ? withAwardCredits(state, applications) : state.transactions;
+  if (state.serverApplications && same(applications, state.applications) && transactions === state.transactions) return unchanged(state);
+  return { ok: true, message: '', state: { ...state, applications, transactions, serverApplications: true } };
+}
+
+/** Puts one application the server just saved into the store (added or replaced). */
+export function adoptServerApplication(state: DemoState, app: Application, ownId?: string): Result {
+  const inSlot = ownId && app.applicantId === ownId ? { ...app, applicantId: CURRENT_APPLICANT_ID } : app;
+  const exists = state.applications.some(a => a.id === app.id);
+  const applications = exists ? state.applications.map(a => a.id === app.id ? inSlot : a) : [inSlot, ...state.applications];
+  const transactions = ownId ? withAwardCredits(state, applications) : state.transactions;
+  return { ok: true, message: '', state: { ...state, applications, transactions, serverApplications: true } };
+}
+
+export function dropServerApplication(state: DemoState, id: string): Result {
+  return { ok: true, message: '', state: { ...state, applications: state.applications.filter(a => a.id !== id) } };
+}
+
+/** Back to the demo applications (after signing out, or when sign-in isn't configured). */
+export function leaveServerApplications(state: DemoState): Result {
+  if (!state.serverApplications) return unchanged(state);
+  return { ok: true, message: '', state: { ...state, applications: createSeedState().applications, serverApplications: false } };
+}
+
+/** Adds a demo grant-balance credit for each approved award that doesn't have one yet. */
+function withAwardCredits(state: DemoState, applications: Application[]): Transaction[] {
+  let n = state.nextId;
+  const credits: Transaction[] = [];
+  for (const app of applications) {
+    if (app.applicantId !== CURRENT_APPLICANT_ID || app.status !== 'Approved' || !app.awardedAmount) continue;
+    if (state.transactions.some(t => t.type === 'Grant' && t.description.endsWith(`(${app.id})`))) continue;
+    const grant = state.grants.find(g => g.id === app.grantId);
+    const approvedAt = [...app.history].reverse().find(h => h.status === 'Approved')?.at ?? app.updatedAt;
+    credits.push({ id: `TX-${80000 + n++}`, applicantId: CURRENT_APPLICANT_ID, type: 'Grant', description: `${grant?.name ?? 'Grant'} award (${app.id})`, amount: app.awardedAmount, status: 'Completed', createdAt: approvedAt });
+  }
+  return credits.length ? [...credits, ...state.transactions] : state.transactions;
+}
+
+/**
  * What the browser may keep in storage. Real applicants loaded for staff are
  * dropped (they're reloaded from the API on the next visit), so their details
  * don't stay on a staff member's computer after they sign out.
  */
 export function forStorage(state: DemoState): DemoState {
-  if (!state.serverApplicants) return state;
-  return { ...state, otherApplicants: [], accounts: { [CURRENT_APPLICANT_ID]: state.accounts[CURRENT_APPLICANT_ID]! } };
+  let stored = state;
+  if (stored.serverApplicants) stored = { ...stored, otherApplicants: [], accounts: { [CURRENT_APPLICANT_ID]: stored.accounts[CURRENT_APPLICANT_ID]! } };
+  if (stored.serverApplications) stored = { ...stored, applications: [] };
+  return stored;
 }

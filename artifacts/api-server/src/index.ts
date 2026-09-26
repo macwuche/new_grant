@@ -6,6 +6,7 @@ import { dbStaffRepo } from "./lib/staffRepo.db";
 import { ensureSeedPrograms } from "./lib/programRepo";
 import { dbProgramRepo } from "./lib/programRepo.db";
 import { dbProfileRepo } from "./lib/profileRepo.db";
+import { dbApplicationRepo } from "./lib/applicationRepo.db";
 import { seedGrants } from "@workspace/domain/seed";
 
 const rawPort = process.env["PORT"];
@@ -37,7 +38,7 @@ if (seeded) logger.info({ count: seeded }, "sample grant programs added to the e
 
 const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
-  staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo,
+  staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo,
 });
 
 app.listen(port, (err) => {

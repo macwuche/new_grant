@@ -282,6 +282,12 @@ export type DemoState = {
    * their accounts are never saved to browser storage.
    */
   serverApplicants?: boolean;
+  /**
+   * Set once applications come from the API (the applicant's own, or the staff
+   * review queue). They're reloaded on each visit, so they're never saved to
+   * browser storage.
+   */
+  serverApplications?: boolean;
 };
 
 export type Result<T = DemoState> = { ok: true; state: T; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };

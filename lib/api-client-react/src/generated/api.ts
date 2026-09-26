@@ -22,12 +22,21 @@ import type {
 import type {
   ApplicantEntry,
   ApplicantResult,
+  Application,
+  ApplicationResult,
+  ApplicationSubmission,
+  ApplicationVersion,
+  AwardDecision,
   BadRequestResponse,
+  ChangeRequest,
   CredentialReset,
+  DeclineDecision,
   Error,
+  EscalationResolution,
   ForbiddenResponse,
   HealthStatus,
   IdentitySubmission,
+  InternalNoteInput,
   InvalidResponse,
   Me,
   Message,
@@ -2036,5 +2045,1044 @@ export const useRequestReverification = <TError = ErrorType<InvalidResponse | Un
         TContext
       > => {
       return useMutation(getRequestReverificationMutationOptions(options));
+    }
+
+export const getListMyApplicationsUrl = () => {
+
+
+
+
+  return `/api/applications/mine`
+}
+
+/**
+ * The signed-in applicant's own applications, drafts included. Staff-only fields (reviewer, internal notes, escalation) are left out.
+ * @summary Your applications
+ */
+export const listMyApplications = async ( options?: Parameters<typeof customFetch>[1]): Promise<Application[]> => {
+
+  return customFetch<Application[]>(getListMyApplicationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyApplicationsQueryKey = () => {
+    return [
+    `/api/applications/mine`
+    ] as const;
+    }
+
+
+export const getListMyApplicationsQueryOptions = <TData = Awaited<ReturnType<typeof listMyApplications>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyApplicationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyApplications>>> = ({ signal }) => listMyApplications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyApplications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyApplicationsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyApplications>>>
+export type ListMyApplicationsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Your applications
+ */
+
+export function useListMyApplications<TData = Awaited<ReturnType<typeof listMyApplications>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyApplicationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListApplicationsUrl = () => {
+
+
+
+
+  return `/api/applications`
+}
+
+/**
+ * Any active staff member. Every application except drafts, with internal notes and escalations.
+ * @summary Review queue
+ */
+export const listApplications = async ( options?: Parameters<typeof customFetch>[1]): Promise<Application[]> => {
+
+  return customFetch<Application[]>(getListApplicationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListApplicationsQueryKey = () => {
+    return [
+    `/api/applications`
+    ] as const;
+    }
+
+
+export const getListApplicationsQueryOptions = <TData = Awaited<ReturnType<typeof listApplications>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListApplicationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listApplications>>> = ({ signal }) => listApplications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listApplications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListApplicationsQueryResult = NonNullable<Awaited<ReturnType<typeof listApplications>>>
+export type ListApplicationsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Review queue
+ */
+
+export function useListApplications<TData = Awaited<ReturnType<typeof listApplications>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListApplicationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveApplicationDraftUrl = () => {
+
+
+
+
+  return `/api/applications/save`
+}
+
+/**
+ * Creates or updates your draft for a program (or your application while changes are requested).
+ * @summary Save a draft
+ */
+export const saveApplicationDraft = async (applicationSubmission: ApplicationSubmission, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getSaveApplicationDraftUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(applicationSubmission)
+  }
+);}
+
+
+
+
+
+export const getSaveApplicationDraftMutationKey = () => ['saveApplicationDraft'] as const;
+
+export const getSaveApplicationDraftMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveApplicationDraft>>, TError,SaveApplicationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveApplicationDraft>>, TError,SaveApplicationDraftMutationVariables, TContext> => {
+
+const mutationKey = getSaveApplicationDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveApplicationDraft>>, SaveApplicationDraftMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveApplicationDraft(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveApplicationDraftMutationResult = NonNullable<Awaited<ReturnType<typeof saveApplicationDraft>>>
+    export type SaveApplicationDraftMutationBody = BodyType<ApplicationSubmission>
+    export type SaveApplicationDraftMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type SaveApplicationDraftMutationVariables = {data: BodyType<ApplicationSubmission>}
+
+    /**
+ * @summary Save a draft
+ */
+export const useSaveApplicationDraft = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveApplicationDraft>>, TError,SaveApplicationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveApplicationDraft>>,
+        TError,
+        SaveApplicationDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveApplicationDraftMutationOptions(options));
+    }
+
+export const getSubmitApplicationUrl = () => {
+
+
+
+
+  return `/api/applications/submit`
+}
+
+/**
+ * Validates, re-checks eligibility, and submits. Resubmits an application that has changes requested.
+ * @summary Submit or resubmit
+ */
+export const submitApplication = async (applicationSubmission: ApplicationSubmission, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getSubmitApplicationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(applicationSubmission)
+  }
+);}
+
+
+
+
+
+export const getSubmitApplicationMutationKey = () => ['submitApplication'] as const;
+
+export const getSubmitApplicationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitApplication>>, TError,SubmitApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitApplication>>, TError,SubmitApplicationMutationVariables, TContext> => {
+
+const mutationKey = getSubmitApplicationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitApplication>>, SubmitApplicationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitApplication(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof submitApplication>>>
+    export type SubmitApplicationMutationBody = BodyType<ApplicationSubmission>
+    export type SubmitApplicationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type SubmitApplicationMutationVariables = {data: BodyType<ApplicationSubmission>}
+
+    /**
+ * @summary Submit or resubmit
+ */
+export const useSubmitApplication = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitApplication>>, TError,SubmitApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitApplication>>,
+        TError,
+        SubmitApplicationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitApplicationMutationOptions(options));
+    }
+
+export const getDeleteApplicationDraftUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/delete`
+}
+
+/**
+ * Only drafts can be deleted.
+ * @summary Delete your draft
+ */
+export const deleteApplicationDraft = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Message> => {
+
+  return customFetch<Message>(getDeleteApplicationDraftUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteApplicationDraftMutationKey = () => ['deleteApplicationDraft'] as const;
+
+export const getDeleteApplicationDraftMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteApplicationDraft>>, TError,DeleteApplicationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteApplicationDraft>>, TError,DeleteApplicationDraftMutationVariables, TContext> => {
+
+const mutationKey = getDeleteApplicationDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteApplicationDraft>>, DeleteApplicationDraftMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteApplicationDraft(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteApplicationDraftMutationResult = NonNullable<Awaited<ReturnType<typeof deleteApplicationDraft>>>
+
+    export type DeleteApplicationDraftMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>
+    export type DeleteApplicationDraftMutationVariables = {id: string}
+
+    /**
+ * @summary Delete your draft
+ */
+export const useDeleteApplicationDraft = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteApplicationDraft>>, TError,DeleteApplicationDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteApplicationDraft>>,
+        TError,
+        DeleteApplicationDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteApplicationDraftMutationOptions(options));
+    }
+
+export const getStartReviewUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/start-review`
+}
+
+/**
+ * Requires applications.review. Submitted → Under review, assigned to you.
+ * @summary Start review
+ */
+export const startReview = async (id: string,
+    applicationVersion: ApplicationVersion, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getStartReviewUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(applicationVersion)
+  }
+);}
+
+
+
+
+
+export const getStartReviewMutationKey = () => ['startReview'] as const;
+
+export const getStartReviewMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startReview>>, TError,StartReviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startReview>>, TError,StartReviewMutationVariables, TContext> => {
+
+const mutationKey = getStartReviewMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startReview>>, StartReviewMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  startReview(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartReviewMutationResult = NonNullable<Awaited<ReturnType<typeof startReview>>>
+    export type StartReviewMutationBody = BodyType<ApplicationVersion>
+    export type StartReviewMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type StartReviewMutationVariables = {id: string;data: BodyType<ApplicationVersion>}
+
+    /**
+ * @summary Start review
+ */
+export const useStartReview = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startReview>>, TError,StartReviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startReview>>,
+        TError,
+        StartReviewMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartReviewMutationOptions(options));
+    }
+
+export const getApproveApplicationUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/approve`
+}
+
+/**
+ * Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+ * @summary Approve with an award
+ */
+export const approveApplication = async (id: string,
+    awardDecision: AwardDecision, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getApproveApplicationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(awardDecision)
+  }
+);}
+
+
+
+
+
+export const getApproveApplicationMutationKey = () => ['approveApplication'] as const;
+
+export const getApproveApplicationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveApplication>>, TError,ApproveApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveApplication>>, TError,ApproveApplicationMutationVariables, TContext> => {
+
+const mutationKey = getApproveApplicationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveApplication>>, ApproveApplicationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveApplication(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof approveApplication>>>
+    export type ApproveApplicationMutationBody = BodyType<AwardDecision>
+    export type ApproveApplicationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type ApproveApplicationMutationVariables = {id: string;data: BodyType<AwardDecision>}
+
+    /**
+ * @summary Approve with an award
+ */
+export const useApproveApplication = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveApplication>>, TError,ApproveApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveApplication>>,
+        TError,
+        ApproveApplicationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveApplicationMutationOptions(options));
+    }
+
+export const getRequestApplicationChangesUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/request-changes`
+}
+
+/**
+ * Requires applications.review. The message is shown to the applicant, who can edit and resubmit.
+ * @summary Request changes
+ */
+export const requestApplicationChanges = async (id: string,
+    changeRequest: ChangeRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getRequestApplicationChangesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(changeRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestApplicationChangesMutationKey = () => ['requestApplicationChanges'] as const;
+
+export const getRequestApplicationChangesMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestApplicationChanges>>, TError,RequestApplicationChangesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestApplicationChanges>>, TError,RequestApplicationChangesMutationVariables, TContext> => {
+
+const mutationKey = getRequestApplicationChangesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestApplicationChanges>>, RequestApplicationChangesMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestApplicationChanges(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestApplicationChangesMutationResult = NonNullable<Awaited<ReturnType<typeof requestApplicationChanges>>>
+    export type RequestApplicationChangesMutationBody = BodyType<ChangeRequest>
+    export type RequestApplicationChangesMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type RequestApplicationChangesMutationVariables = {id: string;data: BodyType<ChangeRequest>}
+
+    /**
+ * @summary Request changes
+ */
+export const useRequestApplicationChanges = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestApplicationChanges>>, TError,RequestApplicationChangesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestApplicationChanges>>,
+        TError,
+        RequestApplicationChangesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestApplicationChangesMutationOptions(options));
+    }
+
+export const getDeclineApplicationUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/decline`
+}
+
+/**
+ * Requires applications.review. The reason is shown to the applicant.
+ * @summary Decline
+ */
+export const declineApplication = async (id: string,
+    declineDecision: DeclineDecision, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getDeclineApplicationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(declineDecision)
+  }
+);}
+
+
+
+
+
+export const getDeclineApplicationMutationKey = () => ['declineApplication'] as const;
+
+export const getDeclineApplicationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineApplication>>, TError,DeclineApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof declineApplication>>, TError,DeclineApplicationMutationVariables, TContext> => {
+
+const mutationKey = getDeclineApplicationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof declineApplication>>, DeclineApplicationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  declineApplication(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeclineApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof declineApplication>>>
+    export type DeclineApplicationMutationBody = BodyType<DeclineDecision>
+    export type DeclineApplicationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type DeclineApplicationMutationVariables = {id: string;data: BodyType<DeclineDecision>}
+
+    /**
+ * @summary Decline
+ */
+export const useDeclineApplication = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineApplication>>, TError,DeclineApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof declineApplication>>,
+        TError,
+        DeclineApplicationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeclineApplicationMutationOptions(options));
+    }
+
+export const getAddInternalNoteUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/notes`
+}
+
+/**
+ * Requires notes.add. Staff-only; doesn't change the record version.
+ * @summary Add an internal note
+ */
+export const addInternalNote = async (id: string,
+    internalNoteInput: InternalNoteInput, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getAddInternalNoteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(internalNoteInput)
+  }
+);}
+
+
+
+
+
+export const getAddInternalNoteMutationKey = () => ['addInternalNote'] as const;
+
+export const getAddInternalNoteMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addInternalNote>>, TError,AddInternalNoteMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addInternalNote>>, TError,AddInternalNoteMutationVariables, TContext> => {
+
+const mutationKey = getAddInternalNoteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addInternalNote>>, AddInternalNoteMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addInternalNote(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddInternalNoteMutationResult = NonNullable<Awaited<ReturnType<typeof addInternalNote>>>
+    export type AddInternalNoteMutationBody = BodyType<InternalNoteInput>
+    export type AddInternalNoteMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type AddInternalNoteMutationVariables = {id: string;data: BodyType<InternalNoteInput>}
+
+    /**
+ * @summary Add an internal note
+ */
+export const useAddInternalNote = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addInternalNote>>, TError,AddInternalNoteMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addInternalNote>>,
+        TError,
+        AddInternalNoteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddInternalNoteMutationOptions(options));
+    }
+
+export const getEscalateApplicationUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/escalate`
+}
+
+/**
+ * Requires applications.escalate. Staff-only; blocks approval until cleared.
+ * @summary Escalate to security
+ */
+export const escalateApplication = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getEscalateApplicationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getEscalateApplicationMutationKey = () => ['escalateApplication'] as const;
+
+export const getEscalateApplicationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof escalateApplication>>, TError,EscalateApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof escalateApplication>>, TError,EscalateApplicationMutationVariables, TContext> => {
+
+const mutationKey = getEscalateApplicationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof escalateApplication>>, EscalateApplicationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  escalateApplication(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EscalateApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof escalateApplication>>>
+    export type EscalateApplicationMutationBody = BodyType<Reason>
+    export type EscalateApplicationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type EscalateApplicationMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Escalate to security
+ */
+export const useEscalateApplication = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof escalateApplication>>, TError,EscalateApplicationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof escalateApplication>>,
+        TError,
+        EscalateApplicationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEscalateApplicationMutationOptions(options));
+    }
+
+export const getClearEscalationUrl = (id: string,) => {
+
+
+
+
+  return `/api/applications/${id}/clear-escalation`
+}
+
+/**
+ * Requires applications.clearEscalation.
+ * @summary Clear an escalation
+ */
+export const clearEscalation = async (id: string,
+    escalationResolution: EscalationResolution, options?: Parameters<typeof customFetch>[1]): Promise<ApplicationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicationResult>(getClearEscalationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(escalationResolution)
+  }
+);}
+
+
+
+
+
+export const getClearEscalationMutationKey = () => ['clearEscalation'] as const;
+
+export const getClearEscalationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearEscalation>>, TError,ClearEscalationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearEscalation>>, TError,ClearEscalationMutationVariables, TContext> => {
+
+const mutationKey = getClearEscalationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearEscalation>>, ClearEscalationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  clearEscalation(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearEscalationMutationResult = NonNullable<Awaited<ReturnType<typeof clearEscalation>>>
+    export type ClearEscalationMutationBody = BodyType<EscalationResolution>
+    export type ClearEscalationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type ClearEscalationMutationVariables = {id: string;data: BodyType<EscalationResolution>}
+
+    /**
+ * @summary Clear an escalation
+ */
+export const useClearEscalation = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearEscalation>>, TError,ClearEscalationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearEscalation>>,
+        TError,
+        ClearEscalationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getClearEscalationMutationOptions(options));
     }
 

@@ -1,0 +1,148 @@
+import { Router, type IRouter, type Response } from "express";
+import {
+  AddInternalNoteBody, ApproveApplicationBody, ClearEscalationBody, DeclineApplicationBody, EscalateApplicationBody,
+  RequestApplicationChangesBody, SaveApplicationDraftBody, StartReviewBody, StartReviewParams as ApplicationIdParams, SubmitApplicationBody,
+} from "@workspace/api-zod";
+import type { Permission } from "@workspace/authz";
+import type { Application, ApplicationInput, DemoState, Result } from "@workspace/domain/model";
+import { addInternalNote, approveApplication, clearEscalation, declineApplication, escalateApplication, requestChanges, startReview } from "@workspace/domain/review";
+import { deleteDraft, saveDraft, submitApplication } from "@workspace/domain/rules";
+import { applicantState, applicantView, readApplicantSlot, serverState } from "@workspace/domain/server";
+import type { ApplicationRepo, ProgramScope } from "../lib/applicationRepo";
+import { slotApplicant } from "../lib/applicantRules";
+import { logger } from "../lib/logger";
+import type { ProfileRepo } from "../lib/profileRepo";
+import { authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { ownProfile } from "./profile";
+
+// Grant applications. Applicants act on their own records only (ownership comes
+// from the sign-in token, via the rules' current-applicant slot); staff review
+// with per-role permissions and never on their own applications. Every change
+// runs the shared rules inside the program's lock (see ../lib/applicationRepo.ts)
+// and stores exactly the applications the rule changed.
+//
+// Not on the server yet: the applicant notifications and staff activity items
+// the rules create (slice 4), the award credit to the grant balance and the
+// application fee (slice 5).
+
+const STALE = "This application changed since you opened it. Review the latest version and try again.";
+
+type Failure = { status: 400 | 403 | 404 | 409; body: { error: string; fieldErrors?: Record<string, string> } };
+type Outcome = { failure: Failure } | { message: string; saved?: Application };
+const refused = (result: Result & { ok: false }): Failure => ({ status: 400, body: { error: result.error, ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}) } });
+
+/** Stores every application the rule added, changed, or removed. */
+async function storeChanges(scope: ProgramScope, before: Application[], after: Application[]) {
+  const previous = new Map(before.map(a => [a.id, JSON.stringify(a)]));
+  for (const app of after) if (previous.get(app.id) !== JSON.stringify(app)) await scope.saveApplication(app);
+  for (const app of before) if (!after.some(a => a.id === app.id)) await scope.removeApplication(app.id);
+}
+
+export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo): IRouter {
+  const router: IRouter = Router();
+
+  // ---------- Applicant ----------
+
+  router.get("/applications/mine", async (_req, res) => {
+    res.json((await apps.listForApplicant(authLocals(res).user.id)).map(applicantView));
+  });
+
+  /** Runs an applicant rule on their own records in one program, and returns their saved application. */
+  async function asApplicant(res: Response, grantId: string, needsId: boolean, command: (state: DemoState) => Result) {
+    const record = await ownProfile(profiles, authLocals(res).user);
+    const nextId = needsId ? await apps.nextNumber() : 0;
+    const outcome = await apps.withProgram(grantId, async (scope): Promise<Outcome> => {
+      const state = applicantState({ grants: scope.grants, applications: scope.applications, nextId }, slotApplicant(record));
+      const result = command(state);
+      if (!result.ok) return { failure: refused(result) };
+      const after = readApplicantSlot(result.state, record.authUserId).applications;
+      await storeChanges(scope, scope.applications, after);
+      return { message: result.message, saved: after.find(a => a.id === result.id) };
+    });
+    if ("failure" in outcome) { res.status(outcome.failure.status).json(outcome.failure.body); return; }
+    if (outcome.saved) res.json({ application: applicantView(outcome.saved), message: outcome.message });
+    else res.json({ message: outcome.message });
+  }
+
+  for (const [path, rule] of [["save", saveDraft], ["submit", submitApplication]] as const) {
+    router.post(`/applications/${path}`, async (req, res) => {
+      const body = (path === "save" ? SaveApplicationDraftBody : SubmitApplicationBody).safeParse(req.body);
+      if (!body.success) { res.status(400).json({ error: "Send the program id and your application." }); return; }
+      const { grantId, draftId, application } = body.data;
+      await asApplicant(res, grantId, !draftId, s => rule(s, grantId, application as ApplicationInput, new Date(), draftId));
+    });
+  }
+
+  router.post("/applications/:id/delete", async (req, res) => {
+    const params = ApplicationIdParams.safeParse(req.params);
+    const app = params.success ? await apps.get(params.data.id) : null;
+    // Someone else's application reads as not found, never as forbidden.
+    if (!app || app.applicantId !== authLocals(res).user.id) { res.status(404).json({ error: "That draft could not be found." }); return; }
+    await asApplicant(res, app.grantId, false, s => deleteDraft(s, app.id));
+  });
+
+  // ---------- Staff ----------
+
+  router.get("/applications", requireStaff, async (_req, res) => {
+    res.json(await apps.listSubmitted());
+  });
+
+  type Parsed = { ok: true; version?: string; command: (state: DemoState, by: string) => Result } | { ok: false; error: string };
+
+  const staffAction = (path: string, permission: Permission, parse: (body: unknown, id: string) => Parsed) =>
+    router.post(`/applications/:id/${path}`, requireStaff, requirePermission(permission), async (req, res) => {
+      const params = ApplicationIdParams.safeParse(req.params);
+      const found = params.success ? await apps.get(params.data.id) : null;
+      if (!found || found.status === "Draft") { res.status(404).json({ error: "That application is not in the review queue." }); return; }
+      // Conflict of interest: nobody reviews, notes, or escalates their own application.
+      if (found.applicantId === authLocals(res).user.id) { res.status(403).json({ error: "You can't act on your own application. Ask another team member." }); return; }
+      const parsed = parse(req.body, found.id);
+      if (!parsed.ok) { res.status(400).json({ error: parsed.error }); return; }
+      const actor = authLocals(res).staff!;
+      const outcome = await apps.withProgram(found.grantId, async (scope): Promise<Outcome> => {
+        const current = scope.applications.find(a => a.id === found.id);
+        if (!current) return { failure: { status: 404, body: { error: "That application is not in the review queue." } } };
+        if (parsed.version !== undefined && current.updatedAt !== parsed.version) return { failure: { status: 409, body: { error: STALE } } };
+        const result = parsed.command(serverState({ grants: scope.grants, applications: scope.applications }), actor.name);
+        if (!result.ok) return { failure: refused(result) };
+        await storeChanges(scope, scope.applications, result.state.applications);
+        return { message: result.message, saved: result.state.applications.find(a => a.id === found.id)! };
+      });
+      if ("failure" in outcome) { res.status(outcome.failure.status).json(outcome.failure.body); return; }
+      logger.info({ actor: actor.id, application: found.id, action: path }, "application reviewed");
+      res.json({ application: outcome.saved!, message: outcome.message });
+    });
+
+  const invalid = (error: string): Parsed => ({ ok: false, error });
+
+  staffAction("start-review", "applications.review", (body, id) => {
+    const b = StartReviewBody.safeParse(body);
+    return b.success ? { ok: true, version: b.data.version, command: (s, by) => startReview(s, id, b.data.version, by, new Date()) } : invalid("Send the application's version.");
+  });
+  staffAction("approve", "applications.review", (body, id) => {
+    const b = ApproveApplicationBody.safeParse(body);
+    return b.success ? { ok: true, version: b.data.version, command: (s, by) => approveApplication(s, id, b.data.version, b.data.award, by, new Date()) } : invalid("Send the application's version and the award amount.");
+  });
+  staffAction("request-changes", "applications.review", (body, id) => {
+    const b = RequestApplicationChangesBody.safeParse(body);
+    return b.success ? { ok: true, version: b.data.version, command: (s, by) => requestChanges(s, id, b.data.version, b.data.message, by, new Date()) } : invalid("Send the application's version and a message.");
+  });
+  staffAction("decline", "applications.review", (body, id) => {
+    const b = DeclineApplicationBody.safeParse(body);
+    return b.success ? { ok: true, version: b.data.version, command: (s, by) => declineApplication(s, id, b.data.version, b.data.reason, by, new Date()) } : invalid("Send the application's version and a reason.");
+  });
+  staffAction("notes", "notes.add", (body, id) => {
+    const b = AddInternalNoteBody.safeParse(body);
+    return b.success ? { ok: true, command: (s, by) => addInternalNote(s, id, b.data.text, by, new Date()) } : invalid("Write a note.");
+  });
+  staffAction("escalate", "applications.escalate", (body, id) => {
+    const b = EscalateApplicationBody.safeParse(body);
+    return b.success ? { ok: true, command: (s, by) => escalateApplication(s, id, b.data.reason, by, new Date()) } : invalid("Explain what compliance should check.");
+  });
+  staffAction("clear-escalation", "applications.clearEscalation", (body, id) => {
+    const b = ClearEscalationBody.safeParse(body);
+    return b.success ? { ok: true, command: (s, by) => clearEscalation(s, id, b.data.resolution, by, new Date()) } : invalid("Record what the check found.");
+  });
+
+  return router;
+}

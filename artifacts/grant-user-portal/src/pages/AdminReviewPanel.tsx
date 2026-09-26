@@ -8,20 +8,26 @@ import {
 } from '@workspace/domain/review';
 import { findApplicant } from '@workspace/domain/applicants';
 import { assessRisk } from '@workspace/domain/risk';
+import * as api from '@workspace/api-client-react';
+import { adoptServerApplication } from '@workspace/domain/sync';
+import { apiError, useServerData } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
-import type { Result } from '@workspace/domain/model';
+import type { Application, Result } from '@workspace/domain/model';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 import { RiskBadge } from './AdminRisk';
 import './AdminReviewPanel.css';
 
 type Decision = 'approve' | 'changes' | 'decline';
+type Outcome = { ok: true; message: string; version?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 const usd = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
 const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: () => void }) {
-  const { state } = useDemoStore();
+  const { state, run } = useDemoStore();
+  const { connected, refreshApplications } = useServerData();
+  const [busy, setBusy] = useState(false);
   const command = useStaffCommand();
   const can = useCan();
   const app = state.applications.find(a => a.id === appId);
@@ -56,13 +62,31 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   }
 
   const stale = app.updatedAt !== seenVersion;
-  const after = (result: Result, clear?: () => void) => {
+  const after = (result: Outcome, clear?: () => void) => {
     setConfirming(false);
     if (!result.ok) { setErrors(result.fieldErrors ?? {}); setFlash({ tone: 'error', text: result.error }); return; }
     setErrors({}); clear?.();
     setFlash({ tone: 'ok', text: result.message });
-    const updated = result.state.applications.find(a => a.id === appId);
-    if (updated) setSeenVersion(updated.updatedAt);
+    if (result.version) setSeenVersion(result.version);
+  };
+  // Without sign-in the rule runs on this browser's store (role-checked and audited there);
+  // signed in, the API runs it under the program's lock and the store takes the saved application.
+  const act = async (local: () => Result, remote: () => Promise<api.ApplicationResult>, clear?: () => void) => {
+    if (!connected) {
+      const result = local();
+      after(result.ok ? { ok: true, message: result.message, version: result.state.applications.find(a => a.id === appId)?.updatedAt } : result, clear);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await remote();
+      run(s => adoptServerApplication(s, res.application as Application));
+      after({ ok: true, message: res.message, version: res.application.updatedAt }, clear);
+    } catch (err) {
+      const failure = apiError(err, "Couldn't reach the server. Nothing was changed; try again.");
+      if (failure.status === 409 || failure.status === 404) void refreshApplications();
+      after({ ok: false, error: failure.error, fieldErrors: failure.fieldErrors });
+    } finally { setBusy(false); }
   };
   const now = () => new Date();
   const awardValue = award.trim() === '' ? NaN : Number(award);
@@ -74,13 +98,13 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     if (decision === 'approve') {
       if (awardError) { setErrors({ award: awardError }); return; }
       if (!confirming) { setConfirming(true); return; }
-      after(review('Approve application', (s, actor) => approveApplication(s, app.id, seenVersion, awardValue, actor.name, now())));
+      void act(() => review('Approve application', (s, actor) => approveApplication(s, app.id, seenVersion, awardValue, actor.name, now())), () => api.approveApplication(app.id, { version: seenVersion, award: awardValue }));
     } else if (decision === 'decline') {
       if (message.trim().length < MIN_MESSAGE_LENGTH) { setErrors({ reason: `Write at least ${MIN_MESSAGE_LENGTH} characters; the applicant sees this reason.` }); return; }
       if (!confirming) { setConfirming(true); return; }
-      after(review('Decline application', (s, actor) => declineApplication(s, app.id, seenVersion, message, actor.name, now())), () => setMessage(''));
+      void act(() => review('Decline application', (s, actor) => declineApplication(s, app.id, seenVersion, message, actor.name, now())), () => api.declineApplication(app.id, { version: seenVersion, reason: message }), () => setMessage(''));
     } else {
-      after(review('Request changes', (s, actor) => requestChanges(s, app.id, seenVersion, message, actor.name, now())), () => setMessage(''));
+      void act(() => review('Request changes', (s, actor) => requestChanges(s, app.id, seenVersion, message, actor.name, now())), () => api.requestApplicationChanges(app.id, { version: seenVersion, message }), () => setMessage(''));
     }
   };
   const canReview = can('applications.review');
@@ -91,8 +115,8 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   const canEscalate = can('applications.escalate') && ['Submitted', 'Under review', 'Changes requested'].includes(app.status) && !escalationOpen;
   const canClear = can('applications.clearEscalation') && escalationOpen;
   const submitEscalation = () => {
-    if (escalationOpen) after(command('applications.clearEscalation', { action: 'Clear escalation', target: app.id }, (s, actor) => clearEscalation(s, app.id, escalationText, actor.name, now())), () => setEscalationText(''));
-    else after(command('applications.escalate', { action: 'Escalate to security', target: app.id }, (s, actor) => escalateApplication(s, app.id, escalationText, actor.name, now())), () => setEscalationText(''));
+    if (escalationOpen) void act(() => command('applications.clearEscalation', { action: 'Clear escalation', target: app.id }, (s, actor) => clearEscalation(s, app.id, escalationText, actor.name, now())), () => api.clearEscalation(app.id, { resolution: escalationText }), () => setEscalationText(''));
+    else void act(() => command('applications.escalate', { action: 'Escalate to security', target: app.id }, (s, actor) => escalateApplication(s, app.id, escalationText, actor.name, now())), () => api.escalateApplication(app.id, { reason: escalationText }), () => setEscalationText(''));
   };
   const decisionLabel = decision === 'approve'
     ? (confirming ? `Confirm: approve ${Number.isFinite(awardValue) ? usd(awardValue) : ''}` : 'Approve')
@@ -125,14 +149,14 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
       <h3>Decision</h3>
       <RoleNotice permission="applications.review" />
       {escalationOpen && app.status === 'Under review' && <p className="admin-review-hint admin-role-notice"><ShieldAlert size={11} /> Escalated to security: approval is blocked until compliance clears it. You can still request changes or decline.</p>}
-      {app.status === 'Submitted' && <><p className="admin-review-hint">Start the review to assign it to yourself and unlock decisions. The applicant will see it is under review.</p><button type="button" className="admin-btn primary" disabled={stale || !canReview} onClick={() => after(review('Start review', (s, actor) => startReview(s, app.id, seenVersion, actor.name, now())))} data-testid="button-admin-start-review">Start review</button></>}
+      {app.status === 'Submitted' && <><p className="admin-review-hint">Start the review to assign it to yourself and unlock decisions. The applicant will see it is under review.</p><button type="button" className="admin-btn primary" disabled={stale || !canReview || busy} onClick={() => void act(() => review('Start review', (s, actor) => startReview(s, app.id, seenVersion, actor.name, now())), () => api.startReview(app.id, { version: seenVersion }))} data-testid="button-admin-start-review">Start review</button></>}
       {app.status === 'Under review' && <>
         <div className="admin-segment" role="tablist" aria-label="Decision type">{([['approve', 'Approve'], ['changes', 'Request changes'], ['decline', 'Decline']] as const).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={decision === key} className={decision === key ? 'active' : ''} onClick={() => pickDecision(key)} data-testid={`tab-admin-decision-${key}`}>{label}</button>)}</div>
         {decision === 'approve' ? <label className="admin-review-field"><span>Award amount (USD)</span><input className="admin-input" type="number" inputMode="decimal" step="0.01" min="0" value={award} onChange={e => { setAward(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors.award} data-testid="input-admin-award" /><small className={errors.award ? 'admin-field-error' : ''}>{errors.award ?? `Up to ${usd(Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))}. Approval credits the applicant's grant balance immediately.`}</small></label>
           : <label className="admin-review-field"><span>{decision === 'decline' ? 'Reason for declining (sent to applicant)' : 'What should the applicant change? (sent to applicant)'}</span><textarea className="admin-input" rows={4} value={message} onChange={e => { setMessage(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors[messageKey]} data-testid="textarea-admin-decision-message" /><small className={errors[messageKey] ? 'admin-field-error' : ''}>{errors[messageKey] ?? `At least ${MIN_MESSAGE_LENGTH} characters.`}</small></label>}
         <div className="admin-review-buttons">
           {confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-decision">Cancel</button>}
-          <button type="button" className={`admin-btn ${decision === 'decline' ? 'danger' : 'primary'}`} disabled={stale || !canReview || (decision === 'approve' && escalationOpen)} onClick={submitDecision} data-testid="button-admin-submit-decision">{decisionLabel}</button>
+          <button type="button" className={`admin-btn ${decision === 'decline' ? 'danger' : 'primary'}`} disabled={stale || !canReview || busy || (decision === 'approve' && escalationOpen)} onClick={submitDecision} data-testid="button-admin-submit-decision">{decisionLabel}</button>
         </div>
         {confirming && <p className="admin-review-hint">Decisions are final and visible to the applicant.</p>}
       </>}
@@ -144,7 +168,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
       {escalation ? <div className={`admin-escalation ${escalation.status === 'Open' ? 'open' : ''}`}><strong>{escalation.status === 'Open' ? 'Open' : 'Cleared'}</strong><span>Escalated by {escalation.by} · {when(escalation.at)}</span><p>{escalation.reason}</p>{escalation.status === 'Cleared' && <><span>Cleared by {escalation.clearedBy} · {when(escalation.clearedAt!)}</span><p>{escalation.resolution}</p></>}</div>
         : <p className="admin-review-hint">Send this application to compliance for a fraud or identity check. The applicant isn't told, and approval is blocked until it's cleared.</p>}
       {(canEscalate || canClear) && <><label className="admin-review-field"><span>{escalationOpen ? 'What did the check find? (staff only)' : 'What should compliance check? (staff only)'}</span><textarea className="admin-input" rows={2} value={escalationText} onChange={e => { setEscalationText(e.target.value); setErrors(({ escalation: _, resolution: __, ...rest }) => rest); }} aria-invalid={!!(errors.escalation ?? errors.resolution)} data-testid="textarea-admin-escalation" /><small className={errors.escalation ?? errors.resolution ? 'admin-field-error' : ''}>{errors.escalation ?? errors.resolution ?? `At least ${MIN_MESSAGE_LENGTH} characters.`}</small></label>
-        <div className="admin-review-buttons"><button type="button" className={`admin-btn ${escalationOpen ? 'primary' : 'danger'}`} onClick={submitEscalation} data-testid="button-admin-escalation">{escalationOpen ? 'Clear escalation' : 'Escalate to security'}</button></div></>}
+        <div className="admin-review-buttons"><button type="button" className={`admin-btn ${escalationOpen ? 'primary' : 'danger'}`} onClick={submitEscalation} disabled={busy} data-testid="button-admin-escalation">{escalationOpen ? 'Clear escalation' : 'Escalate to security'}</button></div></>}
       {escalationOpen && !canClear && <RoleNotice permission="applications.clearEscalation" />}
     </section>
 
@@ -153,10 +177,12 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     <section className="admin-review-section"><h3>Internal notes</h3><p className="admin-review-hint">Staff only. Never shown to the applicant.</p>
       {app.internalNotes.length ? <ul className="admin-review-notes">{app.internalNotes.map((n, i) => <li key={`${n.at}-${i}`}><span>{n.author} · {when(n.at)}</span><p>{n.text}</p></li>)}</ul> : null}
       <label className="admin-review-field"><span className="sr-only">New internal note</span><textarea className="admin-input" rows={3} maxLength={MAX_NOTE_LENGTH} value={note} onChange={e => { setNote(e.target.value); setErrors(({ note: _, ...rest }) => rest); }} placeholder="Add context for other reviewers…" aria-invalid={!!errors.note} data-testid="textarea-admin-note" />{errors.note && <small className="admin-field-error">{errors.note}</small>}</label>
-      <button type="button" className="admin-btn" disabled={!can('notes.add')} onClick={() => after(command('notes.add', { action: 'Add internal note', target: app.id }, (s, actor) => addInternalNote(s, app.id, note, actor.name, now())), () => setNote(''))} data-testid="button-admin-add-note">Add note</button>
+      <button type="button" className="admin-btn" disabled={!can('notes.add') || busy} onClick={() => void act(() => command('notes.add', { action: 'Add internal note', target: app.id }, (s, actor) => addInternalNote(s, app.id, note, actor.name, now())), () => api.addInternalNote(app.id, { text: note }), () => setNote(''))} data-testid="button-admin-add-note">Add note</button>
     </section>
 
-    <div className="admin-detail-note"><Info size={17} /><span>Demo review workflow. Decisions are saved in this browser only and update the applicant preview here. Actions are checked against the acting staff member's role and audited, but there is no real staff sign-in yet, so never use this with real applicant data.</span></div>
+    <div className="admin-detail-note"><Info size={17} /><span>{connected
+      ? 'Decisions are saved on the server, role-checked there, and shown to the applicant. Approved awards are credited to the applicant\'s demo balance until payments move to the server. The applicant isn\'t emailed or notified in the app yet.'
+      : 'Demo review workflow. Decisions are saved in this browser only and update the applicant preview here. Actions are checked against the acting staff member\'s role and audited, but there is no real staff sign-in yet, so never use this with real applicant data.'}</span></div>
   </ReviewFrame>;
 }
 

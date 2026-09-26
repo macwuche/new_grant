@@ -5,6 +5,150 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ApplicationStatus = typeof ApplicationStatus[keyof typeof ApplicationStatus];
+
+
+export const ApplicationStatus = {
+  Draft: 'Draft',
+  Submitted: 'Submitted',
+  Under_review: 'Under review',
+  Changes_requested: 'Changes requested',
+  Approved: 'Approved',
+  Declined: 'Declined',
+} as const;
+
+export type ApplicationInputAnswers = {[key: string]: string};
+
+export interface ApplicationInput {
+  /** @maxLength 200 */
+  businessName: string;
+  requestedAmount: number;
+  /** @maxLength 80 */
+  registrationNumber: string;
+  /** @maxLength 5000 */
+  purpose: string;
+  /**
+     * @maxItems 20
+     * @items.maxLength 200
+     */
+  checklist: string[];
+  answers: ApplicationInputAnswers;
+}
+
+export interface ApplicationSubmission {
+  /** @maxLength 40 */
+  grantId: string;
+  /**
+     * Your existing draft (or application with changes requested), if any
+     * @maxLength 40
+     */
+  draftId?: string;
+  application: ApplicationInput;
+}
+
+export type ApplicationEventActor = typeof ApplicationEventActor[keyof typeof ApplicationEventActor];
+
+
+export const ApplicationEventActor = {
+  Applicant: 'Applicant',
+  Reviewer: 'Reviewer',
+} as const;
+
+export interface ApplicationEvent {
+  status: ApplicationStatus;
+  at: string;
+  actor: ApplicationEventActor;
+  note: string;
+}
+
+export interface InternalNote {
+  at: string;
+  author: string;
+  text: string;
+}
+
+export type EscalationStatus = typeof EscalationStatus[keyof typeof EscalationStatus];
+
+
+export const EscalationStatus = {
+  Open: 'Open',
+  Cleared: 'Cleared',
+} as const;
+
+export interface Escalation {
+  at: string;
+  by: string;
+  reason: string;
+  status: EscalationStatus;
+  clearedAt?: string;
+  clearedBy?: string;
+  resolution?: string;
+}
+
+export type ApplicationAnswers = {[key: string]: string};
+
+export interface Application {
+  id: string;
+  applicantId: string;
+  grantId: string;
+  status: ApplicationStatus;
+  businessName: string;
+  requestedAmount: number;
+  registrationNumber: string;
+  purpose: string;
+  checklist: string[];
+  answers: ApplicationAnswers;
+  createdAt: string;
+  /** Record version; send it back with review decisions */
+  updatedAt: string;
+  submittedAt: string | null;
+  reviewer: string | null;
+  awardedAmount: number | null;
+  history: ApplicationEvent[];
+  internalNotes: InternalNote[];
+  escalation: Escalation | null;
+}
+
+export interface ApplicationResult {
+  application: Application;
+  message: string;
+}
+
+export interface ApplicationVersion {
+  /** @maxLength 40 */
+  version: string;
+}
+
+export interface AwardDecision {
+  /** @maxLength 40 */
+  version: string;
+  award: number;
+}
+
+export interface ChangeRequest {
+  /** @maxLength 40 */
+  version: string;
+  /** @maxLength 2000 */
+  message: string;
+}
+
+export interface DeclineDecision {
+  /** @maxLength 40 */
+  version: string;
+  /** @maxLength 2000 */
+  reason: string;
+}
+
+export interface InternalNoteInput {
+  /** @maxLength 2000 */
+  text: string;
+}
+
+export interface EscalationResolution {
+  /** @maxLength 2000 */
+  resolution: string;
+}
+
 export type ValidationErrorFieldErrors = {[key: string]: string};
 
 export interface ValidationError {

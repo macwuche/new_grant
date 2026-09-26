@@ -1,13 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { listApplicants, listPrograms, type ApplicantEntry } from '@workspace/api-client-react';
-import type { Grant, Tier } from '@workspace/domain/model';
-import { adoptServerApplicants, adoptServerPrograms, leaveServerApplicants, type ServerAccount, type ServerApplicant } from '@workspace/domain/sync';
+import { listApplicants, listApplications, listMyApplications, listPrograms, type ApplicantEntry } from '@workspace/api-client-react';
+import type { Application, Grant, Tier } from '@workspace/domain/model';
+import {
+  adoptServerApplicants, adoptServerApplications, adoptServerPrograms, leaveServerApplicants, leaveServerApplications,
+  type ServerAccount, type ServerApplicant,
+} from '@workspace/domain/sync';
 import { useSession } from './session';
 import { useDemoStore } from './store';
 
 // Records that already live on the server (phase 12). Once someone is signed in,
-// grant programs (and, for staff, the applicant directory) come from the API and
-// are loaded into the browser store, which every page reads. Without sign-in
+// grant programs and applications (an applicant's own, or the staff review
+// queue), plus the applicant directory for staff, come from the API and are
+// loaded into the browser store, which every page reads. Without sign-in
 // configured, the store's demo data is used.
 
 type ServerData = {
@@ -19,9 +23,16 @@ type ServerData = {
   /** Staff: set when the last directory load failed. */
   applicantsError: string | null;
   refreshApplicants: () => Promise<void>;
+  applicationsError: string | null;
+  refreshApplications: () => Promise<void>;
+  /** The signed-in account's id: applications with this applicant id are the viewer's own. */
+  ownId: string | undefined;
 };
 
-const Ctx = createContext<ServerData>({ connected: false, programsError: null, refreshPrograms: async () => {}, applicantsError: null, refreshApplicants: async () => {} });
+const Ctx = createContext<ServerData>({
+  connected: false, programsError: null, refreshPrograms: async () => {}, applicantsError: null, refreshApplicants: async () => {},
+  applicationsError: null, refreshApplications: async () => {}, ownId: undefined,
+});
 
 /** A directory entry from the API in the shape the store takes. */
 export const toServerApplicant = ({ id, profile }: ApplicantEntry): ServerApplicant => ({
@@ -44,6 +55,9 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   const [applicantsError, setApplicantsError] = useState<string | null>(null);
   const request = useRef(0);
   const directoryRequest = useRef(0);
+  const applicationsRequest = useRef(0);
+  const [applicationsError, setApplicationsError] = useState<string | null>(null);
+  const ownId = connected ? session.me?.user.id : undefined;
   const isStaff = connected && !!session.me?.staff?.active;
   // Staff see drafts and applicants don't, so reload whenever the signed-in person changes.
   const who = connected ? `${session.accountEmail}|${session.me?.staff?.id ?? ''}` : '';
@@ -74,7 +88,25 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
     }
   }, [isStaff, run]);
 
+  // Staff get the review queue; an applicant gets their own applications, moved into the portal's slot.
+  const refreshApplications = useCallback(async () => {
+    if (!connected || !session.me) return;
+    const id = ++applicationsRequest.current;
+    try {
+      const apps = (isStaff ? await listApplications() : await listMyApplications()) as Application[];
+      if (id !== applicationsRequest.current) return;
+      run(s => adoptServerApplications(s, apps, isStaff ? undefined : ownId));
+      setApplicationsError(null);
+    } catch (err) {
+      if (id === applicationsRequest.current) setApplicationsError(apiError(err, "Couldn't load applications. Showing the last copy.").error);
+    }
+  }, [connected, isStaff, ownId, run, session.me]);
+
   useEffect(() => { void refreshPrograms(); }, [refreshPrograms, who]);
+  useEffect(() => {
+    if (connected) void refreshApplications();
+    else if (session.status !== 'loading') run(leaveServerApplications);
+  }, [connected, refreshApplications, run, session.status, who]);
   useEffect(() => {
     // Real applicants are only for signed-in staff; anyone else goes back to the demo directory.
     if (isStaff) void refreshApplicants();
@@ -84,12 +116,12 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   // Pick up changes other staff made while this tab was in the background.
   useEffect(() => {
     if (!connected) return;
-    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); };
+    const onFocus = () => { void refreshPrograms(); void refreshApplicants(); void refreshApplications(); };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [connected, refreshPrograms, refreshApplicants]);
+  }, [connected, refreshPrograms, refreshApplicants, refreshApplications]);
 
-  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ connected, programsError, refreshPrograms, applicantsError, refreshApplicants, applicationsError, refreshApplications, ownId }}>{children}</Ctx.Provider>;
 }
 
 export const useServerData = () => useContext(Ctx);

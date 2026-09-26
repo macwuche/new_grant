@@ -6,6 +6,7 @@ import type { AuthUser, TokenVerifier } from "./lib/auth";
 import { seedGrants } from "@workspace/domain/seed";
 import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
 import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
+import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRepo";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
@@ -33,12 +34,14 @@ let base: string;
 let repo: StaffRepo;
 let programs: ProgramRepo;
 let profiles: ProfileRepo;
+let applications: ApplicationRepo;
 
 async function start(v: TokenVerifier | null = verifier) {
   repo = memoryStaffRepo(SEED);
   programs = memoryProgramRepo(seedGrants());
   profiles = memoryProfileRepo();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles }, ["https://app.example.org"]).listen(0);
+  applications = memoryApplicationRepo(programs);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -398,5 +401,137 @@ describe("account controls and identity checks", () => {
     const second = await profiles.saveAccount(MAYA, { tier: 3 }, record.updatedAt);
     expect(first).not.toBe("stale");
     expect(second).toBe("stale");
+  });
+});
+
+describe("applications and review", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const ALEX = USERS["tok-applicant"]!.id;
+  const creative = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const verify = async (token: string, id: string) => {
+    await call("/profile", token);
+    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Test Person" }, token);
+    await post(`/applicants/${id}/identity/approve`, {});
+  };
+  const submit = (body: unknown, token = "tok-maya") => post("/applications/submit", body, token);
+  const mine = async (token = "tok-maya") => json(await call("/applications/mine", token));
+  const queued = async (id: string) => (await json(await call("/applications", "tok-super"))).find((a: { id: string }) => a.id === id);
+  const decide = (id: string, path: string, body: Record<string, unknown>, token = "tok-super") => post(`/applications/${id}/${path}`, body, token);
+
+  it("requires a verified identity before applying", async () => {
+    await call("/profile", "tok-maya");
+    const res = await post("/applications/save", { grantId: "creative", application: creative }, "tok-maya");
+    expect(res.status).toBe(400);
+    expect((await json(res)).error).toMatch(/Identity verification/);
+  });
+
+  it("keeps drafts private to the applicant, and submits with validation", async () => {
+    await verify("tok-maya", MAYA);
+    const draft = await json(await post("/applications/save", { grantId: "creative", application: { ...creative, purpose: "short" } }, "tok-maya"));
+    expect(draft.application).toMatchObject({ id: "APP-5001", status: "Draft", applicantId: MAYA });
+    expect(await queued("APP-5001")).toBeUndefined();
+    const incomplete = await submit({ grantId: "creative", draftId: "APP-5001", application: { ...creative, purpose: "short" } });
+    expect(incomplete.status).toBe(400);
+    expect((await json(incomplete)).fieldErrors.purpose).toBeDefined();
+    const ok = await json(await submit({ grantId: "creative", draftId: "APP-5001", application: creative }));
+    expect(ok.application.status).toBe("Submitted");
+    expect((await queued("APP-5001")).status).toBe("Submitted");
+    const second = await submit({ grantId: "creative", application: creative });
+    expect((await json(second)).error).toMatch(/already have an application/);
+  });
+
+  it("never shows staff-only fields to the applicant", async () => {
+    await verify("tok-maya", MAYA);
+    const { application } = await json(await submit({ grantId: "creative", application: creative }));
+    await decide(application.id, "notes", { text: "Portfolio looks strong." });
+    await decide(application.id, "start-review", { version: application.updatedAt });
+    expect((await queued(application.id)).internalNotes).toHaveLength(1);
+    const own = (await mine()).find((a: { id: string }) => a.id === application.id);
+    expect(own).toMatchObject({ internalNotes: [], reviewer: null, escalation: null, status: "Under review" });
+    expect(await mine("tok-applicant")).toEqual([]);
+  });
+
+  it("runs the review loop with permissions and version checks", async () => {
+    await verify("tok-maya", MAYA);
+    const { application } = await json(await submit({ grantId: "creative", application: creative }));
+    expect((await decide(application.id, "start-review", { version: application.updatedAt }, "tok-finance")).status).toBe(403);
+    const started = await json(await decide(application.id, "start-review", { version: application.updatedAt }));
+    expect(started.application).toMatchObject({ status: "Under review", reviewer: "Sam Rivera" });
+    expect((await decide(application.id, "approve", { version: application.updatedAt, award: 4000 })).status).toBe(409);
+    let v = started.application.updatedAt;
+    expect((await decide(application.id, "request-changes", { version: v, message: "Too short" })).status).toBe(400);
+    expect((await decide(application.id, "request-changes", { version: v, message: "Please add a quote for the kiln." })).status).toBe(200);
+    const resubmitted = await json(await submit({ grantId: "creative", draftId: application.id, application: { ...creative, purpose: `${creative.purpose} Quote attached.` } }));
+    expect(resubmitted.application.status).toBe("Submitted");
+    v = (await json(await decide(application.id, "start-review", { version: resubmitted.application.updatedAt }))).application.updatedAt;
+    expect((await decide(application.id, "approve", { version: v, award: 4500 })).status).toBe(400);
+    const approved = await json(await decide(application.id, "approve", { version: v, award: 3500 }));
+    expect(approved.application).toMatchObject({ status: "Approved", awardedAmount: 3500 });
+    expect((await mine()).find((a: { id: string }) => a.id === application.id).history.at(-1).note).toMatch(/Approved for \$3,500/);
+  });
+
+  it("blocks approval while escalated, until compliance clears it", async () => {
+    await verify("tok-maya", MAYA);
+    const { application } = await json(await submit({ grantId: "creative", application: creative }));
+    const v = (await json(await decide(application.id, "start-review", { version: application.updatedAt }))).application.updatedAt;
+    expect((await decide(application.id, "escalate", { reason: "Reference email bounced." })).status).toBe(200);
+    expect((await json(await decide(application.id, "approve", { version: v, award: 1000 }))).error).toMatch(/escalated/);
+    expect((await decide(application.id, "clear-escalation", { resolution: "Reference confirmed by phone." })).status).toBe(200);
+    expect((await decide(application.id, "approve", { version: v, award: 1000 })).status).toBe(200);
+  });
+
+  it("locks criteria after the first submission and keeps the budget above awards", async () => {
+    await verify("tok-maya", MAYA);
+    const { application } = await json(await submit({ grantId: "creative", application: creative }));
+    const v = (await json(await decide(application.id, "start-review", { version: application.updatedAt }))).application.updatedAt;
+    await decide(application.id, "approve", { version: v, award: 4000 });
+    const grant = await program("creative");
+    const { id: _id, status: _status, updatedAt, changeLog: _log, ...input } = grant;
+    const tier = await json(await put("/programs/creative", { version: updatedAt, program: { ...input, minimumTier: 2 } }));
+    expect(tier.fieldErrors.minimumTier).toMatch(/Locked/);
+    const budget = await json(await put("/programs/creative", { version: updatedAt, program: { ...input, budget: 3000, maxFunding: 3000 } }));
+    expect(budget.fieldErrors).toMatchObject({ budget: expect.stringMatching(/already awarded/) });
+  });
+
+  it("never lets two approvals spend the same budget", async () => {
+    await verify("tok-maya", MAYA);
+    await verify("tok-applicant", ALEX);
+    const deadline = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const created = await json(await post("/programs", { name: "Tight Budget", summary: "A program with room for one award.", focus: "Testing", maxFunding: 6000, minimumRequest: 100, budget: 10000, deadline, minimumTier: 1, requirements: ["A plan"], requiresRegistration: false, questions: [] }));
+    await post(`/programs/${created.program.id}/publish`, { version: created.program.updatedAt });
+    const input = { ...creative, requestedAmount: 6000, checklist: ["A plan"] };
+    const a = (await json(await submit({ grantId: created.program.id, application: input }))).application;
+    const b = (await json(await submit({ grantId: created.program.id, application: input }, "tok-applicant"))).application;
+    const va = (await json(await decide(a.id, "start-review", { version: a.updatedAt }))).application.updatedAt;
+    const vb = (await json(await decide(b.id, "start-review", { version: b.updatedAt }))).application.updatedAt;
+    const results = await Promise.all([decide(a.id, "approve", { version: va, award: 6000 }), decide(b.id, "approve", { version: vb, award: 6000 })]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 400]);
+  });
+
+  it("refuses reviews of your own application", async () => {
+    await verify("tok-super", USERS["tok-super"]!.id).catch(() => {});
+    // A super admin can't approve their own identity check, so place their application directly.
+    await applications.withProgram("creative", async scope => scope.saveApplication({
+      id: "APP-9001", applicantId: USERS["tok-super"]!.id, grantId: "creative", status: "Submitted", ...creative,
+      createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z", submittedAt: "2026-09-01T00:00:00.000Z",
+      reviewer: null, awardedAmount: null, history: [], internalNotes: [], escalation: null,
+    }));
+    const res = await decide("APP-9001", "start-review", { version: "2026-09-01T00:00:00.000Z" });
+    expect(res.status).toBe(403);
+    expect((await decide("APP-9001", "notes", { text: "Looks fine to me." })).status).toBe(403);
+  });
+
+  it("lets only the owner delete a draft, and never a submitted application", async () => {
+    await verify("tok-maya", MAYA);
+    const draft = (await json(await post("/applications/save", { grantId: "creative", application: creative }, "tok-maya"))).application;
+    expect((await post(`/applications/${draft.id}/delete`, {}, "tok-applicant")).status).toBe(404);
+    expect((await post(`/applications/${draft.id}/delete`, {}, "tok-maya")).status).toBe(200);
+    expect(await mine()).toEqual([]);
+    const sent = (await json(await submit({ grantId: "creative", application: creative }))).application;
+    expect((await post(`/applications/${sent.id}/delete`, {}, "tok-maya")).status).toBe(400);
+  });
+
+  it("keeps the review queue to staff", async () => {
+    expect((await call("/applications", "tok-applicant")).status).toBe(403);
   });
 });

@@ -11,8 +11,11 @@ import {
 import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
-import { completeCredentialReset as completeServerReset, getProfile, submitIdentityCheck, updateProfile as saveServerProfile, type Profile as ApiProfile } from '@workspace/api-client-react';
-import { adoptServerProfile, type ServerAccount } from '@workspace/domain/sync';
+import {
+  completeCredentialReset as completeServerReset, deleteApplicationDraft, getProfile, saveApplicationDraft, submitApplication as submitServerApplication,
+  submitIdentityCheck, updateProfile as saveServerProfile, type ApplicationResult as ApiApplicationResult, type Message as ApiMessage, type Profile as ApiProfile,
+} from '@workspace/api-client-react';
+import { adoptServerApplication, adoptServerProfile, dropServerApplication, type ServerAccount } from '@workspace/domain/sync';
 import { ServerDataProvider, apiError, useServerData } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
@@ -101,7 +104,9 @@ function ShellLayout({ children }: { children: ReactNode }) {
       <div className="nav-label">Your workspace</div>
       <nav className="nav-list">{navItems.map(item => <Link key={item.href} href={item.href} className={`nav-link ${active(item.href) ? 'active' : ''}`} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}><span className="nav-icon"><Icon item={item.icon} /></span>{item.label}</Link>)}</nav>
       <div className="sidebar-bottom">
-        <div className="demo-note"><strong>Illustrative workspace</strong><span>Your changes are saved in this browser only. Nothing is sent for review, charged, or paid out.</span></div>
+        <div className="demo-note"><strong>{session.status === 'signedIn' ? 'Early access' : 'Illustrative workspace'}</strong><span>{session.status === 'signedIn'
+          ? 'Your profile and applications are saved to your account and reviewed by the grant team. Balances, cards, deposits, and payouts are still demo records in this browser; no money moves.'
+          : 'Your changes are saved in this browser only. Nothing is sent for review, charged, or paid out.'}</span></div>
         <div className="user-mini"><div className="avatar">{initials}</div><div className="user-mini-text"><div className="user-mini-name">{profile.name}</div><div className="user-mini-email">{profile.email}</div></div><MoreHorizontal size={16} color="#858990" /></div>
       </div>
     </aside>
@@ -257,11 +262,15 @@ function MissingRecord({ title, text }: { title: string; text: string }) {
 type FormState = { businessName: string; amount: string; registrationNumber: string; purpose: string; checklist: string[]; answers: Record<string, string> };
 const STEP_ONE_FIELDS = ['businessName', 'requestedAmount', 'registrationNumber', 'purpose'];
 
+type Outcome = { ok: true; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
 function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Application; onToast: Toast }) {
   const { state, run } = useDemoStore();
   const [, navigate] = useLocation();
   const now = new Date();
   const [draftId, setDraftId] = useState(draft?.id);
+  const { connected, ownId } = useServerData();
+  const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<ApplicationStep>(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -278,33 +287,51 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const setField = (key: Exclude<keyof FormState, 'checklist' | 'answers'>, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
   const toggleRequirement = (req: string) => { setForm(v => ({ ...v, checklist: v.checklist.includes(req) ? v.checklist.filter(r => r !== req) : [...v.checklist, req] })); setErrors(({ checklist: _, ...rest }) => rest); };
 
-  const persistDraft = (quiet = false) => {
+  // Signed in, the API runs the same rules and stores the application; the store takes the saved copy.
+  const remote = async (call: () => Promise<ApiApplicationResult | ApiMessage>, removedId?: string): Promise<Outcome> => {
+    setBusy(true);
+    try {
+      const res = await call();
+      if ('application' in res) run(s => adoptServerApplication(s, res.application as Application, ownId));
+      else if (removedId) run(s => dropServerApplication(s, removedId));
+      return { ok: true, message: res.message, id: 'application' in res ? res.application.id : undefined };
+    } catch (err) {
+      const failure = apiError(err, "Couldn't reach the server. Nothing was saved; try again.");
+      return { ok: false, error: failure.error, fieldErrors: failure.fieldErrors };
+    } finally { setBusy(false); }
+  };
+  const persistDraft = async (quiet = false) => {
     // Drafts may hold partial data, but never an invalid number.
-    const result = run(s => saveDraft(s, grant.id, { ...input, requestedAmount: Number.isFinite(input.requestedAmount) ? input.requestedAmount : 0 }, new Date(), draftId));
+    const draftInput = { ...input, requestedAmount: Number.isFinite(input.requestedAmount) ? input.requestedAmount : 0 };
+    const result: Outcome = connected
+      ? await remote(() => saveApplicationDraft({ grantId: grant.id, ...(draftId ? { draftId } : {}), application: draftInput }))
+      : run(s => saveDraft(s, grant.id, draftInput, new Date(), draftId));
     if (result.ok) { setDraftId(result.id); if (!quiet) onToast(result.message); }
     else onToast(result.error);
     return result.ok;
   };
-  const next = () => {
+  const next = async () => {
     const stepErrors = validateApplication(input, grant, step === 1 ? 1 : 2);
     if (step < 3) {
       const relevant = Object.fromEntries(Object.entries(stepErrors).filter(([k]) => step === 1 ? STEP_ONE_FIELDS.includes(k) : k === 'checklist' || k.startsWith('answers.')));
       if (Object.keys(relevant).length) { setErrors(relevant); return; }
-      if (persistDraft(true)) setStep((step + 1) as ApplicationStep);
+      if (await persistDraft(true)) setStep((step + 1) as ApplicationStep);
       return;
     }
-    const result = run(s => submitApplication(s, grant.id, input, new Date(), draftId));
+    const result: Outcome = connected
+      ? await remote(() => submitServerApplication({ grantId: grant.id, ...(draftId ? { draftId } : {}), application: input }))
+      : run(s => submitApplication(s, grant.id, input, new Date(), draftId));
     if (!result.ok) {
       onToast(result.error);
       if (result.fieldErrors) { setErrors(result.fieldErrors); setStep(Object.keys(result.fieldErrors).some(k => STEP_ONE_FIELDS.includes(k)) ? 1 : 2); }
       return;
     }
-    onToast(`${result.message} It is stored in this browser only — no reviewer receives it yet.`);
+    onToast(connected ? `${result.message} The grant team will review it.` : `${result.message} It is stored in this browser only — no reviewer receives it yet.`);
     navigate(`/applications/${result.id}`, { replace: true });
   };
-  const removeDraft = () => {
+  const removeDraft = async () => {
     if (!draftId) return;
-    const result = run(s => deleteDraft(s, draftId));
+    const result: Outcome = connected ? await remote(() => deleteApplicationDraft(draftId), draftId) : run(s => deleteDraft(s, draftId));
     onToast(result.ok ? result.message : result.error);
     if (result.ok) navigate('/applications');
   };
@@ -352,12 +379,12 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
     <div className="form-actions">
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="btn btn-ghost" onClick={() => step > 1 ? setStep((step - 1) as ApplicationStep) : navigate('/grants')} data-testid="button-application-back">{step > 1 ? <><ArrowLeft size={15} /> Back</> : 'Cancel'}</button>
-        <button className="btn btn-ghost" onClick={() => persistDraft()} data-testid="button-save-draft">{changeRequest ? 'Save changes' : 'Save draft'}</button>
+        <button className="btn btn-ghost" onClick={() => void persistDraft()} disabled={busy} data-testid="button-save-draft">{changeRequest ? 'Save changes' : 'Save draft'}</button>
         {draftId && !changeRequest && (confirmDelete
-          ? <button className="btn btn-ghost danger-text" onClick={removeDraft} data-testid="button-confirm-delete-draft">Confirm delete</button>
+          ? <button className="btn btn-ghost danger-text" onClick={() => void removeDraft()} disabled={busy} data-testid="button-confirm-delete-draft">Confirm delete</button>
           : <button className="btn btn-ghost" onClick={() => setConfirmDelete(true)} aria-label="Delete draft" data-testid="button-delete-draft"><Trash2 size={14} /></button>)}
       </div>
-      <button className="btn btn-primary" onClick={next} data-testid="button-application-next">{step === 3 ? (changeRequest ? 'Resubmit application' : 'Submit application') : 'Continue'} <ArrowRight size={15} /></button>
+      <button className="btn btn-primary" onClick={() => void next()} disabled={busy} data-testid="button-application-next">{step === 3 ? (changeRequest ? 'Resubmit application' : 'Submit application') : 'Continue'} <ArrowRight size={15} /></button>
     </div>
   </div>
   <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Before you begin</h2><p className="section-subtitle">Key details for this category.</p></div><FileCheck2 size={20} color="hsl(var(--lime-deep))" /></div><div className="timeline"><TimelineRow title={`${money(grant.minimumRequest)} – ${money(grant.maxFunding)}`} text="Allowed request range." done /><TimelineRow title={`Minimum Tier ${grant.minimumTier}`} text={tierOk ? `Your Tier ${state.profile.tier} account qualifies.` : `Your account is Tier ${state.profile.tier}, so it can't be submitted.`} done={tierOk} /><TimelineRow title={fmtDate(grant.deadline)} text={daysLeft >= 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to submit.` : 'Deadline has passed.'} current={daysLeft >= 0 && daysLeft <= 14} /></div></div><Link className="btn btn-ghost" href="/grants" data-testid="link-back-to-grants"><ArrowLeft size={15} /> Back to grant categories</Link></aside></div>;
