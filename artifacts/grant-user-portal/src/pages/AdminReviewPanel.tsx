@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Info, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
-import { findGrant } from '@/domain/rules';
+import { findGrant } from '@workspace/domain/rules';
 import {
   addInternalNote, applicantName, approveApplication, clearEscalation, declineApplication, escalateApplication, MAX_NOTE_LENGTH,
   MIN_MESSAGE_LENGTH, programBudget, requestChanges, startReview, validateAward,
-} from '@/domain/review';
-import { findApplicant } from '@/domain/applicants';
-import { assessRisk } from '@/domain/risk';
-import { useDemoStore } from '@/domain/store';
-import type { Result } from '@/domain/model';
+} from '@workspace/domain/review';
+import { findApplicant } from '@workspace/domain/applicants';
+import { assessRisk } from '@workspace/domain/risk';
+import { useDemoStore } from '@/lib/store';
+import type { Result } from '@workspace/domain/model';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 import { RiskBadge } from './AdminRisk';
 import './AdminReviewPanel.css';

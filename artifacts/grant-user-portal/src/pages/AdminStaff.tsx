@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Check, Lock, UserCog } from 'lucide-react';
-import type { Result, StaffMember, StaffRole } from '@/domain/model';
+import type { Result, StaffMember, StaffRole } from '@workspace/domain/model';
 import {
   actingStaff, asStaff, can, PERMISSION_LABELS, permissionError, ROLE_LABELS, ROLE_PERMISSIONS,
   setStaffActive, setStaffRole, switchStaff, type Permission, type StaffAction,
-} from '@/domain/staff';
-import { useDemoStore } from '@/domain/store';
+} from '@workspace/domain/staff';
+import { useDemoStore } from '@/lib/store';
 import { useSession } from '@/lib/session';
 import { createStaffMember, listStaff, updateStaffMember, type StaffMember as ApiStaffMember } from '@workspace/api-client-react';
 

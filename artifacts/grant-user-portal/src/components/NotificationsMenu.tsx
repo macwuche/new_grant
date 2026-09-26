@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { markAllNotificationsRead, markNotificationRead, ownNotifications, unreadCount } from '@/domain/notifications';
-import { useDemoStore } from '@/domain/store';
+import { markAllNotificationsRead, markNotificationRead, ownNotifications, unreadCount } from '@workspace/domain/notifications';
+import { useDemoStore } from '@/lib/store';
 
 /** Topbar bell: the applicant's review, payout, and program updates. */
 export function NotificationsMenu() {

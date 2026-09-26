@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Info, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { applicantName } from '@/domain/review';
-import { confirmDeposit, DEPOSIT_METHODS, depositQueue, MIN_REJECTION_REASON_LENGTH, pendingDepositTotal, rejectDeposit } from '@/domain/deposits';
-import { actingStaff } from '@/domain/staff';
-import { useDemoStore } from '@/domain/store';
+import { applicantName } from '@workspace/domain/review';
+import { confirmDeposit, DEPOSIT_METHODS, depositQueue, MIN_REJECTION_REASON_LENGTH, pendingDepositTotal, rejectDeposit } from '@workspace/domain/deposits';
+import { actingStaff } from '@workspace/domain/staff';
+import { useDemoStore } from '@/lib/store';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
-import type { Result, Transaction } from '@/domain/model';
+import type { Result, Transaction } from '@workspace/domain/model';
 import { ReviewFrame } from './AdminReviewPanel';
 
 const usd = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

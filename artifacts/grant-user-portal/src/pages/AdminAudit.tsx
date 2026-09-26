@@ -1,9 +1,9 @@
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, Lock, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { auditToCsv, auditToJson, filterAudit } from '@/domain/audit';
-import { can, ROLE_LABELS } from '@/domain/staff';
-import { useDemoStore } from '@/domain/store';
+import { auditToCsv, auditToJson, filterAudit } from '@workspace/domain/audit';
+import { can, ROLE_LABELS } from '@workspace/domain/staff';
+import { useDemoStore } from '@/lib/store';
 import { downloadText } from '@/lib/download';
 import { RoleNotice } from './AdminStaff';
 

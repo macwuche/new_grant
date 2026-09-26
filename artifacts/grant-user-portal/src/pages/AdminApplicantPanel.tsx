@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
-import type { Result, Tier } from '@/domain/model';
-import { findApplicant } from '@/domain/applicants';
+import type { Result, Tier } from '@workspace/domain/model';
+import { findApplicant } from '@workspace/domain/applicants';
 import {
   approveKyc, lockAccount, MIN_REASON_LENGTH, rejectKyc, requestReverification, requireCredentialReset, setApplicantTier, unlockAccount,
-} from '@/domain/accounts';
-import { computeBalances, findGrant } from '@/domain/rules';
-import { assessRisk, RISK_HIGH, RISK_MEDIUM } from '@/domain/risk';
-import { useDemoStore } from '@/domain/store';
+} from '@workspace/domain/accounts';
+import { computeBalances, findGrant } from '@workspace/domain/rules';
+import { assessRisk, RISK_HIGH, RISK_MEDIUM } from '@workspace/domain/risk';
+import { useDemoStore } from '@/lib/store';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RiskBadge } from './AdminRisk';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';

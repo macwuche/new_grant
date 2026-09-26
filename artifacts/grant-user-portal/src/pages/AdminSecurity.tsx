@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { ArrowRight, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import { applicantRecords } from '@/domain/applicants';
-import { MIN_REASON_LENGTH } from '@/domain/accounts';
-import { applicantName, openEscalations } from '@/domain/review';
-import { findGrant } from '@/domain/rules';
-import { assessRisk } from '@/domain/risk';
-import { endLockdown, startLockdown } from '@/domain/security';
-import { useDemoStore } from '@/domain/store';
-import type { Result } from '@/domain/model';
+import { applicantRecords } from '@workspace/domain/applicants';
+import { MIN_REASON_LENGTH } from '@workspace/domain/accounts';
+import { applicantName, openEscalations } from '@workspace/domain/review';
+import { findGrant } from '@workspace/domain/rules';
+import { assessRisk } from '@workspace/domain/risk';
+import { endLockdown, startLockdown } from '@workspace/domain/security';
+import { useDemoStore } from '@/lib/store';
+import type { Result } from '@workspace/domain/model';
 import { RiskBadge } from './AdminRisk';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 

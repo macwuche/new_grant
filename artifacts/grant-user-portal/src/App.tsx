@@ -12,22 +12,22 @@ import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpP
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
 import { SessionProvider, useSession } from './lib/session';
-import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from './domain/model';
-import { CURRENT_APPLICANT_ID } from './domain/seed';
-import { accountLockReason, accountOf } from './domain/applicants';
-import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from './domain/accounts';
-import { lockdownMessage } from './domain/security';
+import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from '@workspace/domain/model';
+import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
+import { accountLockReason, accountOf } from '@workspace/domain/applicants';
+import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
+import { lockdownMessage } from '@workspace/domain/security';
 import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
   saveDraft, setTwoFactor, submitApplication, updateProfile, validateApplication, type ApplicationStep, type ProfileInput,
-} from './domain/rules';
-import { DemoStoreProvider, useDemoStore } from './domain/store';
+} from '@workspace/domain/rules';
+import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
   cancelWithdrawal, channelFee, DESTINATION_FIELDS, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
   requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateWithdrawal, type DestinationInput,
-} from './domain/money';
-import { cancelDeposit, DEPOSIT_METHODS, requestDeposit } from './domain/deposits';
+} from '@workspace/domain/money';
+import { cancelDeposit, DEPOSIT_METHODS, requestDeposit } from '@workspace/domain/deposits';
 import { NotificationsMenu } from './components/NotificationsMenu';
 
 type Toast = (message: string) => void;

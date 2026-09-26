@@ -10,6 +10,9 @@
       "path": "./lib/authz"
     },
     {
+      "path": "./lib/domain"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

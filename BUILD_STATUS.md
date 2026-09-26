@@ -4,7 +4,7 @@ Short phase checklist. `work.md` is the detailed source of truth; keep the two c
 
 ## Current direction
 
-Build the application logic first, client-side, against browser-local demo data. The database, API, and authentication come later (decision of 25 Sep 2026). Business rules live as pure functions in `artifacts/grant-user-portal/src/domain/` so they can move to the server unchanged.
+Build the application logic first, client-side, against browser-local demo data. The database, API, and authentication come later (decision of 25 Sep 2026). Business rules live as pure functions in `lib/domain/src/` so they can move to the server unchanged.
 
 ## Build plan
 
@@ -27,14 +27,16 @@ Build the application logic first, client-side, against browser-local demo data.
 10. **Spec gaps, browser-only — Complete** (26 Sep 2026)
    - Staff roles (super admin, reviewer, finance, compliance, support) with per-action permission checks via a demo "acting as" switcher; append-only audit log with field-level changes, filters, and CSV/JSON export; automated fraud risk score (0–100) with explained factors and staff alerts; identity checks (applicant submits, compliance approves/rejects/asks again); applicant tier changes, account lock, forced password/2FA resets; escalation of applications to security (blocks approval); two-person sign-off on payouts at or above a threshold; emergency system lockdown; custom questions per program; application processing fee; saved payout destinations; card daily limits and PIN reveal; transaction tabs, date filter, and receipts; spec overview metrics.
 11. **Authentication and staff authorization — In progress** (Supabase Auth, chosen 26 Sep 2026; plan in `work.md` §6)
-   - Needs from the team: a Supabase project, its URL and anon key as secrets, and the app's URLs in Supabase Auth settings.
+   - Supabase project connected (26 Sep 2026, EU region): URL and publishable key are shared env vars in `.replit`; the app tables (`staff_members`, row-level security on) live in Supabase's Postgres via the `SUPABASE_DATABASE_URL` secret (transaction pooler, Supabase root CA pinned). First super admin: `INITIAL_SUPER_ADMIN_EMAIL`.
+   - Still needed from the team: the `SUPABASE_DATABASE_URL` Replit Secret, and the app's URLs in Supabase → Authentication → URL configuration.
    - Done: (a) shared role/permission list (`lib/authz`); (b) `staff_members` table in the existing Postgres; (c) API token check, `GET /api/me`, and staff endpoints, with 16 API tests.
    - Done (26 Sep 2026): (e) staff login page `/admin/login` with password reset (`/admin/reset-password`) and sign-out; `/admin` requires a signed-in, active staff member once the Supabase keys are set, and the signed-in person replaces the "acting as" switcher. Until the keys are set, the login page says sign-in isn't set up and the admin stays in demo mode.
    - Done (26 Sep 2026): (d) real applicant sign-up (with email confirmation), sign-in, forgot/reset password, and sign-out; applicant pages require a session once the keys are set, demo mode otherwise.
-   - Waiting on Supabase keys: (f) a live check of both sign-ins against a real Supabase project (both were tested against a local stand-in; real confirmation and reset emails haven't been seen yet).
+   - (f) Live check: partly done. The API against the real project and database answers health, rejects missing and forged tokens, and created the first super admin; Supabase rejects wrong passwords. A browser run of sign-up → confirmation email → sign-in → admin access is still to do once the secret and URLs are set.
    - Business data (applications, money) stays browser-local until phase 12, so this phase protects who can open screens and call the API, not the demo records themselves.
-12. **Database and API — Not started**
-   - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
+12. **Database and API — In progress** (started 26 Sep 2026)
+   - Plan, in slices: (1) shared rules package; (2) grant programs and applicant profiles; (3) applications and review; (4) notifications, staff feed, audit log; (5) money (ledger, deposits, payouts, settings), still without a payment provider. Each slice: tables with row-level security, OpenAPI contract, API with permission tests, portal switched over.
+   - Done (26 Sep 2026): (1) the business rules and their 139 tests moved from the portal to `lib/domain` (`@workspace/domain`), used by the portal and bundled into the API server (not yet called there). The browser store stays in the portal (`src/lib/store.tsx`); the saved-data upgrade moved to `lib/domain/src/migrate.ts`.
 13. **Documents, email notifications (Resend) — Not started**
 14. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
@@ -46,7 +48,7 @@ Build the application logic first, client-side, against browser-local demo data.
 - Real risk signals (IP, device fingerprint), document inspection for identity checks, and IP capture in the audit log.
 - File uploads, private document storage, email/SMS notifications (in-app notifications exist).
 - Real card issuance, deposits, charges, or payouts.
-- Committed end-to-end, accessibility, and security test suites (domain unit tests exist: 137 tests in 12 files).
+- Committed end-to-end, accessibility, and security test suites (domain unit tests exist: 139 tests in 12 files).
 
 ## Frontend foundation
 

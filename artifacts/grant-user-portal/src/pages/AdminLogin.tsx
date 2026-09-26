@@ -2,8 +2,8 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
 import { ArrowRight, Eye, EyeOff, Info, LoaderCircle, LogOut, ShieldCheck } from 'lucide-react';
 import { ROLE_LABELS } from '@workspace/authz';
-import { adoptSessionStaff } from '@/domain/staff';
-import { useDemoStore } from '@/domain/store';
+import { adoptSessionStaff } from '@workspace/domain/staff';
+import { useDemoStore } from '@/lib/store';
 import { useSession } from '@/lib/session';
 import './AuthPages.css';
 

@@ -4,7 +4,7 @@ import * as G from './programs';
 import * as M from './money';
 import * as R from './rules';
 import { createSeedState } from './seed';
-import { migrateState } from './store';
+import { migrateState } from './migrate';
 
 const now = new Date('2026-09-25T12:00:00Z');
 let s: DemoState;

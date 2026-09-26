@@ -5,7 +5,7 @@ import * as N from './notifications';
 import * as R from './rules';
 import * as V from './review';
 import { createSeedState } from './seed';
-import { migrateState } from './store';
+import { migrateState } from './migrate';
 
 const now = new Date('2026-09-25T12:00:00Z');
 const PM = 'Sam Rivera';

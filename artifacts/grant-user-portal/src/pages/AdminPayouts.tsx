@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Info, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { applicantName } from '@/domain/review';
-import { approvePayoutRelease, markPayoutFailed, markPayoutPaid, MIN_FAILURE_REASON_LENGTH, needsSecondSignOff, payoutAmounts, payoutQueue, pendingPayoutTotal } from '@/domain/payouts';
-import { actingStaff } from '@/domain/staff';
-import { useDemoStore } from '@/domain/store';
-import type { Result, Transaction } from '@/domain/model';
+import { applicantName } from '@workspace/domain/review';
+import { approvePayoutRelease, markPayoutFailed, markPayoutPaid, MIN_FAILURE_REASON_LENGTH, needsSecondSignOff, payoutAmounts, payoutQueue, pendingPayoutTotal } from '@workspace/domain/payouts';
+import { actingStaff } from '@workspace/domain/staff';
+import { useDemoStore } from '@/lib/store';
+import type { Result, Transaction } from '@workspace/domain/model';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 

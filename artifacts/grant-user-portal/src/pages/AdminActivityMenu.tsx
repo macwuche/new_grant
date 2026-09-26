@@ -2,9 +2,9 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CreditCard, FileText, ShieldAlert, UserRound } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { markAllStaffEventsRead, markStaffEventRead, staffFeed, staffUnread } from '@/domain/activity';
-import { useDemoStore } from '@/domain/store';
-import type { StaffEvent } from '@/domain/model';
+import { markAllStaffEventsRead, markStaffEventRead, staffFeed, staffUnread } from '@workspace/domain/activity';
+import { useDemoStore } from '@/lib/store';
+import type { StaffEvent } from '@workspace/domain/model';
 
 const kindIcon: Record<StaffEvent['kind'], typeof Bell> = { application: FileText, deposit: ArrowDownLeft, withdrawal: ArrowUpRight, card: CreditCard, security: ShieldAlert, account: UserRound };
 

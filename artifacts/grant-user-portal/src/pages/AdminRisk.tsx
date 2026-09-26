@@ -1,4 +1,4 @@
-import type { RiskAssessment } from '@/domain/risk';
+import type { RiskAssessment } from '@workspace/domain/risk';
 
 const TONE = { Low: 'active', Medium: 'submitted', High: 'declined' } as const;
 

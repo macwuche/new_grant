@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import type { Treasury, TreasuryInput } from '@/domain/model';
-import { updateTreasury } from '@/domain/treasury';
-import { useDemoStore } from '@/domain/store';
+import type { Treasury, TreasuryInput } from '@workspace/domain/model';
+import { updateTreasury } from '@workspace/domain/treasury';
+import { useDemoStore } from '@/lib/store';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 
 // Values are edited as strings (fee rate as a percentage) and converted on save.

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Building2, FolderOpen, Info, Leaf, Lock, Palette, Plus, Store, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
-import type { DemoState, GrantInput, ProgramQuestion, Result, Tier } from '@/domain/model';
+import type { DemoState, GrantInput, ProgramQuestion, Result, Tier } from '@workspace/domain/model';
 import {
   closeProgram, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
-} from '@/domain/programs';
-import { programBudget } from '@/domain/review';
-import { useDemoStore } from '@/domain/store';
+} from '@workspace/domain/programs';
+import { programBudget } from '@workspace/domain/review';
+import { useDemoStore } from '@/lib/store';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 

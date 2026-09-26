@@ -183,6 +183,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/domain':
+        specifier: workspace:*
+        version: link:../../lib/domain
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -355,6 +358,9 @@ importers:
       '@workspace/authz':
         specifier: workspace:*
         version: link:../../lib/authz
+      '@workspace/domain':
+        specifier: workspace:*
+        version: link:../../lib/domain
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -424,9 +430,6 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 7.3.6(@types/node@25.9.6)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0)
-      vitest:
-        specifier: ^5.0.1
-        version: 5.0.1(@types/node@25.9.6)(vite@7.3.6(@types/node@25.9.6)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0))
       wouter:
         specifier: ^3.3.5
         version: 3.11.0(react@19.1.0)
@@ -661,6 +664,16 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  lib/domain:
+    dependencies:
+      '@workspace/authz':
+        specifier: workspace:*
+        version: link:../authz
+    devDependencies:
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@25.9.6)(vite@7.3.6(@types/node@25.9.6)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0))
 
   scripts:
     devDependencies:
