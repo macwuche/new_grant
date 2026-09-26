@@ -37,3 +37,14 @@
 .admin-review-notes { margin-bottom: 12px; }
 .admin-badge.approved { background: #e7f3dc; color: #4f742c; }
 .admin-badge.changes-requested { background: #fbe9dc; color: #9a5a22; }
+.admin-badge.open { background: #e7f3dc; color: #4f742c; }
+.admin-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-check-row { display: flex; align-items: center; gap: 8px; min-height: 40px; font-weight: 500; }
+.admin-requirements { margin: 0 0 12px; padding: 0; border: 0; min-width: 0; }
+.admin-requirements legend { padding: 0; margin-bottom: 6px; font-size: 11px; font-weight: 700; }
+.admin-requirement { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.admin-requirement .admin-icon-button { flex: 0 0 auto; }
+.admin-shell .admin-input:disabled, .admin-requirements:disabled .admin-input { background: #f1f3ee; color: #7a837d; cursor: not-allowed; }
+@media (max-width: 560px) { .admin-form-row { grid-template-columns: 1fr; gap: 0; } }
+/* Tailwind preflight makes svg block-level; keep small icons inline with their text. */
+.admin-shell .admin-btn svg, .admin-review-field > span svg, .admin-review-hint svg, .admin-requirements legend svg { display: inline-block; vertical-align: -2px; }

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Application, ApplicationInput, DemoState, Result } from './model';
 import * as R from './rules';
-import { createSeedState, grants, payoutMethods } from './seed';
+import { createSeedState, payoutMethods } from './seed';
 
 const now = new Date('2026-09-25T12:00:00Z');
-const grant = (id: string) => grants.find(g => g.id === id)!;
 const bank = payoutMethods[0]!;
 
 let s: DemoState;
+const grant = (id: string) => s.grants.find(g => g.id === id)!;
 const app = (id: string) => s.applications.find(a => a.id === id)!;
 const mine = () => R.computeBalances(R.ownTransactions(s));
 function accept(result: Result): Result & { ok: true } {
@@ -56,7 +56,19 @@ describe('eligibility', () => {
   });
 
   it('reports the largest award currently open', () => {
-    expect(R.maxEligibleAward(s.profile, R.ownApplications(s), now)).toBe(18000);
+    expect(R.maxEligibleAward(s.grants, s.profile, R.ownApplications(s), now)).toBe(18000);
+  });
+
+  it('hides draft programs and blocks applying to them', () => {
+    expect(R.visibleGrants(s).map(g => g.id)).not.toContain('space');
+    expect(R.checkEligibility(grant('space'), s.profile, [], now).reasons).toContain('This program has not been published.');
+  });
+
+  it('blocks new work on a closed program but allows resubmitting requested changes', () => {
+    s = { ...s, grants: s.grants.map(g => g.id === 'momentum' ? { ...g, status: 'Closed' as const } : g) };
+    expect(R.checkEligibility(grant('momentum'), s.profile, [], now).reasons).toContain('This program is not accepting new applications.');
+    const inFlight = R.ownApplications(s).map(a => a.id === 'APP-2048' ? { ...a, status: 'Changes requested' as const } : a);
+    expect(R.checkEligibility(grant('momentum'), s.profile, inFlight, now).eligible).toBe(true);
   });
 
   it('only counts the signed-in applicant’s applications', () => {

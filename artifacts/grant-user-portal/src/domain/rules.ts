@@ -1,5 +1,5 @@
 import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, PayoutMethod, Profile, Result, Transaction } from './model';
-import { CURRENT_APPLICANT_ID, grants } from './seed';
+import { CURRENT_APPLICANT_ID } from './seed';
 
 // Pure business rules. Everything here takes state in and returns state out so it
 // can move to the API server unchanged once persistence exists.
@@ -25,7 +25,7 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
 };
 
 export const roundCents = (value: number) => Math.round(value * 100) / 100;
-export const findGrant = (id: string): Grant | undefined => grants.find(g => g.id === id);
+export const findGrant = (state: DemoState, id: string): Grant | undefined => state.grants.find(g => g.id === id);
 export const canTransition = (from: ApplicationStatus, to: ApplicationStatus) => TRANSITIONS[from].includes(to);
 
 export const fail = (error: string, fieldErrors?: Record<string, string>): Result => ({ ok: false, error, fieldErrors });
@@ -36,14 +36,22 @@ export const ownApplications = (state: DemoState) => state.applications.filter(a
 export const ownTransactions = (state: DemoState) => state.transactions.filter(t => t.applicantId === CURRENT_APPLICANT_ID);
 
 export function nextIds(state: DemoState) {
-  return { app: `APP-${state.nextId}`, tx: `TX-${80000 + state.nextId}`, nextId: state.nextId + 1 };
+  return { app: `APP-${state.nextId}`, tx: `TX-${80000 + state.nextId}`, notification: `NT-${state.nextId}`, program: `PRG-${state.nextId}`, nextId: state.nextId + 1 };
 }
 
 // ---------- Grants & eligibility ----------
 
-export function isGrantOpen(grant: Grant, now: Date): boolean {
+export function isBeforeDeadline(grant: Grant, now: Date): boolean {
   return new Date(`${grant.deadline}T23:59:59`).getTime() >= now.getTime();
 }
+
+/** Published, not closed by staff, and before its deadline. */
+export function isGrantOpen(grant: Grant, now: Date): boolean {
+  return grant.status === 'Open' && isBeforeDeadline(grant, now);
+}
+
+/** Programs applicants can see: everything except staff-only drafts. */
+export const visibleGrants = (state: DemoState) => state.grants.filter(g => g.status !== 'Draft');
 
 export type Eligibility = {
   eligible: boolean;
@@ -55,8 +63,11 @@ export type Eligibility = {
 export function checkEligibility(grant: Grant, profile: Profile, applications: Application[], now: Date, options: { allowClosed?: boolean } = {}): Eligibility {
   const reasons: string[] = [];
   const existing = applications.find(a => a.grantId === grant.id && (a.status === 'Draft' || ACTIVE_STATUSES.includes(a.status)));
-  // An open deadline only matters for new work; a reviewer-requested change may be resubmitted after it.
-  if (!isGrantOpen(grant, now) && !options.allowClosed && existing?.status !== 'Changes requested') reasons.push(`Applications closed on ${grant.deadline}.`);
+  // Closing only stops new work; a reviewer-requested change may still be resubmitted.
+  const inFlight = options.allowClosed || existing?.status === 'Changes requested';
+  if (grant.status === 'Draft') reasons.push('This program has not been published.');
+  else if (grant.status === 'Closed' && !inFlight) reasons.push('This program is not accepting new applications.');
+  else if (!isBeforeDeadline(grant, now) && !inFlight) reasons.push(`Applications closed on ${grant.deadline}.`);
   if (profile.tier < grant.minimumTier) reasons.push(`Requires Tier ${grant.minimumTier}; your account is Tier ${profile.tier}.`);
   if (!profile.identityVerified) reasons.push('Identity verification is required before applying.');
   if (existing && !isEditable(existing)) reasons.push(`You already have an application for this grant (${existing.id}, ${existing.status.toLowerCase()}).`);
@@ -64,7 +75,7 @@ export function checkEligibility(grant: Grant, profile: Profile, applications: A
 }
 
 /** Largest single award the applicant can currently apply for. */
-export function maxEligibleAward(profile: Profile, applications: Application[], now: Date): number {
+export function maxEligibleAward(grants: Grant[], profile: Profile, applications: Application[], now: Date): number {
   return grants.filter(g => checkEligibility(g, profile, applications, now).eligible).reduce((max, g) => Math.max(max, g.maxFunding), 0);
 }
 
@@ -103,7 +114,7 @@ function normalizeInput(input: ApplicationInput, grant: Grant): ApplicationInput
 
 /** Create or update a draft. Drafts may be incomplete, but the grant must be one the applicant can apply for. */
 export function saveDraft(state: DemoState, grantId: string, input: ApplicationInput, now: Date, draftId?: string): Result {
-  const grant = findGrant(grantId);
+  const grant = findGrant(state, grantId);
   if (!grant) return fail('This grant program no longer exists.');
   const at = now.toISOString();
   const fields = normalizeInput(input, grant);
@@ -125,7 +136,7 @@ export function saveDraft(state: DemoState, grantId: string, input: ApplicationI
 }
 
 export function submitApplication(state: DemoState, grantId: string, input: ApplicationInput, now: Date, draftId?: string): Result {
-  const grant = findGrant(grantId);
+  const grant = findGrant(state, grantId);
   if (!grant) return fail('This grant program no longer exists.');
   const errors = validateApplication(input, grant, 2);
   if (Object.keys(errors).length) return fail('Fix the highlighted fields before submitting.', errors);

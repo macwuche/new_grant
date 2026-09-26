@@ -1,16 +1,28 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DemoState, Result } from './model';
-import { createSeedState } from './seed';
+import { createSeedState, seedGrants } from './seed';
 
 // Browser-only persistence until the API and database exist. Every change goes
 // through a rule function from ./rules; the store only saves accepted results.
 
+// The key name predates v3; the `version` field inside decides the shape.
 export const DEMO_STATE_STORAGE_KEY = 'arc.fund.demoState.v2';
+
+/**
+ * Upgrades older saved shapes instead of discarding the visitor's work.
+ * v2 → v3: the grant catalog moved into state and notifications were added.
+ */
+export function migrateState(raw: unknown): DemoState | null {
+  const data = raw as Record<string, unknown> | null;
+  if (!data || !Array.isArray(data.applications) || !Array.isArray(data.transactions)) return null;
+  if (data.version === 3 && Array.isArray(data.grants) && Array.isArray(data.notifications)) return data as unknown as DemoState;
+  if (data.version === 2) return { ...(data as unknown as Omit<DemoState, 'version' | 'grants' | 'notifications'>), version: 3, grants: seedGrants(), notifications: [] };
+  return null;
+}
 
 function parseState(raw: string | null): DemoState | null {
   try {
-    const parsed = raw ? JSON.parse(raw) as DemoState : null;
-    if (parsed?.version === 2 && Array.isArray(parsed.applications) && Array.isArray(parsed.transactions)) return parsed;
+    return raw ? migrateState(JSON.parse(raw)) : null;
   } catch { /* ignore corrupt data */ }
   return null;
 }

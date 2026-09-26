@@ -38,7 +38,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const grant = app && findGrant(app.grantId);
+  const grant = app && findGrant(state, app.grantId);
   const budget = app ? programBudget(state, app.grantId) : null;
   useEffect(() => {
     if (app && grant && budget) setAward(String(Math.max(0, Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))));

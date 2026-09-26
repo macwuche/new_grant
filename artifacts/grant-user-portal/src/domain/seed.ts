@@ -1,4 +1,4 @@
-import type { Application, ApplicationEvent, DemoState, Grant, PayoutMethod } from './model';
+import type { Application, ApplicationEvent, DemoState, Grant, Notification, PayoutMethod } from './model';
 
 /** The demo applicant who uses the applicant portal. */
 export const CURRENT_APPLICANT_ID = 'APL-1001';
@@ -6,14 +6,27 @@ export const CURRENT_APPLICANT_ID = 'APL-1001';
 export const DEMO_REVIEWER = 'Avery Taylor';
 /** The demo finance operator who processes payouts — deliberately not the reviewer. */
 export const DEMO_FINANCE = 'Jordan Lee';
+/** The demo program manager who edits the grant catalog. */
+export const DEMO_PROGRAM_MANAGER = 'Sam Rivera';
 
 // Illustrative catalog. Amounts, budgets, tiers, and deadlines are examples, not policy.
-export const grants: Grant[] = [
-  { id: 'momentum', name: 'Business Momentum', summary: 'Working capital for small businesses ready for their next chapter.', maxFunding: 12500, minimumRequest: 1000, budget: 150000, deadline: '2026-11-20', minimumTier: 2, requirements: ['Business registration number', '90-day bank statement', 'A short use-of-funds plan'], requiresRegistration: true },
-  { id: 'green', name: 'Green Transition', summary: 'Support for practical energy upgrades that reduce operating costs.', maxFunding: 18000, minimumRequest: 2500, budget: 200000, deadline: '2026-12-11', minimumTier: 2, requirements: ['Project quote or estimate', 'Business registration number', 'Impact statement'], requiresRegistration: true },
-  { id: 'creative', name: 'Creative Practice', summary: 'Flexible funding for independent makers and creative studios.', maxFunding: 8500, minimumRequest: 500, budget: 60000, deadline: '2027-01-15', minimumTier: 1, requirements: ['Portfolio link', 'Project budget', 'Professional reference'], requiresRegistration: false },
-  { id: 'community', name: 'Community Roots', summary: 'Help local organizations build more resilient neighborhoods.', maxFunding: 22000, minimumRequest: 5000, budget: 250000, deadline: '2027-02-05', minimumTier: 3, requirements: ['Organization registration', 'Community plan', 'Annual operating budget'], requiresRegistration: true },
+const CATALOG_CREATED = '2026-06-01T09:00:00.000Z';
+type SeedGrant = Omit<Grant, 'updatedAt' | 'changeLog'>;
+const catalog: SeedGrant[] = [
+  { id: 'momentum', status: 'Open', name: 'Business Momentum', summary: 'Working capital for small businesses ready for their next chapter.', focus: 'Small businesses', maxFunding: 12500, minimumRequest: 1000, budget: 150000, deadline: '2026-11-20', minimumTier: 2, requirements: ['Business registration number', '90-day bank statement', 'A short use-of-funds plan'], requiresRegistration: true },
+  { id: 'green', status: 'Open', name: 'Green Transition', summary: 'Support for practical energy upgrades that reduce operating costs.', focus: 'Climate action', maxFunding: 18000, minimumRequest: 2500, budget: 200000, deadline: '2026-12-11', minimumTier: 2, requirements: ['Project quote or estimate', 'Business registration number', 'Impact statement'], requiresRegistration: true },
+  { id: 'creative', status: 'Open', name: 'Creative Practice', summary: 'Flexible funding for independent makers and creative studios.', focus: 'Independent makers', maxFunding: 8500, minimumRequest: 500, budget: 60000, deadline: '2027-01-15', minimumTier: 1, requirements: ['Portfolio link', 'Project budget', 'Professional reference'], requiresRegistration: false },
+  { id: 'community', status: 'Open', name: 'Community Roots', summary: 'Help local organizations build more resilient neighborhoods.', focus: 'Local organizations', maxFunding: 22000, minimumRequest: 5000, budget: 250000, deadline: '2027-02-05', minimumTier: 3, requirements: ['Organization registration', 'Community plan', 'Annual operating budget'], requiresRegistration: true },
+  { id: 'space', status: 'Draft', name: 'Shared Spaces', summary: 'Welcoming, adaptable community spaces for local groups to meet and make.', focus: 'Civic spaces', maxFunding: 14500, minimumRequest: 2000, budget: 90000, deadline: '2027-04-30', minimumTier: 2, requirements: ['Site plan or lease', 'Community partner letter', 'Project budget'], requiresRegistration: true },
 ];
+
+/** Fresh copies of the seed catalog (callers may keep them in state). */
+export function seedGrants(): Grant[] {
+  return catalog.map(g => ({
+    ...g, requirements: [...g.requirements], updatedAt: CATALOG_CREATED,
+    changeLog: [{ at: CATALOG_CREATED, by: DEMO_PROGRAM_MANAGER, summary: g.status === 'Draft' ? 'Created as draft.' : 'Created and published.' }],
+  }));
+}
 
 export const payoutMethods: PayoutMethod[] = [
   { id: 'bank', type: 'Bank transfer', label: '•••• 0842 · Meridian checking' },
@@ -21,7 +34,7 @@ export const payoutMethods: PayoutMethod[] = [
 ];
 
 const ev = (status: ApplicationEvent['status'], at: string, note: string, actor: ApplicationEvent['actor'] = status === 'Draft' || status === 'Submitted' ? 'Applicant' : 'Reviewer'): ApplicationEvent => ({ status, at, actor, note });
-const allRequirements = (grantId: string) => grants.find(g => g.id === grantId)!.requirements;
+const allRequirements = (grantId: string) => catalog.find(g => g.id === grantId)!.requirements;
 
 function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' | 'status' | 'businessName' | 'requestedAmount' | 'purpose' | 'history'> & Partial<Application>): Application {
   const first = fields.history[0]!.at;
@@ -36,7 +49,9 @@ function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' 
 export function createSeedState(): DemoState {
   const me = CURRENT_APPLICANT_ID;
   return {
-    version: 2,
+    version: 3,
+    grants: seedGrants(),
+    notifications: seedNotifications(me),
     profile: { name: 'Alex Morgan', email: 'alex.morgan@example.com', phone: '+1 (415) 555-0148', address: '54 Valencia Street, San Francisco', tier: 2, identityVerified: true, twoFactor: true },
     otherApplicants: [
       { id: 'APL-1042', name: 'Maya Okafor', email: 'maya.okafor@example.org', sector: 'Creative industries', country: 'United Kingdom', verified: true, joined: '2026-06-18' },
@@ -102,4 +117,11 @@ export function createSeedState(): DemoState {
     },
     nextId: 2102,
   };
+}
+
+function seedNotifications(me: string): Notification[] {
+  return [
+    { id: 'NT-1', applicantId: me, at: '2026-08-14T11:05:00.000Z', title: 'Creative Practice approved', body: 'Approved for $4,200.00. The award has been added to your grant balance.', href: '/applications/APP-1932', read: true },
+    { id: 'NT-2', applicantId: me, at: '2026-09-11T15:40:00.000Z', title: 'Business Momentum is under review', body: 'A reviewer has started reviewing your application.', href: '/applications/APP-2048', read: false },
+  ];
 }

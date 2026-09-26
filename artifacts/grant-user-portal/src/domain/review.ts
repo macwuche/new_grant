@@ -1,6 +1,7 @@
 import type { Application, ApplicationStatus, DemoState, Result, Transaction } from './model';
 import { canTransition, fail, findGrant, nextIds, roundCents } from './rules';
 import { CURRENT_APPLICANT_ID } from './seed';
+import { notify } from './notifications';
 
 // Staff review rules. Like ./rules, these are pure so they can move behind an
 // authorized API later. There is NO staff authorization today: whoever opens
@@ -25,7 +26,7 @@ export function applicantName(state: DemoState, applicantId: string): string {
 export type ProgramBudget = { budget: number; awarded: number; remaining: number };
 
 export function programBudget(state: DemoState, grantId: string): ProgramBudget {
-  const grant = findGrant(grantId);
+  const grant = findGrant(state, grantId);
   const awarded = roundCents(state.applications.filter(a => a.grantId === grantId && a.status === 'Approved').reduce((sum, a) => sum + (a.awardedAmount ?? 0), 0));
   const budget = grant?.budget ?? 0;
   return { budget, awarded, remaining: roundCents(budget - awarded) };
@@ -46,10 +47,20 @@ function guard(state: DemoState, appId: string, expectedVersion: string, to: App
   return { ok: true, app };
 }
 
+const NOTIFICATION_TITLES: Partial<Record<ApplicationStatus, string>> = {
+  'Under review': 'is under review',
+  'Changes requested': 'needs changes',
+  Approved: 'was approved',
+  Declined: 'was declined',
+};
+
+/** Applies a reviewer transition, records history, and notifies the applicant with the same note. */
 function transition(state: DemoState, app: Application, to: ApplicationStatus, reviewer: string, note: string, now: Date, extra: Partial<Application> = {}): DemoState {
   const at = now.toISOString();
   const updated: Application = { ...app, ...extra, status: to, updatedAt: at, reviewer, history: [...app.history, { status: to, at, actor: 'Reviewer', note }] };
-  return { ...state, applications: state.applications.map(a => a.id === app.id ? updated : a) };
+  const next = { ...state, applications: state.applications.map(a => a.id === app.id ? updated : a) };
+  const title = `${findGrant(state, app.grantId)?.name ?? 'Your application'} ${NOTIFICATION_TITLES[to] ?? `is ${to.toLowerCase()}`}`;
+  return notify(next, app.applicantId, title, note, `/applications/${app.id}`, now);
 }
 
 export function startReview(state: DemoState, appId: string, expectedVersion: string, reviewer: string, now: Date): Result {
@@ -75,7 +86,7 @@ export function declineApplication(state: DemoState, appId: string, expectedVers
 }
 
 export function validateAward(state: DemoState, app: Application, amount: number): string | null {
-  const grant = findGrant(app.grantId);
+  const grant = findGrant(state, app.grantId);
   if (!grant) return 'This grant program no longer exists.';
   if (!Number.isFinite(amount) || amount <= 0) return 'Enter the amount to award.';
   if (roundCents(amount) !== amount) return 'Use at most two decimal places.';
@@ -92,7 +103,7 @@ export function approveApplication(state: DemoState, appId: string, expectedVers
   if (!g.ok) return g.result;
   const error = validateAward(state, g.app, awardAmount);
   if (error) return fail(error, { award: error });
-  const grant = findGrant(g.app.grantId)!;
+  const grant = findGrant(state, g.app.grantId)!;
   const amountText = `$${awardAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   const partial = awardAmount < g.app.requestedAmount;
   const note = `Approved for ${amountText}${partial ? ` (of $${g.app.requestedAmount.toLocaleString('en-US')} requested)` : ''}. The award has been added to your grant balance.`;

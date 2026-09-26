@@ -4,10 +4,18 @@
 
 export type Tier = 1 | 2 | 3;
 
+export type ProgramStatus = 'Draft' | 'Open' | 'Closed';
+
+export type ProgramChange = { at: string; by: string; summary: string };
+
 export type Grant = {
   id: string;
+  /** Draft programs are staff-only; Closed programs take no new applications. */
+  status: ProgramStatus;
   name: string;
   summary: string;
+  /** Short audience label shown to staff, e.g. "Small businesses". */
+  focus: string;
   maxFunding: number;
   minimumRequest: number;
   /** Total funds the program can award this cycle. */
@@ -18,6 +26,25 @@ export type Grant = {
   requirements: string[];
   /** Whether a business/organization registration number is mandatory. */
   requiresRegistration: boolean;
+  /** Record version for stale-write checks. */
+  updatedAt: string;
+  /** Who changed what, newest last. */
+  changeLog: ProgramChange[];
+};
+
+/** Fields a program manager edits directly. */
+export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration'>;
+
+/** In-app message for an applicant. Created by review and payout rules. */
+export type Notification = {
+  id: string;
+  applicantId: string;
+  at: string;
+  title: string;
+  body: string;
+  /** In-app route to open, e.g. /applications/APP-2048. */
+  href: string;
+  read: boolean;
 };
 
 export type ApplicationStatus = 'Draft' | 'Submitted' | 'Under review' | 'Changes requested' | 'Approved' | 'Declined';
@@ -96,7 +123,9 @@ export type CardsState = {
 };
 
 export type DemoState = {
-  version: 2;
+  version: 3;
+  grants: Grant[];
+  notifications: Notification[];
   /** The signed-in demo applicant (the applicant portal's user). */
   profile: Profile;
   otherApplicants: ApplicantSummary[];

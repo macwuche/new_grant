@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { format } from 'date-fns';
 import {
-  ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Banknote, Bell,
+  ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, Banknote,
   BriefcaseBusiness, Building2, Check, ChevronDown, CircleHelp, CreditCard,
   Download, FileCheck2, FileText, Home, Info, Landmark, LayoutGrid, LockKeyhole,
   MoreHorizontal, Plus, RotateCcw, Search, Settings, ShieldCheck, SlidersHorizontal,
@@ -10,14 +10,15 @@ import {
 } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
-import type { Application, ApplicationInput, Grant, Transaction } from './domain/model';
-import { grants, payoutMethods } from './domain/seed';
+import type { Application, ApplicationInput, DemoState, Grant, Transaction } from './domain/model';
+import { payoutMethods } from './domain/seed';
 import {
-  checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, MIN_WITHDRAWAL, ownApplications, ownTransactions,
+  checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, MIN_WITHDRAWAL, ownApplications, ownTransactions, visibleGrants,
   PHYSICAL_CARD_FEE, requestPhysicalCard, requestWithdrawal, saveDraft, setTwoFactor, submitApplication,
   toggleCardFreeze, updateProfile, validateApplication, validateWithdrawal, withdrawalFee, type ApplicationStep, type ProfileInput,
 } from './domain/rules';
 import { DemoStoreProvider, useDemoStore } from './domain/store';
+import { NotificationsMenu } from './components/NotificationsMenu';
 
 type Toast = (message: string) => void;
 
@@ -27,7 +28,7 @@ const fmtDate = (iso: string) => format(new Date(iso.length === 10 ? `${iso}T00:
 const statusClass = (status: string) => `status status-${status.toLowerCase().replace(' ', '-')}`;
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('') || '?';
 const byNewest = <T,>(key: (item: T) => string) => (a: T, b: T) => key(b).localeCompare(key(a));
-const grantName = (grantId: string) => findGrant(grantId)?.name ?? 'Unknown grant';
+const grantName = (state: DemoState, grantId: string) => findGrant(state, grantId)?.name ?? 'Unknown grant';
 const daysUntil = (isoDate: string, now: Date) => Math.ceil((new Date(`${isoDate}T23:59:59`).getTime() - now.getTime()) / 86_400_000);
 
 function Logo() {
@@ -61,7 +62,7 @@ function Shell({ children }: { children: ReactNode }) {
     <main className="main">
       <header className="topbar">
         <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
-        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><button className="icon-btn" aria-label="Notifications" data-testid="button-notifications"><Bell size={17} /><span className="notif-dot" /></button><Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link></div>
+        <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu /><Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link></div>
       </header>
       <div className="mobile-demo-note" role="note">DEMO ONLY · Saved in this browser only. Nothing is sent, charged, or paid out.</div>
       <div className="page-wrap">{children}</div>
@@ -106,14 +107,14 @@ function Dashboard({ onToast }: { onToast: Toast }) {
   return <div className="stack">
     <section className="hero-card card"><div className="hero-copy"><div className="kicker">A clearer way forward</div><h2>Keep your next move well funded.</h2><p>Track grant decisions, understand your available funds, and keep every account detail in one calm workspace.</p><Link className="btn btn-primary" href="/grants" style={{ marginTop: 22 }} data-testid="link-explore-grants">Explore grants <ArrowRight size={15} /></Link></div><div className="hero-visual"><div className="hero-stamp">YOUR<br />MOMENTUM<br />MATTERS</div></div></section>
     <section className="grid-4">
-      <Metric label="Eligible amount" value={money(maxEligibleAward(state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
+      <Metric label="Eligible amount" value={money(maxEligibleAward(state.grants, state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
       <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" />
       <Metric label="Deposit balance" value={money(balances.deposit)} helper="Covers card fees" />
       <Metric label="Account tier" value={`Tier ${state.profile.tier}`} helper={state.profile.identityVerified ? 'Verified applicant' : 'Verification needed'} />
     </section>
     <section className="grid-2">
       <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Application pulse</h2><p className="section-subtitle">A quick view of your active grant work.</p></div><Link className="link-text" href="/applications" data-testid="link-view-applications">View all</Link></div>
-        {recentApps.length ? <div className="timeline">{recentApps.map(app => <TimelineRow key={app.id} title={grantName(app.grantId)} text={app.status === 'Draft' ? 'Continue where you left off when ready.' : app.status === 'Changes requested' ? `Action needed: ${app.history[app.history.length - 1]!.note}` : app.history[app.history.length - 1]!.note} status={app.status} current={app.status === 'Submitted' || app.status === 'Under review' || app.status === 'Changes requested'} done={app.status === 'Approved'} href={`/applications/${app.id}`} />)}</div>
+        {recentApps.length ? <div className="timeline">{recentApps.map(app => <TimelineRow key={app.id} title={grantName(state, app.grantId)} text={app.status === 'Draft' ? 'Continue where you left off when ready.' : app.status === 'Changes requested' ? `Action needed: ${app.history[app.history.length - 1]!.note}` : app.history[app.history.length - 1]!.note} status={app.status} current={app.status === 'Submitted' || app.status === 'Under review' || app.status === 'Changes requested'} done={app.status === 'Approved'} href={`/applications/${app.id}`} />)}</div>
           : <div className="empty-state"><h3>No applications yet</h3><p>Browse grant categories to start your first application.</p></div>}
       </div>
       <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your active card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — unfreeze it from Cards.' : 'Ready for everyday spending.'}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">Manage</Link></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} /><div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><button className="quick-action" onClick={() => onToast('Adding funds needs a payment provider, which is not connected yet.')} data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</button></div></div>
@@ -135,8 +136,9 @@ function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
   const GrantIcon = grantIcons[grant.id] ?? BriefcaseBusiness;
   const { eligible, reasons, existing } = checkEligibility(grant, state.profile, ownApplications(state), now);
   const open = isGrantOpen(grant, now);
-  const badge = !open && !existing ? <StatusBadge status="Closed" tone="Declined" />
-    : existing ? <StatusBadge status={existing.status === 'Draft' ? 'Draft saved' : existing.status} tone={existing.status} />
+  const badge = existing && existing.status !== 'Draft' ? <StatusBadge status={existing.status} tone={existing.status} />
+    : !open ? <StatusBadge status="Closed" tone="Declined" />
+    : existing ? <StatusBadge status="Draft saved" tone="Draft" />
     : eligible ? <StatusBadge status="Open" tone="Complete" /> : <StatusBadge status="Not eligible" tone="Pending" />;
   const action = existing?.status === 'Draft'
     ? <Link className="btn btn-dark" style={{ flex: 1 }} href={`/applications/${existing.id}`} data-testid={`link-apply-${grant.id}`}>Resume draft <ArrowRight size={14} /></Link>
@@ -150,8 +152,9 @@ function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
 function GrantsPage({ onToast }: { onToast: Toast }) {
   const { state } = useDemoStore();
   const [filter, setFilter] = useState('All');
-  const filtered = filter === 'All' ? grants : grants.filter(g => `Tier ${g.minimumTier}` === filter);
-  const maxAward = maxEligibleAward(state.profile, ownApplications(state), new Date());
+  const catalog = visibleGrants(state);
+  const filtered = filter === 'All' ? catalog : catalog.filter(g => `Tier ${g.minimumTier}` === filter);
+  const maxAward = maxEligibleAward(state.grants, state.profile, ownApplications(state), new Date());
   return <div className="stack"><div className="page-intro"><h2>Find the right kind of support.</h2><p>Explore illustrative grant programs designed for individuals, makers, and small businesses. Check the requirements before starting an application.</p></div><section className="eligibility-box"><div className="eligibility-copy"><h3>Your eligibility snapshot</h3><p>Based on your {state.profile.identityVerified ? 'verified ' : ''}Tier {state.profile.tier} profile, open deadlines, and your existing applications.</p></div><div className="eligibility-result"><strong>{money(maxAward)}</strong><span>largest award you can apply for now</span></div></section><section className="card card-pad"><div className="toolbar"><div><h2 className="section-title">Categories</h2><p className="section-subtitle">Deadlines and amounts are examples for this demo.</p></div><div className="tabs">{['All', 'Tier 1', 'Tier 2', 'Tier 3'].map(t => <button key={t} className={`tab ${filter === t ? 'active' : ''}`} onClick={() => setFilter(t)} data-testid={`tab-grants-${t.toLowerCase().replace(' ', '-')}`}>{t}</button>)}</div></div><div className="grid-2" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>{filtered.map(g => <GrantCard key={g.id} grant={g} onToast={onToast} />)}</div></section></div>;
 }
 
@@ -161,17 +164,17 @@ function ApplicationsPage() {
   const [filter, setFilter] = useState('All');
   const sorted = ownApplications(state).sort(byNewest(a => a.updatedAt));
   const filtered = filter === 'All' ? sorted : sorted.filter(a => a.status === filter);
-  return <div className="stack"><div className="page-intro"><h2>Your applications, in plain view.</h2><p>See what needs your attention, what is being reviewed, and where a decision has been made.</p></div><div className="card card-pad"><div className="toolbar"><div className="tabs">{APPLICATION_TABS.map(t => <button key={t} className={`tab ${filter === t ? 'active' : ''}`} onClick={() => setFilter(t)} data-testid={`tab-applications-${t.toLowerCase().replace(' ', '-')}`}>{t}</button>)}</div><Link className="btn btn-primary" href="/grants" data-testid="link-start-application"><Plus size={15} /> Start an application</Link></div>{filtered.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Application</th><th>Status</th><th>Requested</th><th>Last updated</th><th /></tr></thead><tbody>{filtered.map(app => <tr key={app.id} data-testid={`row-application-${app.id}`}><td><div className="primary-cell">{grantName(app.grantId)}</div><div className="secondary-cell mono">{app.id} · {app.submittedAt ? `submitted ${fmtDate(app.submittedAt)}` : 'not submitted'}</div></td><td><StatusBadge status={app.status} /></td><td className="amount">{money(app.requestedAmount)}</td><td className="muted">{fmtDate(app.updatedAt)}</td><td><Link className="icon-btn" href={`/applications/${app.id}`} aria-label={`${isEditable(app) ? 'Continue' : 'Open'} ${grantName(app.grantId)}`} data-testid={`button-open-application-${app.id}`}><ArrowRight size={15} /></Link></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-icon"><FileText size={20} /></div><h3>No applications in this view</h3><p>Try another status filter or browse the grant categories to begin.</p><Link className="btn btn-primary" href="/grants" data-testid="link-empty-browse-grants">Browse grants</Link></div>}</div></div>;
+  return <div className="stack"><div className="page-intro"><h2>Your applications, in plain view.</h2><p>See what needs your attention, what is being reviewed, and where a decision has been made.</p></div><div className="card card-pad"><div className="toolbar"><div className="tabs">{APPLICATION_TABS.map(t => <button key={t} className={`tab ${filter === t ? 'active' : ''}`} onClick={() => setFilter(t)} data-testid={`tab-applications-${t.toLowerCase().replace(' ', '-')}`}>{t}</button>)}</div><Link className="btn btn-primary" href="/grants" data-testid="link-start-application"><Plus size={15} /> Start an application</Link></div>{filtered.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Application</th><th>Status</th><th>Requested</th><th>Last updated</th><th /></tr></thead><tbody>{filtered.map(app => <tr key={app.id} data-testid={`row-application-${app.id}`}><td><div className="primary-cell">{grantName(state, app.grantId)}</div><div className="secondary-cell mono">{app.id} · {app.submittedAt ? `submitted ${fmtDate(app.submittedAt)}` : 'not submitted'}</div></td><td><StatusBadge status={app.status} /></td><td className="amount">{money(app.requestedAmount)}</td><td className="muted">{fmtDate(app.updatedAt)}</td><td><Link className="icon-btn" href={`/applications/${app.id}`} aria-label={`${isEditable(app) ? 'Continue' : 'Open'} ${grantName(state, app.grantId)}`} data-testid={`button-open-application-${app.id}`}><ArrowRight size={15} /></Link></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-icon"><FileText size={20} /></div><h3>No applications in this view</h3><p>Try another status filter or browse the grant categories to begin.</p><Link className="btn btn-primary" href="/grants" data-testid="link-empty-browse-grants">Browse grants</Link></div>}</div></div>;
 }
 
 /** /applications/new/:grantId — redirects to an existing draft or record instead of creating duplicates. */
 function NewApplicationRoute({ onToast }: { onToast: Toast }) {
   const [, params] = useRoute('/applications/new/:grantId');
   const { state } = useDemoStore();
-  const grant = findGrant(params?.grantId ?? '');
+  const grant = findGrant(state, params?.grantId ?? '');
   // Evaluate once on entry; saving a draft mid-flow must not bounce the user to another route.
   const [entry] = useState(() => grant && checkEligibility(grant, state.profile, ownApplications(state), new Date()));
-  if (!grant || !entry) return <MissingRecord title="Grant not found" text="This grant program doesn't exist or is no longer offered." />;
+  if (!grant || !entry || grant.status === 'Draft') return <MissingRecord title="Grant not found" text="This grant program doesn't exist or is no longer offered." />;
   if (entry.existing) return <Redirect to={`/applications/${entry.existing.id}`} replace />;
   if (!entry.eligible) return <div className="card card-pad empty-state"><div className="empty-icon"><LockKeyhole size={20} /></div><h3>You can't apply to {grant.name} yet</h3>{entry.reasons.map(r => <p key={r}>{r}</p>)}<Link className="btn btn-primary" href="/grants" data-testid="link-ineligible-back">Back to grant categories</Link></div>;
   return <ApplicationEditor grant={grant} onToast={onToast} />;
@@ -181,7 +184,7 @@ function ApplicationRoute({ onToast }: { onToast: Toast }) {
   const [, params] = useRoute('/applications/:id');
   const { state } = useDemoStore();
   const app = ownApplications(state).find(a => a.id === params?.id);
-  const grant = app && findGrant(app.grantId);
+  const grant = app && findGrant(state, app.grantId);
   if (!app || !grant) return <MissingRecord title="Application not found" text="It may have been deleted, or it was created in another browser." />;
   return isEditable(app) ? <ApplicationEditor key={app.id} grant={grant} draft={app} onToast={onToast} /> : <ApplicationDetail app={app} grant={grant} />;
 }
@@ -247,6 +250,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const tierOk = state.profile.tier >= grant.minimumTier;
 
   return <div className="detail-layout"><div className="card card-pad"><div className="page-intro" style={{ marginBottom: 18 }}><p className="eyebrow">{changeRequest ? `${draftId} · changes requested` : draftId ? `Draft ${draftId}` : 'New application'}</p><h2>{grant.name}</h2><p>{changeRequest ? 'Update your application and resubmit it for review.' : "Complete each step and submit when you're ready. Your progress is saved as a draft in this browser whenever you continue."}</p></div>
+    {!changeRequest && !isGrantOpen(grant, now) && <div className="notice mb" role="note" data-testid="notice-program-closed"><Info size={16} /><div>This program is no longer accepting applications, so this draft can't be submitted. You can still view it or delete it.</div></div>}
     {changeRequest && <div className="notice mb" role="note" data-testid="notice-change-request"><Info size={16} /><div><strong>The reviewer asked for changes:</strong> {changeRequest}</div></div>}
     <div className="stepper">{['Basics', 'Requirements', 'Review'].map((label, i) => <div className={`step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'complete' : ''}`} key={label}><span className="step-num">{step > i + 1 ? <Check size={12} /> : i + 1}</span><span className="step-label">{label}</span></div>)}</div>
     {step === 1 && <div className="field-grid">

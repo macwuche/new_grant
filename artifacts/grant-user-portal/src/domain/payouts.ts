@@ -1,5 +1,6 @@
 import type { DemoState, Result, Transaction } from './model';
 import { fail, roundCents } from './rules';
+import { notify } from './notifications';
 
 // Finance payout processing. Pure, like ./rules and ./review. No payment
 // provider is connected: "paid" only records that finance says the transfer
@@ -44,7 +45,9 @@ export function markPayoutPaid(state: DemoState, txId: string, operator: string,
   const loaded = loadPending(state, txId);
   if (!loaded.ok) return loaded.result;
   const tx: Transaction = { ...loaded.tx, status: 'Completed', processedAt: now.toISOString(), processedBy: operator };
-  return { ok: true, id: txId, message: `${txId} marked as paid (${payoutAmounts(tx).net.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} to the applicant).`, state: update(state, tx) };
+  const net = payoutAmounts(tx).net.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const next = notify(update(state, tx), tx.applicantId, 'Payout sent', `${net} was sent to ${tx.destination ?? 'your payout destination'} (${txId}).`, '/withdrawals', now);
+  return { ok: true, id: txId, message: `${txId} marked as paid (${net} to the applicant).`, state: next };
 }
 
 /** A failed payout stops holding funds, so the amount returns to the applicant's grant balance. */
@@ -54,5 +57,7 @@ export function markPayoutFailed(state: DemoState, txId: string, reason: string,
   const loaded = loadPending(state, txId);
   if (!loaded.ok) return loaded.result;
   const tx: Transaction = { ...loaded.tx, status: 'Failed', processedAt: now.toISOString(), processedBy: operator, failureReason: text };
-  return { ok: true, id: txId, message: `${txId} marked as failed. ${payoutAmounts(tx).gross.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} returned to the applicant's grant balance.`, state: update(state, tx) };
+  const gross = payoutAmounts(tx).gross.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const next = notify(update(state, tx), tx.applicantId, 'Payout failed', `${text} ${gross} is back in your grant balance (${txId}).`, '/withdrawals', now);
+  return { ok: true, id: txId, message: `${txId} marked as failed. ${gross} returned to the applicant's grant balance.`, state: next };
 }

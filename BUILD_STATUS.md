@@ -18,11 +18,15 @@ Build the application logic first, client-side, against browser-local demo data.
 5. **Payout processing (browser-only) — Complete**
    - `/admin/payouts`: finance marks withdrawal requests paid or failed (reason required; failed funds return to the applicant). No payment provider.
 6. **Domain unit tests — Complete** (`pnpm test`, Vitest)
-7. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
-8. **Database and API — Not started**
+7. **Grant program management (browser-only) — Complete**
+   - `/admin/grants`: create drafts, edit with validation, publish, close, reopen, delete unused drafts; eligibility criteria lock after the first submission; change log.
+8. **In-app notifications (browser-only) — Complete**
+   - Applicant bell for review outcomes, payouts, and program closures. Email delivery not connected.
+9. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+10. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
-9. **Documents, notifications, email (Resend) — Not started**
-10. **Real financial operations — Not started**
+11. **Documents, email notifications (Resend) — Not started**
+12. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
 
 ## Not yet implemented
