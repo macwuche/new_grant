@@ -1,4 +1,5 @@
 import { completeCredentialReset } from '@workspace/api-client-react';
+import { AppNameText, brandLetter, useAppName, Wordmark } from '@/lib/appName';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info, LoaderCircle, MailCheck } from 'lucide-react';
@@ -67,9 +68,10 @@ type AuthFrameProps = {
 };
 
 function Brand() {
-  return <Link href="/" className="auth-logo" aria-label="arc.fund demo workspace" data-testid="link-auth-brand">
-    <span className="auth-logo-mark" aria-hidden="true">a</span>
-    <span className="auth-logo-word">arc<span>.</span>fund</span>
+  const { name } = useAppName();
+  return <Link href="/" className="auth-logo" aria-label={`${name} workspace`} data-testid="link-auth-brand">
+    <span className="auth-logo-mark" aria-hidden="true">{brandLetter(name)}</span>
+    <span className="auth-logo-word"><Wordmark /></span>
   </Link>;
 }
 
@@ -84,7 +86,7 @@ function AuthFrame({ children, mode, topLink }: AuthFrameProps) {
   }[mode];
 
   return <main className={`auth-page ${is404 ? 'auth-404' : ''}`}>
-    <aside className="auth-story" aria-label="About arc.fund">
+    <aside className="auth-story" aria-label="About the applicant workspace">
       <Brand />
       <div className="auth-story-center">
         <div className="auth-serial">{story.number}</div>
@@ -93,7 +95,7 @@ function AuthFrame({ children, mode, topLink }: AuthFrameProps) {
       </div>
       {is404 && <span className="auth-big-number" aria-hidden="true">404</span>}
       <div className="auth-story-bottom">
-        <span>arc.fund / applicant workspace</span>
+        <span><AppNameText /> / applicant workspace</span>
         <span>Clarity for what comes next.</span>
       </div>
     </aside>
@@ -104,7 +106,7 @@ function AuthFrame({ children, mode, topLink }: AuthFrameProps) {
       </div>
       {children}
       <footer className="auth-bottomline">
-        <span>© arc.fund · Illustrative experience</span>
+        <span>© <AppNameText /> · {live ? 'Applicant workspace' : 'Illustrative experience'}</span>
         {live ? <span>Applicant workspace</span> : <Link href="/" data-testid="link-demo-workspace-footer">View demo workspace <ArrowRight size={13} aria-hidden="true" /></Link>}
       </footer>
     </section>
@@ -140,7 +142,7 @@ export function LoginPage() {
     if (problem) setError(problem); else setLocation(nextPath(), { replace: true });
   };
 
-  return <AuthFrame mode="login" topLink={{ href: '/signup', prefix: 'New to arc.fund?', label: 'Create an account', testId: 'link-login-signup' }}>
+  return <AuthFrame mode="login" topLink={{ href: '/signup', prefix: 'New here?', label: 'Create an account', testId: 'link-login-signup' }}>
     <div className="auth-form-wrap">
       <div className="auth-eyebrow">{live ? 'Applicant sign-in' : 'Applicant access / preview'}</div>
       <h1>Welcome back.</h1>
@@ -170,7 +172,7 @@ export function LoginPage() {
       </Form>
       {error && <DemoFeedback testId="status-login-error" tone="error">{error}</DemoFeedback>}
       {feedback && <DemoFeedback testId="status-login-demo">Sign-in preview only. No credentials were checked or saved, and no account session was started. You can explore the demo workspace below.</DemoFeedback>}
-      {live ? <p className="auth-aside">New to arc.fund? <Link href="/signup" className="auth-inline-link" data-testid="link-login-signup-aside">Create an account</Link>.</p>
+      {live ? <p className="auth-aside">New to <AppNameText />? <Link href="/signup" className="auth-inline-link" data-testid="link-login-signup-aside">Create an account</Link>.</p>
         : <p className="auth-aside">Just exploring? <Link href="/" className="auth-inline-link" data-testid="link-login-demo-workspace">Open the demo workspace</Link> without signing in.</p>}
     </div>
   </AuthFrame>;

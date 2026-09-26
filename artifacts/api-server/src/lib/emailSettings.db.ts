@@ -19,7 +19,7 @@ export function dbEmailSettingsRepo(cipher: Cipher): EmailSettingsRepo {
     return {
       resendKey: open(r.resendKeyEnc), resendKeyLast4: r.resendKeyLast4, fromAddress: r.fromAddress, replyTo: r.replyTo, appUrl: r.appUrl,
       inboxAddress: r.inboxAddress, domainName: r.domainName, domainId: r.domainId, webhookSecret: open(r.webhookSecretEnc),
-      supabaseToken: open(r.supabaseTokenEnc), updatedAt: r.updatedAt.toISOString(), updatedBy: r.updatedBy,
+      supabaseToken: open(r.supabaseTokenEnc), appName: r.appName, updatedAt: r.updatedAt.toISOString(), updatedBy: r.updatedBy,
     };
   };
   return {
@@ -36,6 +36,7 @@ export function dbEmailSettingsRepo(cipher: Cipher): EmailSettingsRepo {
         ...(patch.inboxAddress !== undefined ? { inboxAddress: patch.inboxAddress } : {}),
         ...(patch.domainName !== undefined ? { domainName: patch.domainName } : {}),
         ...(patch.domainId !== undefined ? { domainId: patch.domainId } : {}),
+        ...(patch.appName !== undefined ? { appName: patch.appName } : {}),
         updatedAt: new Date(), updatedBy: by,
       };
       await db.transaction(async tx => {

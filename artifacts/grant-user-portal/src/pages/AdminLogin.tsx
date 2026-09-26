@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { AppNameText, BrandLetter, Wordmark } from '@/lib/appName';
 import { Link, Redirect, useLocation } from 'wouter';
 import { ArrowRight, Eye, EyeOff, Info, LoaderCircle, LogOut, ShieldCheck } from 'lucide-react';
 import { ROLE_LABELS } from '@workspace/authz';
@@ -12,22 +13,22 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function StaffFrame({ serial, title, children }: { serial: string; title: ReactNode; children: ReactNode }) {
   return <main className="auth-page auth-staff">
-    <aside className="auth-story" aria-label="About the arc.fund admin workspace">
-      <Link href="/admin/login" className="auth-logo" aria-label="arc.fund admin sign-in" data-testid="link-admin-auth-brand">
-        <span className="auth-logo-mark" aria-hidden="true">a</span>
-        <span className="auth-logo-word">arc<span>.</span>fund</span>
+    <aside className="auth-story" aria-label="About the admin workspace">
+      <Link href="/admin/login" className="auth-logo" aria-label="Admin sign-in" data-testid="link-admin-auth-brand">
+        <span className="auth-logo-mark" aria-hidden="true"><BrandLetter /></span>
+        <span className="auth-logo-word"><Wordmark /></span>
       </Link>
       <div className="auth-story-center">
         <div className="auth-serial">{serial}</div>
         <h2>{title}</h2>
         <p className="auth-story-text">For the grant team: reviewers, finance, compliance, and support. Access follows the role you've been given.</p>
       </div>
-      <div className="auth-story-bottom"><span>arc.fund / team workspace</span><span>Staff access only.</span></div>
+      <div className="auth-story-bottom"><span><AppNameText /> / team workspace</span><span>Staff access only.</span></div>
     </aside>
     <section className="auth-content" aria-label="Staff sign-in">
       <div className="auth-topline"><span>Applying for a grant?</span><Link href="/login" data-testid="link-admin-login-applicant">Applicant sign-in</Link></div>
       {children}
-      <footer className="auth-bottomline"><span>© arc.fund · Team workspace</span><span>Every staff action is recorded.</span></footer>
+      <footer className="auth-bottomline"><span>© <AppNameText /> · Team workspace</span><span>Every staff action is recorded.</span></footer>
     </section>
   </main>;
 }
@@ -88,7 +89,7 @@ export function AdminLoginPage() {
       <form className="auth-form" noValidate onSubmit={submit} data-testid="form-admin-login">
         <div className="auth-field">
           <label className="auth-label" htmlFor="admin-email">Work email</label>
-          <input id="admin-email" type="email" className="auth-input" value={email} onChange={e => { setEmail(e.target.value); setErrors(v => ({ ...v, email: undefined })); }} placeholder="you@arc.fund" autoComplete="username" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'admin-email-error' : undefined} data-testid="input-admin-login-email" />
+          <input id="admin-email" type="email" className="auth-input" value={email} onChange={e => { setEmail(e.target.value); setErrors(v => ({ ...v, email: undefined })); }} placeholder="you@example.org" autoComplete="username" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'admin-email-error' : undefined} data-testid="input-admin-login-email" />
           {errors.email && <p className="auth-error" id="admin-email-error">{errors.email}</p>}
         </div>
         {mode === 'signin' && <div className="auth-field">
@@ -180,7 +181,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
   if (needsTwoStep) return <StaffFrame serial="01 / TWO-STEP" title={<>One more <em>step.</em></>}><div className="auth-form-wrap" data-testid="panel-admin-two-step">
     <div className="auth-eyebrow"><ShieldCheck size={13} aria-hidden="true" style={{ display: 'inline', verticalAlign: '-2px' }} /> Two-step sign-in</div>
     {twoStep!.enrolled
-      ? <><h1>Enter your code.</h1><p className="auth-lede">Open your authenticator app and enter the current code for arc.fund.</p><TwoStepCodeForm /></>
+      ? <><h1>Enter your code.</h1><p className="auth-lede">Open your authenticator app and enter the current code for <AppNameText />.</p><TwoStepCodeForm /></>
       : <><h1>Protect your staff account.</h1><p className="auth-lede">Staff access needs two-step sign-in: your password plus a code from an authenticator app. Set it up once; you'll enter a code each time you sign in.</p><TwoStepSetupForm /></>}
     <p className="auth-aside"><button type="button" className="auth-inline-link auth-link-button" onClick={() => void session.signOut()} data-testid="button-admin-two-step-signout">Sign out</button></p>
   </div></StaffFrame>;

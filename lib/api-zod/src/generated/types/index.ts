@@ -26,6 +26,8 @@ export * from './auditLog';
 export * from './auditLogChain';
 export * from './awardDecision';
 export * from './badRequestResponse';
+export * from './branding';
+export * from './brandingInput';
 export * from './cardLimit';
 export * from './cardLimitCard';
 export * from './cards';

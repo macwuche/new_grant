@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+
 import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 
@@ -77,7 +78,7 @@ export function TwoStepSetupForm({ ui = 'auth', onDone, onCancel }: { ui?: Ui; o
   </div>;
   return <form className={c.form} noValidate onSubmit={confirm} data-testid="form-two-step-setup">
     <p className={c.hint}>Scan this code with your authenticator app, then enter the 6-digit code it shows.</p>
-    <img src={setup.qr} alt="QR code to add arc.fund to your authenticator app" width={180} height={180} style={{ background: '#fff', borderRadius: 8, padding: 6 }} data-testid="img-two-step-qr" />
+    <img src={setup.qr} alt="QR code to add this account to your authenticator app" width={180} height={180} style={{ background: '#fff', borderRadius: 8, padding: 6 }} data-testid="img-two-step-qr" />
     <p className={c.hint}>Can't scan it? Enter this key instead: <code style={{ wordBreak: 'break-all' }} data-testid="text-two-step-secret">{setup.secret}</code></p>
     <CodeField ui={ui} id="two-step-setup-code" code={code} setCode={v => { setCode(v); setError(null); }} error={error} />
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>

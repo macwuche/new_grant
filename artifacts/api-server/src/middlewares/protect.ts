@@ -71,7 +71,10 @@ export function failureLimiter(limit: Limit, now = () => Date.now()) {
       return;
     }
     const window = w;
-    res.on("finish", () => { if (res.statusCode === 401) window.count++; });
+    // Only a rejected token is a failed sign-in; a request with no token at all (a page loading before
+    // sign-in) is refused without checking anything, and counting it would lock out the person's address.
+    const presented = /^Bearer\s+\S/i.test(req.headers.authorization ?? "");
+    res.on("finish", () => { if (res.statusCode === 401 && presented) window.count++; });
     if (windows.size > 10_000) for (const [key, v] of windows) if (t - v.start >= limit.windowMs) windows.delete(key);
     next();
   };

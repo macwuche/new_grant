@@ -49,6 +49,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
    - Not built: downloading received attachments inside the app (open them in Resend), SMS, push.
 **Two-step sign-in and enforced resets (26 Sep 2026):** authenticator-app (TOTP) two-step sign-in through Supabase. Staff access needs a two-step session (`STAFF_MFA_REQUIRED`, on unless `false`): staff set up an app on first sign-in and enter a code each time; until then `/api/me` returns their record with no permissions and every staff route answers 403 (`mfa_enrollment_required` / `mfa_required`). Applicants can turn it on in Settings; once anyone has it, every request needs a two-step session. Staff-required resets are now enforced: while one is pending the API blocks everything except reading the profile and notifications and completing the reset, and completion needs proof (a new password needs a session from the reset-password email after the reset was required; a two-step reset needs a two-step session with an authenticator added after it). The applicant's reset page completes a required password reset automatically. 5 new API tests, 4 checks against the real database. Not yet tried against the real Supabase project. Without a service-role key the server can't remove an applicant's authenticator, so someone who lost their phone needs a Supabase admin to remove it.
 
+**Application name (26 Sep 2026):** super admins rename the app in Settings → Application name; the name is stored on the server (`email_settings.app_name`) and used in every wordmark, page title, sign-in page (public `GET /api/branding`), email, Supabase sign-in email wording (after **Reapply**), and as the authenticator issuer for new two-step setups. Demo mode keeps a browser-only preview. The column is pushed to Replit's database; **run `pnpm --filter @workspace/db run push` against Supabase once `SUPABASE_DATABASE_URL` is set**, or the API can't read its email settings there. 1 new API test.
+
 **Hardening (26 Sep 2026):** every API response carries security headers (no caching, no framing, no sniffing, no referrer, HSTS, a deny-all content policy) and the API is rate-limited: 300 requests and 60 changes a minute per signed-in user, 30 uploads per 10 minutes per user, and 30 failed sign-in checks per 10 minutes per address (successful requests from a shared address don't count). Limits are counted in the API process's memory, so they're per instance. 4 new API tests.
 
 14. **Real financial operations — Not started**
@@ -61,7 +63,7 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 - Real risk signals (sign-in location, device), an automated identity-verification provider (staff review uploaded documents by hand), SMS and push, and downloading received email attachments in the app (outgoing email and the team inbox are built and wait on the Resend key; phase 13).
 - Recovery codes for two-step sign-in.
 - Removing a lost authenticator from the app (needs a Supabase service-role key; today a Supabase admin does it in the dashboard).
-- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 95 API tests).
+- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 96 API tests).
 
 ## Frontend foundation
 

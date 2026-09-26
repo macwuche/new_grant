@@ -20,6 +20,8 @@ export const emailSettingsTable = pgTable("email_settings", {
   domainId: text("domain_id"),
   webhookSecretEnc: text("webhook_secret_enc"),
   supabaseTokenEnc: text("supabase_token_enc"),
+  /** The application's name, shown across the portal, emails, and authenticator apps (null: the default). */
+  appName: text("app_name"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
 }).enableRLS();

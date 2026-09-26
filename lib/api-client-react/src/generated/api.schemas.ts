@@ -129,6 +129,15 @@ export interface SignupEmailSetting {
   error?: string;
 }
 
+export interface Branding {
+  appName: string;
+  isDefault: boolean;
+}
+
+export interface BrandingInput {
+  appName: string;
+}
+
 export interface SignupEmailSettingInput {
   emailConfirmation: boolean;
 }

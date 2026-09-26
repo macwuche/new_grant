@@ -34,6 +34,13 @@ let appUrlOverride: string | null | undefined;
 /** Set by the settings loader: the portal address saved in the admin settings (null clears it). */
 export const setAppUrlOverride = (url: string | null) => { appUrlOverride = url; };
 
+export const DEFAULT_APP_NAME = "arc.fund";
+let appNameOverride: string | null = null;
+/** Set by the settings loader and the branding route: the application name saved by a super admin (null: the default). */
+export const setAppName = (name: string | null) => { appNameOverride = name; };
+/** The application's name, used in every email: the saved setting, else arc.fund. */
+export const appName = () => appNameOverride ?? DEFAULT_APP_NAME;
+
 /** The public address of the portal, for links in emails: the saved setting, APP_URL, else the Replit dev domain. */
 export function appUrl(env: NodeJS.ProcessEnv = process.env): string | null {
   if (appUrlOverride) return appUrlOverride;
@@ -49,7 +56,7 @@ export function renderEmail(opts: { greeting: string; paragraphs: string[]; acti
   const text = [greeting, "", ...paragraphs.flatMap(p => [p, ""]), ...(action ? [`${action.label}: ${action.href}`, ""] : []), "—", footer].join("\n");
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;color:#1d1d1b">
 <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px">
-<p style="margin:0 0 18px;font-weight:bold;font-size:15px">arc.fund</p>
+<p style="margin:0 0 18px;font-weight:bold;font-size:15px">${escape(appName())}</p>
 <p style="margin:0 0 14px;font-size:14px;line-height:1.5">${escape(greeting)}</p>
 ${paragraphs.map(p => `<p style="margin:0 0 14px;font-size:14px;line-height:1.5">${escape(p)}</p>`).join("\n")}
 ${action ? `<p style="margin:22px 0"><a href="${escape(action.href)}" style="display:inline-block;background:#1d1d1b;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:14px">${escape(action.label)}</a></p>` : ""}
@@ -63,8 +70,8 @@ export function notificationEmail(n: { title: string; body: string; href: string
   const { text, html } = renderEmail({
     greeting: `Hello ${recipient.name},`,
     paragraphs: [n.body],
-    ...(baseUrl ? { action: { label: "Open arc.fund", href: `${baseUrl}${n.href}` } } : {}),
-    footer: "You're receiving this because you have an arc.fund account. You can turn off email copies of notifications in Settings.",
+    ...(baseUrl ? { action: { label: `Open ${appName()}`, href: `${baseUrl}${n.href}` } } : {}),
+    footer: `You're receiving this because you have an account with ${appName()}. You can turn off email copies of notifications in Settings.`,
   });
   return { kind: "notification", to: recipient.email, subject: n.title, text, html };
 }
@@ -74,13 +81,13 @@ export function staffInviteEmail(member: { email: string; name: string; roleLabe
   const { text, html } = renderEmail({
     greeting: `Hello ${member.name},`,
     paragraphs: [
-      `${invitedBy} added you to the arc.fund grant team as ${member.roleLabel}.`,
+      `${invitedBy} added you to the ${appName()} grant team as ${member.roleLabel}.`,
       `To get in, create an account with this email address (${member.email}) if you don't have one, confirm it, then sign in to the admin workspace. Your staff access links to the account the first time you sign in.`,
     ],
     ...(baseUrl ? { action: { label: "Sign in to the admin workspace", href: `${baseUrl}/admin/login` } } : {}),
     footer: "If you weren't expecting this, you can ignore this email; nothing happens until you sign in.",
   });
-  return { kind: "staff-invite", to: member.email, subject: "You've been added to the arc.fund grant team", text, html };
+  return { kind: "staff-invite", to: member.email, subject: `You've been added to the ${appName()} grant team`, text, html };
 }
 
 // ---------- Sending ----------

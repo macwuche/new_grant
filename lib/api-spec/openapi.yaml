@@ -1911,6 +1911,44 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /branding:
+    get:
+      operationId: getBranding
+      tags: [email]
+      security: []
+      summary: The application name (public)
+      description: Shown on every page, including sign-in pages, so no sign-in is needed.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+    put:
+      operationId: setBranding
+      tags: [email]
+      summary: Change the application name (super admin)
+      description: Applies to the portal, emails, and new authenticator entries. An empty name restores the default. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /inbox:
     get:
       operationId: getInbox
@@ -2190,6 +2228,17 @@ components:
         appTemplates: { type: boolean }
         error: { type: string }
       required: [connected, emailConfirmation]
+    Branding:
+      type: object
+      properties:
+        appName: { type: string }
+        isDefault: { type: boolean }
+      required: [appName, isDefault]
+    BrandingInput:
+      type: object
+      properties:
+        appName: { type: string }
+      required: [appName]
     SignupEmailSettingInput:
       type: object
       properties:

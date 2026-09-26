@@ -17,6 +17,7 @@ export type StoredEmailSettings = {
   domainId: string | null;
   webhookSecret: string | null;
   supabaseToken: string | null;
+  appName: string | null;
   updatedAt: string | null;
   updatedBy: string | null;
 };
@@ -33,7 +34,7 @@ export interface EmailSettingsRepo {
 
 export const EMPTY_SETTINGS: StoredEmailSettings = {
   resendKey: null, resendKeyLast4: null, fromAddress: null, replyTo: null, appUrl: null, inboxAddress: null,
-  domainName: null, domainId: null, webhookSecret: null, supabaseToken: null, updatedAt: null, updatedBy: null,
+  domainName: null, domainId: null, webhookSecret: null, supabaseToken: null, appName: null, updatedAt: null, updatedBy: null,
 };
 
 export const last4 = (secret: string) => secret.slice(-4);

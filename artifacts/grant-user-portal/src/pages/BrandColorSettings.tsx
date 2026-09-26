@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { Palette, RotateCcw } from 'lucide-react';
 import { applyBrandColor, DEFAULT_BRAND_COLOR, readBrandColor, storeBrandColor } from '@/lib/brandColor';
+import { BrandLetter, Wordmark } from '@/lib/appName';
 import './BrandColorSettings.css';
 
 const colors = [
@@ -48,7 +49,7 @@ export function BrandColorSettings() {
       </div>
       <div className="admin-brand-preview" aria-label="Brand color preview">
         <span className="admin-brand-preview-kicker">LIVE PREVIEW</span>
-        <div className="admin-brand-preview-title"><span className="admin-brand-preview-mark">a</span><strong>arc<span>.</span>fund</strong></div>
+        <div className="admin-brand-preview-title"><span className="admin-brand-preview-mark"><BrandLetter /></span><strong><Wordmark /></strong></div>
         <p>Your chosen accent updates navigation, highlights, and buttons in this browser.</p>
         <span className="admin-brand-preview-action">Brand action <span>↗</span></span>
       </div>

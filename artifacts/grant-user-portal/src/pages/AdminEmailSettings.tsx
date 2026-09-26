@@ -6,6 +6,7 @@ import {
   type EmailDomain, type EmailSettings, type EmailSettingsInput, type EmailStatus, type SignupEmailSetting,
 } from '@workspace/api-client-react';
 import { apiError } from '@/lib/serverData';
+import { useAppName } from '@/lib/appName';
 import { useCan } from './AdminStaff';
 import './AdminEmailSettings.css';
 
@@ -72,6 +73,7 @@ function SignupConfirmation({ tokenSet, sending }: { tokenSet: boolean; sending:
   };
   const on = state?.emailConfirmation;
   const smtp = state?.smtp;
+  const { name: appName } = useAppName();
   return <section className="admin-panel admin-email-settings" aria-labelledby="signup-confirm-title" data-testid="panel-admin-signup-confirmation">
     <div className="admin-panel-head"><div><p className="admin-email-settings-kicker">SIGN-UP / SUPABASE</p><h2 id="signup-confirm-title">Email verification at sign-up</h2><p>When on, new applicants and staff must click the link in a confirmation email before they can sign in. When off, accounts work straight away, but anyone can sign up with an address they don't own.</p></div>
       <button type="button" className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={!!on} aria-label="Require email verification at sign-up" disabled={!state?.connected || busy} onClick={toggle} data-testid="switch-signup-email-confirmation" /></div>
@@ -80,9 +82,9 @@ function SignupConfirmation({ tokenSet, sending }: { tokenSet: boolean; sending:
       <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><Mail size={17} /></span><div><strong>Sent through Resend</strong><p>Confirmation, password-reset, and verification-code emails come from Supabase. Its built-in mailer allows only a few emails an hour from a generic sender; this points it at Resend with the saved key and sender. Press again after changing the Resend key or sender.{smtp.emailsPerHour !== null ? ` Supabase currently allows ${smtp.emailsPerHour} emails an hour (Authentication → Rate Limits).` : ''}</p></div>
         <span className="admin-email-settings-value" data-testid="status-auth-smtp">{smtp.viaResend ? `Resend${smtp.sender ? ` · ${smtp.sender}` : ''}` : smtp.host ? `Other (${smtp.host})` : "Supabase's mailer"}</span>
         <button type="button" className="admin-btn" disabled={busy || !sending} title={sending ? undefined : 'Save a Resend API key and a sender first.'} onClick={() => void run(sendAuthEmailsThroughResend, next => `Supabase's emails now go through Resend${next.smtp?.sender ? ` from ${next.smtp.sender}` : ''}.`, "Couldn't update Supabase.")} data-testid="button-auth-smtp-resend">{smtp.viaResend ? 'Update' : 'Use Resend'}</button></div>
-      <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><ShieldCheck size={17} /></span><div><strong>Email wording</strong><p>Replaces Supabase's default text for the confirmation, reset, invite, email-change, sign-in link, and code emails with arc.fund's.</p></div>
-        <span className="admin-email-settings-value" data-testid="status-auth-templates">{state.appTemplates ? 'arc.fund' : 'Supabase default'}</span>
-        <button type="button" className="admin-btn" disabled={busy} onClick={() => void run(setAuthEmailTemplates, () => "Supabase's emails now use arc.fund's wording.", "Couldn't update Supabase.")} data-testid="button-auth-templates">{state.appTemplates ? 'Reapply' : 'Use arc.fund wording'}</button></div>
+      <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><ShieldCheck size={17} /></span><div><strong>Email wording</strong><p>Replaces Supabase's default text for the confirmation, reset, invite, email-change, sign-in link, and code emails with the app's own, under the application name. Press Reapply after changing the name.</p></div>
+        <span className="admin-email-settings-value" data-testid="status-auth-templates">{state.appTemplates ? appName : 'Supabase default'}</span>
+        <button type="button" className="admin-btn" disabled={busy} onClick={() => void run(setAuthEmailTemplates, () => `Supabase's emails now use the app's wording as ${appName}.`, "Couldn't update Supabase.")} data-testid="button-auth-templates">{state.appTemplates ? 'Reapply' : 'Use app wording'}</button></div>
     </div>}
     {state?.connected && <div className="admin-email-settings-banner"><Info size={17} /><span>A Supabase access token can manage every project in its Supabase account, not only this one. Use a token from an account that holds only this project, and remove it under Email connection once setup is done: these settings stay in Supabase.</span></div>}
     {flash && <p className={flash.tone === 'error' ? 'admin-field-error' : 'admin-review-hint'} role="status">{flash.text}</p>}

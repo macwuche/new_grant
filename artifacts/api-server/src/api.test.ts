@@ -12,7 +12,8 @@ import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRe
 import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore } from "./lib/fileStore";
-import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, unconfiguredMailer } from "./lib/email";
+import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
+import { authEmailTemplateConfig } from "./lib/authEmails";
 import { memoryEmailSettingsRepo } from "./lib/emailSettings";
 import { memoryInboxRepo } from "./lib/inbox";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
@@ -1027,6 +1028,8 @@ describe("protections", () => {
   it("slows down repeated failed sign-ins from one address, but not signed-in use", async () => {
     await restart({ anonymous: { name: "anonymous", max: 3, windowMs: 60_000 } });
     for (let i = 0; i < 5; i++) expect((await call("/me", "tok-super")).status).toBe(200);
+    // Requests without any token (pages loading before sign-in) don't count.
+    for (let i = 0; i < 5; i++) expect((await fetch(`${base}/me`)).status).toBe(401);
     for (let i = 0; i < 3; i++) expect((await call("/me", "tok-guess")).status).toBe(401);
     expect((await call("/me", "tok-guess")).status).toBe(429);
     expect((await call("/healthz")).status).toBe(200);
@@ -1124,6 +1127,25 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect(patchCall.body).toEqual({ mailer_autoconfirm: true });
     expect(patchCall.headers.authorization).toBe(`Bearer ${TOKEN}`);
     expect((await put("/email/auth-settings", { emailConfirmation: true }, "tok-finance")).status).toBe(403);
+  });
+
+  it("lets super admins rename the app for everyone, including emails and sign-in pages", async () => {
+    const anon = await fetch(`${base}/branding`);
+    expect(anon.status).toBe(200);
+    expect(await json(anon)).toEqual({ appName: "arc.fund", isDefault: true });
+    expect((await put("/branding", { appName: "Nova Bridge" }, "tok-finance")).status).toBe(403);
+    expect((await put("/branding", { appName: "<b>Nova</b>" })).status).toBe(400);
+    expect((await put("/branding", { appName: "x".repeat(41) })).status).toBe(400);
+    expect(await json(await put("/branding", { appName: "  Nova   Bridge " }))).toEqual({ appName: "Nova Bridge", isDefault: false });
+    expect(await json(await fetch(`${base}/branding`))).toEqual({ appName: "Nova Bridge", isDefault: false });
+    const [entry] = (await json(await call("/audit", "tok-super"))).events;
+    expect(entry).toMatchObject({ action: "Change application name" });
+    const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null);
+    expect(invite.subject).toBe("You've been added to the Nova Bridge grant team");
+    expect(invite.html).toContain(">Nova Bridge</p>");
+    expect(authEmailTemplateConfig()["mailer_subjects_confirmation"]).toBe("Confirm your Nova Bridge email");
+    expect(await json(await put("/branding", { appName: "" }))).toEqual({ appName: "arc.fund", isDefault: true });
+    expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).subject).toContain("arc.fund");
   });
 
   it("points Supabase's sign-in emails at Resend and sets their wording", async () => {

@@ -3599,6 +3599,30 @@ export const SetAuthEmailTemplatesResponse = zod.object({
 
 
 /**
+ * Shown on every page, including sign-in pages, so no sign-in is needed.
+ * @summary The application name (public)
+ */
+export const GetBrandingResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean()
+})
+
+
+/**
+ * Applies to the portal, emails, and new authenticator entries. An empty name restores the default. Audited.
+ * @summary Change the application name (super admin)
+ */
+export const SetBrandingBody = zod.object({
+  "appName": zod.string()
+})
+
+export const SetBrandingResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean()
+})
+
+
+/**
  * Any active staff member. Up to 200 messages in the folder, newest first.
  * @summary The team mailbox (staff)
  */

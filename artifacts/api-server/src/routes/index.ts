@@ -18,7 +18,7 @@ import { activityRouter } from "./activity";
 import { applicantsRouter } from "./applicants";
 import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
-import { emailRouter, emailWebhookRouter } from "./email";
+import { brandingRouter, emailRouter, emailWebhookRouter } from "./email";
 import { moneyRouter } from "./money";
 import healthRouter from "./health";
 import meRouter from "./me";
@@ -41,6 +41,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(healthRouter);
   // Resend's webhook signs its requests instead of signing in.
   router.use(emailWebhookRouter(email));
+  // The application name, for pages shown before sign-in.
+  router.use(brandingRouter(emailSettings));
   // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
   const writes = rateLimiter(limit.writes, byUser);
   const uploads = rateLimiter(limit.uploads, byUser);

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useAppName } from './appName';
 import type { Session as AuthSession } from '@supabase/supabase-js';
 import { getMe, setAuthTokenGetter, type Me } from '@workspace/api-client-react';
 import { supabase } from './supabase';
@@ -62,6 +63,8 @@ function apiErrorMessage(err: unknown): string {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  // The name authenticator apps show for this account.
+  const { name: appName } = useAppName();
   const [status, setStatus] = useState<SessionStatus>(supabase ? 'loading' : 'unconfigured');
   const [me, setMe] = useState<Me | null>(null);
   const [meError, setMeError] = useState<string | null>(null);
@@ -146,7 +149,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Setups that were started but never confirmed would block a new one; clear them first.
       const { data: list } = await supabase.auth.mfa.listFactors();
       for (const f of list?.all ?? []) if (f.status === 'unverified') await supabase.auth.mfa.unenroll({ factorId: f.id });
-      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Authenticator ${new Date().toISOString().slice(0, 16).replace('T', ' ')}` });
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: appName, friendlyName: `Authenticator ${new Date().toISOString().slice(0, 16).replace('T', ' ')}` });
       if (error || !data) return { error: authErrorMessage(error?.message ?? 'Couldn\'t start the setup.') };
       return { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
     },

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AppNameProvider, AppNameText, BrandLetter, ShortAppName, useAppName, Wordmark } from '@/lib/appName';
+import { supabase } from '@/lib/supabase';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { format } from 'date-fns';
 import {
@@ -51,7 +53,7 @@ const grantName = (state: DemoState, grantId: string) => findGrant(state, grantI
 const daysUntil = (isoDate: string, now: Date) => Math.ceil((new Date(`${isoDate}T23:59:59`).getTime() - now.getTime()) / 86_400_000);
 
 function Logo() {
-  return <div className="brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div>;
+  return <div className="brand"><div className="brand-mark"><BrandLetter /></div><div className="brand-name"><Wordmark /></div></div>;
 }
 function Icon({ item }: { item: typeof Home }) { const I = item; return <I size={17} strokeWidth={1.8} />; }
 const navItems = [
@@ -91,7 +93,7 @@ function ApplicantGate({ children }: { children: ReactNode }) {
   if (session.status === 'loading') return <div className="gate-loading" role="status" data-testid="status-applicant-gate-loading"><LoaderCircle size={20} className="auth-spin" aria-hidden="true" /> Opening your workspace…</div>;
   if (session.me?.twoStep.enrolled && session.me.twoStep.level !== 'aal2') return <div className="gate-two-step" data-testid="panel-applicant-two-step"><div className="card card-pad">
     <h1 className="section-title" style={{ fontSize: 20 }}>Enter your two-step code</h1>
-    <p className="section-subtitle" style={{ marginBottom: 14 }}>Open your authenticator app and enter the current code for arc.fund.</p>
+    <p className="section-subtitle" style={{ marginBottom: 14 }}>Open your authenticator app and enter the current code for <AppNameText />.</p>
     <TwoStepCodeForm ui="app" />
     <button type="button" className="btn btn-ghost mt" onClick={() => void session.signOut()} data-testid="button-two-step-signout">Sign out</button>
   </div></div>;
@@ -121,7 +123,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
     </aside>
     <main className="main">
       <header className="topbar">
-        <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark">a</div><div className="brand-name">arc<span>.</span>fund</div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
+        <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark"><BrandLetter /></div><div className="brand-name"><Wordmark /></div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
         <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu />{session.status === 'signedIn'
           ? <><span className="top-avatar" aria-hidden="true">{initials}</span><button className="icon-btn" onClick={() => void session.signOut()} aria-label="Sign out" title="Sign out" data-testid="button-signout"><LogOut size={16} /></button></>
           : <Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link>}</div>
@@ -203,7 +205,7 @@ function TimelineRow({ title, text, status, current, done, href }: { title: stri
   return <div className="timeline-item"><div className={`timeline-dot ${current ? 'current' : done ? 'done' : ''}`} /><div style={{ flex: 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><h4>{heading}</h4>{status && <StatusBadge status={status} />}</div><p>{text}</p></div></div>;
 }
 function CardVisual({ name, lastFour, revealed = false, physical = false, label }: { name: string; lastFour?: string; revealed?: boolean; physical?: boolean; label?: string }) {
-  return <div className={`card-visual ${physical ? 'lime-card' : ''}`} data-testid={`card-visual-${physical ? 'physical' : 'virtual'}`}><div className="card-visual-top"><span style={{ font: '700 11px var(--app-font-display)' }}>arc.fund</span><div className="card-chip" /></div><div className="card-number">{label ?? `••••  ••••  ••••  ${revealed ? lastFour : '••••'}`}</div><div className="card-footer"><div><div className="card-holder">Cardholder</div><div className="card-name">{name.toUpperCase()}</div></div><div className="card-network">arc</div></div></div>;
+  return <div className={`card-visual ${physical ? 'lime-card' : ''}`} data-testid={`card-visual-${physical ? 'physical' : 'virtual'}`}><div className="card-visual-top"><span style={{ font: '700 11px var(--app-font-display)' }}><AppNameText /></span><div className="card-chip" /></div><div className="card-number">{label ?? `••••  ••••  ••••  ${revealed ? lastFour : '••••'}`}</div><div className="card-footer"><div><div className="card-holder">Cardholder</div><div className="card-name">{name.toUpperCase()}</div></div><div className="card-network"><ShortAppName /></div></div></div>;
 }
 
 function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
@@ -488,10 +490,10 @@ function TransactionTable({ rows, action }: { rows: Transaction[]; action?: (tx:
   if (!rows.length) return <div className="empty-state"><h3>No activity yet</h3><p>Awards, deposits, payouts, and fees will appear here.</p></div>;
   return <div className="table-wrap"><table className="data-table"><thead><tr><th>Activity</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th>{action && <th />}</tr></thead><tbody>{rows.map(tx => <tr key={tx.id} data-testid={`row-transaction-${tx.id}`}><td><div className="primary-cell">{tx.description}</div><div className="secondary-cell mono">{tx.reference ?? tx.id}</div><TransactionNote tx={tx} /></td><td className="muted">{tx.type}</td><td className={`amount ${tx.amount < 0 ? 'muted' : ''}`}>{money(tx.amount)}</td><td><StatusBadge status={tx.status} /></td><td className="muted">{fmtDate(tx.createdAt)}</td>{action && <td>{action(tx)}</td>}</tr>)}</tbody></table></div>;
 }
-function exportCsv(rows: Transaction[]) {
+function exportCsv(rows: Transaction[], appName: string) {
   const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
   const lines = [
-    '# arc.fund demo export — browser-only sample records, not a financial statement',
+    `# ${appName} demo export — browser-only sample records, not a financial statement`,
     ['id', 'date', 'type', 'description', 'amount', 'status'].join(','),
     ...rows.map(t => [t.id, t.createdAt, t.type, t.description, t.amount.toFixed(2), t.status].map(escape).join(',')),
   ];
@@ -508,8 +510,9 @@ function receiptLines(tx: Transaction, name: string): [string, string][] {
 }
 function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
   const { state } = useDemoStore();
+  const { name: appName } = useAppName();
   const lines = receiptLines(tx, state.profile.name);
-  const download = () => downloadText(`arc-fund-receipt-${tx.id}.txt`, ['arc.fund demo receipt — browser-only sample record, not proof of payment', '', ...lines.map(([k, v]) => `${k}: ${v}`)].join('\n'));
+  const download = () => downloadText(`arc-fund-receipt-${tx.id}.txt`, [`${appName} demo receipt — browser-only sample record, not proof of payment`, '', ...lines.map(([k, v]) => `${k}: ${v}`)].join('\n'));
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [onClose]);
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="receipt-title" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><div className="modal" data-testid="modal-receipt"><div className="modal-head"><div><h2 id="receipt-title">Receipt</h2><p>Demo record from this browser. Not proof of payment.</p></div><button className="icon-btn" onClick={onClose} aria-label="Close receipt" data-testid="button-close-receipt" autoFocus><X size={16} /></button></div>
     {lines.map(([k, v]) => <div className="fee-row" key={k}><span>{k}</span><strong>{v}</strong></div>)}
@@ -521,6 +524,7 @@ const TRANSACTION_TABS: { label: string; types: Transaction['type'][] | null }[]
   { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
 ];
 function TransactionsPage() {
+  const { name: appName } = useAppName();
   const { state } = useDemoStore();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('All');
@@ -540,7 +544,7 @@ function TransactionsPage() {
   const clear = () => { setQuery(''); setTab('All'); setStatus('All statuses'); setFrom(''); setTo(''); };
   return <div className="stack"><div className="page-intro"><h2>Every movement, easy to follow.</h2><p>Grants, deposits, fees, and payout requests in one activity ledger. Balances are calculated from these entries.</p></div><div className="card card-pad">
     <div className="tabs mb" role="tablist" aria-label="Transaction type">{TRANSACTION_TABS.map(t => <button key={t.label} role="tab" aria-selected={tab === t.label} className={`tab ${tab === t.label ? 'active' : ''}`} onClick={() => setTab(t.label)} data-testid={`tab-transactions-${t.label.toLowerCase()}`}>{t.label}</button>)}</div>
-    <div className="toolbar"><div className="search-wrap"><Search size={16} /><input className="input" type="search" placeholder="Search activity or reference" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search activity" data-testid="input-search-transactions" /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SlidersHorizontal size={15} color="hsl(var(--muted))" /><select className="select" style={{ width: 140 }} value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by status" data-testid="select-transaction-status"><option>All statuses</option><option>Completed</option><option>Pending</option><option>Failed</option><option>Cancelled</option></select><input className="input" style={{ width: 150 }} type="date" value={from} onChange={e => setFrom(e.target.value)} aria-label="From date" data-testid="input-transactions-from" /><input className="input" style={{ width: 150 }} type="date" value={to} onChange={e => setTo(e.target.value)} aria-label="To date" data-testid="input-transactions-to" /><button className="btn btn-ghost" disabled={!filtered.length} onClick={() => exportCsv(filtered)} data-testid="button-export-transactions"><Download size={14} /> Export</button></div></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={16} /><input className="input" type="search" placeholder="Search activity or reference" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search activity" data-testid="input-search-transactions" /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SlidersHorizontal size={15} color="hsl(var(--muted))" /><select className="select" style={{ width: 140 }} value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by status" data-testid="select-transaction-status"><option>All statuses</option><option>Completed</option><option>Pending</option><option>Failed</option><option>Cancelled</option></select><input className="input" style={{ width: 150 }} type="date" value={from} onChange={e => setFrom(e.target.value)} aria-label="From date" data-testid="input-transactions-from" /><input className="input" style={{ width: 150 }} type="date" value={to} onChange={e => setTo(e.target.value)} aria-label="To date" data-testid="input-transactions-to" /><button className="btn btn-ghost" disabled={!filtered.length} onClick={() => exportCsv(filtered, appName)} data-testid="button-export-transactions"><Download size={14} /> Export</button></div></div>
     {filtered.length ? <TransactionTable rows={filtered} action={tx => <button className="icon-btn" onClick={() => setReceipt(tx)} aria-label={`Receipt for ${tx.reference ?? tx.id}`} data-testid={`button-receipt-${tx.id}`}><Receipt size={15} /></button>} /> : <div className="empty-state"><div className="empty-icon"><Search size={19} /></div><h3>No activity found</h3><p>Try a different search, date range, or filter.</p><button className="btn btn-ghost" onClick={clear} data-testid="button-clear-transaction-filters">Clear filters</button></div>}
   </div>{receipt && <ReceiptModal tx={receipt} onClose={() => setReceipt(null)} />}</div>;
 }
@@ -782,6 +786,7 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
 
 function RouterView({ onToast }: { onToast: Toast }) {
   const [location] = useLocation();
+  const { name: appName } = useAppName();
   useEffect(() => {
     const titles: Record<string, string> = {
       '/': 'Dashboard', '/dashboard': 'Dashboard', '/grants': 'Grant categories',
@@ -795,9 +800,9 @@ function RouterView({ onToast }: { onToast: Toast }) {
     };
     const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
     const description = location.startsWith('/admin')
-      ? 'Explore the arc.fund admin UI preview. Sample records only; admin access and changes are not active.'
-      : 'Explore the arc.fund grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.';
-    document.title = `${title} | arc.fund demo`;
+      ? `Explore the ${appName} admin UI preview. Sample records only; admin access and changes are not active.`
+      : `Explore the ${appName} grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.`;
+    document.title = `${title} | ${appName}${supabase ? '' : ' demo'}`;
     for (const [selector, value] of [
       ['meta[name="description"]', description],
       ['meta[property="og:title"]', document.title],
@@ -805,7 +810,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       ['meta[name="twitter:title"]', document.title],
       ['meta[name="twitter:description"]', description],
     ]) document.querySelector(selector)?.setAttribute('content', value);
-  }, [location]);
+  }, [location, appName]);
   return <Switch>
     <Route path="/login"><LoginPage /></Route>
     <Route path="/signup"><SignUpPage /></Route>
@@ -840,7 +845,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
 function App() {
   const [toast, setToast] = useState<string | null>(null);
   const onToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(current => current === message ? null : current), 4200); };
-  return <DemoStoreProvider><SessionProvider><ServerDataProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></ServerDataProvider></SessionProvider></DemoStoreProvider>;
+  return <AppNameProvider><DemoStoreProvider><SessionProvider><ServerDataProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></ServerDataProvider></SessionProvider></DemoStoreProvider></AppNameProvider>;
 }
 
 export default App;

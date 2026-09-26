@@ -29,6 +29,8 @@ import type {
   AuditLog,
   AwardDecision,
   BadRequestResponse,
+  Branding,
+  BrandingInput,
   CardLimit,
   ChangeRequest,
   CredentialReset,
@@ -6745,6 +6747,173 @@ export const useSetAuthEmailTemplates = <TError = ErrorType<InvalidResponse | Un
         TContext
       > => {
       return useMutation(getSetAuthEmailTemplatesMutationOptions(options));
+    }
+
+export const getGetBrandingUrl = () => {
+
+
+
+
+  return `/api/branding`
+}
+
+/**
+ * Shown on every page, including sign-in pages, so no sign-in is needed.
+ * @summary The application name (public)
+ */
+export const getBranding = async ( options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+  return customFetch<Branding>(getGetBrandingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrandingQueryKey = () => {
+    return [
+    `/api/branding`
+    ] as const;
+    }
+
+
+export const getGetBrandingQueryOptions = <TData = Awaited<ReturnType<typeof getBranding>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrandingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBranding>>> = ({ signal }) => getBranding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBranding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrandingQueryResult = NonNullable<Awaited<ReturnType<typeof getBranding>>>
+export type GetBrandingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary The application name (public)
+ */
+
+export function useGetBranding<TData = Awaited<ReturnType<typeof getBranding>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrandingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetBrandingUrl = () => {
+
+
+
+
+  return `/api/branding`
+}
+
+/**
+ * Applies to the portal, emails, and new authenticator entries. An empty name restores the default. Audited.
+ * @summary Change the application name (super admin)
+ */
+export const setBranding = async (brandingInput: BrandingInput, options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Branding>(getSetBrandingUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(brandingInput)
+  }
+);}
+
+
+
+
+
+export const getSetBrandingMutationKey = () => ['setBranding'] as const;
+
+export const getSetBrandingMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBranding>>, TError,SetBrandingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setBranding>>, TError,SetBrandingMutationVariables, TContext> => {
+
+const mutationKey = getSetBrandingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setBranding>>, SetBrandingMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setBranding(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetBrandingMutationResult = NonNullable<Awaited<ReturnType<typeof setBranding>>>
+    export type SetBrandingMutationBody = BodyType<BrandingInput>
+    export type SetBrandingMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SetBrandingMutationVariables = {data: BodyType<BrandingInput>}
+
+    /**
+ * @summary Change the application name (super admin)
+ */
+export const useSetBranding = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBranding>>, TError,SetBrandingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setBranding>>,
+        TError,
+        SetBrandingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetBrandingMutationOptions(options));
     }
 
 export const getGetInboxUrl = (params?: GetInboxParams,) => {
