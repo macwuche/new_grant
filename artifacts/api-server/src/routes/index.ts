@@ -10,6 +10,7 @@ import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
 import type { StaffRepo } from "../lib/staffRepo";
 import { authenticate, loadStaff } from "../middlewares/auth";
+import { byUser, failureLimiter, LIMITS, rateLimiter, type Limit } from "../middlewares/protect";
 import { activityRouter } from "./activity";
 import { applicantsRouter } from "./applicants";
 import { applicationsRouter } from "./applications";
@@ -22,13 +23,21 @@ import { profileRouter } from "./profile";
 import { programsRouter } from "./programs";
 import { staffRouter } from "./staff";
 
-export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; programRepo: ProgramRepo; profileRepo: ProfileRepo; applicationRepo: ApplicationRepo; activityRepo: ActivityRepo; moneyRepo: MoneyRepo; documentRepo: DocumentRepo; fileStore: FileStore; emailOutbox: EmailOutbox; mailer: Mailer };
+export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; programRepo: ProgramRepo; profileRepo: ProfileRepo; applicationRepo: ApplicationRepo; activityRepo: ActivityRepo; moneyRepo: MoneyRepo; documentRepo: DocumentRepo; fileStore: FileStore; emailOutbox: EmailOutbox; mailer: Mailer;
+  /** Overrides for the rate limits (tests). */
+  limits?: Partial<Record<keyof typeof LIMITS, Limit>> };
 
-export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, mailer }: ApiDeps): IRouter {
+export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, mailer, limits = {} }: ApiDeps): IRouter {
   const router: IRouter = Router();
+  const limit = { ...LIMITS, ...limits };
   router.use(healthRouter);
-  // Everything below requires a verified sign-in token.
-  router.use(authenticate(verifier), loadStaff(staffRepo));
+  // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
+  const writes = rateLimiter(limit.writes, byUser);
+  const uploads = rateLimiter(limit.uploads, byUser);
+  router.use(failureLimiter(limit.anonymous), authenticate(verifier), rateLimiter(limit.user, byUser));
+  router.use((req, res, next) => req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS" ? next() : writes(req, res, next));
+  router.post("/documents", uploads);
+  router.use(loadStaff(staffRepo));
   router.use(meRouter);
   router.use(staffRouter(staffRepo));
   router.use(programsRouter(programRepo, applicationRepo));

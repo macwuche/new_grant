@@ -2,6 +2,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
+import type { ApiDeps } from "./routes";
 import type { AuthUser, TokenVerifier } from "./lib/auth";
 import { seedGrants } from "@workspace/domain/seed";
 import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
@@ -48,7 +49,7 @@ let files: ReturnType<typeof memoryFileStore>;
 let outbox: ReturnType<typeof memoryOutbox>;
 const mailer: Mailer = { configured: false, from: null, send: async () => ({ ok: false, error: "off", retry: false }) };
 
-async function start(v: TokenVerifier | null = verifier) {
+async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits"] = {}) {
   outbox = memoryOutbox();
   const people: { peek(id: string): { email: string; name: string; emailNotifications: boolean } | undefined } = { peek: () => undefined };
   activity = memoryActivity({ outbox, recipient: id => people.peek(id) });
@@ -61,7 +62,7 @@ async function start(v: TokenVerifier | null = verifier) {
   applications = memoryApplicationRepo(programs, [], activity, money);
   documents = memoryDocumentRepo(activity);
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer, limits }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -951,5 +952,48 @@ describe("email delivery", () => {
     const failing = resendMailer("k", "a@example.org", undefined, (async () => new Response("{}", { status: 503 })) as unknown as typeof fetch);
     for (let i = 0; i < RETRY_MINUTES.length; i++) { at = box.rows[0]!.nextAttemptAt; await deliverBatch(box, failing, new Date(at)); }
     expect(box.rows[0]).toMatchObject({ status: "failed", attempts: RETRY_MINUTES.length + 1 });
+  });
+});
+
+describe("protections", () => {
+  const restart = async (limits: ApiDeps["limits"]) => { await new Promise(r => server.close(r)); await start(verifier, limits); };
+
+  it("sends security headers and never caches API responses", async () => {
+    const res = await call("/me", "tok-super");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+    expect(res.headers.get("strict-transport-security")).toContain("max-age=");
+    expect(res.headers.get("x-powered-by")).toBeNull();
+  });
+
+  it("limits each user's requests and changes, without affecting other users", async () => {
+    await restart({ writes: { name: "writes", max: 2, windowMs: 60_000 } });
+    await call("/profile", "tok-maya");
+    const read = (await post("/notifications/read-all", {}, "tok-maya"));
+    expect(read.status).toBe(200);
+    expect(read.headers.get("ratelimit-remaining")).toBe("1");
+    expect((await post("/notifications/read-all", {}, "tok-maya")).status).toBe(200);
+    const limited = await post("/notifications/read-all", {}, "tok-maya");
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBeTruthy();
+    expect((await call("/notifications", "tok-maya")).status).toBe(200);
+    expect((await post("/notifications/read-all", {}, "tok-applicant")).status).toBe(200);
+  });
+
+  it("slows down repeated failed sign-ins from one address, but not signed-in use", async () => {
+    await restart({ anonymous: { name: "anonymous", max: 3, windowMs: 60_000 } });
+    for (let i = 0; i < 5; i++) expect((await call("/me", "tok-super")).status).toBe(200);
+    for (let i = 0; i < 3; i++) expect((await call("/me", "tok-guess")).status).toBe(401);
+    expect((await call("/me", "tok-guess")).status).toBe(429);
+    expect((await call("/healthz")).status).toBe(200);
+  });
+
+  it("limits uploads per user", async () => {
+    await restart({ uploads: { name: "uploads", max: 2, windowMs: 60_000 } });
+    await call("/profile", "tok-maya");
+    expect((await upload("tok-maya", "purpose=identity")).status).toBe(201);
+    expect((await upload("tok-maya", "purpose=identity")).status).toBe(201);
+    expect((await upload("tok-maya", "purpose=identity")).status).toBe(429);
   });
 });

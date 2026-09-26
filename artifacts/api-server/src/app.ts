@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import { apiRouter, type ApiDeps } from "./routes";
 import { logger } from "./lib/logger";
+import { securityHeaders } from "./middlewares/protect";
 
 /** Origins allowed to call the API from a browser: CORS_ORIGINS plus the Replit domains. Same-host requests are always allowed. */
 export function allowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -15,6 +16,7 @@ export function allowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
 
 export function createApp(deps: ApiDeps, origins: string[] = allowedOrigins()): Express {
   const app: Express = express();
+  app.disable("x-powered-by");
   // The client address comes from the proxy in front of the app (Replit's): trust that many hops, no more,
   // so a client can't choose the IP recorded in the audit log.
   app.set("trust proxy", Number(process.env["TRUST_PROXY_HOPS"] ?? 1));
@@ -45,6 +47,7 @@ export function createApp(deps: ApiDeps, origins: string[] = allowedOrigins()): 
       callback(null, { origin: !origin || sameHost || origins.includes(origin) });
     }),
   );
+  app.use(securityHeaders);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
