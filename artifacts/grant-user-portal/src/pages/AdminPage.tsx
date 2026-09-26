@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import {
-  ArrowRight, Building2, ClipboardList, FileText, FolderOpen, Info,
+  ArrowRight, Banknote, Building2, ClipboardList, FileText, FolderOpen, Info,
   LayoutDashboard, Leaf, Mail, Palette, Search, Settings2, ShieldCheck,
   Store, Users, X,
 } from 'lucide-react';
@@ -9,6 +9,8 @@ import { AdminInbox } from './AdminInbox';
 import { AdminEmailSettings } from './AdminEmailSettings';
 import { BrandColorSettings } from './BrandColorSettings';
 import { AdminReviewPanel } from './AdminReviewPanel';
+import { AdminPayouts } from './AdminPayouts';
+import { pendingPayoutTotal } from '@/domain/payouts';
 import { findGrant } from '@/domain/rules';
 import { applicantName, awaitingAction, programBudget, reviewQueue } from '@/domain/review';
 import { CURRENT_APPLICANT_ID } from '@/domain/seed';
@@ -17,7 +19,7 @@ import type { Application as DomainApplication, DemoState } from '@/domain/model
 import { format } from 'date-fns';
 import './AdminPage.css';
 
-export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'grants' | 'settings';
+export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'payouts' | 'grants' | 'settings';
 type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string; applications: number };
 /** Queue row derived from the shared store. */
 type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string };
@@ -55,6 +57,7 @@ const navItems = [
   { section: 'applicants' as const, label: 'Applicants', icon: Users, href: '/admin/applicants' },
   { section: 'inbox' as const, label: 'Email inbox', icon: Mail, href: '/admin/inbox' },
   { section: 'applications' as const, label: 'Applications', icon: ClipboardList, href: '/admin/applications' },
+  { section: 'payouts' as const, label: 'Payouts', icon: Banknote, href: '/admin/payouts' },
   { section: 'grants' as const, label: 'Grant programs', icon: FolderOpen, href: '/admin/grants' },
   { section: 'settings' as const, label: 'Settings', icon: Settings2, href: '/admin/settings' },
 ];
@@ -111,7 +114,7 @@ function Overview({ openReview }: { openReview: (id: string) => void }) {
       <section className="admin-panel"><SectionHead title="Review queue" subtitle="Oldest submissions first. Open one to review it." href="/admin/applications" link="Open queue" />{waiting.length ? <div className="admin-list">{waiting.slice(0, 4).map(a => toRow(state, a)).map(item => <div className="admin-list-item" key={item.id} data-testid={`item-admin-queue-${item.id}`}><span className="admin-list-icon"><FileText size={17} /></span><span className="admin-list-copy"><strong>{item.title}</strong><small>{item.applicant} · {money(item.amount)} · {item.date}</small></span><Badge status={item.status} /><button type="button" className="admin-icon-button" onClick={() => openReview(item.id)} aria-label={`Review application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></div>)}</div> : <p className="admin-review-hint">Nothing is waiting for review.</p>}</section>
       <div className="admin-grid">
         <div className="admin-priority"><span className="admin-eyebrow">Workspace focus</span><strong>A clearer view of every request.</strong><p>Start reviews, request changes, and record decisions. Everything is saved in this browser only.</p><Link href="/admin/applications" data-testid="link-admin-explore-review-queue">Explore review queue <ArrowRight size={14} /></Link></div>
-        <section className="admin-panel"><SectionHead title="At a glance" subtitle="Live counts from this browser's demo data." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>{pad(count('Submitted'))}</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>{pad(count('Under review'))}</strong></div><div className="admin-mini-stat"><span>With applicant for changes</span><strong>{pad(count('Changes requested'))}</strong></div><div className="admin-mini-stat"><span>Approved / declined</span><strong>{pad(count('Approved'))} / {pad(count('Declined'))}</strong></div></section>
+        <section className="admin-panel"><SectionHead title="At a glance" subtitle="Live counts from this browser's demo data." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>{pad(count('Submitted'))}</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>{pad(count('Under review'))}</strong></div><div className="admin-mini-stat"><span>With applicant for changes</span><strong>{pad(count('Changes requested'))}</strong></div><div className="admin-mini-stat"><span>Payouts waiting</span><strong>{pad(state.transactions.filter(t => t.type === 'Withdrawal' && t.status === 'Pending').length)} · {money(pendingPayoutTotal(state))}</strong></div><div className="admin-mini-stat"><span>Approved / declined</span><strong>{pad(count('Approved'))} / {pad(count('Declined'))}</strong></div></section>
       </div>
     </div>
     <div className="admin-overview-bottom">
@@ -192,7 +195,7 @@ function Settings() {
     </section>
     <div className="admin-grid">
       <section className="admin-panel"><SectionHead title="Example sectors" subtitle="Illustrative labels, not live choices." /><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div><div className="admin-settings-callout"><strong>Configuration preview only</strong><p>Editing these options would require authenticated admin access and a backend. This screen does not save changes.</p></div></section>
-      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Authorization</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>This browser</strong></div><div className="admin-mini-stat"><span>Write access</span><strong>Review decisions (browser only)</strong></div></section>
+      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Authorization</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>This browser</strong></div><div className="admin-mini-stat"><span>Write access</span><strong>Reviews &amp; payouts (browser only)</strong></div></section>
     </div>
   </div><AdminEmailSettings /></>;
 }
@@ -202,6 +205,7 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Browse fictional applicant profiles across sectors and regions. Profiles open as read-only previews.' },
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
+  payouts: { eyebrow: 'Funding / Payouts', title: 'Money out, on the record.', description: 'Process applicant withdrawal requests: record each as paid or failed. No payment provider is connected, so nothing is actually sent.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Explore sample grant categories, their focus, and illustrative funding ceilings.' },
   settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Preview the brand color and see where policies, sectors, and review conventions could be managed.' },
 };
@@ -218,15 +222,16 @@ export function AdminPage({ section }: { section: AdminSection }) {
     applicants: <Applicants openDetail={setDetail} />,
     inbox: <AdminInbox />,
     applications: <Applications openReview={setReviewId} />,
+    payouts: <AdminPayouts />,
     grants: <Grants openDetail={setDetail} />,
     settings: <Settings />,
   };
   return <div className="admin-shell">
-    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only. Review decisions and brand color are saved in this browser; there is no staff sign-in or server.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
+    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only. Review decisions, payout records, and brand color are saved in this browser; there is no staff sign-in or server.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
     <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
       <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2026</span></div>{content[section]}</div>
     </main>
-    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
+    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'payouts' ? 'Payouts' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
     {detail && <DetailPanel detail={detail} onClose={closeDetail} />}
     {reviewId && <AdminReviewPanel appId={reviewId} onClose={closeReview} />}
   </div>;

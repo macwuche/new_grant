@@ -1,4 +1,4 @@
-import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, Result, Transaction } from './model';
+import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, PayoutMethod, Profile, Result, Transaction } from './model';
 import { CURRENT_APPLICANT_ID, grants } from './seed';
 
 // Pure business rules. Everything here takes state in and returns state out so it
@@ -190,12 +190,12 @@ export function validateWithdrawal(amount: number, available: number): string | 
   return null;
 }
 
-export function requestWithdrawal(state: DemoState, amount: number, methodType: string, now: Date): Result {
+export function requestWithdrawal(state: DemoState, amount: number, method: PayoutMethod, now: Date): Result {
   const { grant } = computeBalances(ownTransactions(state));
   const error = validateWithdrawal(amount, grant);
   if (error) return fail(error, { amount: error });
   const ids = nextIds(state);
-  const tx: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Withdrawal', description: `Payout to ${methodType}`, amount: -amount, status: 'Pending', createdAt: now.toISOString() };
+  const tx: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Withdrawal', description: `Payout to ${method.type}`, amount: -amount, status: 'Pending', createdAt: now.toISOString(), fee: withdrawalFee(amount), destination: `${method.type} · ${method.label}` };
   return { ok: true, id: tx.id, message: `Payout request ${tx.id} recorded as pending.`, state: { ...state, nextId: ids.nextId, transactions: [tx, ...state.transactions] } };
 }
 

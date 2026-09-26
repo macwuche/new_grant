@@ -46,7 +46,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   }, [appId, seenVersion]);
 
   if (!app || !grant || !budget || app.status === 'Draft') {
-    return <Frame closeRef={closeRef} onClose={onClose} eyebrow={appId}><h2 id="admin-detail-title">Not in the queue</h2><p className="admin-detail-lead">This application no longer exists or has not been submitted.</p></Frame>;
+    return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={appId}><h2 id="admin-detail-title">Not in the queue</h2><p className="admin-detail-lead">This application no longer exists or has not been submitted.</p></ReviewFrame>;
   }
 
   const stale = app.updatedAt !== seenVersion;
@@ -81,7 +81,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     : decision === 'decline' ? (confirming ? 'Confirm decline' : 'Decline') : 'Send change request';
   const messageKey = decision === 'decline' ? 'reason' : 'message';
 
-  return <Frame closeRef={closeRef} onClose={onClose} eyebrow={`${app.id} / Review`}>
+  return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${app.id} / Review`}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{app.businessName}</h2><span className={`admin-badge ${app.status === 'Under review' ? 'review' : slug(app.status)}`} data-testid="status-admin-review">{app.status}</span></div>
     <p className="admin-detail-lead">{applicantName(state, app.applicantId)} · {grant.name}</p>
 
@@ -126,14 +126,14 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     </section>
 
     <div className="admin-detail-note"><Info size={17} /><span>Demo review workflow. Decisions are saved in this browser only and update the applicant preview here. There is no staff sign-in or authorization yet, so never use this with real applicant data.</span></div>
-  </Frame>;
+  </ReviewFrame>;
 }
 
 function Field({ label, value }: { label: string; value: string }) {
   return <div className="admin-detail-field"><dt>{label}</dt><dd data-testid={`text-admin-detail-${slug(label)}`}>{value}</dd></div>;
 }
 
-function Frame({ eyebrow, onClose, closeRef, children }: { eyebrow: string; onClose: () => void; closeRef: React.RefObject<HTMLButtonElement | null>; children: React.ReactNode }) {
+export function ReviewFrame({ eyebrow, onClose, closeRef, children }: { eyebrow: string; onClose: () => void; closeRef: React.RefObject<HTMLButtonElement | null>; children: React.ReactNode }) {
   return <div className="admin-detail-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }} data-testid="overlay-admin-review">
     <aside className="admin-detail admin-review" role="dialog" aria-modal="true" aria-labelledby="admin-detail-title">
       <div className="admin-detail-header"><span className="admin-eyebrow" style={{ margin: 0 }}>{eyebrow}</span><button ref={closeRef} type="button" className="admin-icon-button" onClick={onClose} aria-label="Close review" data-testid="button-close-admin-review"><X size={17} /></button></div>

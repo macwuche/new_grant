@@ -197,7 +197,7 @@
   .admin-content { padding: 22px 18px 55px; }
   .admin-pagehead { align-items: flex-start; }
   .admin-date { display: none; }
-  .admin-mobile-nav { position: fixed; z-index: 50; bottom: 10px; left: 10px; right: 10px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 9px 3px; border: 1px solid #414a55; border-radius: 17px; background: var(--admin-night); box-shadow: 0 12px 25px rgba(20,29,33,.2); }
+  .admin-mobile-nav { position: fixed; z-index: 50; bottom: 10px; left: 10px; right: 10px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 9px 3px; border: 1px solid #414a55; border-radius: 17px; background: var(--admin-night); box-shadow: 0 12px 25px rgba(20,29,33,.2); }
   .admin-mobile-nav a { display: grid; justify-items: center; gap: 4px; min-width: 0; color: #9eabae; font-size: 9px; font-weight: 700; }
   .admin-mobile-nav a.active { color: var(--admin-lime); }
 }

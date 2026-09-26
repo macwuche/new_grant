@@ -65,6 +65,14 @@ export type Transaction = {
   amount: number;
   status: TransactionStatus;
   createdAt: string;
+  /** Withdrawals only: processing fee taken from the amount, and where it goes. */
+  fee?: number;
+  destination?: string;
+  /** Withdrawals only: set when finance marks the payout paid or failed. */
+  processedAt?: string;
+  processedBy?: string;
+  /** Shown to the applicant when a payout fails. */
+  failureReason?: string;
 };
 
 export type PayoutMethod = { id: string; type: string; label: string };

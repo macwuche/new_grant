@@ -15,12 +15,15 @@ Build the application logic first, client-side, against browser-local demo data.
    - Overview, applicants, email inbox (page-memory only), review queue, grant programs, settings with browser-only brand color.
 4. **Admin review logic (browser-only) — Complete**
    - Start review, approve with award (≤ requested, ≤ ceiling, ≤ program budget; credits applicant ledger), request changes (applicant edits and resubmits), decline with reason, internal notes, stale-version guard, cross-tab sync.
-5. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
-6. **Database and API — Not started**
+5. **Payout processing (browser-only) — Complete**
+   - `/admin/payouts`: finance marks withdrawal requests paid or failed (reason required; failed funds return to the applicant). No payment provider.
+6. **Domain unit tests — Complete** (`pnpm test`, Vitest)
+7. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+8. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
-7. **Documents, notifications, email (Resend) — Not started**
-8. **Financial operations — Not started**
-   - Cards, deposits, withdrawals only after provider, compliance, and ledger decisions.
+9. **Documents, notifications, email (Resend) — Not started**
+10. **Real financial operations — Not started**
+   - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
 
 ## Not yet implemented
 
@@ -28,7 +31,7 @@ Build the application logic first, client-side, against browser-local demo data.
 - Sign-in, accounts, staff roles, and authorization; `/admin` is open to anyone with the URL (acceptable only because data is fictional and local).
 - File uploads, private document storage, applicant notifications.
 - Real card issuance, deposits, charges, or payouts.
-- Committed automated tests.
+- End-to-end, accessibility, and security test suites (domain unit tests exist).
 
 ## Frontend foundation
 

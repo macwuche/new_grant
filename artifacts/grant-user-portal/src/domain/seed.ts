@@ -4,6 +4,8 @@ import type { Application, ApplicationEvent, DemoState, Grant, PayoutMethod } fr
 export const CURRENT_APPLICANT_ID = 'APL-1001';
 /** The demo staff member using the admin workspace. No real staff identity exists yet. */
 export const DEMO_REVIEWER = 'Avery Taylor';
+/** The demo finance operator who processes payouts — deliberately not the reviewer. */
+export const DEMO_FINANCE = 'Jordan Lee';
 
 // Illustrative catalog. Amounts, budgets, tiers, and deadlines are examples, not policy.
 export const grants: Grant[] = [
@@ -92,7 +94,7 @@ export function createSeedState(): DemoState {
       { id: 'TX-84019', applicantId: me, type: 'Grant', description: 'Creative Practice award (APP-1932)', amount: 4200, status: 'Completed', createdAt: '2026-08-14T11:05:00.000Z' },
       { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Demo account funding', amount: 450, status: 'Completed', createdAt: '2026-08-06T13:00:00.000Z' },
       { id: 'TX-83984', applicantId: me, type: 'Card fee', description: 'Virtual card issuance', amount: -8.5, status: 'Completed', createdAt: '2026-07-30T09:00:00.000Z' },
-      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z' },
+      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', fee: 1.56, destination: 'Bank transfer · •••• 0842 · Meridian checking' },
     ],
     cards: {
       virtual: { lastFour: '4826', dailyLimit: 1500, frozen: false },
