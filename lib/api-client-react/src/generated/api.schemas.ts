@@ -5,6 +5,207 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type EmailSettingsResendKeySource = typeof EmailSettingsResendKeySource[keyof typeof EmailSettingsResendKeySource];
+
+
+export const EmailSettingsResendKeySource = {
+  settings: 'settings',
+  environment: 'environment',
+  none: 'none',
+} as const;
+
+export type EmailSettingsResendKey = {
+  set: boolean;
+  /** @nullable */
+  last4: string | null;
+  source: EmailSettingsResendKeySource;
+};
+
+export type EmailSettingsFromSource = typeof EmailSettingsFromSource[keyof typeof EmailSettingsFromSource];
+
+
+export const EmailSettingsFromSource = {
+  settings: 'settings',
+  environment: 'environment',
+  none: 'none',
+} as const;
+
+export type EmailSettingsDomain = {
+  name: string;
+  /** @nullable */
+  id: string | null;
+} | null;
+
+export type EmailSettingsWebhook = {
+  /** @nullable */
+  url: string | null;
+  secretSet: boolean;
+};
+
+export type EmailSettingsSupabaseToken = {
+  set: boolean;
+};
+
+export interface EmailSettings {
+  resendKey: EmailSettingsResendKey;
+  /** @nullable */
+  from: string | null;
+  fromSource: EmailSettingsFromSource;
+  /** @nullable */
+  replyTo: string | null;
+  /** @nullable */
+  appUrl: string | null;
+  /** @nullable */
+  inboxAddress: string | null;
+  domain: EmailSettingsDomain;
+  webhook: EmailSettingsWebhook;
+  supabaseToken: EmailSettingsSupabaseToken;
+  sending: boolean;
+  /** @nullable */
+  updatedAt: string | null;
+  /** @nullable */
+  updatedBy: string | null;
+}
+
+export interface EmailSettingsInput {
+  resendKey?: string;
+  fromAddress?: string;
+  replyTo?: string;
+  appUrl?: string;
+  inboxAddress?: string;
+  webhookSecret?: string;
+  supabaseToken?: string;
+}
+
+export interface TestEmailInput {
+  to: string;
+}
+
+export interface EmailDomainInput {
+  name: string;
+  receiving?: boolean;
+}
+
+export type EmailDomainCapabilities = {
+  sending?: string;
+  receiving?: string;
+};
+
+export type EmailDomainRecordsItem = {
+  record: string;
+  name: string;
+  type: string;
+  value?: string;
+  priority?: number;
+  ttl?: string;
+  status: string;
+};
+
+export interface EmailDomain {
+  id: string;
+  name: string;
+  status: string;
+  region?: string;
+  capabilities?: EmailDomainCapabilities;
+  records?: EmailDomainRecordsItem[];
+}
+
+export interface SignupEmailSetting {
+  connected: boolean;
+  /** @nullable */
+  emailConfirmation: boolean | null;
+  error?: string;
+}
+
+export interface SignupEmailSettingInput {
+  emailConfirmation: boolean;
+}
+
+export type InboxMessageDirection = typeof InboxMessageDirection[keyof typeof InboxMessageDirection];
+
+
+export const InboxMessageDirection = {
+  inbound: 'inbound',
+  outbound: 'outbound',
+} as const;
+
+export type InboxMessageAttachmentsItem = {
+  id: string;
+  filename: string;
+  contentType: string;
+  /** @nullable */
+  size: number | null;
+};
+
+export type InboxMessageFolder = typeof InboxMessageFolder[keyof typeof InboxMessageFolder];
+
+
+export const InboxMessageFolder = {
+  inbox: 'inbox',
+  sent: 'sent',
+  archive: 'archive',
+  trash: 'trash',
+} as const;
+
+export interface InboxMessage {
+  id: string;
+  direction: InboxMessageDirection;
+  /** @nullable */
+  resendId: string | null;
+  /** @nullable */
+  messageId: string | null;
+  /** @nullable */
+  inReplyTo: string | null;
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  /** @nullable */
+  text: string | null;
+  /** @nullable */
+  html: string | null;
+  attachments: InboxMessageAttachmentsItem[];
+  /** @nullable */
+  status: string | null;
+  folder: InboxMessageFolder;
+  read: boolean;
+  /** @nullable */
+  sentBy: string | null;
+  at: string;
+}
+
+export interface InboxView {
+  /** @nullable */
+  address: string | null;
+  receiving: boolean;
+  sending: boolean;
+  unread: number;
+  messages: InboxMessage[];
+}
+
+export interface InboxSendInput {
+  to: string;
+  cc?: string;
+  subject: string;
+  text: string;
+  inReplyTo?: string;
+}
+
+export type InboxUpdateInputFolder = typeof InboxUpdateInputFolder[keyof typeof InboxUpdateInputFolder];
+
+
+export const InboxUpdateInputFolder = {
+  inbox: 'inbox',
+  sent: 'sent',
+  archive: 'archive',
+  trash: 'trash',
+} as const;
+
+export interface InboxUpdateInput {
+  folder?: InboxUpdateInputFolder;
+  read?: boolean;
+}
+
 export interface EmailPreference {
   enabled: boolean;
 }
@@ -861,4 +1062,18 @@ purpose: DocumentPurpose;
 applicationId?: string;
 requirement?: string;
 };
+
+export type GetInboxParams = {
+folder?: GetInboxFolder;
+};
+
+export type GetInboxFolder = typeof GetInboxFolder[keyof typeof GetInboxFolder];
+
+
+export const GetInboxFolder = {
+  inbox: 'inbox',
+  sent: 'sent',
+  archive: 'archive',
+  trash: 'trash',
+} as const;
 

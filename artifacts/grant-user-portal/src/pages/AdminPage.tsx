@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Mail, Search, Settings2, ShieldAlert, ShieldCheck, Users,
 } from 'lucide-react';
 import { AdminInbox } from './AdminInbox';
+import { AdminInboxLive } from './AdminInboxLive';
 import { AdminEmailSettings } from './AdminEmailSettings';
 import { BrandColorSettings } from './BrandColorSettings';
 import { AdminReviewPanel } from './AdminReviewPanel';
@@ -209,7 +210,7 @@ function Settings() {
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Fictional applicants with their tier, identity status, balances, and fraud risk. Open a profile to change tier, lock the account, force credential resets, or review identity.' },
-  inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
+  inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'Mail to and from the grant team\'s address.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
   deposits: { eyebrow: 'Funding / Deposits', title: 'Money in, matched by reference.', description: 'Confirm deposits applicants have announced once the transfer arrives, or reject them with a reason. No bank feed is connected.' },
   payouts: { eyebrow: 'Funding / Payouts', title: 'Money out, on the record.', description: 'Process applicant withdrawal requests: record each as paid or failed. No payment provider is connected, so nothing is actually sent.' },
@@ -235,7 +236,7 @@ function AdminWorkspace({ section }: { section: AdminSection }) {
   const content: Record<AdminSection, ReactNode> = {
     overview: <Overview openReview={setReviewId} />,
     applicants: <Applicants openApplicant={setApplicantId} />,
-    inbox: <AdminInbox />,
+    inbox: signedIn ? <AdminInboxLive /> : <AdminInbox />,
     applications: <Applications openReview={setReviewId} />,
     payouts: <><PaymentsTabs tab="payouts" /><AdminPayouts /></>,
     deposits: <><PaymentsTabs tab="deposits" /><AdminDeposits /></>,

@@ -36,13 +36,22 @@ import type {
   DepositRequest,
   DestinationInput,
   Document,
+  EmailDomain,
+  EmailDomainInput,
   EmailPreference,
+  EmailSettings,
+  EmailSettingsInput,
   EmailStatus,
   Error,
   EscalationResolution,
   ForbiddenResponse,
+  GetInboxParams,
   HealthStatus,
   IdentitySubmission,
+  InboxMessage,
+  InboxSendInput,
+  InboxUpdateInput,
+  InboxView,
   InternalNoteInput,
   InvalidResponse,
   LedgerEntry,
@@ -65,11 +74,14 @@ import type {
   ProgramUpdate,
   ProgramVersion,
   Reason,
+  SignupEmailSetting,
+  SignupEmailSettingInput,
   StaffFeedItem,
   StaffMember,
   StaffMemberCreate,
   StaffMemberUpdate,
   StaleResponse,
+  TestEmailInput,
   TierChange,
   UnauthorizedResponse,
   UploadDocumentParams,
@@ -5919,4 +5931,933 @@ export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStat
 
 
 
+
+export const getGetEmailSettingsUrl = () => {
+
+
+
+
+  return `/api/email/settings`
+}
+
+/**
+ * Requires staff.manage. Secrets are never returned, only whether they are set.
+ * @summary Email settings (super admin)
+ */
+export const getEmailSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<EmailSettings> => {
+
+  return customFetch<EmailSettings>(getGetEmailSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailSettingsQueryKey = () => {
+    return [
+    `/api/email/settings`
+    ] as const;
+    }
+
+
+export const getGetEmailSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getEmailSettings>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailSettings>>> = ({ signal }) => getEmailSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailSettings>>>
+export type GetEmailSettingsQueryError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Email settings (super admin)
+ */
+
+export function useGetEmailSettings<TData = Awaited<ReturnType<typeof getEmailSettings>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveEmailSettingsUrl = () => {
+
+
+
+
+  return `/api/email/settings`
+}
+
+/**
+ * Requires staff.manage. Send only the fields to change; an empty string clears a saved value. A new Resend key or Supabase token is checked with the provider before saving. Audited without secret values.
+ * @summary Save email settings (super admin)
+ */
+export const saveEmailSettings = async (emailSettingsInput: EmailSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<EmailSettings> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EmailSettings>(getSaveEmailSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(emailSettingsInput)
+  }
+);}
+
+
+
+
+
+export const getSaveEmailSettingsMutationKey = () => ['saveEmailSettings'] as const;
+
+export const getSaveEmailSettingsMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEmailSettings>>, TError,SaveEmailSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveEmailSettings>>, TError,SaveEmailSettingsMutationVariables, TContext> => {
+
+const mutationKey = getSaveEmailSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveEmailSettings>>, SaveEmailSettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveEmailSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveEmailSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof saveEmailSettings>>>
+    export type SaveEmailSettingsMutationBody = BodyType<EmailSettingsInput>
+    export type SaveEmailSettingsMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SaveEmailSettingsMutationVariables = {data: BodyType<EmailSettingsInput>}
+
+    /**
+ * @summary Save email settings (super admin)
+ */
+export const useSaveEmailSettings = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEmailSettings>>, TError,SaveEmailSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveEmailSettings>>,
+        TError,
+        SaveEmailSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveEmailSettingsMutationOptions(options));
+    }
+
+export const getSendTestEmailUrl = () => {
+
+
+
+
+  return `/api/email/test`
+}
+
+/**
+ * Sends straight through Resend with the current settings.
+ * @summary Send a test email (super admin)
+ */
+export const sendTestEmail = async (testEmailInput: TestEmailInput, options?: Parameters<typeof customFetch>[1]): Promise<Message> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Message>(getSendTestEmailUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(testEmailInput)
+  }
+);}
+
+
+
+
+
+export const getSendTestEmailMutationKey = () => ['sendTestEmail'] as const;
+
+export const getSendTestEmailMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTestEmail>>, TError,SendTestEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendTestEmail>>, TError,SendTestEmailMutationVariables, TContext> => {
+
+const mutationKey = getSendTestEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendTestEmail>>, SendTestEmailMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendTestEmail(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendTestEmailMutationResult = NonNullable<Awaited<ReturnType<typeof sendTestEmail>>>
+    export type SendTestEmailMutationBody = BodyType<TestEmailInput>
+    export type SendTestEmailMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SendTestEmailMutationVariables = {data: BodyType<TestEmailInput>}
+
+    /**
+ * @summary Send a test email (super admin)
+ */
+export const useSendTestEmail = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTestEmail>>, TError,SendTestEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendTestEmail>>,
+        TError,
+        SendTestEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendTestEmailMutationOptions(options));
+    }
+
+export const getGetEmailDomainUrl = () => {
+
+
+
+
+  return `/api/email/domain`
+}
+
+/**
+ * Null when no domain has been added.
+ * @summary The sending and receiving domain in Resend, with DNS records (super admin)
+ */
+export const getEmailDomain = async ( options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
+
+  return customFetch<unknown>(getGetEmailDomainUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailDomainQueryKey = () => {
+    return [
+    `/api/email/domain`
+    ] as const;
+    }
+
+
+export const getGetEmailDomainQueryOptions = <TData = Awaited<ReturnType<typeof getEmailDomain>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailDomain>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailDomainQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailDomain>>> = ({ signal }) => getEmailDomain({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailDomain>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailDomainQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailDomain>>>
+export type GetEmailDomainQueryError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary The sending and receiving domain in Resend, with DNS records (super admin)
+ */
+
+export function useGetEmailDomain<TData = Awaited<ReturnType<typeof getEmailDomain>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailDomain>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailDomainQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAddEmailDomainUrl = () => {
+
+
+
+
+  return `/api/email/domain`
+}
+
+/**
+ * Reuses the domain if it already exists in the Resend account.
+ * @summary Add the domain in Resend (super admin)
+ */
+export const addEmailDomain = async (emailDomainInput: EmailDomainInput, options?: Parameters<typeof customFetch>[1]): Promise<EmailDomain> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EmailDomain>(getAddEmailDomainUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(emailDomainInput)
+  }
+);}
+
+
+
+
+
+export const getAddEmailDomainMutationKey = () => ['addEmailDomain'] as const;
+
+export const getAddEmailDomainMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addEmailDomain>>, TError,AddEmailDomainMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addEmailDomain>>, TError,AddEmailDomainMutationVariables, TContext> => {
+
+const mutationKey = getAddEmailDomainMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addEmailDomain>>, AddEmailDomainMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  addEmailDomain(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddEmailDomainMutationResult = NonNullable<Awaited<ReturnType<typeof addEmailDomain>>>
+    export type AddEmailDomainMutationBody = BodyType<EmailDomainInput>
+    export type AddEmailDomainMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type AddEmailDomainMutationVariables = {data: BodyType<EmailDomainInput>}
+
+    /**
+ * @summary Add the domain in Resend (super admin)
+ */
+export const useAddEmailDomain = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addEmailDomain>>, TError,AddEmailDomainMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addEmailDomain>>,
+        TError,
+        AddEmailDomainMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddEmailDomainMutationOptions(options));
+    }
+
+export const getVerifyEmailDomainUrl = () => {
+
+
+
+
+  return `/api/email/domain/verify`
+}
+
+/**
+ * Returns the domain with each record's current status.
+ * @summary Ask Resend to check the domain's DNS records (super admin)
+ */
+export const verifyEmailDomain = async ( options?: Parameters<typeof customFetch>[1]): Promise<EmailDomain> => {
+
+  return customFetch<EmailDomain>(getVerifyEmailDomainUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyEmailDomainMutationKey = () => ['verifyEmailDomain'] as const;
+
+export const getVerifyEmailDomainMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyEmailDomain>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyEmailDomain>>, TError,void, TContext> => {
+
+const mutationKey = getVerifyEmailDomainMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyEmailDomain>>, void> = () => {
+
+
+          return  verifyEmailDomain(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyEmailDomainMutationResult = NonNullable<Awaited<ReturnType<typeof verifyEmailDomain>>>
+
+    export type VerifyEmailDomainMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+    /**
+ * @summary Ask Resend to check the domain's DNS records (super admin)
+ */
+export const useVerifyEmailDomain = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyEmailDomain>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyEmailDomain>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getVerifyEmailDomainMutationOptions(options));
+    }
+
+export const getGetSignupEmailSettingUrl = () => {
+
+
+
+
+  return `/api/email/auth-settings`
+}
+
+/**
+ * Read from Supabase with the saved access token; connected is false without one.
+ * @summary Whether new accounts must confirm their email (super admin)
+ */
+export const getSignupEmailSetting = async ( options?: Parameters<typeof customFetch>[1]): Promise<SignupEmailSetting> => {
+
+  return customFetch<SignupEmailSetting>(getGetSignupEmailSettingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignupEmailSettingQueryKey = () => {
+    return [
+    `/api/email/auth-settings`
+    ] as const;
+    }
+
+
+export const getGetSignupEmailSettingQueryOptions = <TData = Awaited<ReturnType<typeof getSignupEmailSetting>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSignupEmailSetting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignupEmailSettingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignupEmailSetting>>> = ({ signal }) => getSignupEmailSetting({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignupEmailSetting>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSignupEmailSettingQueryResult = NonNullable<Awaited<ReturnType<typeof getSignupEmailSetting>>>
+export type GetSignupEmailSettingQueryError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Whether new accounts must confirm their email (super admin)
+ */
+
+export function useGetSignupEmailSetting<TData = Awaited<ReturnType<typeof getSignupEmailSetting>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSignupEmailSetting>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSignupEmailSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetSignupEmailSettingUrl = () => {
+
+
+
+
+  return `/api/email/auth-settings`
+}
+
+/**
+ * Changes the Supabase project's auth setting through the Management API. Audited.
+ * @summary Turn sign-up email confirmation on or off (super admin)
+ */
+export const setSignupEmailSetting = async (signupEmailSettingInput: SignupEmailSettingInput, options?: Parameters<typeof customFetch>[1]): Promise<SignupEmailSetting> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SignupEmailSetting>(getSetSignupEmailSettingUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(signupEmailSettingInput)
+  }
+);}
+
+
+
+
+
+export const getSetSignupEmailSettingMutationKey = () => ['setSignupEmailSetting'] as const;
+
+export const getSetSignupEmailSettingMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setSignupEmailSetting>>, TError,SetSignupEmailSettingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setSignupEmailSetting>>, TError,SetSignupEmailSettingMutationVariables, TContext> => {
+
+const mutationKey = getSetSignupEmailSettingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setSignupEmailSetting>>, SetSignupEmailSettingMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setSignupEmailSetting(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetSignupEmailSettingMutationResult = NonNullable<Awaited<ReturnType<typeof setSignupEmailSetting>>>
+    export type SetSignupEmailSettingMutationBody = BodyType<SignupEmailSettingInput>
+    export type SetSignupEmailSettingMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SetSignupEmailSettingMutationVariables = {data: BodyType<SignupEmailSettingInput>}
+
+    /**
+ * @summary Turn sign-up email confirmation on or off (super admin)
+ */
+export const useSetSignupEmailSetting = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setSignupEmailSetting>>, TError,SetSignupEmailSettingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setSignupEmailSetting>>,
+        TError,
+        SetSignupEmailSettingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetSignupEmailSettingMutationOptions(options));
+    }
+
+export const getGetInboxUrl = (params?: GetInboxParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/inbox?${stringifiedParams}` : `/api/inbox`
+}
+
+/**
+ * Any active staff member. Up to 200 messages in the folder, newest first.
+ * @summary The team mailbox (staff)
+ */
+export const getInbox = async (params?: GetInboxParams, options?: Parameters<typeof customFetch>[1]): Promise<InboxView> => {
+
+  return customFetch<InboxView>(getGetInboxUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInboxQueryKey = (params?: GetInboxParams,) => {
+    return [
+    `/api/inbox`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetInboxQueryOptions = <TData = Awaited<ReturnType<typeof getInbox>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(params?: GetInboxParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInboxQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInbox>>> = ({ signal }) => getInbox(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInboxQueryResult = NonNullable<Awaited<ReturnType<typeof getInbox>>>
+export type GetInboxQueryError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary The team mailbox (staff)
+ */
+
+export function useGetInbox<TData = Awaited<ReturnType<typeof getInbox>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(
+ params?: GetInboxParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInboxQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendInboxEmailUrl = () => {
+
+
+
+
+  return `/api/inbox/send`
+}
+
+/**
+ * Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+ * @summary Send or reply from the team mailbox (staff)
+ */
+export const sendInboxEmail = async (inboxSendInput: InboxSendInput, options?: Parameters<typeof customFetch>[1]): Promise<InboxMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InboxMessage>(getSendInboxEmailUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(inboxSendInput)
+  }
+);}
+
+
+
+
+
+export const getSendInboxEmailMutationKey = () => ['sendInboxEmail'] as const;
+
+export const getSendInboxEmailMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendInboxEmail>>, TError,SendInboxEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendInboxEmail>>, TError,SendInboxEmailMutationVariables, TContext> => {
+
+const mutationKey = getSendInboxEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendInboxEmail>>, SendInboxEmailMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendInboxEmail(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendInboxEmailMutationResult = NonNullable<Awaited<ReturnType<typeof sendInboxEmail>>>
+    export type SendInboxEmailMutationBody = BodyType<InboxSendInput>
+    export type SendInboxEmailMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SendInboxEmailMutationVariables = {data: BodyType<InboxSendInput>}
+
+    /**
+ * @summary Send or reply from the team mailbox (staff)
+ */
+export const useSendInboxEmail = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendInboxEmail>>, TError,SendInboxEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendInboxEmail>>,
+        TError,
+        SendInboxEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendInboxEmailMutationOptions(options));
+    }
+
+export const getUpdateInboxMessageUrl = (id: string,) => {
+
+
+
+
+  return `/api/inbox/${id}/update`
+}
+
+/**
+ * Folder inbox, sent, archive, or trash.
+ * @summary Move a message or mark it read (staff)
+ */
+export const updateInboxMessage = async (id: string,
+    inboxUpdateInput: InboxUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<InboxMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InboxMessage>(getUpdateInboxMessageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(inboxUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateInboxMessageMutationKey = () => ['updateInboxMessage'] as const;
+
+export const getUpdateInboxMessageMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInboxMessage>>, TError,UpdateInboxMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInboxMessage>>, TError,UpdateInboxMessageMutationVariables, TContext> => {
+
+const mutationKey = getUpdateInboxMessageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInboxMessage>>, UpdateInboxMessageMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateInboxMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInboxMessageMutationResult = NonNullable<Awaited<ReturnType<typeof updateInboxMessage>>>
+    export type UpdateInboxMessageMutationBody = BodyType<InboxUpdateInput>
+    export type UpdateInboxMessageMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type UpdateInboxMessageMutationVariables = {id: string;data: BodyType<InboxUpdateInput>}
+
+    /**
+ * @summary Move a message or mark it read (staff)
+ */
+export const useUpdateInboxMessage = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInboxMessage>>, TError,UpdateInboxMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInboxMessage>>,
+        TError,
+        UpdateInboxMessageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateInboxMessageMutationOptions(options));
+    }
 

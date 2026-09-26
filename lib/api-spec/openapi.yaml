@@ -1700,6 +1700,257 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /email/settings:
+    get:
+      operationId: getEmailSettings
+      tags: [email]
+      summary: Email settings (super admin)
+      description: Requires staff.manage. Secrets are never returned, only whether they are set.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: saveEmailSettings
+      tags: [email]
+      summary: Save email settings (super admin)
+      description: Requires staff.manage. Send only the fields to change; an empty string clears a saved value. A new Resend key or Supabase token is checked with the provider before saving. Audited without secret values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailSettingsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /email/test:
+    post:
+      operationId: sendTestEmail
+      tags: [email]
+      summary: Send a test email (super admin)
+      description: Sends straight through Resend with the current settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestEmailInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /email/domain:
+    get:
+      operationId: getEmailDomain
+      tags: [email]
+      summary: The sending and receiving domain in Resend, with DNS records (super admin)
+      description: Null when no domain has been added.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf: [{{ $ref: "#/components/schemas/EmailDomain" }}, {{ type: "null" }}]
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: addEmailDomain
+      tags: [email]
+      summary: Add the domain in Resend (super admin)
+      description: Reuses the domain if it already exists in the Resend account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailDomainInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDomain"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /email/domain/verify:
+    post:
+      operationId: verifyEmailDomain
+      tags: [email]
+      summary: Ask Resend to check the domain's DNS records (super admin)
+      description: Returns the domain with each record's current status.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDomain"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /email/auth-settings:
+    get:
+      operationId: getSignupEmailSetting
+      tags: [email]
+      summary: Whether new accounts must confirm their email (super admin)
+      description: Read from Supabase with the saved access token; connected is false without one.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupEmailSetting"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: setSignupEmailSetting
+      tags: [email]
+      summary: Turn sign-up email confirmation on or off (super admin)
+      description: Changes the Supabase project's auth setting through the Management API. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupEmailSettingInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupEmailSetting"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /inbox:
+    get:
+      operationId: getInbox
+      tags: [email]
+      summary: The team mailbox (staff)
+      description: Any active staff member. Up to 200 messages in the folder, newest first.
+      parameters:
+        - name: folder
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [inbox, sent, archive, trash]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxView"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /inbox/send:
+    post:
+      operationId: sendInboxEmail
+      tags: [email]
+      summary: Send or reply from the team mailbox (staff)
+      description: Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InboxSendInput"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxMessage"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /inbox/{id}/update:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    post:
+      operationId: updateInboxMessage
+      tags: [email]
+      summary: Move a message or mark it read (staff)
+      description: Folder inbox, sent, archive, or trash.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InboxUpdateInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxMessage"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
   securitySchemes:
     bearerAuth:
@@ -1800,6 +2051,159 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    EmailSettings:
+      type: object
+      properties:
+        resendKey:
+          type: object
+          properties:
+            set: { type: boolean }
+            last4: { type: [string, "null"] }
+            source: { type: string, enum: [settings, environment, none] }
+          required: [set, last4, source]
+        from: { type: [string, "null"] }
+        fromSource: { type: string, enum: [settings, environment, none] }
+        replyTo: { type: [string, "null"] }
+        appUrl: { type: [string, "null"] }
+        inboxAddress: { type: [string, "null"] }
+        domain:
+          oneOf:
+            - type: object
+              properties:
+                name: { type: string }
+                id: { type: [string, "null"] }
+              required: [name, id]
+            - type: "null"
+        webhook:
+          type: object
+          properties:
+            url: { type: [string, "null"] }
+            secretSet: { type: boolean }
+          required: [url, secretSet]
+        supabaseToken:
+          type: object
+          properties:
+            set: { type: boolean }
+          required: [set]
+        sending: { type: boolean }
+        updatedAt: { type: [string, "null"] }
+        updatedBy: { type: [string, "null"] }
+      required: [resendKey, from, fromSource, replyTo, appUrl, inboxAddress, domain, webhook, supabaseToken, sending, updatedAt, updatedBy]
+    EmailSettingsInput:
+      type: object
+      properties:
+        resendKey: { type: string }
+        fromAddress: { type: string }
+        replyTo: { type: string }
+        appUrl: { type: string }
+        inboxAddress: { type: string }
+        webhookSecret: { type: string }
+        supabaseToken: { type: string }
+    TestEmailInput:
+      type: object
+      properties:
+        to: { type: string }
+      required: [to]
+    EmailDomainInput:
+      type: object
+      properties:
+        name: { type: string }
+        receiving: { type: boolean }
+      required: [name]
+    EmailDomain:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string }
+        region: { type: string }
+        capabilities:
+          type: object
+          properties:
+            sending: { type: string }
+            receiving: { type: string }
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              record: { type: string }
+              name: { type: string }
+              type: { type: string }
+              value: { type: string }
+              priority: { type: number }
+              ttl: { type: string }
+              status: { type: string }
+            required: [record, name, type, status]
+      required: [id, name, status]
+    SignupEmailSetting:
+      type: object
+      properties:
+        connected: { type: boolean }
+        emailConfirmation: { type: [boolean, "null"] }
+        error: { type: string }
+      required: [connected, emailConfirmation]
+    SignupEmailSettingInput:
+      type: object
+      properties:
+        emailConfirmation: { type: boolean }
+      required: [emailConfirmation]
+    InboxMessage:
+      type: object
+      properties:
+        id: { type: string }
+        direction: { type: string, enum: [inbound, outbound] }
+        resendId: { type: [string, "null"] }
+        messageId: { type: [string, "null"] }
+        inReplyTo: { type: [string, "null"] }
+        from: { type: string }
+        to: { type: array, items: { type: string } }
+        cc: { type: array, items: { type: string } }
+        subject: { type: string }
+        text: { type: [string, "null"] }
+        html: { type: [string, "null"] }
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              filename: { type: string }
+              contentType: { type: string }
+              size: { type: [number, "null"] }
+            required: [id, filename, contentType, size]
+        status: { type: [string, "null"] }
+        folder: { type: string, enum: [inbox, sent, archive, trash] }
+        read: { type: boolean }
+        sentBy: { type: [string, "null"] }
+        at: { type: string }
+      required: [id, direction, resendId, messageId, inReplyTo, from, to, cc, subject, text, html, attachments, status, folder, read, sentBy, at]
+    InboxView:
+      type: object
+      properties:
+        address: { type: [string, "null"] }
+        receiving: { type: boolean }
+        sending: { type: boolean }
+        unread: { type: integer }
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/InboxMessage"
+      required: [address, receiving, sending, unread, messages]
+    InboxSendInput:
+      type: object
+      properties:
+        to: { type: string }
+        cc: { type: string }
+        subject: { type: string }
+        text: { type: string }
+        inReplyTo: { type: string }
+      required: [to, subject, text]
+    InboxUpdateInput:
+      type: object
+      properties:
+        folder: { type: string, enum: [inbox, sent, archive, trash] }
+        read: { type: boolean }
     EmailPreference:
       type: object
       properties:

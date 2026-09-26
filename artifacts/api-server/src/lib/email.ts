@@ -20,6 +20,8 @@ export interface EmailOutbox {
   /** `retryAt` null means give up. */
   markFailed(seq: number, error: string, retryAt: Date | null): Promise<void>;
   markSkipped(seq: number, reason: string): Promise<void>;
+  /** What Resend reported after sending (from the webhook), by Resend's id. */
+  recordDelivery(providerId: string, delivery: string): Promise<void>;
   /** Counts per status and the most recent entries (newest first), for staff. */
   summary(recent: number): Promise<{ counts: Record<OutboxStatus, number>; recent: OutboxEntry[] }>;
 }
@@ -28,8 +30,13 @@ export interface EmailOutbox {
 
 const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/** The public address of the portal, for links in emails: APP_URL, else the Replit dev domain. */
+let appUrlOverride: string | null | undefined;
+/** Set by the settings loader: the portal address saved in the admin settings (null clears it). */
+export const setAppUrlOverride = (url: string | null) => { appUrlOverride = url; };
+
+/** The public address of the portal, for links in emails: the saved setting, APP_URL, else the Replit dev domain. */
 export function appUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (appUrlOverride) return appUrlOverride;
   const explicit = env["APP_URL"]?.trim().replace(/\/+$/, "");
   if (explicit) return explicit;
   const dev = env["REPLIT_DEV_DOMAIN"]?.trim();
@@ -111,15 +118,10 @@ export function resendMailer(apiKey: string, from: string, replyTo?: string, fet
 /** Used when RESEND_API_KEY isn't set: nothing is sent. */
 export const unconfiguredMailer: Mailer = { configured: false, from: null, send: async () => ({ ok: false, error: "Email isn't configured", retry: false }) };
 
-/** The mailer from the environment: RESEND_API_KEY and EMAIL_FROM (optional EMAIL_REPLY_TO). */
-export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer {
-  const key = env["RESEND_API_KEY"]?.trim();
-  const from = env["EMAIL_FROM"]?.trim();
-  if (!key || !from) {
-    if (key || from) logger.warn("Set both RESEND_API_KEY and EMAIL_FROM to send email; email stays off");
-    return unconfiguredMailer;
-  }
-  return resendMailer(key, from, env["EMAIL_REPLY_TO"]?.trim() || undefined);
+/** The mailer for a Resend key and sender (from the admin settings or the environment); off unless both are set. */
+export function mailerFor(config: { resendKey: string | null; from: string | null; replyTo: string | null }, fetchImpl: typeof fetch = fetch): Mailer {
+  if (!config.resendKey || !config.from) return unconfiguredMailer;
+  return resendMailer(config.resendKey, config.from, config.replyTo ?? undefined, fetchImpl);
 }
 
 /** Minutes to wait before attempt n+1 (after n failed attempts); past the end, give up. */
@@ -139,13 +141,13 @@ export async function deliverBatch(outbox: EmailOutbox, mailer: Mailer, now = ne
   return batch.length;
 }
 
-/** Runs deliverBatch every `intervalMs` (and straight away). Returns a stop function. */
-export function startEmailWorker(outbox: EmailOutbox, mailer: Mailer, intervalMs = 15_000): () => void {
+/** Runs deliverBatch every `intervalMs` (and straight away), with the mailer as currently configured. Returns a stop function. */
+export function startEmailWorker(outbox: EmailOutbox, mailer: () => Promise<Mailer>, intervalMs = 15_000): () => void {
   let running = false;
   const tick = async () => {
     if (running) return;
     running = true;
-    try { while (await deliverBatch(outbox, mailer) > 0) { /* keep going while there's a backlog */ } }
+    try { const current = await mailer(); while (await deliverBatch(outbox, current) > 0) { /* keep going while there's a backlog */ } }
     catch (err) { logger.error({ err }, "email worker failed"); }
     finally { running = false; }
   };
@@ -170,6 +172,7 @@ export function memoryOutbox() {
     },
     markSent: async (s, providerId, now) => { const r = rows.find(x => x.seq === s)!; Object.assign(r, { status: "sent", providerId, sentAt: now.toISOString(), lastError: null }); },
     markFailed: async (s, error, retryAt) => { const r = rows.find(x => x.seq === s)!; Object.assign(r, { status: retryAt ? "queued" : "failed", lastError: error, nextAttemptAt: retryAt?.getTime() ?? r.nextAttemptAt }); },
+    recordDelivery: async (providerId, delivery) => { for (const r of rows) if (r.providerId === providerId) Object.assign(r, { delivery }); },
     markSkipped: async (s, reason) => { const r = rows.find(x => x.seq === s)!; Object.assign(r, { status: "skipped", lastError: reason }); },
     summary: async recent => {
       const counts: Record<OutboxStatus, number> = { queued: 0, sending: 0, sent: 0, failed: 0, skipped: 0 };

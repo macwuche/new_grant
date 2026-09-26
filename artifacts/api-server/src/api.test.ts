@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -11,7 +12,9 @@ import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRe
 import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore } from "./lib/fileStore";
-import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, unconfiguredMailer, type Mailer } from "./lib/email";
+import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, unconfiguredMailer } from "./lib/email";
+import { memoryEmailSettingsRepo } from "./lib/emailSettings";
+import { memoryInboxRepo } from "./lib/inbox";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
 import { seedTreasury } from "@workspace/domain/seed";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
@@ -56,7 +59,18 @@ let money: ReturnType<typeof memoryMoneyRepo>;
 let documents: DocumentRepo;
 let files: ReturnType<typeof memoryFileStore>;
 let outbox: ReturnType<typeof memoryOutbox>;
-const mailer: Mailer = { configured: false, from: null, send: async () => ({ ok: false, error: "off", retry: false }) };
+let emailSettings: ReturnType<typeof memoryEmailSettingsRepo>;
+let inbox: ReturnType<typeof memoryInboxRepo>;
+/** Fake Resend and Supabase: tests set `providerReplies` (by "METHOD path") and read `providerCalls`. */
+let providerCalls: { method: string; url: string; headers: Record<string, string>; body: unknown }[] = [];
+let providerReplies: Record<string, { status: number; body: unknown }> = {};
+const providerFetch = (async (url: string, init: RequestInit = {}) => {
+  const method = init.method ?? "GET";
+  providerCalls.push({ method, url, headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(String(init.body)) : null });
+  const path = new URL(url).pathname;
+  const reply = providerReplies[`${method} ${path}`] ?? { status: 404, body: { message: "not found" } };
+  return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { "content-type": "application/json" } });
+}) as unknown as typeof fetch;
 
 async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits"] = {}) {
   outbox = memoryOutbox();
@@ -70,8 +84,11 @@ async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits
   money = memoryMoneyRepo(profiles, { treasury: seedTreasury(), lockdown: null }, activity);
   applications = memoryApplicationRepo(programs, [], activity, money);
   documents = memoryDocumentRepo(activity);
+  emailSettings = memoryEmailSettingsRepo(activity);
+  inbox = memoryInboxRepo();
+  providerCalls = []; providerReplies = {};
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer, limits }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, fetchImpl: providerFetch, limits }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -1053,9 +1070,108 @@ describe("two-step sign-in", () => {
 
   it("can be switched off for staff (STAFF_MFA_REQUIRED=false)", async () => {
     await new Promise(r => server.close(r));
-    server = createApp({ verifier, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer, staffMfa: false }, ["https://app.example.org"]).listen(0);
+    server = createApp({ verifier, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, fetchImpl: providerFetch, staffMfa: false }, ["https://app.example.org"]).listen(0);
     await new Promise(r => server.once("listening", r));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
     expect((await call("/applications", "tok-super-password-only")).status).toBe(200);
+  });
+});
+
+describe("email settings, domain, sign-up confirmation, webhook, and inbox", () => {
+  const KEY = "re_test_1234567890abcd";
+  const SECRET = `whsec_${Buffer.from("a-very-secret-signing-key-32byte").toString("base64")}`;
+  const TOKEN = "sbp_0123456789abcdef0123456789abcdef";
+  const sign = (body: string, id = "msg_1", ts = Math.floor(Date.now() / 1000)) => ({
+    "svix-id": id, "svix-timestamp": String(ts),
+    "svix-signature": `v1,${createHmac("sha256", Buffer.from(SECRET.slice(6), "base64")).update(`${id}.${ts}.${body}`).digest("base64")}`,
+  });
+  const hook = (event: unknown, headers?: Record<string, string>) => {
+    const body = JSON.stringify(event);
+    return fetch(`${base}/email/webhook`, { method: "POST", body, headers: { "content-type": "application/json", ...(headers ?? sign(body)) } });
+  };
+  const configure = async () => {
+    providerReplies["GET /domains"] = { status: 200, body: { data: [] } };
+    return put("/email/settings", { resendKey: KEY, fromAddress: "Nova Bridge <grants@novabridgegrant.org>", inboxAddress: "info@novabridgegrant.org", webhookSecret: SECRET, appUrl: "https://app.example.org" });
+  };
+
+  it("lets only super admins save settings, checks the key with Resend, and never returns secrets", async () => {
+    expect((await call("/email/settings", "tok-finance")).status).toBe(403);
+    const bad = await put("/email/settings", { resendKey: "sk_live_nope", fromAddress: "not an address" });
+    expect((await json(bad)).fieldErrors).toMatchObject({ resendKey: expect.any(String), fromAddress: expect.any(String) });
+    providerReplies["GET /domains"] = { status: 401, body: { message: "API key is invalid" } };
+    expect((await put("/email/settings", { resendKey: KEY })).status).toBe(400);
+    const saved = await json(await configure());
+    expect(saved).toMatchObject({ resendKey: { set: true, last4: "abcd", source: "settings" }, from: "Nova Bridge <grants@novabridgegrant.org>", sending: true, webhook: { url: "https://app.example.org/api/email/webhook", secretSet: true } });
+    expect(JSON.stringify(saved)).not.toContain(KEY);
+    expect(JSON.stringify(saved)).not.toContain(SECRET);
+    expect((await json(await call("/email/status", "tok-super"))).configured).toBe(true);
+    const [entry] = (await json(await call("/audit", "tok-super"))).events;
+    expect(entry).toMatchObject({ action: "Change email settings" });
+    expect(JSON.stringify(entry)).not.toContain(KEY);
+    expect((await json(await put("/email/settings", { resendKey: "" }))).resendKey.set).toBe(false);
+  });
+
+  it("switches sign-up email confirmation through the Supabase Management API", async () => {
+    process.env["SUPABASE_URL"] ??= "https://tynjqjukramcmtotgfdw.supabase.co";
+    const ref = /^https:\/\/([a-z0-9]+)\./.exec(process.env["SUPABASE_URL"]!)![1];
+    expect((await put("/email/auth-settings", { emailConfirmation: false })).status).toBe(400);
+    providerReplies[`GET /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: false } };
+    expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
+    expect(await json(await call("/email/auth-settings", "tok-super"))).toEqual({ connected: true, emailConfirmation: true });
+    providerReplies[`PATCH /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: true } };
+    expect(await json(await put("/email/auth-settings", { emailConfirmation: false }))).toEqual({ connected: true, emailConfirmation: false });
+    const patchCall = providerCalls.find(c => c.method === "PATCH")!;
+    expect(patchCall.body).toEqual({ mailer_autoconfirm: true });
+    expect(patchCall.headers.authorization).toBe(`Bearer ${TOKEN}`);
+    expect((await put("/email/auth-settings", { emailConfirmation: true }, "tok-finance")).status).toBe(403);
+  });
+
+  it("adds the sending and receiving domain in Resend and shows its DNS records", async () => {
+    await configure();
+    providerReplies["POST /domains"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "not_started" } };
+    providerReplies["GET /domains/dom_1"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "pending", records: [{ record: "DKIM", name: "resend._domainkey", type: "TXT", value: "p=abc", status: "pending" }] } };
+    expect((await post("/email/domain", { name: "not a domain" })).status).toBe(400);
+    const domain = await json(await post("/email/domain", { name: "NovaBridgeGrant.org", receiving: true }));
+    expect(domain.records[0]).toMatchObject({ type: "TXT", name: "resend._domainkey" });
+    expect(providerCalls.find(c => c.method === "POST" && c.url.endsWith("/domains"))!.body).toMatchObject({ name: "novabridgegrant.org", capabilities: { receiving: "enabled" } });
+    expect((await json(await call("/email/settings", "tok-super"))).domain).toEqual({ name: "novabridgegrant.org", id: "dom_1" });
+  });
+
+  it("accepts only signed webhooks, stores received mail once, and records delivery results", async () => {
+    const received = { type: "email.received", data: { email_id: "in_1", from: "Maya <maya@example.com>", to: ["info@novabridgegrant.org"], subject: "Question", created_at: "2026-09-26T10:00:00Z", attachments: [] } };
+    expect((await hook(received)).status).toBe(503);
+    await configure();
+    expect((await hook(received, { "svix-id": "x", "svix-timestamp": String(Math.floor(Date.now() / 1000)), "svix-signature": "v1,AAAA" })).status).toBe(401);
+    const old = JSON.stringify(received);
+    expect((await hook(received, sign(old, "msg_1", Math.floor(Date.now() / 1000) - 3600))).status).toBe(401);
+    providerReplies["GET /emails/receiving/in_1"] = { status: 200, body: { id: "in_1", from: "Maya <maya@example.com>", to: ["info@novabridgegrant.org"], subject: "Question", html: "<p>Hello <script>x</script></p>", text: "Hello", created_at: "2026-09-26T10:00:00Z", message_id: "<m1@example.com>", attachments: [{ id: "a1", filename: "plan.pdf", content_type: "application/pdf", size: 1200 }] } };
+    expect((await hook(received)).status).toBe(200);
+    expect((await hook(received, sign(JSON.stringify(received), "msg_2"))).status).toBe(200);
+    const box = await json(await call("/inbox", "tok-finance"));
+    expect(box).toMatchObject({ address: "info@novabridgegrant.org", receiving: true, sending: true, unread: 1 });
+    expect(box.messages).toHaveLength(1);
+    expect(box.messages[0]).toMatchObject({ from: "Maya <maya@example.com>", subject: "Question", text: "Hello", messageId: "<m1@example.com>", attachments: [{ filename: "plan.pdf", size: 1200 }] });
+    expect((await call("/inbox", "tok-applicant")).status).toBe(403);
+  });
+
+  it("sends and replies from the team mailbox through Resend, and audits it", async () => {
+    await configure();
+    providerReplies["GET /emails/receiving/in_2"] = { status: 200, body: { id: "in_2", from: "maya@example.com", to: ["info@novabridgegrant.org"], subject: "Budget", html: null, text: "Is equipment eligible?", created_at: "2026-09-26T10:00:00Z", message_id: "<m2@example.com>" } };
+    await hook({ type: "email.received", data: { email_id: "in_2" } });
+    const [original] = (await json(await call("/inbox", "tok-super"))).messages;
+    expect((await post("/inbox/send", { to: "nope", subject: "", text: "" })).status).toBe(400);
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_1" } };
+    const sent = await post("/inbox/send", { to: "maya@example.com", subject: "Re: Budget", text: "Yes, it is.\n\nThanks", inReplyTo: original.id });
+    expect(sent.status).toBe(201);
+    const request = providerCalls.find(c => c.method === "POST" && c.url.endsWith("/emails"))!;
+    expect(request.body).toMatchObject({ from: "Nova Bridge <info@novabridgegrant.org>", to: ["maya@example.com"], reply_to: "info@novabridgegrant.org", headers: { "In-Reply-To": "<m2@example.com>" } });
+    const sentBox = (await json(await call("/inbox?folder=sent", "tok-super"))).messages;
+    expect(sentBox[0]).toMatchObject({ direction: "outbound", status: "sent", sentBy: "Sam Rivera", inReplyTo: original.id });
+    await hook({ type: "email.delivered", data: { email_id: "out_1" } }, sign(JSON.stringify({ type: "email.delivered", data: { email_id: "out_1" } }), "msg_9"));
+    expect((await json(await call("/inbox?folder=sent", "tok-super"))).messages[0].status).toBe("delivered");
+    expect((await json(await call("/inbox", "tok-super"))).unread).toBe(0);
+    expect((await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action)).toContain("Send email");
+    expect((await post(`/inbox/${original.id}/update`, { folder: "archive" })).status).toBe(200);
+    expect((await json(await call("/inbox?folder=archive", "tok-super"))).messages).toHaveLength(1);
   });
 });

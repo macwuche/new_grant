@@ -24,6 +24,8 @@ export const emailOutboxTable = pgTable("email_outbox", {
   providerId: text("provider_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  /** What Resend reported after sending (webhook): delivered, bounced, complained, delayed. */
+  delivery: text("delivery"),
 }, t => [index("email_outbox_due_idx").on(t.status, t.nextAttemptAt)]).enableRLS();
 
 export type EmailOutboxRow = typeof emailOutboxTable.$inferSelect;

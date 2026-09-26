@@ -16,6 +16,9 @@
 .admin-email-counts strong { display: block; font-size: 18px; }
 .admin-email-counts span { color: #7a867e; font-size: 10px; }
 .admin-email-settings code { font: 600 10px var(--app-font-mono, monospace); }
+.admin-email-form { display: grid; gap: 10px; }
+.admin-email-form .admin-review-field small { color: #7a867e; font-size: 10px; line-height: 1.45; }
+.admin-email-form .admin-review-field small.admin-field-error { color: #b3403a; }
 @media (max-width: 560px) {
   .admin-email-settings .admin-panel-head { align-items: flex-start; flex-wrap: wrap; }
   .admin-email-settings-value { align-self: flex-start; }

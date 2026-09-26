@@ -25,3 +25,4 @@ export * from "./activity";
 export * from "./money";
 export * from "./documents";
 export * from "./email";
+export * from "./mail";

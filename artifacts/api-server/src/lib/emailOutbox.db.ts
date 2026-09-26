@@ -25,6 +25,9 @@ export const dbEmailOutbox: EmailOutbox = {
   markFailed: async (seq, error, retryAt) => {
     await db.update(emailOutboxTable).set(retryAt ? { status: "queued", lastError: error, nextAttemptAt: retryAt } : { status: "failed", lastError: error }).where(eq(emailOutboxTable.seq, seq));
   },
+  recordDelivery: async (providerId, delivery) => {
+    await db.update(emailOutboxTable).set({ delivery }).where(eq(emailOutboxTable.providerId, providerId));
+  },
   markSkipped: async (seq, reason) => {
     await db.update(emailOutboxTable).set({ status: "skipped", lastError: reason }).where(eq(emailOutboxTable.seq, seq));
   },

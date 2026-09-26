@@ -11,7 +11,11 @@ import { dbActivityRepo } from "./lib/activity.db";
 import { dbMoneyRepo, ensureSettings } from "./lib/moneyRepo.db";
 import { dbDocumentRepo } from "./lib/documentRepo.db";
 import { diskFileStore, documentsDir } from "./lib/fileStore";
-import { appUrl, mailerFromEnv, startEmailWorker } from "./lib/email";
+import { mailerFor, setAppUrlOverride, startEmailWorker } from "./lib/email";
+import { effectiveConfig } from "./lib/emailSettings";
+import { dbEmailSettingsRepo } from "./lib/emailSettings.db";
+import { dbInboxRepo } from "./lib/inbox.db";
+import { serverCipher } from "./lib/secrets";
 import { dbEmailOutbox } from "./lib/emailOutbox.db";
 import { seedGrants } from "@workspace/domain/seed";
 
@@ -46,16 +50,18 @@ if (seeded) logger.info({ count: seeded }, "sample grant programs added to the e
 const docsDir = documentsDir();
 logger.info({ dir: docsDir }, "document files are stored on this server's disk");
 
-const mailer = mailerFromEnv();
-if (mailer.configured) logger.info({ from: mailer.from, links: appUrl() }, "email is sent through Resend");
-else logger.warn("RESEND_API_KEY / EMAIL_FROM not set: email is off (queued messages are marked skipped)");
-if (mailer.configured && !appUrl()) logger.warn("APP_URL not set: emails won't include links to the portal");
-startEmailWorker(dbEmailOutbox, mailer);
+// Email settings saved in the admin (secrets encrypted with the server's key) override the environment.
+const emailSettings = dbEmailSettingsRepo(serverCipher());
+const startup = effectiveConfig(await emailSettings.get());
+if ((await emailSettings.get()).appUrl) setAppUrlOverride(startup.appUrl);
+if (startup.resendKey && startup.from) logger.info({ from: startup.from, links: startup.appUrl }, "email is sent through Resend");
+else logger.warn("No Resend key and sender yet (admin Settings or RESEND_API_KEY / EMAIL_FROM): email is off (queued messages are marked skipped)");
+startEmailWorker(dbEmailOutbox, async () => mailerFor(effectiveConfig(await emailSettings.get())));
 
 const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
-  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, mailer,
+  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, emailSettings, inbox: dbInboxRepo,
   staffMfa: process.env["STAFF_MFA_REQUIRED"] !== "false",
 });
 

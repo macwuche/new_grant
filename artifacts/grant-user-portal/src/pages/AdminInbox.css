@@ -124,3 +124,4 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-mailbox * { transition-duration: .01ms !important; }
 }
+.admin-mail-html { width: 100%; min-height: 360px; border: 1px solid #e8ece5; border-radius: 9px; background: #fff; margin: 14px 0; }

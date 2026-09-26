@@ -3373,3 +3373,295 @@ export const GetEmailStatusResponse = zod.object({
 })
 
 
+/**
+ * Requires staff.manage. Secrets are never returned, only whether they are set.
+ * @summary Email settings (super admin)
+ */
+export const GetEmailSettingsResponse = zod.object({
+  "resendKey": zod.object({
+  "set": zod.boolean(),
+  "last4": zod.string().nullable(),
+  "source": zod.enum(['settings', 'environment', 'none'])
+}),
+  "from": zod.string().nullable(),
+  "fromSource": zod.enum(['settings', 'environment', 'none']),
+  "replyTo": zod.string().nullable(),
+  "appUrl": zod.string().nullable(),
+  "inboxAddress": zod.string().nullable(),
+  "domain": zod.union([zod.object({
+  "name": zod.string(),
+  "id": zod.string().nullable()
+}),zod.null()]),
+  "webhook": zod.object({
+  "url": zod.string().nullable(),
+  "secretSet": zod.boolean()
+}),
+  "supabaseToken": zod.object({
+  "set": zod.boolean()
+}),
+  "sending": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "updatedBy": zod.string().nullable()
+})
+
+
+/**
+ * Requires staff.manage. Send only the fields to change; an empty string clears a saved value. A new Resend key or Supabase token is checked with the provider before saving. Audited without secret values.
+ * @summary Save email settings (super admin)
+ */
+export const SaveEmailSettingsBody = zod.object({
+  "resendKey": zod.string().optional(),
+  "fromAddress": zod.string().optional(),
+  "replyTo": zod.string().optional(),
+  "appUrl": zod.string().optional(),
+  "inboxAddress": zod.string().optional(),
+  "webhookSecret": zod.string().optional(),
+  "supabaseToken": zod.string().optional()
+})
+
+export const SaveEmailSettingsResponse = zod.object({
+  "resendKey": zod.object({
+  "set": zod.boolean(),
+  "last4": zod.string().nullable(),
+  "source": zod.enum(['settings', 'environment', 'none'])
+}),
+  "from": zod.string().nullable(),
+  "fromSource": zod.enum(['settings', 'environment', 'none']),
+  "replyTo": zod.string().nullable(),
+  "appUrl": zod.string().nullable(),
+  "inboxAddress": zod.string().nullable(),
+  "domain": zod.union([zod.object({
+  "name": zod.string(),
+  "id": zod.string().nullable()
+}),zod.null()]),
+  "webhook": zod.object({
+  "url": zod.string().nullable(),
+  "secretSet": zod.boolean()
+}),
+  "supabaseToken": zod.object({
+  "set": zod.boolean()
+}),
+  "sending": zod.boolean(),
+  "updatedAt": zod.string().nullable(),
+  "updatedBy": zod.string().nullable()
+})
+
+
+/**
+ * Sends straight through Resend with the current settings.
+ * @summary Send a test email (super admin)
+ */
+export const SendTestEmailBody = zod.object({
+  "to": zod.string()
+})
+
+export const SendTestEmailResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Null when no domain has been added.
+ * @summary The sending and receiving domain in Resend, with DNS records (super admin)
+ */
+export const GetEmailDomainResponse = zod.union([zod.unknown(),zod.unknown()])
+
+
+/**
+ * Reuses the domain if it already exists in the Resend account.
+ * @summary Add the domain in Resend (super admin)
+ */
+export const AddEmailDomainBody = zod.object({
+  "name": zod.string(),
+  "receiving": zod.boolean().optional()
+})
+
+export const AddEmailDomainResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "status": zod.string(),
+  "region": zod.string().optional(),
+  "capabilities": zod.object({
+  "sending": zod.string().optional(),
+  "receiving": zod.string().optional()
+}).optional(),
+  "records": zod.array(zod.object({
+  "record": zod.string(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "value": zod.string().optional(),
+  "priority": zod.number().optional(),
+  "ttl": zod.string().optional(),
+  "status": zod.string()
+})).optional()
+})
+
+
+/**
+ * Returns the domain with each record's current status.
+ * @summary Ask Resend to check the domain's DNS records (super admin)
+ */
+export const VerifyEmailDomainResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "status": zod.string(),
+  "region": zod.string().optional(),
+  "capabilities": zod.object({
+  "sending": zod.string().optional(),
+  "receiving": zod.string().optional()
+}).optional(),
+  "records": zod.array(zod.object({
+  "record": zod.string(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "value": zod.string().optional(),
+  "priority": zod.number().optional(),
+  "ttl": zod.string().optional(),
+  "status": zod.string()
+})).optional()
+})
+
+
+/**
+ * Read from Supabase with the saved access token; connected is false without one.
+ * @summary Whether new accounts must confirm their email (super admin)
+ */
+export const GetSignupEmailSettingResponse = zod.object({
+  "connected": zod.boolean(),
+  "emailConfirmation": zod.boolean().nullable(),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * Changes the Supabase project's auth setting through the Management API. Audited.
+ * @summary Turn sign-up email confirmation on or off (super admin)
+ */
+export const SetSignupEmailSettingBody = zod.object({
+  "emailConfirmation": zod.boolean()
+})
+
+export const SetSignupEmailSettingResponse = zod.object({
+  "connected": zod.boolean(),
+  "emailConfirmation": zod.boolean().nullable(),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * Any active staff member. Up to 200 messages in the folder, newest first.
+ * @summary The team mailbox (staff)
+ */
+export const GetInboxQueryParams = zod.object({
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']).optional()
+})
+
+export const GetInboxResponse = zod.object({
+  "address": zod.string().nullable(),
+  "receiving": zod.boolean(),
+  "sending": zod.boolean(),
+  "unread": zod.number().int(),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "resendId": zod.string().nullable(),
+  "messageId": zod.string().nullable(),
+  "inReplyTo": zod.string().nullable(),
+  "from": zod.string(),
+  "to": zod.array(zod.string()),
+  "cc": zod.array(zod.string()),
+  "subject": zod.string(),
+  "text": zod.string().nullable(),
+  "html": zod.string().nullable(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().nullable()
+})),
+  "status": zod.string().nullable(),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "read": zod.boolean(),
+  "sentBy": zod.string().nullable(),
+  "at": zod.string()
+}))
+})
+
+
+/**
+ * Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+ * @summary Send or reply from the team mailbox (staff)
+ */
+export const SendInboxEmailBody = zod.object({
+  "to": zod.string(),
+  "cc": zod.string().optional(),
+  "subject": zod.string(),
+  "text": zod.string(),
+  "inReplyTo": zod.string().optional()
+})
+
+export const SendInboxEmailResponse = zod.object({
+  "id": zod.string(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "resendId": zod.string().nullable(),
+  "messageId": zod.string().nullable(),
+  "inReplyTo": zod.string().nullable(),
+  "from": zod.string(),
+  "to": zod.array(zod.string()),
+  "cc": zod.array(zod.string()),
+  "subject": zod.string(),
+  "text": zod.string().nullable(),
+  "html": zod.string().nullable(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().nullable()
+})),
+  "status": zod.string().nullable(),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "read": zod.boolean(),
+  "sentBy": zod.string().nullable(),
+  "at": zod.string()
+})
+
+
+/**
+ * Folder inbox, sent, archive, or trash.
+ * @summary Move a message or mark it read (staff)
+ */
+export const UpdateInboxMessageParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const UpdateInboxMessageBody = zod.object({
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']).optional(),
+  "read": zod.boolean().optional()
+})
+
+export const UpdateInboxMessageResponse = zod.object({
+  "id": zod.string(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "resendId": zod.string().nullable(),
+  "messageId": zod.string().nullable(),
+  "inReplyTo": zod.string().nullable(),
+  "from": zod.string(),
+  "to": zod.array(zod.string()),
+  "cc": zod.array(zod.string()),
+  "subject": zod.string(),
+  "text": zod.string().nullable(),
+  "html": zod.string().nullable(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().nullable()
+})),
+  "status": zod.string().nullable(),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "read": zod.boolean(),
+  "sentBy": zod.string().nullable(),
+  "at": zod.string()
+})
+
+

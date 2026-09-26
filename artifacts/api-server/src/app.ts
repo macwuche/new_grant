@@ -48,7 +48,8 @@ export function createApp(deps: ApiDeps, origins: string[] = allowedOrigins()): 
     }),
   );
   app.use(securityHeaders);
-  app.use(express.json());
+  // Keep the raw body too: webhook signatures are computed over the exact bytes.
+  app.use(express.json({ verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; } }));
   app.use(express.urlencoded({ extended: true }));
 
   app.use("/api", apiRouter(deps));
