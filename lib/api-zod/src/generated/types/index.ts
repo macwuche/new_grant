@@ -122,6 +122,7 @@ export * from './programVersion';
 export * from './reason';
 export * from './signupEmailSetting';
 export * from './signupEmailSettingInput';
+export * from './signupEmailSettingSmtp';
 export * from './staffFeedItem';
 export * from './staffFeedItemKind';
 export * from './staffMember';

@@ -1117,13 +1117,48 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect((await put("/email/auth-settings", { emailConfirmation: false })).status).toBe(400);
     providerReplies[`GET /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: false } };
     expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
-    expect(await json(await call("/email/auth-settings", "tok-super"))).toEqual({ connected: true, emailConfirmation: true });
+    expect(await json(await call("/email/auth-settings", "tok-super"))).toMatchObject({ connected: true, emailConfirmation: true, smtp: { viaResend: false }, appTemplates: false });
     providerReplies[`PATCH /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: true } };
-    expect(await json(await put("/email/auth-settings", { emailConfirmation: false }))).toEqual({ connected: true, emailConfirmation: false });
+    expect(await json(await put("/email/auth-settings", { emailConfirmation: false }))).toMatchObject({ connected: true, emailConfirmation: false });
     const patchCall = providerCalls.find(c => c.method === "PATCH")!;
     expect(patchCall.body).toEqual({ mailer_autoconfirm: true });
     expect(patchCall.headers.authorization).toBe(`Bearer ${TOKEN}`);
     expect((await put("/email/auth-settings", { emailConfirmation: true }, "tok-finance")).status).toBe(403);
+  });
+
+  it("points Supabase's sign-in emails at Resend and sets their wording", async () => {
+    process.env["SUPABASE_URL"] ??= "https://tynjqjukramcmtotgfdw.supabase.co";
+    const ref = /^https:\/\/([a-z0-9]+)\./.exec(process.env["SUPABASE_URL"]!)![1];
+    const path = `/v1/projects/${ref}/config/auth`;
+    expect((await post("/email/auth-settings/smtp", {})).status).toBe(400);
+    providerReplies[`GET ${path}`] = { status: 200, body: { mailer_autoconfirm: false } };
+    expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
+    expect(await json(await post("/email/auth-settings/smtp", {}))).toMatchObject({ error: expect.stringContaining("Resend API key") });
+    await configure();
+    // A saved domain that isn't verified yet blocks the switch.
+    providerReplies["POST /domains"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "not_started" } };
+    providerReplies["GET /domains/dom_1"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "pending" } };
+    await post("/email/domain", { name: "novabridgegrant.org" });
+    expect((await post("/email/auth-settings/smtp", {})).status).toBe(400);
+    expect(providerCalls.some(c => c.method === "PATCH")).toBe(false);
+    providerReplies["GET /domains/dom_1"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "verified" } };
+    providerReplies[`PATCH ${path}`] = { status: 200, body: { mailer_autoconfirm: false, smtp_host: "smtp.resend.com", smtp_admin_email: "grants@novabridgegrant.org", smtp_sender_name: "Nova Bridge", rate_limit_email_sent: 30 } };
+    expect(await json(await post("/email/auth-settings/smtp", {}))).toMatchObject({ smtp: { viaResend: true, sender: "Nova Bridge <grants@novabridgegrant.org>", emailsPerHour: 30 } });
+    const smtpCall = providerCalls.filter(c => c.method === "PATCH").at(-1)!;
+    expect(smtpCall.body).toEqual({ smtp_host: "smtp.resend.com", smtp_port: "465", smtp_user: "resend", smtp_pass: KEY, smtp_admin_email: "grants@novabridgegrant.org", smtp_sender_name: "Nova Bridge" });
+    const [entry] = (await json(await call("/audit", "tok-super"))).events;
+    expect(entry).toMatchObject({ action: "Send sign-in emails through Resend" });
+    expect(JSON.stringify(entry)).not.toContain(KEY);
+
+    providerReplies[`PATCH ${path}`] = { status: 200, body: { mailer_subjects_confirmation: "Confirm your arc.fund email" } };
+    expect(await json(await post("/email/auth-settings/templates", {}))).toMatchObject({ appTemplates: true });
+    const templates = providerCalls.filter(c => c.method === "PATCH").at(-1)!.body as Record<string, string>;
+    for (const kind of ["confirmation", "recovery", "invite", "magic_link", "email_change", "reauthentication"]) {
+      expect(templates[`mailer_subjects_${kind}`]).toBeTruthy();
+      expect(templates[`mailer_templates_${kind}_content`]).toContain(kind === "reauthentication" ? "{{ .Token }}" : "{{ .ConfirmationURL }}");
+    }
+    expect((await post("/email/auth-settings/templates", {}, "tok-finance")).status).toBe(403);
+    expect((await post("/email/auth-settings/smtp", {}, "tok-finance")).status).toBe(403);
   });
 
   it("adds the sending and receiving domain in Resend and shows its DNS records", async () => {

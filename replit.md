@@ -42,7 +42,7 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - Uploaded documents are files on the API server's disk (`DOCUMENTS_DIR`), never in Supabase Storage; Supabase holds only their records and SHA-256, checked on every download. Back up that directory with the database.
 - Server-loaded records are never written to browser storage.
 - Two-step sign-in is Supabase TOTP; the API reads the session's `aal` from the verified token. Staff need aal2; anyone enrolled needs aal2; pending staff-required resets block the account until proven.
-- Email settings saved by a super admin (encrypted) override the email environment variables. Resend webhooks (received mail, delivery results) arrive at `POST /api/email/webhook`, verified by signature.
+- Email settings saved by a super admin (encrypted) override the email environment variables. Supabase's own auth emails are pointed at Resend's SMTP relay and given the app's wording through the Supabase Management API (Settings → Email). Resend webhooks (received mail, delivery results) arrive at `POST /api/email/webhook`, verified by signature.
 - Outgoing email uses an outbox table written in the same transaction as the change; a worker in the API sends it through Resend with a per-row idempotency key and retries with backoff.
 
 ## Product
@@ -59,7 +59,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 - New tables must call `.enableRLS()`.
 - `jsonb` reorders object keys, and Postgres timestamps have microseconds: storage code rebuilds nested objects in the domain's key order and compares versions at millisecond precision.
 - An empty `description:` in the OpenAPI spec makes orval fail and empty the generated folders.
-- The app currently can't see its Supabase settings; add them under Tools → Secrets in this workspace and restart (see `work.md` §6).
+- The workspace sees the Supabase URL and keys but not the `SUPABASE_DATABASE_URL` secret; add it under Tools → Secrets in this workspace and restart (see `work.md` §6).
 
 ## Pointers
 

@@ -1873,6 +1873,44 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /email/auth-settings/smtp:
+    post:
+      operationId: sendAuthEmailsThroughResend
+      tags: [email]
+      summary: Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
+      description: Sets the Supabase project's custom SMTP to Resend's relay with the saved Resend key and sender. Refused while the saved domain isn't verified. Audited.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupEmailSetting"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /email/auth-settings/templates:
+    post:
+      operationId: setAuthEmailTemplates
+      tags: [email]
+      summary: Use the app's wording for Supabase's sign-in emails (super admin)
+      description: Sets the subject and body of the confirmation, reset, invite, email-change, sign-in link, and verification-code emails. Audited.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupEmailSetting"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /inbox:
     get:
       operationId: getInbox
@@ -2141,6 +2179,15 @@ components:
       properties:
         connected: { type: boolean }
         emailConfirmation: { type: [boolean, "null"] }
+        smtp:
+          type: object
+          properties:
+            viaResend: { type: boolean }
+            host: { type: [string, "null"] }
+            sender: { type: [string, "null"] }
+            emailsPerHour: { type: [integer, "null"] }
+          required: [viaResend, host, sender, emailsPerHour]
+        appTemplates: { type: boolean }
         error: { type: string }
       required: [connected, emailConfirmation]
     SignupEmailSettingInput:

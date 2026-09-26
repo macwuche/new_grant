@@ -69,15 +69,24 @@ export function verifyWebhook(secret: string, headers: { id?: string; timestamp?
 
 // ---------- Supabase Management API ----------
 
+/** The parts of a Supabase project's auth config this app reads (the Management API returns many more). */
+export type SupabaseAuthConfig = {
+  mailer_autoconfirm?: boolean; smtp_host?: string | null; smtp_admin_email?: string | null; smtp_sender_name?: string | null;
+  rate_limit_email_sent?: number | null; mailer_subjects_confirmation?: string | null;
+};
+
 /** The project ref from SUPABASE_URL (https://<ref>.supabase.co). */
 export const projectRef = (supabaseUrl: string | undefined) => /^https:\/\/([a-z0-9]+)\.supabase\.co/i.exec(supabaseUrl ?? "")?.[1] ?? null;
 
 export function supabaseManagement(token: string, ref: string, fetchImpl: Fetch = fetch) {
   const url = `https://api.supabase.com/v1/projects/${ref}/config/auth`;
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const update = (patch: Record<string, unknown>) => call<SupabaseAuthConfig>(fetchImpl, url, { method: "PATCH", headers, body: JSON.stringify(patch) }, "Supabase");
   return {
-    getAuthConfig: () => call<{ mailer_autoconfirm?: boolean }>(fetchImpl, url, { headers }, "Supabase"),
+    getAuthConfig: () => call<SupabaseAuthConfig>(fetchImpl, url, { headers }, "Supabase"),
     /** Email confirmation at sign-up on (true) or off (false: new accounts are confirmed automatically). */
-    setEmailConfirmation: (required: boolean) => call<{ mailer_autoconfirm?: boolean }>(fetchImpl, url, { method: "PATCH", headers, body: JSON.stringify({ mailer_autoconfirm: !required }) }, "Supabase"),
+    setEmailConfirmation: (required: boolean) => update({ mailer_autoconfirm: !required }),
+    /** Any other auth settings: custom SMTP, email subjects and templates. */
+    updateAuthConfig: update,
   };
 }

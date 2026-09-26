@@ -3529,6 +3529,13 @@ export const VerifyEmailDomainResponse = zod.object({
 export const GetSignupEmailSettingResponse = zod.object({
   "connected": zod.boolean(),
   "emailConfirmation": zod.boolean().nullable(),
+  "smtp": zod.object({
+  "viaResend": zod.boolean(),
+  "host": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "emailsPerHour": zod.number().int().nullable()
+}).optional(),
+  "appTemplates": zod.boolean().optional(),
   "error": zod.string().optional()
 })
 
@@ -3544,6 +3551,49 @@ export const SetSignupEmailSettingBody = zod.object({
 export const SetSignupEmailSettingResponse = zod.object({
   "connected": zod.boolean(),
   "emailConfirmation": zod.boolean().nullable(),
+  "smtp": zod.object({
+  "viaResend": zod.boolean(),
+  "host": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "emailsPerHour": zod.number().int().nullable()
+}).optional(),
+  "appTemplates": zod.boolean().optional(),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * Sets the Supabase project's custom SMTP to Resend's relay with the saved Resend key and sender. Refused while the saved domain isn't verified. Audited.
+ * @summary Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
+ */
+export const SendAuthEmailsThroughResendResponse = zod.object({
+  "connected": zod.boolean(),
+  "emailConfirmation": zod.boolean().nullable(),
+  "smtp": zod.object({
+  "viaResend": zod.boolean(),
+  "host": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "emailsPerHour": zod.number().int().nullable()
+}).optional(),
+  "appTemplates": zod.boolean().optional(),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * Sets the subject and body of the confirmation, reset, invite, email-change, sign-in link, and verification-code emails. Audited.
+ * @summary Use the app's wording for Supabase's sign-in emails (super admin)
+ */
+export const SetAuthEmailTemplatesResponse = zod.object({
+  "connected": zod.boolean(),
+  "emailConfirmation": zod.boolean().nullable(),
+  "smtp": zod.object({
+  "viaResend": zod.boolean(),
+  "host": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "emailsPerHour": zod.number().int().nullable()
+}).optional(),
+  "appTemplates": zod.boolean().optional(),
   "error": zod.string().optional()
 })
 

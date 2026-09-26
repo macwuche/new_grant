@@ -110,10 +110,22 @@ export interface EmailDomain {
   records?: EmailDomainRecordsItem[];
 }
 
+export type SignupEmailSettingSmtp = {
+  viaResend: boolean;
+  /** @nullable */
+  host: string | null;
+  /** @nullable */
+  sender: string | null;
+  /** @nullable */
+  emailsPerHour: number | null;
+};
+
 export interface SignupEmailSetting {
   connected: boolean;
   /** @nullable */
   emailConfirmation: boolean | null;
+  smtp?: SignupEmailSettingSmtp;
+  appTemplates?: boolean;
   error?: string;
 }
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { format } from 'date-fns';
 import { Copy, Globe2, Info, KeyRound, Mail, Radio, RefreshCw, ShieldCheck, Webhook } from 'lucide-react';
 import {
-  addEmailDomain, getEmailDomain, getEmailSettings, getEmailStatus, getSignupEmailSetting, saveEmailSettings, sendTestEmail, setSignupEmailSetting, verifyEmailDomain,
+  addEmailDomain, getEmailDomain, getEmailSettings, getEmailStatus, getSignupEmailSetting, saveEmailSettings, sendAuthEmailsThroughResend, sendTestEmail, setAuthEmailTemplates, setSignupEmailSetting, verifyEmailDomain,
   type EmailDomain, type EmailSettings, type EmailSettingsInput, type EmailStatus, type SignupEmailSetting,
 } from '@workspace/api-client-react';
 import { apiError } from '@/lib/serverData';
@@ -42,7 +42,7 @@ function EmailAdmin() {
   }, []);
   useEffect(() => { void load(); }, [load]);
   return <>
-    <SignupConfirmation tokenSet={!!settings?.supabaseToken.set} />
+    <SignupConfirmation tokenSet={!!settings?.supabaseToken.set} sending={!!settings?.sending} />
     <section className="admin-panel admin-email-settings" aria-labelledby="email-connection-title" data-testid="panel-admin-email-settings">
       <div className="admin-panel-head"><div><p className="admin-email-settings-kicker">DELIVERY / RESEND</p><h2 id="email-connection-title">Email connection</h2><p>The Resend account the app sends and receives mail through. Keys and secrets are stored encrypted on the server and never shown again; leave a secret blank to keep the saved one.</p></div>
         <span className="admin-email-settings-state" data-testid="status-email-configured">{settings === null ? '…' : settings.sending ? 'SENDING' : 'OFF'}</span></div>
@@ -55,23 +55,36 @@ function EmailAdmin() {
   </>;
 }
 
-function SignupConfirmation({ tokenSet }: { tokenSet: boolean }) {
+function SignupConfirmation({ tokenSet, sending }: { tokenSet: boolean; sending: boolean }) {
   const [state, setState] = useState<SignupEmailSetting | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<Flash>(null);
   useEffect(() => { let live = true; getSignupEmailSetting().then(s => { if (live) setState(s); }).catch(() => { if (live) setState({ connected: false, emailConfirmation: null }); }); return () => { live = false; }; }, [tokenSet]);
-  const toggle = async () => {
-    if (!state?.connected || state.emailConfirmation === null) return;
+  const run = async (action: () => Promise<SignupEmailSetting>, done: (s: SignupEmailSetting) => string, failed: string) => {
     setBusy(true); setFlash(null);
-    try { const next = await setSignupEmailSetting({ emailConfirmation: !state.emailConfirmation }); setState(next); setFlash({ tone: 'ok', text: next.emailConfirmation ? 'New accounts must confirm their email.' : 'New accounts are confirmed automatically.' }); }
-    catch (err) { setFlash({ tone: 'error', text: apiError(err, "Couldn't change the setting.").error }); }
+    try { const next = await action(); setState(next); setFlash({ tone: 'ok', text: done(next) }); }
+    catch (err) { setFlash({ tone: 'error', text: apiError(err, failed).error }); }
     finally { setBusy(false); }
   };
+  const toggle = () => {
+    if (!state?.connected || state.emailConfirmation === null) return;
+    void run(() => setSignupEmailSetting({ emailConfirmation: !state.emailConfirmation }), next => next.emailConfirmation ? 'New accounts must confirm their email.' : 'New accounts are confirmed automatically.', "Couldn't change the setting.");
+  };
   const on = state?.emailConfirmation;
+  const smtp = state?.smtp;
   return <section className="admin-panel admin-email-settings" aria-labelledby="signup-confirm-title" data-testid="panel-admin-signup-confirmation">
     <div className="admin-panel-head"><div><p className="admin-email-settings-kicker">SIGN-UP / SUPABASE</p><h2 id="signup-confirm-title">Email verification at sign-up</h2><p>When on, new applicants and staff must click the link in a confirmation email before they can sign in. When off, accounts work straight away, but anyone can sign up with an address they don't own.</p></div>
-      <button type="button" className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={!!on} aria-label="Require email verification at sign-up" disabled={!state?.connected || busy} onClick={() => void toggle()} data-testid="switch-signup-email-confirmation" /></div>
+      <button type="button" className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={!!on} aria-label="Require email verification at sign-up" disabled={!state?.connected || busy} onClick={toggle} data-testid="switch-signup-email-confirmation" /></div>
     {state && !state.connected && <div className="admin-email-settings-banner"><Info size={17} /><span>{state.error ? `Supabase refused the saved token: ${state.error}` : 'To control this from here, save a Supabase access token under Email connection below.'} You can also change it in Supabase → Authentication → Sign In / Providers → Email → Confirm email.</span></div>}
+    {state?.connected && smtp && <div className="admin-email-settings-list">
+      <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><Mail size={17} /></span><div><strong>Sent through Resend</strong><p>Confirmation, password-reset, and verification-code emails come from Supabase. Its built-in mailer allows only a few emails an hour from a generic sender; this points it at Resend with the saved key and sender. Press again after changing the Resend key or sender.{smtp.emailsPerHour !== null ? ` Supabase currently allows ${smtp.emailsPerHour} emails an hour (Authentication → Rate Limits).` : ''}</p></div>
+        <span className="admin-email-settings-value" data-testid="status-auth-smtp">{smtp.viaResend ? `Resend${smtp.sender ? ` · ${smtp.sender}` : ''}` : smtp.host ? `Other (${smtp.host})` : "Supabase's mailer"}</span>
+        <button type="button" className="admin-btn" disabled={busy || !sending} title={sending ? undefined : 'Save a Resend API key and a sender first.'} onClick={() => void run(sendAuthEmailsThroughResend, next => `Supabase's emails now go through Resend${next.smtp?.sender ? ` from ${next.smtp.sender}` : ''}.`, "Couldn't update Supabase.")} data-testid="button-auth-smtp-resend">{smtp.viaResend ? 'Update' : 'Use Resend'}</button></div>
+      <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><ShieldCheck size={17} /></span><div><strong>Email wording</strong><p>Replaces Supabase's default text for the confirmation, reset, invite, email-change, sign-in link, and code emails with arc.fund's.</p></div>
+        <span className="admin-email-settings-value" data-testid="status-auth-templates">{state.appTemplates ? 'arc.fund' : 'Supabase default'}</span>
+        <button type="button" className="admin-btn" disabled={busy} onClick={() => void run(setAuthEmailTemplates, () => "Supabase's emails now use arc.fund's wording.", "Couldn't update Supabase.")} data-testid="button-auth-templates">{state.appTemplates ? 'Reapply' : 'Use arc.fund wording'}</button></div>
+    </div>}
+    {state?.connected && <div className="admin-email-settings-banner"><Info size={17} /><span>A Supabase access token can manage every project in its Supabase account, not only this one. Use a token from an account that holds only this project, and remove it under Email connection once setup is done: these settings stay in Supabase.</span></div>}
     {flash && <p className={flash.tone === 'error' ? 'admin-field-error' : 'admin-review-hint'} role="status">{flash.text}</p>}
   </section>;
 }
@@ -115,7 +128,7 @@ function ConnectionForm({ settings, onSaved }: { settings: EmailSettings; onSave
     {field('replyTo', 'Reply-to (optional)', 'Where replies to notification emails go. Leave empty to use the sender.', { placeholder: 'info@novabridgegrant.org' })}
     {field('appUrl', 'Portal address', 'Used for links in emails and the webhook address.', { placeholder: 'https://portal.novabridgegrant.org' })}
     {field('webhookSecret', 'Webhook signing secret', 'From Resend → Webhooks → your endpoint → Signing secret (starts with whsec_).', { secret: true, placeholder: 'whsec_…', saved: settings.webhook.secretSet ? '••••' : null, clearable: settings.webhook.secretSet })}
-    {field('supabaseToken', 'Supabase access token', 'Lets this page switch sign-up email verification. Create one at supabase.com → Account → Access Tokens (starts with sbp_).', { secret: true, placeholder: 'sbp_…', saved: settings.supabaseToken.set ? '••••' : null, clearable: settings.supabaseToken.set })}
+    {field('supabaseToken', 'Supabase access token', 'Lets this page manage sign-up verification and sign-in emails. Create one at supabase.com → Account → Access Tokens (starts with sbp_). It can manage every project in that account; remove it when you\'re done.', { secret: true, placeholder: 'sbp_…', saved: settings.supabaseToken.set ? '••••' : null, clearable: settings.supabaseToken.set })}
     <div className="admin-review-buttons" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
       <span className="admin-review-hint">{settings.updatedBy ? `Last changed by ${settings.updatedBy}${settings.updatedAt ? ` · ${format(new Date(settings.updatedAt), 'dd MMM yyyy, HH:mm')}` : ''}.` : 'Not changed from here yet.'}</span>
       <button type="submit" className="admin-btn primary" disabled={busy} data-testid="button-save-email-settings">{busy ? 'Saving…' : 'Save email settings'}</button>

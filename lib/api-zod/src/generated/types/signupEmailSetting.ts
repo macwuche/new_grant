@@ -5,10 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SignupEmailSettingSmtp } from './signupEmailSettingSmtp';
 
 export interface SignupEmailSetting {
   connected: boolean;
   /** @nullable */
   emailConfirmation: boolean | null;
+  smtp?: SignupEmailSettingSmtp;
+  appTemplates?: boolean;
   error?: string;
 }

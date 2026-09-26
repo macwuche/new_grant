@@ -25,4 +25,5 @@
   .admin-email-settings-row { flex-wrap: wrap; }
   .admin-email-settings-row > div { flex-basis: calc(100% - 44px); }
   .admin-email-settings-row .admin-email-settings-value { margin-left: 44px; }
-}
+}.admin-email-settings-row > .admin-btn { flex-shrink: 0; }
+@media (max-width: 560px) { .admin-email-settings-row:has(> .admin-btn) { flex-wrap: wrap; } }
