@@ -4,6 +4,7 @@ import type { ActivityRepo } from "../lib/activity";
 import type { ApplicationRepo } from "../lib/applicationRepo";
 import type { DocumentRepo } from "../lib/documentRepo";
 import type { FileStore } from "../lib/fileStore";
+import type { EmailOutbox, Mailer } from "../lib/email";
 import type { MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
@@ -13,6 +14,7 @@ import { activityRouter } from "./activity";
 import { applicantsRouter } from "./applicants";
 import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
+import { emailRouter } from "./email";
 import { moneyRouter } from "./money";
 import healthRouter from "./health";
 import meRouter from "./me";
@@ -20,9 +22,9 @@ import { profileRouter } from "./profile";
 import { programsRouter } from "./programs";
 import { staffRouter } from "./staff";
 
-export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; programRepo: ProgramRepo; profileRepo: ProfileRepo; applicationRepo: ApplicationRepo; activityRepo: ActivityRepo; moneyRepo: MoneyRepo; documentRepo: DocumentRepo; fileStore: FileStore };
+export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; programRepo: ProgramRepo; profileRepo: ProfileRepo; applicationRepo: ApplicationRepo; activityRepo: ActivityRepo; moneyRepo: MoneyRepo; documentRepo: DocumentRepo; fileStore: FileStore; emailOutbox: EmailOutbox; mailer: Mailer };
 
-export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore }: ApiDeps): IRouter {
+export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, mailer }: ApiDeps): IRouter {
   const router: IRouter = Router();
   router.use(healthRouter);
   // Everything below requires a verified sign-in token.
@@ -36,5 +38,6 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(documentsRouter({ documents: documentRepo, files: fileStore, profiles: profileRepo, applications: applicationRepo, programs: programRepo }));
   router.use(moneyRouter(moneyRepo, profileRepo));
   router.use(activityRouter(activityRepo));
+  router.use(emailRouter(emailOutbox, mailer));
   return router;
 }

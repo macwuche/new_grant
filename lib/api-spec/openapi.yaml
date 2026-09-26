@@ -26,6 +26,8 @@ tags:
     description: Notifications, the staff activity feed, and the audit log
   - name: money
     description: The ledger, deposits, payouts, cards, money settings, and the lockdown
+  - name: email
+    description: Email preferences and delivery status
   - name: documents
     description: Identity documents and application evidence (files kept on the API server's disk)
 security:
@@ -1644,6 +1646,60 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /profile/email-preference:
+    get:
+      operationId: getEmailPreference
+      tags: [email]
+      summary: Whether your notifications are also emailed
+      description: On by default.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailPreference"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: setEmailPreference
+      tags: [email]
+      summary: Turn email copies of your notifications on or off
+      description: In-app notifications are unaffected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailPreference"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailPreference"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /email/status:
+    get:
+      operationId: getEmailStatus
+      tags: [email]
+      summary: Email delivery status (super admin)
+      description: Requires staff.manage. Whether sending is configured, the sender, counts per status, and the 25 latest messages (no bodies).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
   securitySchemes:
     bearerAuth:
@@ -1744,6 +1800,64 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    EmailPreference:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required: [enabled]
+    EmailOutboxStatus:
+      type: string
+      enum: [queued, sending, sent, failed, skipped]
+    EmailStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        from:
+          type: [string, "null"]
+        counts:
+          type: object
+          properties:
+            queued:
+              type: integer
+            sending:
+              type: integer
+            sent:
+              type: integer
+            failed:
+              type: integer
+            skipped:
+              type: integer
+          required: [queued, sending, sent, failed, skipped]
+        recent:
+          type: array
+          items:
+            type: object
+            properties:
+              seq:
+                type: integer
+              kind:
+                type: string
+                enum: [notification, staff-invite]
+              to:
+                type: string
+              subject:
+                type: string
+              status:
+                $ref: "#/components/schemas/EmailOutboxStatus"
+              attempts:
+                type: integer
+              lastError:
+                type: [string, "null"]
+              createdAt:
+                type: string
+                format: date-time
+              sentAt:
+                type: [string, "null"]
+                format: date-time
+            required: [seq, kind, to, subject, status, attempts, lastError, createdAt, sentAt]
+      required: [configured, from, counts, recent]
     DocumentPurpose:
       type: string
       enum: [identity, application]

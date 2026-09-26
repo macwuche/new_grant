@@ -49,6 +49,8 @@ export const applicantProfilesTable = pgTable("applicant_profiles", {
   /** Masked payout destination labels per channel; full numbers are never stored. */
   payoutDestinations: jsonb("payout_destinations").$type<Partial<Record<"bank" | "wire" | "mobile" | "crypto", string>>>().notNull().default({}),
   destinationChangedAt: timestamp("destination_changed_at", { withTimezone: true }),
+  /** Whether in-app notifications are also sent by email. */
+  emailNotifications: boolean("email_notifications").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

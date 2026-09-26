@@ -7,7 +7,7 @@ import {
   Download, FileCheck2, FileText, Home, Info, Landmark, LayoutGrid, LockKeyhole,
   LoaderCircle, LogOut, MoreHorizontal, Plus, Receipt, RotateCcw, Search, Settings, ShieldAlert, ShieldCheck, SlidersHorizontal,
   PiggyBank, Sparkles, Store, Trash2, WalletCards, X, Zap,
-} from 'lucide-react';
+Mail, } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
@@ -660,6 +660,21 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
     </div>}
   </div><StatusBadge status={kyc.status} tone={tone} /></div>;
 }
+/** Signed in only: whether notifications are also emailed to the account's address. */
+function EmailPreferenceCard({ onToast }: { onToast: Toast }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { let live = true; api.getEmailPreference().then(p => { if (live) setEnabled(p.enabled); }).catch(() => { if (live) setEnabled(null); }); return () => { live = false; }; }, []);
+  const toggle = async () => {
+    if (enabled === null) return;
+    setSaving(true);
+    try { const saved = await api.setEmailPreference({ enabled: !enabled }); setEnabled(saved.enabled); onToast(saved.enabled ? 'Notifications will also be emailed to you.' : 'Email copies turned off. You\'ll still see notifications here.'); }
+    catch (err) { onToast(apiError(err, "Couldn't save your email preference. Try again.").error); }
+    finally { setSaving(false); }
+  };
+  return <div className="card card-pad" id="email" data-testid="section-email-preference"><div className="verification-item" style={{ border: 0, padding: 0 }}><div className="verification-icon"><Mail size={15} /></div><div className="verification-copy"><strong>Email copies of notifications</strong><span>{enabled === null ? 'Loading…' : enabled ? 'Review outcomes, identity checks, deposits, payouts, and account changes are also sent to your email.' : 'Off. You\'ll only see notifications in the bell.'}</span></div>
+    <button className={`switch ${enabled ? 'on' : ''}`} role="switch" aria-checked={!!enabled} disabled={enabled === null || saving} onClick={() => void toggle()} aria-label="Email copies of notifications" data-testid="button-toggle-email-notifications" /></div></div>;
+}
 function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
   const [editing, setEditing] = useState<ChannelId | null>(null);
@@ -733,6 +748,7 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
       <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => void complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>
       {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>{connected ? 'Requested by the grant team. Change it with “Forgot password?” on the sign-in page, then confirm here.' : "Requested by the grant team. Sign-in isn't connected, so nothing is stored."}</span></div><button className="btn btn-ghost" onClick={() => void complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
     </div>
+    {connected && <EmailPreferenceCard onToast={onToast} />}
     <PayoutDestinationsCard onToast={onToast} />
     <div className="card card-pad" id="demo-data"><div className="section-head"><div><h2 className="section-title">Demo data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser. Resetting also clears the staff audit log and settings.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); setEditing(false); onToast('Demo data reset to the original sample records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset demo data</button>}</div></div>
   </div></div>;

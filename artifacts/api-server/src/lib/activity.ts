@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { recordAudit } from "@workspace/domain/audit";
 import type { AuditChange, DemoState, StaffMember } from "@workspace/domain/model";
 import { CURRENT_APPLICANT_ID } from "@workspace/domain/seed";
+import { appUrl, notificationEmail, type NewEmail } from "./email";
 
 // Notifications, staff activity items, and audit entries that accompany a
 // change ("effects"). Rules create notifications and feed items as part of
@@ -14,7 +15,20 @@ export type NewAudit = {
   at: string; staffId: string; staffName: string; role: string; action: string; target: string;
   applicantId: string | null; summary: string; changes: AuditChange[]; riskScore: number | null; ip: string | null;
 };
-export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffEvent[]; audit: NewAudit[] };
+/** `emails`: messages besides notification copies (which are derived from `notifications` when stored). */
+export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffEvent[]; audit: NewAudit[]; emails?: NewEmail[] };
+
+/** Who a notification's email copy goes to; null or opted out means no email. */
+export type EmailRecipient = { email: string; name: string; emailNotifications: boolean };
+
+/** The emails a change sends: a copy of each notification to applicants who want them, plus any explicit emails. */
+export function emailsFor(effects: Effects, recipient: (applicantId: string) => EmailRecipient | null | undefined, baseUrl = appUrl()): NewEmail[] {
+  const copies = effects.notifications.flatMap(n => {
+    const to = recipient(n.applicantId);
+    return to?.emailNotifications && to.email ? [notificationEmail(n, to, baseUrl)] : [];
+  });
+  return [...copies, ...(effects.emails ?? [])];
+}
 
 export const NO_EFFECTS: Effects = { notifications: [], staffEvents: [], audit: [] };
 
@@ -93,7 +107,7 @@ export function checkChain(rows: { id: string; entry: NewAudit; prevHash: string
 export const LIST_LIMIT = 200;
 
 /** In-memory activity store for tests: `write` is what memory repos call with their effects. */
-export function memoryActivity(): ActivityRepo & { write(effects: Effects): void; tamper(seq: number, summary: string): void } {
+export function memoryActivity(email?: { outbox: { enqueue(emails: NewEmail[]): void }; recipient: (applicantId: string) => EmailRecipient | null | undefined }): ActivityRepo & { write(effects: Effects): void; tamper(seq: number, summary: string): void } {
   const notifications: (NewNotification & { seq: number; read: boolean })[] = [];
   const events: (NewStaffEvent & { seq: number })[] = [];
   const reads = new Set<string>();
@@ -101,6 +115,7 @@ export function memoryActivity(): ActivityRepo & { write(effects: Effects): void
   let seq = 0;
   return {
     write: effects => {
+      if (email) email.outbox.enqueue(emailsFor(effects, email.recipient, "https://app.example.org"));
       for (const n of effects.notifications) notifications.push({ ...n, seq: ++seq, read: false });
       for (const e of effects.staffEvents) events.push({ ...e, seq: ++seq });
       for (const a of effects.audit) {

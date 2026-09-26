@@ -36,6 +36,8 @@ import type {
   DepositRequest,
   DestinationInput,
   Document,
+  EmailPreference,
+  EmailStatus,
   Error,
   EscalationResolution,
   ForbiddenResponse,
@@ -5661,6 +5663,251 @@ export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocument
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDocumentFileQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEmailPreferenceUrl = () => {
+
+
+
+
+  return `/api/profile/email-preference`
+}
+
+/**
+ * On by default.
+ * @summary Whether your notifications are also emailed
+ */
+export const getEmailPreference = async ( options?: Parameters<typeof customFetch>[1]): Promise<EmailPreference> => {
+
+  return customFetch<EmailPreference>(getGetEmailPreferenceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailPreferenceQueryKey = () => {
+    return [
+    `/api/profile/email-preference`
+    ] as const;
+    }
+
+
+export const getGetEmailPreferenceQueryOptions = <TData = Awaited<ReturnType<typeof getEmailPreference>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailPreference>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailPreferenceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailPreference>>> = ({ signal }) => getEmailPreference({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailPreference>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailPreferenceQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailPreference>>>
+export type GetEmailPreferenceQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary Whether your notifications are also emailed
+ */
+
+export function useGetEmailPreference<TData = Awaited<ReturnType<typeof getEmailPreference>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailPreference>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailPreferenceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetEmailPreferenceUrl = () => {
+
+
+
+
+  return `/api/profile/email-preference`
+}
+
+/**
+ * In-app notifications are unaffected.
+ * @summary Turn email copies of your notifications on or off
+ */
+export const setEmailPreference = async (emailPreference: EmailPreference, options?: Parameters<typeof customFetch>[1]): Promise<EmailPreference> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EmailPreference>(getSetEmailPreferenceUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(emailPreference)
+  }
+);}
+
+
+
+
+
+export const getSetEmailPreferenceMutationKey = () => ['setEmailPreference'] as const;
+
+export const getSetEmailPreferenceMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailPreference>>, TError,SetEmailPreferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setEmailPreference>>, TError,SetEmailPreferenceMutationVariables, TContext> => {
+
+const mutationKey = getSetEmailPreferenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEmailPreference>>, SetEmailPreferenceMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setEmailPreference(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetEmailPreferenceMutationResult = NonNullable<Awaited<ReturnType<typeof setEmailPreference>>>
+    export type SetEmailPreferenceMutationBody = BodyType<EmailPreference>
+    export type SetEmailPreferenceMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+    export type SetEmailPreferenceMutationVariables = {data: BodyType<EmailPreference>}
+
+    /**
+ * @summary Turn email copies of your notifications on or off
+ */
+export const useSetEmailPreference = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailPreference>>, TError,SetEmailPreferenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setEmailPreference>>,
+        TError,
+        SetEmailPreferenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetEmailPreferenceMutationOptions(options));
+    }
+
+export const getGetEmailStatusUrl = () => {
+
+
+
+
+  return `/api/email/status`
+}
+
+/**
+ * Requires staff.manage. Whether sending is configured, the sender, counts per status, and the 25 latest messages (no bodies).
+ * @summary Email delivery status (super admin)
+ */
+export const getEmailStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<EmailStatus> => {
+
+  return customFetch<EmailStatus>(getGetEmailStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmailStatusQueryKey = () => {
+    return [
+    `/api/email/status`
+    ] as const;
+    }
+
+
+export const getGetEmailStatusQueryOptions = <TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailStatus>>> = ({ signal }) => getEmailStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmailStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailStatus>>>
+export type GetEmailStatusQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Email delivery status (super admin)
+ */
+
+export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmailStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

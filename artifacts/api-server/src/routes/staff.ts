@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { staffChangeError } from "@workspace/authz";
+import { ROLE_LABELS, staffChangeError } from "@workspace/authz";
 import { CreateStaffMemberBody, ListStaffResponse, UpdateStaffMemberBody, UpdateStaffMemberParams, UpdateStaffMemberResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 import type { StaffRecord, StaffRepo } from "../lib/staffRepo";
 import { auditEntry } from "../lib/activity";
+import { appUrl, staffInviteEmail } from "../lib/email";
 import { auditContext, authLocals, requirePermission } from "../middlewares/auth";
 
 export const toStaffMember = (r: StaffRecord) => ({ id: r.id, email: r.email, name: r.name, role: r.role, active: r.active, linked: !!r.authUserId });
@@ -25,7 +26,8 @@ export function staffRouter(repo: StaffRepo): IRouter {
     // The new member's id doesn't exist yet, so the entry is keyed by their email.
     const audit = auditEntry(auditContext(req, res, "Add staff member", email), `${name} added as ${body.data.role}.`,
       [{ field: "email", before: "—", after: email }, { field: "name", before: "—", after: name }, { field: "role", before: "—", after: body.data.role }], new Date());
-    const created = await repo.create({ email, name, role: body.data.role }, { notifications: [], staffEvents: [], audit: [audit] });
+    const invite = staffInviteEmail({ email, name, roleLabel: ROLE_LABELS[body.data.role] }, authLocals(res).staff!.name, appUrl());
+    const created = await repo.create({ email, name, role: body.data.role }, { notifications: [], staffEvents: [], audit: [audit], emails: [invite] });
     logger.info({ actor: authLocals(res).staff!.id, target: created.id, role: created.role }, "staff member added");
     res.status(201).json(toStaffMember(created));
   });

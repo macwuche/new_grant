@@ -5,6 +5,59 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface EmailPreference {
+  enabled: boolean;
+}
+
+export type EmailOutboxStatus = typeof EmailOutboxStatus[keyof typeof EmailOutboxStatus];
+
+
+export const EmailOutboxStatus = {
+  queued: 'queued',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+  skipped: 'skipped',
+} as const;
+
+export type EmailStatusCounts = {
+  queued: number;
+  sending: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+};
+
+export type EmailStatusRecentItemKind = typeof EmailStatusRecentItemKind[keyof typeof EmailStatusRecentItemKind];
+
+
+export const EmailStatusRecentItemKind = {
+  notification: 'notification',
+  'staff-invite': 'staff-invite',
+} as const;
+
+export type EmailStatusRecentItem = {
+  seq: number;
+  kind: EmailStatusRecentItemKind;
+  to: string;
+  subject: string;
+  status: EmailOutboxStatus;
+  attempts: number;
+  /** @nullable */
+  lastError: string | null;
+  createdAt: string;
+  /** @nullable */
+  sentAt: string | null;
+};
+
+export interface EmailStatus {
+  configured: boolean;
+  /** @nullable */
+  from: string | null;
+  counts: EmailStatusCounts;
+  recent: EmailStatusRecentItem[];
+}
+
 export type DocumentPurpose = typeof DocumentPurpose[keyof typeof DocumentPurpose];
 
 

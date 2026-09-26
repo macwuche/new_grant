@@ -11,6 +11,8 @@ import { dbActivityRepo } from "./lib/activity.db";
 import { dbMoneyRepo, ensureSettings } from "./lib/moneyRepo.db";
 import { dbDocumentRepo } from "./lib/documentRepo.db";
 import { diskFileStore, documentsDir } from "./lib/fileStore";
+import { appUrl, mailerFromEnv, startEmailWorker } from "./lib/email";
+import { dbEmailOutbox } from "./lib/emailOutbox.db";
 import { seedGrants } from "@workspace/domain/seed";
 
 const rawPort = process.env["PORT"];
@@ -44,10 +46,16 @@ if (seeded) logger.info({ count: seeded }, "sample grant programs added to the e
 const docsDir = documentsDir();
 logger.info({ dir: docsDir }, "document files are stored on this server's disk");
 
+const mailer = mailerFromEnv();
+if (mailer.configured) logger.info({ from: mailer.from, links: appUrl() }, "email is sent through Resend");
+else logger.warn("RESEND_API_KEY / EMAIL_FROM not set: email is off (queued messages are marked skipped)");
+if (mailer.configured && !appUrl()) logger.warn("APP_URL not set: emails won't include links to the portal");
+startEmailWorker(dbEmailOutbox, mailer);
+
 const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
-  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir),
+  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, mailer,
 });
 
 app.listen(port, (err) => {

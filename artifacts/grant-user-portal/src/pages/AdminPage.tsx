@@ -201,9 +201,9 @@ function Settings() {
     </section>
     <div className="admin-grid">
       <section className="admin-panel"><SectionHead title="Example sectors" subtitle="Illustrative labels, not live choices." /><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div><div className="admin-settings-callout"><strong>Configuration preview only</strong><p>Editing these options would require authenticated admin access and a backend. This screen does not save changes.</p></div></section>
-      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Staff sign-in</span><strong>Not enabled</strong></div><div className="admin-mini-stat"><span>Role checks</span><strong>Demo roles, this browser</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>This browser</strong></div></section>
+      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Staff sign-in</span><strong>{signedIn ? 'Supabase Auth' : 'Not enabled'}</strong></div><div className="admin-mini-stat"><span>Role checks</span><strong>{signedIn ? 'Enforced by the API' : 'Demo roles, this browser'}</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>{signedIn ? 'Server database' : 'This browser'}</strong></div></section>
     </div>
-  </div><AdminEmailSettings /></>;
+  </div><AdminEmailSettings signedIn={signedIn} /></>;
 }
 
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {

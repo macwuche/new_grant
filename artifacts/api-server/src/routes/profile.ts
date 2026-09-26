@@ -71,6 +71,19 @@ export function profileRouter(repo: ProfileRepo, documents: DocumentRepo): IRout
     await ownRule(res, s => submitKyc(s, body.data, new Date()));
   });
 
+  router.get("/profile/email-preference", async (_req, res) => {
+    res.json({ enabled: (await ownProfile(repo, authLocals(res).user)).emailNotifications });
+  });
+
+  router.put("/profile/email-preference", async (req, res) => {
+    const enabled = (req.body as { enabled?: unknown } | undefined)?.enabled;
+    if (typeof enabled !== "boolean") { res.status(400).json({ error: "Say whether email copies are on or off." }); return; }
+    const { user } = authLocals(res);
+    await ownProfile(repo, user);
+    const saved = await repo.updateContact(user.id, { emailNotifications: enabled });
+    res.json({ enabled: saved.emailNotifications });
+  });
+
   router.post("/profile/credential-reset", async (req, res) => {
     const body = CompleteCredentialResetBody.safeParse(req.body);
     if (!body.success) { res.status(400).json({ error: "Say which reset you completed." }); return; }

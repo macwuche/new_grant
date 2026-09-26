@@ -3318,3 +3318,53 @@ export const GetDocumentFileParams = zod.object({
 export const GetDocumentFileResponse = zod.unknown()
 
 
+/**
+ * On by default.
+ * @summary Whether your notifications are also emailed
+ */
+export const GetEmailPreferenceResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * In-app notifications are unaffected.
+ * @summary Turn email copies of your notifications on or off
+ */
+export const SetEmailPreferenceBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const SetEmailPreferenceResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * Requires staff.manage. Whether sending is configured, the sender, counts per status, and the 25 latest messages (no bodies).
+ * @summary Email delivery status (super admin)
+ */
+export const GetEmailStatusResponse = zod.object({
+  "configured": zod.boolean(),
+  "from": zod.string().nullable(),
+  "counts": zod.object({
+  "queued": zod.number().int(),
+  "sending": zod.number().int(),
+  "sent": zod.number().int(),
+  "failed": zod.number().int(),
+  "skipped": zod.number().int()
+}),
+  "recent": zod.array(zod.object({
+  "seq": zod.number().int(),
+  "kind": zod.enum(['notification', 'staff-invite']),
+  "to": zod.string(),
+  "subject": zod.string(),
+  "status": zod.enum(['queued', 'sending', 'sent', 'failed', 'skipped']),
+  "attempts": zod.number().int(),
+  "lastError": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "sentAt": zod.coerce.date().nullable()
+}))
+})
+
+

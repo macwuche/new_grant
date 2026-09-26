@@ -20,6 +20,8 @@ export type ProfileRecord = {
   tier: 1 | 2 | 3;
   identityVerified: boolean;
   account: StoredAccount;
+  /** Whether notifications are also emailed. */
+  emailNotifications: boolean;
   /** ISO timestamp the profile was created. */
   createdAt: string;
   /** Record version for account-control writes. */
@@ -27,7 +29,7 @@ export type ProfileRecord = {
 };
 
 export type NewProfile = Pick<ProfileRecord, "authUserId" | "name" | "email" | "phone" | "sector" | "country" | "birthDate">;
-export type ContactPatch = Partial<Pick<ProfileRecord, "name" | "email" | "phone" | "address">>;
+export type ContactPatch = Partial<Pick<ProfileRecord, "name" | "email" | "phone" | "address" | "emailNotifications">>;
 /** What the account rules may change. */
 export type AccountPatch = Partial<Pick<ProfileRecord, "tier" | "identityVerified" | "account">>;
 
@@ -46,18 +48,19 @@ export interface ProfileRepo {
 export const NEW_ACCOUNT: StoredAccount = { status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } };
 
 /** In-memory repo for tests and local experiments. */
-export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write(effects: Effects): void }): ProfileRepo {
+export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write(effects: Effects): void }): ProfileRepo & { peek(id: string): ProfileRecord | undefined } {
   const rows = new Map(seed.map(r => [r.authUserId, structuredClone(r)]));
   let tick = Date.parse("2026-01-01T00:00:00.000Z");
   const stamp = () => new Date(tick += 1000).toISOString();
   return {
+    peek: id => rows.get(id),
     get: async id => { const row = rows.get(id); return row ? structuredClone(row) : null; },
     list: async () => [...rows.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(r => structuredClone(r)),
     create: async profile => {
       const existing = rows.get(profile.authUserId);
       if (existing) return structuredClone(existing);
       const at = stamp();
-      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), createdAt: at, updatedAt: at, ...profile };
+      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, createdAt: at, updatedAt: at, ...profile };
       rows.set(row.authUserId, row);
       return structuredClone(row);
     },

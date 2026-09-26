@@ -15,6 +15,7 @@ export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
     ...(row.lockedBy ? { lockedBy: row.lockedBy } : {}),
     passwordResetRequired: row.passwordResetRequired, twoFactorResetRequired: row.twoFactorResetRequired, kyc: row.kyc,
   },
+  emailNotifications: row.emailNotifications,
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
 });
 

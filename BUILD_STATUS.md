@@ -44,7 +44,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
    - Phase 12 is complete: every record is on the server once sign-in is configured; without it the browser demo is unchanged. Still to do: the live check of everything with a real Supabase sign-in (the app can't see its Supabase settings yet).
 13. **Documents, email notifications (Resend) — In progress**
    - Done (26 Sep 2026): documents. Files are kept on the API server's own disk (`DOCUMENTS_DIR`, e.g. `/var/lib/arcfund/documents` on the VPS; `artifacts/api-server/data/documents` by default), never in Supabase Storage; the `documents` table in Supabase (row-level security on) records owner, purpose, application and requirement, file name, detected type, size, and SHA-256. Applicants upload identity documents (at least one is required before an identity check can be submitted) and a file for each program requirement (every requirement needs one before an application can be submitted). PDF, JPEG, PNG only, detected from the content; 10 MB each. Evidence is frozen while an identity check is pending or verified, and once an application is submitted (unless changes are requested). Staff open documents by role (identity: `kyc.review`; application files: `applications.review`, `applications.clearEscalation`, or `kyc.review`), and every staff view is audited. Downloads are checked against the SHA-256, so a changed or missing file is reported. Deleting a draft removes its files. 6 new API tests and 10 checks against the real database and disk. Demo mode is unchanged (no uploads).
-   - Next: email through Resend.
+   - Done (26 Sep 2026): email through Resend. An `email_outbox` table (row-level security on) is written in the same transaction as the change: a copy of every applicant notification (unless the applicant turns email copies off in Settings; `email_notifications` on `applicant_profiles`) and an invitation when a super admin adds a staff member. A worker in the API server sends queued mail through Resend's HTTP API with the idempotency key `email-<seq>`, retries rate limits and server errors after 1, 5, 30, 120, and 360 minutes, and gives up on other errors; claims use `FOR UPDATE SKIP LOCKED`, so several API instances never send a message twice. Without `RESEND_API_KEY` and `EMAIL_FROM`, queued mail is marked skipped (no backlog is sent later). Super admins see the delivery status (configured, sender, counts, latest 25) under Settings. 6 new API tests and 7 checks against the real database. **Waiting on:** `RESEND_API_KEY`, `EMAIL_FROM` (on a domain verified in Resend), and `APP_URL` in Secrets; no real email has been sent yet.
+   - Not built: inbound email (the admin inbox is still a page-memory sample), SMS, push.
 14. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
 
@@ -52,9 +53,9 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 - Live check with a real Supabase sign-in: the running app can't see its Supabase settings yet, so everything since phase 11 has been tested against the real database with a stand-in for sign-in only.
 - A payment provider: deposits are confirmed and payouts marked paid by finance by hand, cards are fictional, and receiving details are fictional (phase 14).
-- Real risk signals (sign-in location, device), an automated identity-verification provider (staff review uploaded documents by hand), and email/SMS notifications (in-app notifications exist; phase 13).
+- Real risk signals (sign-in location, device), an automated identity-verification provider (staff review uploaded documents by hand), and SMS or inbound email (outgoing email is built and waits on the Resend key; phase 13).
 - Enforcing staff-required password and two-step resets at sign-in (they're recorded for the applicant to confirm).
-- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 74 API tests).
+- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 80 API tests).
 
 ## Frontend foundation
 

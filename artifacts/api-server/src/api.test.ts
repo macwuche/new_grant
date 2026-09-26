@@ -10,6 +10,7 @@ import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRe
 import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore } from "./lib/fileStore";
+import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, unconfiguredMailer, type Mailer } from "./lib/email";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
 import { seedTreasury } from "@workspace/domain/seed";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
@@ -44,17 +45,23 @@ let activity: ReturnType<typeof memoryActivity>;
 let money: ReturnType<typeof memoryMoneyRepo>;
 let documents: DocumentRepo;
 let files: ReturnType<typeof memoryFileStore>;
+let outbox: ReturnType<typeof memoryOutbox>;
+const mailer: Mailer = { configured: false, from: null, send: async () => ({ ok: false, error: "off", retry: false }) };
 
 async function start(v: TokenVerifier | null = verifier) {
-  activity = memoryActivity();
+  outbox = memoryOutbox();
+  const people: { peek(id: string): { email: string; name: string; emailNotifications: boolean } | undefined } = { peek: () => undefined };
+  activity = memoryActivity({ outbox, recipient: id => people.peek(id) });
   repo = memoryStaffRepo(SEED, activity);
   programs = memoryProgramRepo(seedGrants(), activity);
-  profiles = memoryProfileRepo([], activity);
+  const profileRepo = memoryProfileRepo([], activity);
+  people.peek = profileRepo.peek;
+  profiles = profileRepo;
   money = memoryMoneyRepo(profiles, { treasury: seedTreasury(), lockdown: null }, activity);
   applications = memoryApplicationRepo(programs, [], activity, money);
   documents = memoryDocumentRepo(activity);
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -859,5 +866,90 @@ describe("documents", () => {
     expect((await post(`/applications/${draft.id}/delete`, {}, "tok-maya")).status).toBe(200);
     expect((await mineDocs()).map((d: { purpose: string }) => d.purpose)).toEqual(["identity"]);
     expect(files.files.size).toBe(1);
+  });
+});
+
+describe("email", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+
+  it("queues an email copy of each notification, in the same write, unless the applicant turned them off", async () => {
+    await call("/profile", "tok-maya");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const copy = outbox.rows.find(r => r.subject === "Identity verified")!;
+    expect(copy).toMatchObject({ kind: "notification", to: "maya@example.com", status: "queued" });
+    expect(copy.text).toContain("Hello Maya Okafor,");
+    expect(copy.html).toContain("https://app.example.org/");
+    expect((await json(await call("/profile/email-preference", "tok-maya"))).enabled).toBe(true);
+    expect((await put("/profile/email-preference", { enabled: "no" }, "tok-maya")).status).toBe(400);
+    expect((await json(await put("/profile/email-preference", { enabled: false }, "tok-maya"))).enabled).toBe(false);
+    const before = outbox.rows.length;
+    await submitApp({ grantId: "creative", application: input }, "tok-maya");
+    const { application } = { application: (await json(await call("/applications", "tok-super")))[0] };
+    await post(`/applications/${application.id}/start-review`, { version: application.updatedAt });
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toMatch(/under review/);
+    expect(outbox.rows.length).toBe(before);
+  });
+
+  it("emails new staff members how to sign in", async () => {
+    await post("/staff", { email: "Casey@Example.org", name: "Casey <b>Brooks</b>", role: "reviewer" });
+    const invite = outbox.rows.find(r => r.kind === "staff-invite")!;
+    expect(invite).toMatchObject({ to: "casey@example.org", subject: expect.stringMatching(/grant team/) });
+    expect(invite.text).toContain("Sam Rivera added you to the arc.fund grant team as Grant reviewer");
+    expect(invite.html).toContain("Casey &lt;b&gt;Brooks&lt;/b&gt;");
+    expect(invite.html).not.toContain("<b>Brooks");
+  });
+
+  it("shows delivery status to super admins only", async () => {
+    await post("/staff", { email: "casey@example.org", name: "Casey Brooks", role: "reviewer" });
+    expect((await call("/email/status", "tok-finance")).status).toBe(403);
+    const status = await json(await call("/email/status", "tok-super"));
+    expect(status).toMatchObject({ configured: false, from: null, counts: { queued: 1 } });
+    expect(status.recent[0]).toMatchObject({ kind: "staff-invite", to: "casey@example.org", status: "queued" });
+    expect(status.recent[0].html).toBeUndefined();
+  });
+});
+
+describe("email delivery", () => {
+  const email = { kind: "notification" as const, to: "maya@example.com", subject: "Hi", text: "t", html: "<p>h</p>" };
+  const fakeResend = (responses: { status: number; body: unknown }[]) => {
+    const calls: { headers: Record<string, string>; body: Record<string, unknown> }[] = [];
+    const impl = (async (_url: string, init: RequestInit) => {
+      calls.push({ headers: init.headers as Record<string, string>, body: JSON.parse(String(init.body)) });
+      const next = responses.shift()!;
+      return new Response(JSON.stringify(next.body), { status: next.status, headers: { "content-type": "application/json" } });
+    }) as unknown as typeof fetch;
+    return { calls, impl };
+  };
+
+  it("marks mail skipped when email isn't configured, so turning it on later sends no backlog", async () => {
+    const box = memoryOutbox(); box.enqueue([email]);
+    await deliverBatch(box, unconfiguredMailer, new Date());
+    expect(box.rows[0]).toMatchObject({ status: "skipped", lastError: expect.stringMatching(/configured/) });
+  });
+
+  it("sends through Resend with an idempotency key per outbox row", async () => {
+    const box = memoryOutbox(); box.enqueue([email]);
+    const resend = fakeResend([{ status: 200, body: { id: "re_123" } }]);
+    await deliverBatch(box, resendMailer("re_key", "arc.fund <grants@example.org>", undefined, resend.impl), new Date());
+    expect(box.rows[0]).toMatchObject({ status: "sent", providerId: "re_123" });
+    expect(resend.calls[0]!.headers).toMatchObject({ authorization: "Bearer re_key", "idempotency-key": "email-1" });
+    expect(resend.calls[0]!.body).toMatchObject({ from: "arc.fund <grants@example.org>", to: ["maya@example.com"], subject: "Hi" });
+  });
+
+  it("retries rate limits and server errors with backoff, and gives up on bad requests and after the last retry", async () => {
+    const box = memoryOutbox(); box.enqueue([email, { ...email, to: "not-an-address" }]);
+    const resend = fakeResend([{ status: 500, body: { message: "down" } }, { status: 422, body: { message: "Invalid `to` field" } }]);
+    const mailer = resendMailer("k", "a@example.org", undefined, resend.impl);
+    const t0 = new Date("2026-09-26T12:00:00Z");
+    await deliverBatch(box, mailer, t0);
+    expect(box.rows[0]).toMatchObject({ status: "queued", attempts: 1, nextAttemptAt: t0.getTime() + RETRY_MINUTES[0]! * 60_000 });
+    expect(box.rows[1]).toMatchObject({ status: "failed", lastError: expect.stringContaining("422") });
+    expect(await deliverBatch(box, mailer, t0)).toBe(0);
+    let at = t0.getTime();
+    const failing = resendMailer("k", "a@example.org", undefined, (async () => new Response("{}", { status: 503 })) as unknown as typeof fetch);
+    for (let i = 0; i < RETRY_MINUTES.length; i++) { at = box.rows[0]!.nextAttemptAt; await deliverBatch(box, failing, new Date(at)); }
+    expect(box.rows[0]).toMatchObject({ status: "failed", attempts: RETRY_MINUTES.length + 1 });
   });
 });

@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { auditEventsTable, db, notificationsTable, staffEventReadsTable, staffEventsTable, type AuditEventRow } from "@workspace/db";
-import { auditHash, checkChain, GENESIS_HASH, LIST_LIMIT, type ActivityRepo, type Effects, type NewAudit } from "./activity";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { applicantProfilesTable, auditEventsTable, db, emailOutboxTable, notificationsTable, staffEventReadsTable, staffEventsTable, type AuditEventRow } from "@workspace/db";
+import { auditHash, checkChain, emailsFor, GENESIS_HASH, LIST_LIMIT, type ActivityRepo, type Effects, type NewAudit } from "./activity";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -11,6 +11,14 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function writeEffects(tx: Tx, effects: Effects): Promise<void> {
   if (effects.notifications.length) {
     await tx.insert(notificationsTable).values(effects.notifications.map(n => ({ ...n, at: new Date(n.at) })));
+  }
+  // Email copies of notifications (for applicants who want them) and explicit emails, queued for the worker.
+  const ids = [...new Set(effects.notifications.map(n => n.applicantId))];
+  const people = ids.length ? await tx.select({ id: applicantProfilesTable.authUserId, email: applicantProfilesTable.email, name: applicantProfilesTable.name, emailNotifications: applicantProfilesTable.emailNotifications })
+    .from(applicantProfilesTable).where(inArray(applicantProfilesTable.authUserId, ids)) : [];
+  const emails = emailsFor(effects, id => people.find(p => p.id === id));
+  if (emails.length) {
+    await tx.insert(emailOutboxTable).values(emails.map(e => ({ kind: e.kind, toAddress: e.to, subject: e.subject, textBody: e.text, htmlBody: e.html })));
   }
   if (effects.staffEvents.length) {
     await tx.insert(staffEventsTable).values(effects.staffEvents.map(e => ({ ...e, at: new Date(e.at) })));
