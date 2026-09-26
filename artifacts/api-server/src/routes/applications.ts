@@ -9,6 +9,8 @@ import { addInternalNote, approveApplication, clearEscalation, declineApplicatio
 import { deleteDraft, saveDraft, submitApplication } from "@workspace/domain/rules";
 import { applicantState, applicantView, readApplicantSlot, serverState } from "@workspace/domain/server";
 import type { ApplicationRepo, ProgramScope } from "../lib/applicationRepo";
+import type { DocumentRepo } from "../lib/documentRepo";
+import type { FileStore } from "../lib/fileStore";
 import { storeLedgerChanges } from "../lib/ledger";
 import type { MoneyRepo } from "../lib/moneyRepo";
 import { slotApplicant } from "../lib/applicantRules";
@@ -16,6 +18,7 @@ import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
 import { effectsOf } from "../lib/activity";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { missingEvidence } from "./documents";
 import { ownProfile } from "./profile";
 
 // Grant applications. Applicants act on their own records only (ownership comes
@@ -43,7 +46,7 @@ async function storeChanges(scope: ProgramScope, before: Application[], after: A
   for (const app of before) if (!after.some(a => a.id === app.id)) await scope.removeApplication(app.id);
 }
 
-export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo, money: MoneyRepo): IRouter {
+export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo, money: MoneyRepo, documents: DocumentRepo, files: FileStore): IRouter {
   const router: IRouter = Router();
 
   // ---------- Applicant ----------
@@ -73,12 +76,19 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
     else res.json({ message: outcome.message });
   }
 
-  for (const [path, rule] of [["save", saveDraft], ["submit", submitApplication]] as const) {
+  for (const path of ["save", "submit"] as const) {
     router.post(`/applications/${path}`, async (req, res) => {
       const body = (path === "save" ? SaveApplicationDraftBody : SubmitApplicationBody).safeParse(req.body);
       if (!body.success) { res.status(400).json({ error: "Send the program id and your application." }); return; }
       const { grantId, draftId, application } = body.data;
-      await asApplicant(res, grantId, !draftId, s => rule(s, grantId, application as ApplicationInput, new Date(), draftId));
+      if (path === "save") { await asApplicant(res, grantId, !draftId, s => saveDraft(s, grantId, application as ApplicationInput, new Date(), draftId)); return; }
+      // Server-only rule: every requirement needs an uploaded file, attached to the saved draft.
+      const evidence = draftId ? (await documents.listForApplication(draftId)).filter(d => d.ownerId === authLocals(res).user.id) : [];
+      await asApplicant(res, grantId, !draftId, s => {
+        const missing = missingEvidence(s.grants.find(g => g.id === grantId)?.requirements ?? [], evidence);
+        if (missing.length) return { ok: false, error: draftId ? `Upload a file for: ${missing.join(", ")}.` : "Save your application as a draft and upload a file for each requirement first.", fieldErrors: { checklist: `Upload a file for: ${missing.join(", ")}.` } };
+        return submitApplication(s, grantId, application as ApplicationInput, new Date(), draftId);
+      });
     });
   }
 
@@ -88,6 +98,10 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
     // Someone else's application reads as not found, never as forbidden.
     if (!app || app.applicantId !== authLocals(res).user.id) { res.status(404).json({ error: "That draft could not be found." }); return; }
     await asApplicant(res, app.grantId, false, s => deleteDraft(s, app.id));
+    // The draft is gone: remove its evidence files too.
+    if (res.statusCode === 200) {
+      for (const doc of await documents.listForApplication(app.id)) if (await documents.markDeleted(doc.id)) await files.remove(doc.storageKey);
+    }
   });
 
   // ---------- Staff ----------

@@ -5,6 +5,7 @@ import type { DemoState, Result } from "@workspace/domain/model";
 import { validateProfile } from "@workspace/domain/rules";
 import type { AuthUser } from "../lib/auth";
 import { runAccountRule } from "../lib/applicantRules";
+import type { DocumentRepo } from "../lib/documentRepo";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { authLocals } from "../middlewares/auth";
 
@@ -36,7 +37,7 @@ export async function ownProfile(repo: ProfileRepo, user: AuthUser): Promise<Pro
   });
 }
 
-export function profileRouter(repo: ProfileRepo): IRouter {
+export function profileRouter(repo: ProfileRepo, documents: DocumentRepo): IRouter {
   const router: IRouter = Router();
 
   router.get("/profile", async (_req, res) => {
@@ -64,6 +65,9 @@ export function profileRouter(repo: ProfileRepo): IRouter {
   router.post("/profile/identity", async (req, res) => {
     const body = SubmitIdentityCheckBody.safeParse(req.body);
     if (!body.success) { res.status(400).json({ error: "Send a document type, document number, and the name on the document." }); return; }
+    // Server-only rule: compliance reviews the document itself, so at least one must be uploaded.
+    const uploaded = (await documents.listForOwner(authLocals(res).user.id)).some(d => d.purpose === "identity");
+    if (!uploaded) { res.status(400).json({ error: "Upload a photo or scan of your document first.", fieldErrors: { documents: "Upload a photo or scan of your document." } }); return; }
     await ownRule(res, s => submitKyc(s, body.data, new Date()));
   });
 

@@ -8,6 +8,8 @@ import { memoryProfileRepo, type ProfileRepo } from "./lib/profileRepo";
 import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/programRepo";
 import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRepo";
 import { memoryActivity } from "./lib/activity";
+import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
+import { memoryFileStore } from "./lib/fileStore";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
 import { seedTreasury } from "@workspace/domain/seed";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
@@ -40,6 +42,8 @@ let profiles: ProfileRepo;
 let applications: ApplicationRepo;
 let activity: ReturnType<typeof memoryActivity>;
 let money: ReturnType<typeof memoryMoneyRepo>;
+let documents: DocumentRepo;
+let files: ReturnType<typeof memoryFileStore>;
 
 async function start(v: TokenVerifier | null = verifier) {
   activity = memoryActivity();
@@ -48,7 +52,9 @@ async function start(v: TokenVerifier | null = verifier) {
   profiles = memoryProfileRepo([], activity);
   money = memoryMoneyRepo(profiles, { treasury: seedTreasury(), lockdown: null }, activity);
   applications = memoryApplicationRepo(programs, [], activity, money);
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money }, ["https://app.example.org"]).listen(0);
+  documents = memoryDocumentRepo(activity);
+  files = memoryFileStore();
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -183,6 +189,29 @@ const newProgram = (overrides: Record<string, unknown> = {}) => ({
 });
 const post = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "POST", body: JSON.stringify(body) });
 const put = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "PUT", body: JSON.stringify(body) });
+
+// Documents: identity checks need an uploaded document, and submissions need a file for every requirement.
+const PDF = Buffer.from("%PDF-1.7\n% test document\n");
+const upload = (token: string, query: string, bytes: Buffer = PDF, name = "scan.pdf") => fetch(`${base}/documents?${query}`, {
+  method: "POST", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream", "x-file-name": encodeURIComponent(name) },
+});
+/** Uploads an identity document, then submits the identity details. */
+const identityCheck = async (body: unknown, token = "tok-super") => { await upload(token, "purpose=identity"); return post("/profile/identity", body, token); };
+/** Submits an application the way the portal does: saved as a draft first, with a file uploaded for each program requirement. */
+async function submitApp(body: { grantId: string; draftId?: string; application: unknown }, token = "tok-super") {
+  let draftId = body.draftId;
+  if (!draftId) {
+    const saved = await post("/applications/save", { grantId: body.grantId, application: body.application }, token);
+    if (saved.status !== 200) return saved;
+    draftId = ((await saved.json()) as { application: { id: string } }).application.id;
+  }
+  const programsList = (await (await call("/programs", token)).json()) as { id: string; requirements: string[] }[];
+  const have = (await (await call("/documents/mine", token)).json()) as { applicationId: string; requirement: string }[];
+  for (const r of programsList.find(p => p.id === body.grantId)?.requirements ?? []) {
+    if (!have.some(d => d.applicationId === draftId && d.requirement === r)) await upload(token, `purpose=application&applicationId=${draftId}&requirement=${encodeURIComponent(r)}`);
+  }
+  return post("/applications/submit", { ...body, draftId }, token);
+}
 const program = async (id: string, token = "tok-super") => (await json(await call("/programs", token))).find((g: { id: string }) => g.id === id);
 
 describe("grant programs", () => {
@@ -323,16 +352,16 @@ describe("account controls and identity checks", () => {
   });
 
   it("keeps only the last four characters of the document number", async () => {
-    const res = await post("/profile/identity", identity, "tok-maya");
+    const res = await identityCheck(identity, "tok-maya");
     expect(res.status).toBe(200);
     const { account } = await json(res);
     expect(account.kyc).toMatchObject({ status: "Pending", documentType: "Passport", documentLast4: "5678", nameOnDocument: "Maya Okafor" });
     expect(JSON.stringify(account)).not.toContain("1234");
-    expect((await post("/profile/identity", identity, "tok-maya")).status).toBe(400);
+    expect((await identityCheck(identity, "tok-maya")).status).toBe(400);
   });
 
   it("lets only kyc.review approve, and marks the applicant verified", async () => {
-    await post("/profile/identity", identity, "tok-maya");
+    await identityCheck(identity, "tok-maya");
     expect((await act("identity/approve", {}, "tok-finance")).status).toBe(403);
     expect((await act("identity/approve", {}, "tok-applicant")).status).toBe(403);
     const res = await act("identity/approve");
@@ -342,17 +371,17 @@ describe("account controls and identity checks", () => {
   });
 
   it("needs a reason to reject, and lets the applicant resubmit", async () => {
-    await post("/profile/identity", identity, "tok-maya");
+    await identityCheck(identity, "tok-maya");
     const short = await act("identity/reject", { reason: "No." });
     expect(short.status).toBe(400);
     expect((await json(short)).fieldErrors.reason).toBeDefined();
     expect((await act("identity/reject", { reason: "The name doesn't match the document." })).status).toBe(200);
     expect((await maya()).account.kyc).toMatchObject({ status: "Rejected", rejectionReason: "The name doesn't match the document." });
-    expect((await post("/profile/identity", identity, "tok-maya")).status).toBe(200);
+    expect((await identityCheck(identity, "tok-maya")).status).toBe(200);
   });
 
   it("asks a verified applicant to verify again", async () => {
-    await post("/profile/identity", identity, "tok-maya");
+    await identityCheck(identity, "tok-maya");
     await act("identity/approve");
     expect((await act("identity/reverify", { reason: "The passport on file has expired." })).status).toBe(200);
     expect(await maya()).toMatchObject({ identityVerified: false, account: { kyc: { status: "Not submitted" } } });
@@ -417,10 +446,10 @@ describe("applications and review", () => {
   const creative = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const verify = async (token: string, id: string) => {
     await call("/profile", token);
-    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Test Person" }, token);
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Test Person" }, token);
     await post(`/applicants/${id}/identity/approve`, {});
   };
-  const submit = (body: unknown, token = "tok-maya") => post("/applications/submit", body, token);
+  const submit = (body: { grantId: string; draftId?: string; application: unknown }, token = "tok-maya") => submitApp(body, token);
   const mine = async (token = "tok-maya") => json(await call("/applications/mine", token));
   const queued = async (id: string) => (await json(await call("/applications", "tok-super"))).find((a: { id: string }) => a.id === id);
   const decide = (id: string, path: string, body: Record<string, unknown>, token = "tok-super") => post(`/applications/${id}/${path}`, body, token);
@@ -548,7 +577,7 @@ describe("notifications, team activity, and the audit log", () => {
   const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const verifyMaya = async () => {
     await call("/profile", "tok-maya");
-    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
   };
   const notes = async (token = "tok-maya") => json(await call("/notifications", token));
@@ -556,7 +585,7 @@ describe("notifications, team activity, and the audit log", () => {
 
   it("notifies only the applicant concerned, and lets only them mark it read", async () => {
     await verifyMaya();
-    const { application } = await json(await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya"));
+    const { application } = await json(await submitApp({ grantId: "creative", application: input }, "tok-maya"));
     const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
     await post(`/applications/${application.id}/approve`, { version: v, award: 3000 });
     const mine = await notes();
@@ -577,7 +606,7 @@ describe("notifications, team activity, and the audit log", () => {
 
   it("feeds applicant actions to staff, with each person's own read state", async () => {
     await verifyMaya();
-    await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya");
+    await submitApp({ grantId: "creative", application: input }, "tok-maya");
     const items = await feed();
     expect(items.map((e: { title: string }) => e.title)).toEqual(["New application APP-5001", "Identity check submitted"]);
     expect((await call("/staff-feed", "tok-applicant")).status).toBe(403);
@@ -624,9 +653,9 @@ describe("money", () => {
   /** Maya verified, awarded `award` on Creative Practice, with a confirmed deposit and a saved bank account. */
   const fund = async (award: number, deposited = 100) => {
     await call("/profile", "tok-maya");
-    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
-    const { application } = await json(await post("/applications/submit", { grantId: "creative", application: { ...input, requestedAmount: award } }, "tok-maya"));
+    const { application } = await json(await submitApp({ grantId: "creative", application: { ...input, requestedAmount: award } }, "tok-maya"));
     const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
     await post(`/applications/${application.id}/approve`, { version: v, award });
     const d = (await json(await deposit(deposited))).money.transactions.find((t: { type: string; status: string }) => t.type === "Deposit" && t.status === "Pending");
@@ -711,12 +740,12 @@ describe("money", () => {
     expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-finance")).status).toBe(200);
     expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 20 } }, "tok-finance")).status).toBe(409);
     await call("/profile", "tok-maya");
-    await post("/profile/identity", { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
-    expect((await json(await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya"))).error).toMatch(/application fee/);
+    expect((await json(await submitApp({ grantId: "creative", application: input }, "tok-maya"))).error).toMatch(/application fee/);
     const d = (await json(await deposit(50))).money.transactions[0];
     await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
-    expect((await post("/applications/submit", { grantId: "creative", application: input }, "tok-maya")).status).toBe(200);
+    expect((await submitApp({ grantId: "creative", application: input }, "tok-maya")).status).toBe(200);
     expect((await mine()).transactions.find((t: { type: string }) => t.type === "Application fee")).toMatchObject({ amount: -10, id: expect.stringMatching(/^TX-\d+$/) });
   });
 
@@ -728,5 +757,107 @@ describe("money", () => {
     await call("/profile", "tok-super");
     const own = (await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-super"))).money.transactions[0];
     expect((await post(`/money/deposits/${own.id}/confirm`, {})).status).toBe(403);
+  });
+});
+
+describe("documents", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("image")]);
+  const identity = { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" };
+  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const mineDocs = async (token = "tok-maya") => json(await call("/documents/mine", token));
+  const file = (id: string, token: string) => call(`/documents/${id}/file`, token);
+
+  it("accepts only PDF, JPEG, and PNG files up to 10 MB, typed by content", async () => {
+    await call("/profile", "tok-maya");
+    expect((await upload("tok-maya", "purpose=identity", Buffer.from("<html>not a scan</html>"), "scan.pdf")).status).toBe(415);
+    expect((await upload("tok-maya", "purpose=identity", Buffer.alloc(0))).status).toBe(400);
+    expect((await upload("tok-maya", "purpose=identity", Buffer.concat([PDF, Buffer.alloc(10 * 1024 * 1024)]))).status).toBe(413);
+    expect((await upload("tok-maya", "purpose=elsewhere")).status).toBe(400);
+    const res = await upload("tok-maya", "purpose=identity", PNG, "../../etc/passport.pdf");
+    expect(res.status).toBe(201);
+    expect(await json(res)).toMatchObject({ purpose: "identity", contentType: "image/png", fileName: "passport.pdf", sizeBytes: PNG.length });
+    expect(files.files.size).toBe(1);
+  });
+
+  it("needs an uploaded document before an identity check, and keeps it while the check is open", async () => {
+    await call("/profile", "tok-maya");
+    const refused = await post("/profile/identity", identity, "tok-maya");
+    expect(refused.status).toBe(400);
+    expect((await json(refused)).fieldErrors.documents).toBeDefined();
+    const doc = await json(await upload("tok-maya", "purpose=identity"));
+    expect((await post("/profile/identity", identity, "tok-maya")).status).toBe(200);
+    expect((await post(`/documents/${doc.id}/delete`, {}, "tok-maya")).status).toBe(409);
+    expect((await upload("tok-maya", "purpose=identity")).status).toBe(409);
+    await post(`/applicants/${MAYA}/identity/reject`, { reason: "The scan is too blurry to read." });
+    expect((await post(`/documents/${doc.id}/delete`, {}, "tok-maya")).status).toBe(200);
+    expect(await mineDocs()).toEqual([]);
+    expect(files.files.size).toBe(0);
+  });
+
+  it("lets the owner and permitted staff open a document, audits staff views, and hides it from everyone else", async () => {
+    await call("/profile", "tok-maya");
+    const doc = await json(await upload("tok-maya", "purpose=identity", PDF, "passport scan.pdf"));
+    const own = await file(doc.id, "tok-maya");
+    expect(own.status).toBe(200);
+    expect(Buffer.from(await own.arrayBuffer()).equals(PDF)).toBe(true);
+    expect(own.headers.get("content-type")).toBe("application/pdf");
+    expect(own.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(own.headers.get("cache-control")).toContain("no-store");
+    expect(own.headers.get("content-disposition")).toContain("attachment");
+    expect((await file(doc.id, "tok-applicant")).status).toBe(404);
+    expect((await file(doc.id, "tok-finance")).status).toBe(404);
+    expect((await call(`/documents?applicantId=${MAYA}`, "tok-finance").then(json))).toEqual([]);
+    expect((await call(`/documents?applicantId=${MAYA}`, "tok-applicant")).status).toBe(403);
+    expect((await call(`/documents?applicantId=${MAYA}`, "tok-super").then(json)).map((d: { id: string }) => d.id)).toEqual([doc.id]);
+    expect((await file(doc.id, "tok-super")).status).toBe(200);
+    const [view] = (await json(await call("/audit", "tok-super"))).events;
+    expect(view).toMatchObject({ action: "View document", target: doc.id, applicantId: MAYA, staffName: "Sam Rivera" });
+    expect(view.summary).toContain("passport scan.pdf");
+  });
+
+  it("detects a stored file that was changed or removed", async () => {
+    await call("/profile", "tok-maya");
+    const doc = await json(await upload("tok-maya", "purpose=identity"));
+    const [key] = [...files.files.keys()];
+    files.files.set(key!, Buffer.from("%PDF-1.7 altered"));
+    expect((await file(doc.id, "tok-maya")).status).toBe(500);
+    files.files.delete(key!);
+    expect((await file(doc.id, "tok-maya")).status).toBe(500);
+  });
+
+  it("needs a file for every requirement before submitting, and freezes evidence once submitted", async () => {
+    await call("/profile", "tok-maya");
+    await identityCheck(identity, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const draft = (await json(await post("/applications/save", { grantId: "creative", application: input }, "tok-maya"))).application;
+    const q = (requirement: string, id = draft.id) => `purpose=application&applicationId=${id}&requirement=${encodeURIComponent(requirement)}`;
+    expect((await upload("tok-maya", q("A letter from the Queen"))).status).toBe(400);
+    expect((await upload("tok-applicant", q("Portfolio link"))).status).toBe(404);
+    expect((await upload("tok-maya", "purpose=application")).status).toBe(400);
+    const portfolio = await json(await upload("tok-maya", q("Portfolio link")));
+    const missing = await post("/applications/submit", { grantId: "creative", draftId: draft.id, application: input }, "tok-maya");
+    expect(missing.status).toBe(400);
+    expect((await json(missing)).error).toMatch(/Project budget, Professional reference/);
+    expect((await post("/applications/submit", { grantId: "creative", application: input }, "tok-applicant")).status).toBe(400);
+    await upload("tok-maya", q("Project budget"));
+    await upload("tok-maya", q("Professional reference"));
+    expect((await post("/applications/submit", { grantId: "creative", draftId: draft.id, application: input }, "tok-maya")).status).toBe(200);
+    expect((await post(`/documents/${portfolio.id}/delete`, {}, "tok-maya")).status).toBe(409);
+    expect((await upload("tok-maya", q("Portfolio link"))).status).toBe(409);
+    expect((await call(`/documents?applicationId=${draft.id}`, "tok-super").then(json))).toHaveLength(3);
+    expect((await file(portfolio.id, "tok-super")).status).toBe(200);
+  });
+
+  it("removes a deleted draft's files", async () => {
+    await call("/profile", "tok-maya");
+    await identityCheck(identity, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const draft = (await json(await post("/applications/save", { grantId: "creative", application: input }, "tok-maya"))).application;
+    await upload("tok-maya", `purpose=application&applicationId=${draft.id}&requirement=${encodeURIComponent("Portfolio link")}`);
+    expect(files.files.size).toBe(2);
+    expect((await post(`/applications/${draft.id}/delete`, {}, "tok-maya")).status).toBe(200);
+    expect((await mineDocs()).map((d: { purpose: string }) => d.purpose)).toEqual(["identity"]);
+    expect(files.files.size).toBe(1);
   });
 });

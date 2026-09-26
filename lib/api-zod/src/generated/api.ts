@@ -3229,3 +3229,92 @@ export const MarkPayoutFailedResponse = zod.object({
 })
 
 
+/**
+ * Documents you uploaded that haven't been deleted, newest first.
+ * @summary Your documents
+ */
+export const ListMyDocumentsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "purpose": zod.enum(['identity', 'application']),
+  "applicationId": zod.string().nullable(),
+  "requirement": zod.string().nullable(),
+  "fileName": zod.string(),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png']),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date()
+})
+export const ListMyDocumentsResponse = zod.array(ListMyDocumentsResponseItem)
+
+
+/**
+ * Any active staff member; only the kinds of document the role may open are listed (identity needs kyc.review; application evidence needs applications.review, applications.clearEscalation, or kyc.review).
+ * @summary An applicant's or application's documents (staff)
+ */
+export const ListDocumentsQueryParams = zod.object({
+  "applicantId": zod.coerce.string().uuid().optional(),
+  "applicationId": zod.coerce.string().optional()
+})
+
+export const ListDocumentsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "purpose": zod.enum(['identity', 'application']),
+  "applicationId": zod.string().nullable(),
+  "requirement": zod.string().nullable(),
+  "fileName": zod.string(),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png']),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date()
+})
+export const ListDocumentsResponse = zod.array(ListDocumentsResponseItem)
+
+
+/**
+ * The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements. Identity documents can't change while a check is pending or verified.
+ * @summary Upload a document
+ */
+export const UploadDocumentQueryParams = zod.object({
+  "purpose": zod.enum(['identity', 'application']),
+  "applicationId": zod.coerce.string().optional(),
+  "requirement": zod.coerce.string().optional()
+})
+
+export const UploadDocumentHeader = zod.object({
+  "X-File-Name": zod.string().optional()
+})
+
+export const UploadDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "purpose": zod.enum(['identity', 'application']),
+  "applicationId": zod.string().nullable(),
+  "requirement": zod.string().nullable(),
+  "fileName": zod.string(),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png']),
+  "sizeBytes": zod.number().int(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * Removes the file and keeps the record, marked deleted. Refused while the evidence is under review or on record.
+ * @summary Delete one of your documents
+ */
+export const DeleteDocumentParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const DeleteDocumentResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * The owner, or staff whose role covers the document (each staff view is audited). The content is checked against the SHA-256 recorded at upload; a changed or missing file answers 500.
+ * @summary Download a document
+ */
+export const GetDocumentFileParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const GetDocumentFileResponse = zod.unknown()
+
+

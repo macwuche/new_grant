@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Uploaded document files (API server disk storage; DOCUMENTS_DIR)
+data/documents/
+artifacts/api-server/data/

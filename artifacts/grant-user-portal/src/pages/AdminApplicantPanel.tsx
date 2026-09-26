@@ -11,6 +11,7 @@ import { computeBalances, findGrant } from '@workspace/domain/rules';
 import { assessRisk, RISK_HIGH, RISK_MEDIUM } from '@workspace/domain/risk';
 import { adoptServerApplicant } from '@workspace/domain/sync';
 import { apiError, toServerApplicant, useServerData } from '@/lib/serverData';
+import { DocumentFiles, useStaffDocuments } from '@/lib/documents';
 import { useDemoStore } from '@/lib/store';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RiskBadge } from './AdminRisk';
@@ -39,6 +40,7 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
   const [pending, setPending] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const identityDocs = useStaffDocuments(connected && can('kyc.review'), { applicantId });
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -142,7 +144,12 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
         {kyc.status === 'Pending' && <><button type="button" className="admin-btn" onClick={() => start('kyc-reject')} data-testid="button-admin-kyc-reject">Reject</button><button type="button" className="admin-btn primary" disabled={busy} onClick={() => void perform(acts.approve)} data-testid="button-admin-kyc-approve">Approve identity</button></>}
         {kyc.status === 'Verified' && <button type="button" className="admin-btn" onClick={() => start('reverify')} data-testid="button-admin-kyc-reverify">Ask to verify again</button>}
       </div>}
-      <p className="admin-review-hint">No documents are uploaded yet; staff see only the details the applicant entered.</p>
+      {!connected ? <p className="admin-review-hint">Demo: no documents are uploaded; staff see only the details the applicant entered.</p>
+        : !can('kyc.review') ? <p className="admin-review-hint">Only staff who review identity checks can open identity documents.</p>
+        : <div data-testid="section-admin-identity-documents"><h4 className="admin-review-subhead">Documents</h4>
+          {identityDocs.error ? <p className="admin-field-error">{identityDocs.error}</p> : identityDocs.docs === null ? <p className="admin-review-hint">Loading…</p>
+            : <DocumentFiles docs={identityDocs.docs.filter(d => d.purpose === 'identity')} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No documents uploaded." />}
+          <p className="admin-review-hint">Opening a document is recorded in the audit log.</p></div>}
     </section>
 
     <section className="admin-review-section admin-review-actions" aria-label="Account controls"><h3>Account controls</h3>
@@ -166,7 +173,7 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
     </section>}
 
     <div className="admin-detail-note"><Info size={17} /><span>{connected
-      ? 'Account changes are saved on the server and role-checked there. Password and two-step resets are recorded for the applicant to complete, not enforced at sign-in. Balances and applications shown here are still this browser\'s demo records.'
+      ? 'Account changes are saved on the server and role-checked there. Password and two-step resets are recorded for the applicant to complete, not enforced at sign-in.'
       : 'Fictional applicant. Account changes are saved in this browser, role-checked, and audited. Sign-in isn\'t connected, so password and two-step resets are recorded, not enforced.'}</span></div>
   </ReviewFrame>;
 }

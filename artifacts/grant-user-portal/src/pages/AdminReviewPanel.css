@@ -88,3 +88,7 @@
 .admin-treasury-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .admin-treasury-cell { margin-bottom: 0; }
 @media (max-width: 760px) { .admin-treasury-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.admin-review-req { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; font-weight: 600; }
+.admin-review-req.ok svg { color: var(--admin-ok, #3a7d44); }
+.admin-review-req.missing svg { color: var(--admin-danger, #b3403a); }
+.admin-review-subhead { margin: 12px 0 4px; font-size: 12px; }

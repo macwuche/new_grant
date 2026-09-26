@@ -11,6 +11,7 @@ import { assessRisk } from '@workspace/domain/risk';
 import * as api from '@workspace/api-client-react';
 import { adoptServerApplication } from '@workspace/domain/sync';
 import { apiError, useServerData } from '@/lib/serverData';
+import { DocumentFiles, useStaffDocuments } from '@/lib/documents';
 import { useDemoStore } from '@/lib/store';
 import type { Application, Result } from '@workspace/domain/model';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
@@ -42,6 +43,8 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   const [escalationText, setEscalationText] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [flash, setFlash] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const mayOpenEvidence = can('applications.review') || can('applications.clearEscalation') || can('kyc.review');
+  const evidence = useStaffDocuments(connected && mayOpenEvidence, { applicationId: appId });
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -142,7 +145,14 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     </dl>
 
     <section className="admin-review-section"><h3>Funding plan</h3><p className="admin-review-text">{app.purpose}</p></section>
-    <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Applicants confirm readiness only; documents can't be uploaded or inspected yet.</p></section>
+    {connected
+      ? <section className="admin-review-section" data-testid="section-admin-evidence"><h3>Requirements and files</h3>
+        {!mayOpenEvidence ? <p className="admin-review-hint">Your role can't open application files.</p>
+          : evidence.error ? <p className="admin-field-error">{evidence.error}</p>
+          : evidence.docs === null ? <p className="admin-review-hint">Loading…</p>
+          : grant.requirements.map(req => { const files = evidence.docs!.filter(d => d.requirement === req); return <div key={req}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{req}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
+        <p className="admin-review-hint">Opening a file is recorded in the audit log.</p></section>
+      : <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Demo: applicants confirm readiness only; no files are uploaded.</p></section>}
     {grant.questions.length > 0 && <section className="admin-review-section"><h3>Program questions</h3><dl className="admin-detail-fields">{grant.questions.map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}</dl></section>}
 
     <section className="admin-review-section admin-review-actions" aria-label="Decision">

@@ -19,6 +19,7 @@ import { adoptServerApplication, adoptServerProfile, dropServerApplication, type
 import * as api from '@workspace/api-client-react';
 import { ServerDataProvider, apiError, useMoneyAction, useServerData, type Outcome as MoneyOutcome } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
+import { DocumentFiles, UploadButton, useMyDocuments } from './lib/documents';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
@@ -254,7 +255,7 @@ function ApplicationRoute({ onToast }: { onToast: Toast }) {
   const app = ownApplications(state).find(a => a.id === params?.id);
   const grant = app && findGrant(state, app.grantId);
   if (!app || !grant) return <MissingRecord title="Application not found" text="It may have been deleted, or it was created in another browser." />;
-  return isEditable(app) ? <ApplicationEditor key={app.id} grant={grant} draft={app} onToast={onToast} /> : <ApplicationDetail app={app} grant={grant} />;
+  return isEditable(app) ? <ApplicationEditor key={app.id} grant={grant} draft={app} onToast={onToast} /> : <ApplicationDetail app={app} grant={grant} onToast={onToast} />;
 }
 function MissingRecord({ title, text }: { title: string; text: string }) {
   return <div className="card card-pad empty-state"><div className="empty-icon"><FileText size={20} /></div><h3>{title}</h3><p>{text}</p><Link className="btn btn-primary" href="/applications" data-testid="link-missing-back">Go to applications</Link></div>;
@@ -286,6 +287,11 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const input: ApplicationInput = { businessName: form.businessName, requestedAmount: form.amount.trim() === '' ? NaN : Number(form.amount), registrationNumber: form.registrationNumber, purpose: form.purpose, checklist: form.checklist, answers: form.answers };
   const setAnswer = (id: string, value: string) => { setForm(v => ({ ...v, answers: { ...v.answers, [id]: value } })); setErrors(({ [`answers.${id}`]: _, ...rest }) => rest); };
   const setField = (key: Exclude<keyof FormState, 'checklist' | 'answers'>, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
+  const { docs: myDocs, refresh: refreshDocs } = useMyDocuments(connected);
+  const evidence = (req: string) => myDocs.filter(d => d.applicationId === draftId && d.requirement === req);
+  // Signed in, a requirement counts as ready once a file for it is uploaded.
+  const withEvidence = grant.requirements.filter(req => myDocs.some(d => d.applicationId === draftId && d.requirement === req)).join('\n');
+  useEffect(() => { if (connected) setForm(v => ({ ...v, checklist: withEvidence ? withEvidence.split('\n') : [] })); }, [connected, withEvidence]);
   const toggleRequirement = (req: string) => { setForm(v => ({ ...v, checklist: v.checklist.includes(req) ? v.checklist.filter(r => r !== req) : [...v.checklist, req] })); setErrors(({ checklist: _, ...rest }) => rest); };
 
   // Signed in, the API runs the same rules and stores the application; the store takes the saved copy.
@@ -341,7 +347,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const daysLeft = daysUntil(grant.deadline, now);
   const tierOk = state.profile.tier >= grant.minimumTier;
 
-  return <div className="detail-layout"><div className="card card-pad"><div className="page-intro" style={{ marginBottom: 18 }}><p className="eyebrow">{changeRequest ? `${draftId} · changes requested` : draftId ? `Draft ${draftId}` : 'New application'}</p><h2>{grant.name}</h2><p>{changeRequest ? 'Update your application and resubmit it for review.' : "Complete each step and submit when you're ready. Your progress is saved as a draft in this browser whenever you continue."}</p></div>
+  return <div className="detail-layout"><div className="card card-pad"><div className="page-intro" style={{ marginBottom: 18 }}><p className="eyebrow">{changeRequest ? `${draftId} · changes requested` : draftId ? `Draft ${draftId}` : 'New application'}</p><h2>{grant.name}</h2><p>{changeRequest ? 'Update your application and resubmit it for review.' : "Complete each step and submit when you're ready. Your progress is saved as a draft whenever you continue."}</p></div>
     {!changeRequest && !isGrantOpen(grant, now) && <div className="notice mb" role="note" data-testid="notice-program-closed"><Info size={16} /><div>This program is no longer accepting applications, so this draft can't be submitted. You can still view it or delete it.</div></div>}
     {changeRequest && <div className="notice mb" role="note" data-testid="notice-change-request"><Info size={16} /><div><strong>The reviewer asked for changes:</strong> {changeRequest}</div></div>}
     <div className="stepper">{['Basics', 'Requirements', 'Review'].map((label, i) => <div className={`step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'complete' : ''}`} key={label}><span className="step-num">{step > i + 1 ? <Check size={12} /> : i + 1}</span><span className="step-label">{label}</span></div>)}</div>
@@ -352,8 +358,12 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       <div className="field field-full"><label className="field-label" htmlFor="purpose">What would this funding unlock?</label><textarea id="purpose" className="textarea" value={form.purpose} onChange={e => setField('purpose', e.target.value)} placeholder="Share a few sentences about your plan..." data-testid="textarea-funding-purpose" {...invalid('purpose')} />{errors.purpose ? <FieldError id="purpose-error" message={errors.purpose} /> : <span className="field-hint">{form.purpose.trim().length} characters · at least 30</span>}</div>
     </div>}
     {step === 2 && <div className="stack" style={{ gap: 13 }}>
-      <div className="notice"><Info size={16} />Confirm you have each document ready. Secure document upload will be added with private storage; nothing is uploaded yet.</div>
-      {grant.requirements.map((req, i) => <label className="upload" key={req} style={{ cursor: 'pointer' }}><div className="upload-icon">{form.checklist.includes(req) ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{form.checklist.includes(req) ? 'Marked as ready' : 'Required'}</span></div><input type="checkbox" checked={form.checklist.includes(req)} onChange={() => toggleRequirement(req)} aria-label={`I have ${req} ready`} data-testid={`checkbox-requirement-${i}`} /></label>)}
+      {connected ? <><div className="notice"><Info size={16} />Upload a file for each requirement: PDF, JPEG, or PNG, up to 10 MB each. Only the grant team can open them.</div>
+      {grant.requirements.map((req, i) => { const files = evidence(req); return <div className="upload upload-files" key={req} data-testid={`row-requirement-${i}`}><div className="upload-icon">{files.length ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{files.length ? `${files.length} file${files.length === 1 ? '' : 's'} uploaded` : 'Required'}</span>
+        <DocumentFiles docs={files} editable onDeleted={() => void refreshDocs()} onToast={onToast} /></div>
+        {draftId && <UploadButton params={{ purpose: 'application', applicationId: draftId, requirement: req }} label={files.length ? 'Add file' : 'Upload'} onUploaded={() => { void refreshDocs(); setErrors(({ checklist: _, ...rest }) => rest); }} onToast={onToast} testId={`button-upload-requirement-${i}`} />}</div>; })}</>
+      : <><div className="notice"><Info size={16} />Confirm you have each document ready. This demo doesn't upload files.</div>
+      {grant.requirements.map((req, i) => <label className="upload" key={req} style={{ cursor: 'pointer' }}><div className="upload-icon">{form.checklist.includes(req) ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{form.checklist.includes(req) ? 'Marked as ready' : 'Required'}</span></div><input type="checkbox" checked={form.checklist.includes(req)} onChange={() => toggleRequirement(req)} aria-label={`I have ${req} ready`} data-testid={`checkbox-requirement-${i}`} /></label>)}</>}
       <FieldError id="checklist-error" message={errors.checklist} />
       {grant.questions.length > 0 && <div className="stack" style={{ gap: 12, marginTop: 8 }} data-testid="section-program-questions"><h3 className="section-title" style={{ fontSize: 14 }}>A few questions from the program team</h3>{grant.questions.map(q => { const id = `question-${q.id}`; const err = errors[`answers.${q.id}`]; const value = form.answers[q.id] ?? ''; return <div className="field" key={q.id}>
         <label className="field-label" htmlFor={id}>{q.label}{q.required ? '' : ' (optional)'}</label>
@@ -364,13 +374,13 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       </div>; })}</div>}
     </div>}
     {step === 3 && <div className="stack">
-      <div className="notice"><ShieldCheck size={16} />Review your details. Submitting records the application in this browser only — it is not sent to a reviewer yet.</div>
+      <div className="notice"><ShieldCheck size={16} />{connected ? 'Review your details. Submitting sends the application and its files to the grant team.' : 'Review your details. Submitting records the application in this browser only — it is not sent to a reviewer yet.'}</div>
       <div className="card" style={{ padding: 16, background: 'hsl(var(--background))' }}>
         <div className="fee-row"><span>Grant category</span><strong>{grant.name}</strong></div>
         <div className="fee-row"><span>Requested amount</span><strong>{money(input.requestedAmount || 0)}</strong></div>
         <div className="fee-row"><span>Project or business</span><strong>{form.businessName.trim()}</strong></div>
         <div className="fee-row"><span>Registration number</span><strong>{form.registrationNumber.trim() || 'Not provided'}</strong></div>
-        <div className="fee-row"><span>Requirements ready</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>
+        <div className="fee-row"><span>{connected ? 'Requirements with files' : 'Requirements ready'}</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>
         {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{form.answers[q.id]?.trim() || '—'}</strong></div>)}
         {!changeRequest && state.treasury.applicationFee > 0 && <div className="fee-row"><span>Application fee (from deposit balance)</span><strong>{money(state.treasury.applicationFee)}</strong></div>}
         <div className="fee-row"><span>Current state</span><StatusBadge status={draft?.status ?? 'Draft'} /></div>
@@ -391,8 +401,11 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Before you begin</h2><p className="section-subtitle">Key details for this category.</p></div><FileCheck2 size={20} color="hsl(var(--lime-deep))" /></div><div className="timeline"><TimelineRow title={`${money(grant.minimumRequest)} – ${money(grant.maxFunding)}`} text="Allowed request range." done /><TimelineRow title={`Minimum Tier ${grant.minimumTier}`} text={tierOk ? `Your Tier ${state.profile.tier} account qualifies.` : `Your account is Tier ${state.profile.tier}, so it can't be submitted.`} done={tierOk} /><TimelineRow title={fmtDate(grant.deadline)} text={daysLeft >= 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to submit.` : 'Deadline has passed.'} current={daysLeft >= 0 && daysLeft <= 14} /></div></div><Link className="btn btn-ghost" href="/grants" data-testid="link-back-to-grants"><ArrowLeft size={15} /> Back to grant categories</Link></aside></div>;
 }
 
-function ApplicationDetail({ app, grant }: { app: Application; grant: Grant }) {
+function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: Grant; onToast: Toast }) {
   const history = [...app.history].reverse();
+  const { connected } = useServerData();
+  const { docs } = useMyDocuments(connected);
+  const files = docs.filter(d => d.applicationId === app.id);
   return <div className="detail-layout"><div className="card card-pad"><div className="section-head"><div><p className="eyebrow mono">{app.id}</p><h2 className="section-title" style={{ fontSize: 22 }}>{grant.name}</h2><p className="section-subtitle">{app.submittedAt ? `Submitted ${fmtDate(app.submittedAt)}` : 'Not submitted'} · updated {fmtDate(app.updatedAt)}</p></div><StatusBadge status={app.status} /></div>
     <div className="card" style={{ padding: 16, background: 'hsl(var(--background))' }}>
       <div className="fee-row"><span>Requested amount</span><strong>{money(app.requestedAmount)}</strong></div>
@@ -403,6 +416,7 @@ function ApplicationDetail({ app, grant }: { app: Application; grant: Grant }) {
       {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{app.answers[q.id] || '—'}</strong></div>)}
     </div>
     <div className="mt"><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{app.purpose}</p></div>
+    {connected && <div className="mt" data-testid="section-application-files"><span className="field-label">Files</span>{grant.requirements.map(req => <div key={req} style={{ marginTop: 10 }}><strong style={{ fontSize: 11 }}>{req}</strong><DocumentFiles docs={files.filter(d => d.requirement === req)} editable={false} onToast={onToast} empty="No file." /></div>)}</div>}
     <div className="notice mt"><Info size={16} />{app.status === 'Approved' ? 'This decision is final. The award is in your grant balance and can be requested as a payout.' : app.status === 'Declined' ? `This decision is final. ${app.history[app.history.length - 1]!.note}` : 'Submitted applications are read-only while the grant team reviews them. If they need anything, the application will reopen for your changes.'}</div>
   </div>
   <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">History</h2><p className="section-subtitle">Every status change, newest first.</p></div></div><div className="timeline">{history.map((h, i) => <TimelineRow key={`${h.status}-${h.at}`} title={h.status} text={`${fmtDate(h.at)} · ${h.actor === 'Reviewer' ? 'Grant team' : 'You'} · ${h.note}`} current={i === 0 && h.status !== 'Approved' && h.status !== 'Declined'} done={i > 0 || h.status === 'Approved'} />)}</div></div><Link className="btn btn-ghost" href="/applications" data-testid="link-back-to-applications"><ArrowLeft size={15} /> All applications</Link></aside></div>;
@@ -611,8 +625,11 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
   const [form, setForm] = useState<KycInput>({ documentType: 'Passport', documentNumber: '', nameOnDocument: state.profile.name });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const canSubmit = kyc.status === 'Not submitted' || kyc.status === 'Rejected';
+  const { docs, refresh } = useMyDocuments(connected);
+  const identityDocs = docs.filter(d => d.purpose === 'identity');
   const submit = async () => {
     if (connected) {
+      if (!identityDocs.length) { setErrors({ documents: 'Upload a photo or scan of your document.' }); return; }
       setSending(true);
       try {
         run(adoptProfile(await submitIdentityCheck(form)));
@@ -630,11 +647,16 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
   const tone = kyc.status === 'Verified' ? 'Completed' : kyc.status === 'Pending' ? 'Pending' : kyc.status === 'Rejected' ? 'Failed' : 'Draft';
   return <div className="verification-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }} data-testid="section-identity-check"><div className="verification-icon"><Check size={15} /></div><div className="verification-copy" style={{ flex: '1 1 240px' }}><strong>Identity verification</strong>
     <span>{kyc.status === 'Verified' ? `Verified${kyc.documentType ? ` with ${kyc.documentType.toLowerCase()} ending ${kyc.documentLast4}` : ''}.` : kyc.status === 'Pending' ? `Submitted ${kyc.submittedAt ? fmtDate(kyc.submittedAt) : ''} · waiting for the compliance team.` : kyc.status === 'Rejected' ? `Not approved: ${kyc.rejectionReason}` : kyc.rejectionReason ? `Please verify again: ${kyc.rejectionReason}` : 'Required before you can apply for grants.'}</span>
+    {connected && !canSubmit && identityDocs.length > 0 && <div style={{ marginTop: 10 }}><DocumentFiles docs={identityDocs} editable={false} onToast={onToast} /></div>}
     {canSubmit && <div className="field-grid" style={{ marginTop: 12 }}>
       <div className="field"><label className="field-label" htmlFor="kyc-type">Document</label><select id="kyc-type" className="select" value={form.documentType} onChange={e => setForm({ ...form, documentType: e.target.value as KycDocumentType })} data-testid="select-kyc-document">{KYC_DOCUMENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
       <div className="field"><label className="field-label" htmlFor="kyc-number">Document number</label><input id="kyc-number" className="input" value={form.documentNumber} onChange={e => { setForm({ ...form, documentNumber: e.target.value }); setErrors(({ documentNumber: _, ...rest }) => rest); }} autoComplete="off" data-testid="input-kyc-number" aria-invalid={!!errors.documentNumber} aria-describedby={errors.documentNumber ? 'kyc-number-error' : undefined} />{errors.documentNumber ? <FieldError id="kyc-number-error" message={errors.documentNumber} /> : <span className="field-hint">Only the last four characters are kept.</span>}</div>
       <div className="field field-full"><label className="field-label" htmlFor="kyc-name">Name exactly as on the document</label><input id="kyc-name" className="input" value={form.nameOnDocument} onChange={e => { setForm({ ...form, nameOnDocument: e.target.value }); setErrors(({ nameOnDocument: _, ...rest }) => rest); }} data-testid="input-kyc-name" aria-invalid={!!errors.nameOnDocument} aria-describedby={errors.nameOnDocument ? 'kyc-name-error' : undefined} /><FieldError id="kyc-name-error" message={errors.nameOnDocument} /></div>
-      <div className="field-full" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="field-hint">{connected ? 'No document image is uploaded: compliance reviews the details you enter.' : 'Demo: no document image is uploaded or checked.'}</span><button className="btn btn-primary" onClick={() => void submit()} disabled={sending} data-testid="button-submit-kyc">{sending ? 'Submitting…' : 'Submit for review'}</button></div>
+      {connected && <div className="field field-full" data-testid="section-identity-documents"><span className="field-label">Photo or scan of the document</span>
+        <DocumentFiles docs={identityDocs} editable onDeleted={() => void refresh()} onToast={onToast} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><UploadButton params={{ purpose: 'identity' }} label={identityDocs.length ? 'Add another file' : 'Upload document'} onUploaded={() => { void refresh(); setErrors(({ documents: _, ...rest }) => rest); }} onToast={onToast} testId="button-upload-identity" />
+        {errors.documents ? <FieldError id="kyc-documents-error" message={errors.documents} /> : <span className="field-hint">PDF, JPEG, or PNG, up to 10 MB. Both sides of an ID card if it has two.</span>}</div></div>}
+      <div className="field-full" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span className="field-hint">{connected ? 'Only the compliance team can open your documents, and every time they do is recorded.' : 'Demo: no document image is uploaded or checked.'}</span><button className="btn btn-primary" onClick={() => void submit()} disabled={sending} data-testid="button-submit-kyc">{sending ? 'Submitting…' : 'Submit for review'}</button></div>
     </div>}
   </div><StatusBadge status={kyc.status} tone={tone} /></div>;
 }

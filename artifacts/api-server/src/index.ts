@@ -9,6 +9,8 @@ import { dbProfileRepo } from "./lib/profileRepo.db";
 import { dbApplicationRepo } from "./lib/applicationRepo.db";
 import { dbActivityRepo } from "./lib/activity.db";
 import { dbMoneyRepo, ensureSettings } from "./lib/moneyRepo.db";
+import { dbDocumentRepo } from "./lib/documentRepo.db";
+import { diskFileStore, documentsDir } from "./lib/fileStore";
 import { seedGrants } from "@workspace/domain/seed";
 
 const rawPort = process.env["PORT"];
@@ -39,9 +41,13 @@ if (await ensureSettings()) logger.info("default money settings created");
 const seeded = await ensureSeedPrograms(dbProgramRepo, seedGrants());
 if (seeded) logger.info({ count: seeded }, "sample grant programs added to the empty programs table");
 
+const docsDir = documentsDir();
+logger.info({ dir: docsDir }, "document files are stored on this server's disk");
+
 const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
+  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir),
 });
 
 app.listen(port, (err) => {

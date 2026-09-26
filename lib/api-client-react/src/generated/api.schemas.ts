@@ -5,6 +5,36 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type DocumentPurpose = typeof DocumentPurpose[keyof typeof DocumentPurpose];
+
+
+export const DocumentPurpose = {
+  identity: 'identity',
+  application: 'application',
+} as const;
+
+export type DocumentContentType = typeof DocumentContentType[keyof typeof DocumentContentType];
+
+
+export const DocumentContentType = {
+  'application/pdf': 'application/pdf',
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+} as const;
+
+export interface Document {
+  id: string;
+  purpose: DocumentPurpose;
+  /** @nullable */
+  applicationId: string | null;
+  /** @nullable */
+  requirement: string | null;
+  fileName: string;
+  contentType: DocumentContentType;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
 export type ChannelId = typeof ChannelId[keyof typeof ChannelId];
 
 
@@ -748,4 +778,15 @@ export type ForbiddenResponse = Error;
  * Not found
  */
 export type NotFoundResponse = Error;
+
+export type ListDocumentsParams = {
+applicantId?: string;
+applicationId?: string;
+};
+
+export type UploadDocumentParams = {
+purpose: DocumentPurpose;
+applicationId?: string;
+requirement?: string;
+};
 

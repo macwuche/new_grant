@@ -221,6 +221,14 @@ button { cursor: pointer; }
 .upload-copy { flex: 1; }
 .upload-copy strong { display: block; font-size: 11px; }
 .upload-copy span { display: block; margin-top: 3px; color: hsl(var(--muted)); font-size: 10px; }
+.upload-files { align-items: flex-start; flex-wrap: wrap; }
+.doc-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.doc-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid hsl(var(--line)); border-radius: 9px; background: hsl(var(--surface, 0 0% 100%)); font-size: 11px; }
+.doc-row > .doc-name { flex: 1 1 140px; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; font-size: 11px; font-weight: 600; }
+.doc-row > .doc-meta { margin: 0; color: hsl(var(--muted)); font-size: 10px; }
+.doc-row > .doc-actions { display: flex; gap: 4px; margin: 0; }
+.doc-row .btn, .doc-row .admin-btn { padding: 4px 9px; font-size: 10px; min-height: 0; }
+.doc-empty { margin: 4px 0 0; color: hsl(var(--muted)); font-size: 10px; }
 .form-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 25px; padding-top: 18px; border-top: 1px solid hsl(var(--line)); }
 .notice { display: flex; gap: 10px; padding: 13px; border-radius: 12px; background: hsl(207 50% 94%); color: hsl(207 48% 31%); font-size: 11px; line-height: 1.45; }
 .notice svg { flex: 0 0 auto; }

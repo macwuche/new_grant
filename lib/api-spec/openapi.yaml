@@ -26,6 +26,8 @@ tags:
     description: Notifications, the staff activity feed, and the audit log
   - name: money
     description: The ledger, deposits, payouts, cards, money settings, and the lockdown
+  - name: documents
+    description: Identity documents and application evidence (files kept on the API server's disk)
 security:
   - bearerAuth: []
 paths:
@@ -1497,6 +1499,151 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /documents/mine:
+    get:
+      operationId: listMyDocuments
+      tags: [documents]
+      summary: Your documents
+      description: Documents you uploaded that haven't been deleted, newest first.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: An applicant's or application's documents (staff)
+      description: Any active staff member; only the kinds of document the role may open are listed (identity needs kyc.review; application evidence needs applications.review, applications.clearEscalation, or kyc.review).
+      parameters:
+        - name: applicantId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: applicationId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: uploadDocument
+      tags: [documents]
+      summary: Upload a document
+      description: The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements. Identity documents can't change while a check is pending or verified.
+      parameters:
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocumentPurpose"
+        - name: applicationId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: requirement
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: X-File-Name
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+        "413":
+          $ref: "#/components/responses/BadRequest"
+        "415":
+          $ref: "#/components/responses/BadRequest"
+  /documents/{id}/delete:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    post:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete one of your documents
+      description: Removes the file and keeps the record, marked deleted. Refused while the evidence is under review or on record.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /documents/{id}/file:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    get:
+      operationId: getDocumentFile
+      tags: [documents]
+      summary: Download a document
+      description: The owner, or staff whose role covers the document (each staff view is audited). The content is checked against the SHA-256 recorded at upload; a changed or missing file answers 500.
+      responses:
+        "200":
+          description: The file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     bearerAuth:
@@ -1504,6 +1651,13 @@ components:
       scheme: bearer
       description: Supabase Auth access token
   parameters:
+    DocumentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     LedgerId:
       name: id
       in: path
@@ -1590,6 +1744,32 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    DocumentPurpose:
+      type: string
+      enum: [identity, application]
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        purpose:
+          $ref: "#/components/schemas/DocumentPurpose"
+        applicationId:
+          type: [string, "null"]
+        requirement:
+          type: [string, "null"]
+        fileName:
+          type: string
+        contentType:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png]
+        sizeBytes:
+          type: integer
+        uploadedAt:
+          type: string
+          format: date-time
+      required: [id, purpose, applicationId, requirement, fileName, contentType, sizeBytes, uploadedAt]
     ChannelId:
       type: string
       enum: [bank, wire, mobile, crypto]
