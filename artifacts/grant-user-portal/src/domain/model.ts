@@ -225,7 +225,8 @@ export type AccountControls = {
   destinationChangedAt?: string;
 };
 
-export type StaffRole = 'super' | 'reviewer' | 'finance' | 'compliance' | 'support';
+import type { StaffRole } from '@workspace/authz';
+export type { StaffRole };
 export type StaffMember = { id: string; name: string; role: StaffRole; active: boolean };
 
 export type AuditChange = { field: string; before: string; after: string };

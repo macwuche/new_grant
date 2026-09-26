@@ -10,11 +10,18 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: The signed-in user
+  - name: staff
+    description: Staff members and roles
+security:
+  - bearerAuth: []
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
+      security: []
       summary: Health check
       description: Returns server health status
       responses:
@@ -24,8 +31,210 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Current user
+      description: The signed-in user, and their staff record if they are staff. Links a staff record to this user on first sign-in with a confirmed email.
+      responses:
+        "200":
+          description: Signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List staff members
+      description: Requires the staff.manage permission.
+      responses:
+        "200":
+          description: Staff members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createStaffMember
+      tags: [staff]
+      summary: Add a staff member
+      description: Requires the staff.manage permission. The person gets access when they sign in with this email and have confirmed it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffMemberCreate"
+      responses:
+        "201":
+          description: Created staff member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A staff member with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /staff/{id}:
+    patch:
+      operationId: updateStaffMember
+      tags: [staff]
+      summary: Change a staff member's role or access
+      description: Requires the staff.manage permission. At least one active super admin must remain, and nobody can disable their own access.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffMemberUpdate"
+      responses:
+        "200":
+          description: Updated staff member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Supabase Auth access token
+  responses:
+    BadRequest:
+      description: The request was not valid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing, invalid, or expired sign-in token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Signed in, but not allowed to do this
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    StaffRole:
+      type: string
+      enum: [super, reviewer, finance, compliance, support]
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/StaffRole"
+        active:
+          type: boolean
+        linked:
+          type: boolean
+          description: Whether this member has signed in at least once
+      required: [id, email, name, role, active, linked]
+    StaffMemberCreate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        role:
+          $ref: "#/components/schemas/StaffRole"
+      required: [email, name, role]
+      additionalProperties: false
+    StaffMemberUpdate:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/StaffRole"
+        active:
+          type: boolean
+      additionalProperties: false
+    Me:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+              nullable: true
+            emailConfirmed:
+              type: boolean
+          required: [id, email, emailConfirmed]
+        staff:
+          allOf:
+            - $ref: "#/components/schemas/StaffMember"
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Staff permissions for this user (empty for applicants)
+      required: [user, staff, permissions]
     HealthStatus:
       type: object
       properties:

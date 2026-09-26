@@ -26,7 +26,11 @@ Build the application logic first, client-side, against browser-local demo data.
    - Applicants announce deposits with a reference; finance confirms or rejects. Finance sets payout channels (on/off, limits, fees), card fees, deposit limits, the deposit reserve, and the high-value flag. Only enabled channels are offered; applicants can cancel pending deposits and payouts. Staff bell and overview feed of applicant actions.
 10. **Spec gaps, browser-only — Complete** (26 Sep 2026)
    - Staff roles (super admin, reviewer, finance, compliance, support) with per-action permission checks via a demo "acting as" switcher; append-only audit log with field-level changes, filters, and CSV/JSON export; automated fraud risk score (0–100) with explained factors and staff alerts; identity checks (applicant submits, compliance approves/rejects/asks again); applicant tier changes, account lock, forced password/2FA resets; escalation of applications to security (blocks approval); two-person sign-off on payouts at or above a threshold; emergency system lockdown; custom questions per program; application processing fee; saved payout destinations; card daily limits and PIN reveal; transaction tabs, date filter, and receipts; spec overview metrics.
-11. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+11. **Authentication and staff authorization — In progress** (Supabase Auth, chosen 26 Sep 2026; plan in `work.md` §6)
+   - Needs from the team: a Supabase project, its URL and anon key as secrets, and the app's URLs in Supabase Auth settings.
+   - Done: (a) shared role/permission list (`lib/authz`); (b) `staff_members` table in the existing Postgres; (c) API token check, `GET /api/me`, and staff endpoints, with 16 API tests.
+   - Waiting on Supabase keys: (d) real applicant sign-up / sign-in / reset / sign-out; (e) `/admin` limited to signed-in staff, replacing the "acting as" switcher; (f) browser test of the full sign-in flow.
+   - Business data (applications, money) stays browser-local until phase 12, so this phase protects who can open screens and call the API, not the demo records themselves.
 12. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
 13. **Documents, email notifications (Resend) — Not started**

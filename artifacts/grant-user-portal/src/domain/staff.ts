@@ -1,3 +1,4 @@
+import { PERMISSION_LABELS, ROLE_LABELS, roleCan, staffChangeError, type Permission, type StaffPatch } from '@workspace/authz';
 import type { DemoState, Result, StaffMember, StaffRole } from './model';
 import { fail } from './core';
 import { recordAudit } from './audit';
@@ -8,42 +9,9 @@ import { recordAudit } from './audit';
 // in /admin stands in for a staff session, so this is a demo of the rules, not
 // a security boundary.
 
-export type Permission =
-  | 'applications.review' | 'applications.escalate' | 'applications.clearEscalation' | 'notes.add'
-  | 'programs.manage' | 'payments.process' | 'payments.release' | 'treasury.manage'
-  | 'kyc.review' | 'accounts.manage' | 'accounts.tier' | 'staff.manage' | 'security.lockdown' | 'audit.view';
-
-export const ROLE_LABELS: Record<StaffRole, string> = {
-  super: 'Super admin', reviewer: 'Grant reviewer', finance: 'Finance admin', compliance: 'Compliance & risk', support: 'Support agent',
-};
-
-export const PERMISSION_LABELS: Record<Permission, string> = {
-  'applications.review': 'review and decide applications',
-  'applications.escalate': 'escalate applications to security',
-  'applications.clearEscalation': 'clear security escalations',
-  'notes.add': 'add internal notes',
-  'programs.manage': 'manage grant programs',
-  'payments.process': 'process deposits and payouts',
-  'payments.release': 'give the second sign-off on large payouts',
-  'treasury.manage': 'change money settings',
-  'kyc.review': 'review identity checks',
-  'accounts.manage': 'lock accounts and force credential resets',
-  'accounts.tier': 'change account tiers',
-  'staff.manage': 'assign staff roles',
-  'security.lockdown': 'start or end a system lockdown',
-  'audit.view': 'view the audit log',
-};
-
-export const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
-  super: Object.keys(PERMISSION_LABELS) as Permission[],
-  reviewer: ['applications.review', 'applications.escalate', 'notes.add'],
-  finance: ['payments.process', 'treasury.manage', 'notes.add'],
-  compliance: ['applications.escalate', 'applications.clearEscalation', 'notes.add', 'payments.release', 'kyc.review', 'accounts.manage', 'accounts.tier', 'audit.view'],
-  support: [],
-};
+export { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS, roleCan, type Permission } from '@workspace/authz';
 
 export const actingStaff = (state: DemoState): StaffMember | undefined => state.staff.find(m => m.id === state.actingStaffId && m.active);
-export const roleCan = (role: StaffRole, permission: Permission) => ROLE_PERMISSIONS[role].includes(permission);
 export const can = (state: DemoState, permission: Permission) => { const me = actingStaff(state); return !!me && roleCan(me.role, permission); };
 
 export function permissionError(state: DemoState, permission: Permission): string | null {
@@ -76,28 +44,15 @@ export function switchStaff(state: DemoState, staffId: string): Result {
   return { ok: true, message: `Now acting as ${member.name} (${ROLE_LABELS[member.role]}).`, state: { ...state, actingStaffId: staffId } };
 }
 
-const activeSupers = (staff: StaffMember[]) => staff.filter(m => m.active && m.role === 'super').length;
-
-function updateMember(state: DemoState, staffId: string, patch: Partial<StaffMember>): Result {
-  const member = state.staff.find(m => m.id === staffId);
-  if (!member) return fail('That staff member could not be found.');
-  const staff = state.staff.map(m => m.id === staffId ? { ...m, ...patch } : m);
-  if (!activeSupers(staff)) return fail('At least one active super admin must remain.');
-  if (patch.active === false && staffId === state.actingStaffId) return fail("You can't disable your own access.");
-  return { ok: true, id: staffId, message: '', state: { ...state, staff } };
+function updateMember(state: DemoState, staffId: string, patch: StaffPatch, message: (member: StaffMember) => string): Result {
+  const error = staffChangeError(state.staff, staffId, patch, state.actingStaffId);
+  if (error) return fail(error);
+  const member = state.staff.find(m => m.id === staffId)!;
+  return { ok: true, id: staffId, message: message(member), state: { ...state, staff: state.staff.map(m => m.id === staffId ? { ...m, ...patch } : m) } };
 }
 
-export function setStaffRole(state: DemoState, staffId: string, role: StaffRole): Result {
-  if (!(role in ROLE_LABELS)) return fail('Choose a valid role.');
-  const member = state.staff.find(m => m.id === staffId);
-  if (member?.role === role) return fail(`${member.name} is already ${ROLE_LABELS[role]}.`);
-  const result = updateMember(state, staffId, { role });
-  return result.ok ? { ...result, message: `${member!.name} is now ${ROLE_LABELS[role]}.` } : result;
-}
+export const setStaffRole = (state: DemoState, staffId: string, role: StaffRole): Result =>
+  updateMember(state, staffId, { role }, m => `${m.name} is now ${ROLE_LABELS[role]}.`);
 
-export function setStaffActive(state: DemoState, staffId: string, active: boolean): Result {
-  const member = state.staff.find(m => m.id === staffId);
-  if (member && member.active === active) return fail(`${member.name}'s access is already ${active ? 'enabled' : 'disabled'}.`);
-  const result = updateMember(state, staffId, { active });
-  return result.ok ? { ...result, message: `${member!.name}'s access ${active ? 'restored' : 'disabled'}.` } : result;
-}
+export const setStaffActive = (state: DemoState, staffId: string, active: boolean): Result =>
+  updateMember(state, staffId, { active }, m => `${m.name}'s access ${active ? 'restored' : 'disabled'}.`);
