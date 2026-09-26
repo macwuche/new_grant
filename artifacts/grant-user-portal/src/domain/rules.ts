@@ -1,13 +1,14 @@
-import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, PayoutMethod, Profile, Result, Transaction } from './model';
+import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, Result, Transaction } from './model';
+import { fail, nextIds, roundCents } from './core';
+import { logStaff } from './activity';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // Pure business rules. Everything here takes state in and returns state out so it
 // can move to the API server unchanged once persistence exists.
 
-export const WITHDRAWAL_FEE_RATE = 0.0125;
-export const WITHDRAWAL_FEE_CAP = 14;
-export const MIN_WITHDRAWAL = 10;
-export const PHYSICAL_CARD_FEE = 8.5;
+// Shared helpers live in ./core; re-exported so existing imports keep working.
+export { fail, nextIds, roundCents };
+
 export const MIN_PURPOSE_LENGTH = 30;
 
 /** Statuses the applicant can still edit and (re)submit. */
@@ -24,20 +25,14 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   Declined: [],
 };
 
-export const roundCents = (value: number) => Math.round(value * 100) / 100;
 export const findGrant = (state: DemoState, id: string): Grant | undefined => state.grants.find(g => g.id === id);
 export const canTransition = (from: ApplicationStatus, to: ApplicationStatus) => TRANSITIONS[from].includes(to);
 
-export const fail = (error: string, fieldErrors?: Record<string, string>): Result => ({ ok: false, error, fieldErrors });
 export const isEditable = (app: Application) => EDITABLE_STATUSES.includes(app.status);
 
 /** Records owned by the signed-in demo applicant. Other applicants' records are staff-only. */
 export const ownApplications = (state: DemoState) => state.applications.filter(a => a.applicantId === CURRENT_APPLICANT_ID);
 export const ownTransactions = (state: DemoState) => state.transactions.filter(t => t.applicantId === CURRENT_APPLICANT_ID);
-
-export function nextIds(state: DemoState) {
-  return { app: `APP-${state.nextId}`, tx: `TX-${80000 + state.nextId}`, notification: `NT-${state.nextId}`, program: `PRG-${state.nextId}`, nextId: state.nextId + 1 };
-}
 
 // ---------- Grants & eligibility ----------
 
@@ -158,7 +153,13 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
     ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at,
     history: [...a.history, { status: 'Submitted' as const, at, actor: 'Applicant' as const, note: resubmission ? 'Application resubmitted with the requested changes.' : 'Application submitted.' }],
   });
-  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.`, state: { ...saved.state, applications: next } };
+  const logged = logStaff({ ...saved.state, applications: next }, {
+    kind: 'application',
+    title: resubmission ? `${id} resubmitted with changes` : `New application ${id}`,
+    body: `${state.profile.name} · ${grant.name} · $${input.requestedAmount.toLocaleString('en-US')}`,
+    href: '/admin/applications',
+  }, now);
+  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.`, state: logged };
 }
 
 export function deleteDraft(state: DemoState, id: string): Result {
@@ -170,63 +171,24 @@ export function deleteDraft(state: DemoState, id: string): Result {
 
 // ---------- Balances & ledger ----------
 
-export type Balances = { grant: number; deposit: number; pendingWithdrawals: number };
+export type Balances = { grant: number; deposit: number; pendingWithdrawals: number; pendingDeposits: number };
 
 /**
  * Balances are derived from the ledger, never stored. Grant awards fund payouts;
- * deposits fund card fees. Pending withdrawals are held (already deducted).
+ * deposits fund card fees. Pending withdrawals are held (already deducted);
+ * pending deposits don't count until finance confirms them. Failed and
+ * cancelled entries are ignored.
  */
 export function computeBalances(transactions: Transaction[]): Balances {
-  let grant = 0, deposit = 0, pendingWithdrawals = 0;
+  let grant = 0, deposit = 0, pendingWithdrawals = 0, pendingDeposits = 0;
   for (const tx of transactions) {
-    if (tx.status === 'Failed') continue;
+    if (tx.status === 'Failed' || tx.status === 'Cancelled') continue;
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
     if (tx.type === 'Withdrawal') { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; }
-    if (tx.type === 'Deposit' && tx.status === 'Completed') deposit += tx.amount;
+    if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
     if (tx.type === 'Card fee') deposit += tx.amount;
   }
-  return { grant: roundCents(grant), deposit: roundCents(deposit), pendingWithdrawals: roundCents(pendingWithdrawals) };
-}
-
-export function withdrawalFee(amount: number): number {
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return roundCents(Math.min(amount * WITHDRAWAL_FEE_RATE, WITHDRAWAL_FEE_CAP));
-}
-
-export function validateWithdrawal(amount: number, available: number): string | null {
-  if (!Number.isFinite(amount) || amount <= 0) return 'Enter an amount to withdraw.';
-  if (roundCents(amount) !== amount) return 'Use at most two decimal places.';
-  if (amount < MIN_WITHDRAWAL) return `The minimum payout is $${MIN_WITHDRAWAL.toFixed(2)}.`;
-  if (amount > available) return `You can request up to $${available.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`;
-  return null;
-}
-
-export function requestWithdrawal(state: DemoState, amount: number, method: PayoutMethod, now: Date): Result {
-  const { grant } = computeBalances(ownTransactions(state));
-  const error = validateWithdrawal(amount, grant);
-  if (error) return fail(error, { amount: error });
-  const ids = nextIds(state);
-  const tx: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Withdrawal', description: `Payout to ${method.type}`, amount: -amount, status: 'Pending', createdAt: now.toISOString(), fee: withdrawalFee(amount), destination: `${method.type} · ${method.label}` };
-  return { ok: true, id: tx.id, message: `Payout request ${tx.id} recorded as pending.`, state: { ...state, nextId: ids.nextId, transactions: [tx, ...state.transactions] } };
-}
-
-// ---------- Cards ----------
-
-export function toggleCardFreeze(state: DemoState): Result {
-  const frozen = !state.cards.virtual.frozen;
-  return { ok: true, message: frozen ? 'Virtual card frozen.' : 'Virtual card unfrozen.', state: { ...state, cards: { ...state.cards, virtual: { ...state.cards.virtual, frozen } } } };
-}
-
-export function requestPhysicalCard(state: DemoState, now: Date): Result {
-  if (state.cards.physical.status !== 'Not requested') return fail('A physical card has already been requested.');
-  const { deposit } = computeBalances(ownTransactions(state));
-  if (deposit < PHYSICAL_CARD_FEE) return fail(`Your deposit balance must cover the $${PHYSICAL_CARD_FEE.toFixed(2)} issuance fee.`);
-  const ids = nextIds(state);
-  const fee: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Card fee', description: 'Physical card issuance', amount: -PHYSICAL_CARD_FEE, status: 'Completed', createdAt: now.toISOString() };
-  return {
-    ok: true, message: `Physical card requested. $${PHYSICAL_CARD_FEE.toFixed(2)} fee deducted from your deposit balance.`,
-    state: { ...state, nextId: ids.nextId, transactions: [fee, ...state.transactions], cards: { ...state.cards, physical: { ...state.cards.physical, status: 'Requested' } } },
-  };
+  return { grant: roundCents(grant), deposit: roundCents(deposit), pendingWithdrawals: roundCents(pendingWithdrawals), pendingDeposits: roundCents(pendingDeposits) };
 }
 
 // ---------- Profile ----------

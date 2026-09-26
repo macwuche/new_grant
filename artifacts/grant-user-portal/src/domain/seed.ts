@@ -1,4 +1,4 @@
-import type { Application, ApplicationEvent, DemoState, Grant, Notification, PayoutMethod } from './model';
+import type { Application, ApplicationEvent, ChannelId, DemoState, Grant, Notification, StaffEvent, Treasury } from './model';
 
 /** The demo applicant who uses the applicant portal. */
 export const CURRENT_APPLICANT_ID = 'APL-1001';
@@ -28,10 +28,34 @@ export function seedGrants(): Grant[] {
   }));
 }
 
-export const payoutMethods: PayoutMethod[] = [
-  { id: 'bank', type: 'Bank transfer', label: '•••• 0842 · Meridian checking' },
-  { id: 'mobile', type: 'Mobile money', label: '+1 (415) 555-0148' },
-];
+/** The demo applicant's saved payout destination for each channel (fictional). */
+export const payoutDestinations: Record<ChannelId, string> = {
+  bank: '•••• 0842 · Meridian checking',
+  wire: 'SWIFT MRDNUS33 · •••• 0842',
+  mobile: '+1 (415) 555-0148',
+  crypto: 'USDT (TRC-20) · TXr9…4kP2',
+};
+
+const TREASURY_CREATED = '2026-06-01T09:00:00.000Z';
+/** Default money settings. Values are illustrative, not approved commercial terms. */
+export function seedTreasury(): Treasury {
+  return {
+    channels: [
+      { id: 'bank', name: 'Bank transfer', enabled: true, min: 10, max: 10000, feeRate: 0.0125, feeFixed: 0, feeCap: 14 },
+      { id: 'mobile', name: 'Mobile money', enabled: true, min: 10, max: 2000, feeRate: 0.015, feeFixed: 0, feeCap: 10 },
+      { id: 'wire', name: 'Wire transfer', enabled: false, min: 500, max: 50000, feeRate: 0, feeFixed: 25, feeCap: 25 },
+      { id: 'crypto', name: 'USDT wallet', enabled: false, min: 50, max: 20000, feeRate: 0.01, feeFixed: 1, feeCap: 20 },
+    ],
+    physicalCardFee: 8.5,
+    cardDeliveryFee: 3.5,
+    minDeposit: 20,
+    maxDeposit: 25000,
+    depositThreshold: 25,
+    highValueDeposit: 1000,
+    updatedAt: TREASURY_CREATED,
+    changeLog: [{ at: TREASURY_CREATED, by: DEMO_FINANCE, summary: 'Initial money settings.' }],
+  };
+}
 
 const ev = (status: ApplicationEvent['status'], at: string, note: string, actor: ApplicationEvent['actor'] = status === 'Draft' || status === 'Submitted' ? 'Applicant' : 'Reviewer'): ApplicationEvent => ({ status, at, actor, note });
 const allRequirements = (grantId: string) => catalog.find(g => g.id === grantId)!.requirements;
@@ -49,9 +73,11 @@ function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' 
 export function createSeedState(): DemoState {
   const me = CURRENT_APPLICANT_ID;
   return {
-    version: 3,
+    version: 4,
     grants: seedGrants(),
     notifications: seedNotifications(me),
+    treasury: seedTreasury(),
+    staffFeed: seedStaffFeed(),
     profile: { name: 'Alex Morgan', email: 'alex.morgan@example.com', phone: '+1 (415) 555-0148', address: '54 Valencia Street, San Francisco', tier: 2, identityVerified: true, twoFactor: true },
     otherApplicants: [
       { id: 'APL-1042', name: 'Maya Okafor', email: 'maya.okafor@example.org', sector: 'Creative industries', country: 'United Kingdom', verified: true, joined: '2026-06-18' },
@@ -107,9 +133,10 @@ export function createSeedState(): DemoState {
     ],
     transactions: [
       { id: 'TX-84019', applicantId: me, type: 'Grant', description: 'Creative Practice award (APP-1932)', amount: 4200, status: 'Completed', createdAt: '2026-08-14T11:05:00.000Z' },
-      { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Demo account funding', amount: 450, status: 'Completed', createdAt: '2026-08-06T13:00:00.000Z' },
+      { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Deposit via Bank transfer', amount: 450, status: 'Completed', createdAt: '2026-08-05T10:00:00.000Z', method: 'bank', reference: 'ARC-1990', processedAt: '2026-08-06T13:00:00.000Z', processedBy: DEMO_FINANCE },
+      { id: 'TX-82090', applicantId: 'APL-1042', type: 'Deposit', description: 'Deposit via Bank transfer', amount: 1500, status: 'Pending', createdAt: '2026-09-24T10:00:00.000Z', method: 'bank', reference: 'ARC-2090' },
       { id: 'TX-83984', applicantId: me, type: 'Card fee', description: 'Virtual card issuance', amount: -8.5, status: 'Completed', createdAt: '2026-07-30T09:00:00.000Z' },
-      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', fee: 1.56, destination: 'Bank transfer · •••• 0842 · Meridian checking' },
+      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', method: 'bank', fee: 1.56, destination: 'Bank transfer · •••• 0842 · Meridian checking' },
     ],
     cards: {
       virtual: { lastFour: '4826', dailyLimit: 1500, frozen: false },
@@ -123,5 +150,14 @@ function seedNotifications(me: string): Notification[] {
   return [
     { id: 'NT-1', applicantId: me, at: '2026-08-14T11:05:00.000Z', title: 'Creative Practice approved', body: 'Approved for $4,200.00. The award has been added to your grant balance.', href: '/applications/APP-1932', read: true },
     { id: 'NT-2', applicantId: me, at: '2026-09-11T15:40:00.000Z', title: 'Business Momentum is under review', body: 'A reviewer has started reviewing your application.', href: '/applications/APP-2048', read: false },
+  ];
+}
+
+function seedStaffFeed(): StaffEvent[] {
+  return [
+    { id: 'FD-4', at: '2026-09-24T10:00:00.000Z', kind: 'deposit', title: 'High-value deposit announced: $1,500.00', body: 'Maya Okafor · Bank transfer · reference ARC-2090', href: '/admin/deposits', highlight: true, read: false },
+    { id: 'FD-3', at: '2026-09-22T11:30:00.000Z', kind: 'application', title: 'New application APP-2047', body: 'Priya Shah · Creative Practice · $4,950', href: '/admin/applications', highlight: false, read: false },
+    { id: 'FD-2', at: '2026-09-20T16:45:00.000Z', kind: 'application', title: 'New application APP-2050', body: 'Samira Haddad · Green Transition · $12,800', href: '/admin/applications', highlight: false, read: true },
+    { id: 'FD-1', at: '2026-09-20T14:45:00.000Z', kind: 'withdrawal', title: 'Payout request TX-84077', body: 'Alex Morgan · $125.00 via Bank transfer', href: '/admin/payouts', highlight: false, read: false },
   ];
 }

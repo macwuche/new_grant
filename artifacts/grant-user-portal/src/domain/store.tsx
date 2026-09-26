@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DemoState, Result } from './model';
-import { createSeedState, seedGrants } from './seed';
+import { createSeedState, seedGrants, seedTreasury } from './seed';
 
 // Browser-only persistence until the API and database exist. Every change goes
 // through a rule function from ./rules; the store only saves accepted results.
@@ -11,12 +11,14 @@ export const DEMO_STATE_STORAGE_KEY = 'arc.fund.demoState.v2';
 /**
  * Upgrades older saved shapes instead of discarding the visitor's work.
  * v2 → v3: the grant catalog moved into state and notifications were added.
+ * v3 → v4: money settings (treasury) and the staff activity feed were added.
  */
 export function migrateState(raw: unknown): DemoState | null {
   const data = raw as Record<string, unknown> | null;
   if (!data || !Array.isArray(data.applications) || !Array.isArray(data.transactions)) return null;
-  if (data.version === 3 && Array.isArray(data.grants) && Array.isArray(data.notifications)) return data as unknown as DemoState;
-  if (data.version === 2) return { ...(data as unknown as Omit<DemoState, 'version' | 'grants' | 'notifications'>), version: 3, grants: seedGrants(), notifications: [] };
+  if (data.version === 4 && Array.isArray(data.grants) && Array.isArray(data.notifications) && Array.isArray(data.staffFeed) && data.treasury) return data as unknown as DemoState;
+  if (data.version === 3 && Array.isArray(data.grants) && Array.isArray(data.notifications)) return migrateState({ ...data, version: 4, treasury: seedTreasury(), staffFeed: [] });
+  if (data.version === 2) return migrateState({ ...data, version: 3, grants: seedGrants(), notifications: [] });
   return null;
 }
 

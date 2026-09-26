@@ -10,6 +10,11 @@ import { BrandColorSettings } from './BrandColorSettings';
 import { AdminReviewPanel } from './AdminReviewPanel';
 import { AdminPayouts } from './AdminPayouts';
 import { AdminPrograms } from './AdminPrograms';
+import { AdminDeposits } from './AdminDeposits';
+import { AdminTreasurySettings } from './AdminTreasurySettings';
+import { ActivityItem, AdminActivityMenu, useOpenActivity } from './AdminActivityMenu';
+import { staffFeed } from '@/domain/activity';
+import { pendingDepositTotal } from '@/domain/deposits';
 import { pendingPayoutTotal } from '@/domain/payouts';
 import { findGrant } from '@/domain/rules';
 import { applicantName, awaitingAction, programBudget, reviewQueue } from '@/domain/review';
@@ -19,7 +24,7 @@ import type { Application as DomainApplication, DemoState } from '@/domain/model
 import { format } from 'date-fns';
 import './AdminPage.css';
 
-export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'payouts' | 'grants' | 'settings';
+export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'payouts' | 'deposits' | 'grants' | 'settings';
 type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string; applications: number };
 /** Queue row derived from the shared store. */
 type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string };
@@ -41,6 +46,21 @@ function useApplicants(): Applicant[] {
   return [me, ...state.otherApplicants.map(p => ({ id: p.id, name: p.name, email: p.email, sector: p.sector, country: p.country, status: p.verified ? 'Verified' : 'Pending', joined: shortDate(p.joined), applications: count(p.id) }))];
 }
 
+/** Deposits live under the Payments nav item. */
+const isActive = (current: AdminSection, item: AdminSection) => current === item || (item === 'payouts' && current === 'deposits');
+function PaymentsTabs({ tab }: { tab: 'payouts' | 'deposits' }) {
+  return <nav className="admin-tabs" aria-label="Payments">
+    <Link href="/admin/payouts" className={tab === 'payouts' ? 'active' : ''} aria-current={tab === 'payouts' ? 'page' : undefined} data-testid="tab-admin-payments-payouts">Payouts</Link>
+    <Link href="/admin/deposits" className={tab === 'deposits' ? 'active' : ''} aria-current={tab === 'deposits' ? 'page' : undefined} data-testid="tab-admin-payments-deposits">Deposits</Link>
+  </nav>;
+}
+function RecentActivity() {
+  const { state } = useDemoStore();
+  const open = useOpenActivity();
+  const items = staffFeed(state).slice(0, 5);
+  return <section className="admin-panel" style={{ marginTop: 17 }} data-testid="panel-admin-recent-activity"><SectionHead title="Team activity" subtitle="Applicant actions that may need staff attention, newest first." />{items.length ? items.map(e => <ActivityItem key={e.id} event={e} onOpen={open} compact />) : <p className="admin-review-hint">No activity yet.</p>}</section>;
+}
+
 const money = (value: number) => `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const navItems = [
@@ -48,7 +68,7 @@ const navItems = [
   { section: 'applicants' as const, label: 'Applicants', icon: Users, href: '/admin/applicants' },
   { section: 'inbox' as const, label: 'Email inbox', icon: Mail, href: '/admin/inbox' },
   { section: 'applications' as const, label: 'Applications', icon: ClipboardList, href: '/admin/applications' },
-  { section: 'payouts' as const, label: 'Payouts', icon: Banknote, href: '/admin/payouts' },
+  { section: 'payouts' as const, label: 'Payments', icon: Banknote, href: '/admin/payouts' },
   { section: 'grants' as const, label: 'Grant programs', icon: FolderOpen, href: '/admin/grants' },
   { section: 'settings' as const, label: 'Settings', icon: Settings2, href: '/admin/settings' },
 ];
@@ -105,9 +125,10 @@ function Overview({ openReview }: { openReview: (id: string) => void }) {
       <section className="admin-panel"><SectionHead title="Review queue" subtitle="Oldest submissions first. Open one to review it." href="/admin/applications" link="Open queue" />{waiting.length ? <div className="admin-list">{waiting.slice(0, 4).map(a => toRow(state, a)).map(item => <div className="admin-list-item" key={item.id} data-testid={`item-admin-queue-${item.id}`}><span className="admin-list-icon"><FileText size={17} /></span><span className="admin-list-copy"><strong>{item.title}</strong><small>{item.applicant} · {money(item.amount)} · {item.date}</small></span><Badge status={item.status} /><button type="button" className="admin-icon-button" onClick={() => openReview(item.id)} aria-label={`Review application ${item.title}`} data-testid={`button-preview-admin-application-${item.id}`}><ArrowRight size={15} /></button></div>)}</div> : <p className="admin-review-hint">Nothing is waiting for review.</p>}</section>
       <div className="admin-grid">
         <div className="admin-priority"><span className="admin-eyebrow">Workspace focus</span><strong>A clearer view of every request.</strong><p>Start reviews, request changes, and record decisions. Everything is saved in this browser only.</p><Link href="/admin/applications" data-testid="link-admin-explore-review-queue">Explore review queue <ArrowRight size={14} /></Link></div>
-        <section className="admin-panel"><SectionHead title="At a glance" subtitle="Live counts from this browser's demo data." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>{pad(count('Submitted'))}</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>{pad(count('Under review'))}</strong></div><div className="admin-mini-stat"><span>With applicant for changes</span><strong>{pad(count('Changes requested'))}</strong></div><div className="admin-mini-stat"><span>Payouts waiting</span><strong>{pad(state.transactions.filter(t => t.type === 'Withdrawal' && t.status === 'Pending').length)} · {money(pendingPayoutTotal(state))}</strong></div><div className="admin-mini-stat"><span>Approved / declined</span><strong>{pad(count('Approved'))} / {pad(count('Declined'))}</strong></div></section>
+        <section className="admin-panel"><SectionHead title="At a glance" subtitle="Live counts from this browser's demo data." /><div className="admin-mini-stat"><span>Awaiting first look</span><strong>{pad(count('Submitted'))}</strong></div><div className="admin-mini-stat"><span>Under review</span><strong>{pad(count('Under review'))}</strong></div><div className="admin-mini-stat"><span>With applicant for changes</span><strong>{pad(count('Changes requested'))}</strong></div><div className="admin-mini-stat"><span>Deposits to confirm</span><strong>{pad(state.transactions.filter(t => t.type === 'Deposit' && t.status === 'Pending').length)} · {money(pendingDepositTotal(state))}</strong></div><div className="admin-mini-stat"><span>Payouts waiting</span><strong>{pad(state.transactions.filter(t => t.type === 'Withdrawal' && t.status === 'Pending').length)} · {money(pendingPayoutTotal(state))}</strong></div><div className="admin-mini-stat"><span>Approved / declined</span><strong>{pad(count('Approved'))} / {pad(count('Declined'))}</strong></div></section>
       </div>
     </div>
+    <RecentActivity />
     <div className="admin-overview-bottom">
       <section className="admin-panel"><SectionHead title="Recently joined" subtitle="Illustrative applicant profiles." href="/admin/applicants" link="View applicants" />{applicants.slice(0, 3).map(person => <div className="admin-simple-row" key={person.id}><strong>{person.name}</strong><span>{person.sector}</span></div>)}</section>
       <section className="admin-panel"><SectionHead title="Program landscape" subtitle="Budget remaining in open programs." href="/admin/grants" link="View programs" />{state.grants.filter(g => g.status === 'Open').slice(0, 4).map(grant => <div className="admin-simple-row" key={grant.id}><strong>{grant.name}</strong><span>{money(programBudget(state, grant.id).remaining)} left</span></div>)}</section>
@@ -161,7 +182,7 @@ function Applications({ openReview }: { openReview: (id: string) => void }) {
 
 
 function Settings() {
-  return <><BrandColorSettings /><div className="admin-settings-grid">
+  return <><AdminTreasurySettings /><BrandColorSettings /><div className="admin-settings-grid">
     <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
@@ -180,9 +201,10 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Browse fictional applicant profiles across sectors and regions. Profiles open as read-only previews.' },
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'A quiet reading space for fictional grant correspondence. Explore the sample flow without sending or receiving email.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
+  deposits: { eyebrow: 'Funding / Deposits', title: 'Money in, matched by reference.', description: 'Confirm deposits applicants have announced once the transfer arrives, or reject them with a reason. No bank feed is connected.' },
   payouts: { eyebrow: 'Funding / Payouts', title: 'Money out, on the record.', description: 'Process applicant withdrawal requests: record each as paid or failed. No payment provider is connected, so nothing is actually sent.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Create, edit, publish, and close grant programs. Changes apply to the applicant portal in this browser.' },
-  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Preview the brand color and see where policies, sectors, and review conventions could be managed.' },
+  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Set payout channels, fees, and deposit rules; preview the brand color; and see where policies, sectors, and review conventions could be managed.' },
 };
 
 export function AdminPage({ section }: { section: AdminSection }) {
@@ -197,16 +219,17 @@ export function AdminPage({ section }: { section: AdminSection }) {
     applicants: <Applicants openDetail={setDetail} />,
     inbox: <AdminInbox />,
     applications: <Applications openReview={setReviewId} />,
-    payouts: <AdminPayouts />,
+    payouts: <><PaymentsTabs tab="payouts" /><AdminPayouts /></>,
+    deposits: <><PaymentsTabs tab="deposits" /><AdminDeposits /></>,
     grants: <AdminPrograms />,
     settings: <Settings />,
   };
   return <div className="admin-shell">
-    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${section === item.section ? 'active' : ''}`} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only. Review decisions, payout records, and brand color are saved in this browser; there is no staff sign-in or server.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
-    <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
+    <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark">a</span><span className="admin-brand-name">arc<span>.</span>fund</span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${isActive(section, item.section) ? 'active' : ''}`} aria-current={isActive(section, item.section) ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only. Review decisions, payout records, and brand color are saved in this browser; there is no staff sign-in or server.</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
+    <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark">a</span><span>arc.fund <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right"><AdminActivityMenu /><span className="admin-preview-pill" data-testid="status-admin-preview">Preview mode</span><span className="admin-avatar" aria-label="Illustrative team avatar">AT</span></div></header>
       <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2026</span></div>{content[section]}</div>
     </main>
-    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={section === item.section ? 'active' : ''} aria-current={section === item.section ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'payouts' ? 'Payouts' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
+    <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={isActive(section, item.section) ? 'active' : ''} aria-current={isActive(section, item.section) ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'payouts' ? 'Money' : item.section === 'settings' ? 'Settings' : 'Grants'}</span></Link>; })}</nav>
     {detail && <DetailPanel detail={detail} onClose={closeDetail} />}
     {reviewId && <AdminReviewPanel appId={reviewId} onClose={closeReview} />}
   </div>;

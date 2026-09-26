@@ -21,12 +21,14 @@ Build the application logic first, client-side, against browser-local demo data.
 7. **Grant program management (browser-only) — Complete**
    - `/admin/grants`: create drafts, edit with validation, publish, close, reopen, delete unused drafts; eligibility criteria lock after the first submission; change log.
 8. **In-app notifications (browser-only) — Complete**
-   - Applicant bell for review outcomes, payouts, and program closures. Email delivery not connected.
-9. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
-10. **Database and API — Not started**
+   - Applicant bell for review outcomes, payouts, deposits, and program closures. Email delivery not connected.
+9. **Deposits, money settings, withdrawal upgrades, staff activity feed (browser-only) — Complete**
+   - Applicants announce deposits with a reference; finance confirms or rejects. Finance sets payout channels (on/off, limits, fees), card fees, deposit limits, the deposit reserve, and the high-value flag. Only enabled channels are offered; applicants can cancel pending deposits and payouts. Staff bell and overview feed of applicant actions.
+10. **Authentication and staff authorization — Not started** (Supabase or Clerk; choose one)
+11. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.
-11. **Documents, email notifications (Resend) — Not started**
-12. **Real financial operations — Not started**
+12. **Documents, email notifications (Resend) — Not started**
+13. **Real financial operations — Not started**
    - Card issuance, deposits, and provider-confirmed payouts only after provider, compliance, and ledger decisions.
 
 ## Not yet implemented

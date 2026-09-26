@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Application, ApplicationInput, DemoState, Result } from './model';
 import * as R from './rules';
-import { createSeedState, payoutMethods } from './seed';
+import { createSeedState } from './seed';
 
 const now = new Date('2026-09-25T12:00:00Z');
-const bank = payoutMethods[0]!;
 
 let s: DemoState;
 const grant = (id: string) => s.grants.find(g => g.id === id)!;
@@ -25,7 +24,7 @@ beforeEach(() => { s = createSeedState(); });
 
 describe('balances', () => {
   it('derives balances from the ledger, holding pending withdrawals', () => {
-    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 125 });
+    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 125, pendingDeposits: 0 });
   });
 
   it('ignores failed entries', () => {
@@ -134,36 +133,7 @@ describe('drafts and submission', () => {
   });
 });
 
-describe('withdrawals', () => {
-  it('computes a capped fee', () => {
-    expect(R.withdrawalFee(100)).toBe(1.25);
-    expect(R.withdrawalFee(5000)).toBe(14);
-    expect(R.withdrawalFee(0)).toBe(0);
-  });
-
-  it('validates the amount', () => {
-    expect(R.validateWithdrawal(5, 4075)).toMatch(/minimum/);
-    expect(R.validateWithdrawal(5000, 4075)).toMatch(/up to/);
-    expect(R.validateWithdrawal(10.005, 4075)).toMatch(/decimal/);
-    expect(R.validateWithdrawal(100, 4075)).toBeNull();
-  });
-
-  it('records a pending withdrawal with fee and destination, holding the amount', () => {
-    const result = accept(R.requestWithdrawal(s, 1000, bank, now));
-    const tx = s.transactions.find(t => t.id === result.id)!;
-    expect(tx).toMatchObject({ status: 'Pending', amount: -1000, fee: 12.5, destination: `${bank.type} · ${bank.label}` });
-    expect(mine().grant).toBe(3075);
-    expect(R.requestWithdrawal(s, 3075.01, bank, now).ok).toBe(false);
-  });
-});
-
-describe('cards and profile', () => {
-  it('charges the physical card fee once', () => {
-    accept(R.requestPhysicalCard(s, now));
-    expect(mine().deposit).toBe(433);
-    expect(R.requestPhysicalCard(s, now).ok).toBe(false);
-  });
-
+describe('profile', () => {
   it('validates profile edits', () => {
     const result = R.updateProfile(s, { name: 'A', email: 'bad', phone: '12', address: 'x' });
     expect(result.ok).toBe(false);

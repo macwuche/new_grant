@@ -81,7 +81,7 @@ export type Application = {
 export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist'>;
 
 export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee';
-export type TransactionStatus = 'Completed' | 'Pending' | 'Failed';
+export type TransactionStatus = 'Completed' | 'Pending' | 'Failed' | 'Cancelled';
 
 export type Transaction = {
   id: string;
@@ -92,14 +92,66 @@ export type Transaction = {
   amount: number;
   status: TransactionStatus;
   createdAt: string;
+  /** Withdrawals: channel id; deposits: deposit method id. */
+  method?: string;
   /** Withdrawals only: processing fee taken from the amount, and where it goes. */
   fee?: number;
   destination?: string;
-  /** Withdrawals only: set when finance marks the payout paid or failed. */
+  /** Deposits only: reference the applicant quotes when sending money. */
+  reference?: string;
+  /** Deposits and withdrawals: set when finance confirms/rejects, or the applicant cancels. */
   processedAt?: string;
   processedBy?: string;
-  /** Shown to the applicant when a payout fails. */
+  /** Shown to the applicant when a payout or deposit fails. */
   failureReason?: string;
+};
+
+export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
+
+/** A withdrawal channel finance can enable, limit, and price. */
+export type PayoutChannel = {
+  id: ChannelId;
+  name: string;
+  enabled: boolean;
+  /** Per-transaction limits (USD). */
+  min: number;
+  max: number;
+  /** Fee = min(feeFixed + amount × feeRate, feeCap). */
+  feeRate: number;
+  feeFixed: number;
+  feeCap: number;
+};
+
+export type DepositMethodId = 'bank' | 'mobile';
+
+/** Money settings managed by finance. */
+export type Treasury = {
+  channels: PayoutChannel[];
+  physicalCardFee: number;
+  cardDeliveryFee: number;
+  minDeposit: number;
+  maxDeposit: number;
+  /** Deposit balance applicants must keep to request a card or a payout. */
+  depositThreshold: number;
+  /** Deposits at or above this amount are flagged in the staff feed. */
+  highValueDeposit: number;
+  updatedAt: string;
+  changeLog: ProgramChange[];
+};
+
+export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog'>;
+
+/** Staff activity feed entry (shared by the demo staff team). */
+export type StaffEvent = {
+  id: string;
+  at: string;
+  kind: 'application' | 'deposit' | 'withdrawal' | 'card';
+  title: string;
+  body: string;
+  /** Admin route to open. */
+  href: string;
+  highlight: boolean;
+  read: boolean;
 };
 
 export type PayoutMethod = { id: string; type: string; label: string };
@@ -123,9 +175,11 @@ export type CardsState = {
 };
 
 export type DemoState = {
-  version: 3;
+  version: 4;
   grants: Grant[];
   notifications: Notification[];
+  treasury: Treasury;
+  staffFeed: StaffEvent[];
   /** The signed-in demo applicant (the applicant portal's user). */
   profile: Profile;
   otherApplicants: ApplicantSummary[];

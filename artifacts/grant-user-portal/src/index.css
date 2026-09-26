@@ -353,3 +353,4 @@ button { cursor: pointer; }
 .notif-empty { margin: 0; padding: 22px 16px; color: hsl(var(--muted)); font-size: 12px; line-height: 1.5; }
 .notif-foot { margin: 0; padding: 10px 16px; border-top: 1px solid hsl(var(--line)); color: hsl(var(--muted)); font-size: 10px; }
 @media (max-width: 560px) { .notif-panel { position: fixed; top: 64px; right: 16px; left: 16px; width: auto; } }
+.status-cancelled { background: hsl(var(--surface-soft)); color: hsl(var(--muted)); text-decoration: line-through; }

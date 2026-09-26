@@ -6,18 +6,19 @@ import {
   BriefcaseBusiness, Building2, Check, ChevronDown, CircleHelp, CreditCard,
   Download, FileCheck2, FileText, Home, Info, Landmark, LayoutGrid, LockKeyhole,
   MoreHorizontal, Plus, RotateCcw, Search, Settings, ShieldCheck, SlidersHorizontal,
-  Sparkles, Store, Trash2, WalletCards, X, Zap,
+  PiggyBank, Sparkles, Store, Trash2, WalletCards, X, Zap,
 } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
-import type { Application, ApplicationInput, DemoState, Grant, Transaction } from './domain/model';
-import { payoutMethods } from './domain/seed';
+import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, PayoutChannel, Transaction } from './domain/model';
+import { payoutDestinations } from './domain/seed';
 import {
-  checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, MIN_WITHDRAWAL, ownApplications, ownTransactions, visibleGrants,
-  PHYSICAL_CARD_FEE, requestPhysicalCard, requestWithdrawal, saveDraft, setTwoFactor, submitApplication,
-  toggleCardFreeze, updateProfile, validateApplication, validateWithdrawal, withdrawalFee, type ApplicationStep, type ProfileInput,
+  checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
+  saveDraft, setTwoFactor, submitApplication, updateProfile, validateApplication, type ApplicationStep, type ProfileInput,
 } from './domain/rules';
 import { DemoStoreProvider, useDemoStore } from './domain/store';
+import { cancelWithdrawal, channelFee, enabledChannels, payoutBlocker, physicalCardTotal, requestPhysicalCard, requestWithdrawal, toggleCardFreeze, validateWithdrawal } from './domain/money';
+import { cancelDeposit, DEPOSIT_METHODS, requestDeposit } from './domain/deposits';
 import { NotificationsMenu } from './components/NotificationsMenu';
 
 type Toast = (message: string) => void;
@@ -42,6 +43,7 @@ const navItems = [
   { href: '/cards', label: 'Cards', icon: CreditCard },
   { href: '/transactions', label: 'Transactions', icon: ArrowDownLeft },
   { href: '/withdrawals', label: 'Withdrawals', icon: ArrowUpRight },
+  { href: '/deposits', label: 'Add funds', icon: PiggyBank },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 function Shell({ children }: { children: ReactNode }) {
@@ -82,6 +84,7 @@ function pageTitle(location: string, name: string) {
   if (location.startsWith('/cards')) return 'Cards';
   if (location.startsWith('/transactions')) return 'Transactions';
   if (location.startsWith('/withdrawals')) return 'Withdrawals';
+  if (location.startsWith('/deposits')) return 'Add funds';
   return 'Settings';
 }
 function DemoToast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -109,7 +112,7 @@ function Dashboard({ onToast }: { onToast: Toast }) {
     <section className="grid-4">
       <Metric label="Eligible amount" value={money(maxEligibleAward(state.grants, state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
       <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" />
-      <Metric label="Deposit balance" value={money(balances.deposit)} helper="Covers card fees" />
+      <Metric label="Deposit balance" value={money(balances.deposit)} helper={balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees'} />
       <Metric label="Account tier" value={`Tier ${state.profile.tier}`} helper={state.profile.identityVerified ? 'Verified applicant' : 'Verification needed'} />
     </section>
     <section className="grid-2">
@@ -117,7 +120,7 @@ function Dashboard({ onToast }: { onToast: Toast }) {
         {recentApps.length ? <div className="timeline">{recentApps.map(app => <TimelineRow key={app.id} title={grantName(state, app.grantId)} text={app.status === 'Draft' ? 'Continue where you left off when ready.' : app.status === 'Changes requested' ? `Action needed: ${app.history[app.history.length - 1]!.note}` : app.history[app.history.length - 1]!.note} status={app.status} current={app.status === 'Submitted' || app.status === 'Under review' || app.status === 'Changes requested'} done={app.status === 'Approved'} href={`/applications/${app.id}`} />)}</div>
           : <div className="empty-state"><h3>No applications yet</h3><p>Browse grant categories to start your first application.</p></div>}
       </div>
-      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your active card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — unfreeze it from Cards.' : 'Ready for everyday spending.'}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">Manage</Link></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} /><div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><button className="quick-action" onClick={() => onToast('Adding funds needs a payment provider, which is not connected yet.')} data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</button></div></div>
+      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your active card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — unfreeze it from Cards.' : 'Ready for everyday spending.'}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">Manage</Link></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} /><div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><Link className="quick-action" href="/deposits" data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</Link></div></div>
     </section>
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Recent activity</h2><p className="section-subtitle">Latest entries in your demo ledger.</p></div><Link className="link-text" href="/transactions" data-testid="link-view-transactions">See activity</Link></div><TransactionTable rows={recentTx} /></section>
   </div>;
@@ -310,18 +313,33 @@ function CardsPage({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
   const [revealed, setRevealed] = useState(false);
   const { virtual, physical } = state.cards;
+  const { treasury } = state;
   const balances = computeBalances(ownTransactions(state));
   const requested = physical.status === 'Requested';
+  const total = physicalCardTotal(treasury);
   const act = (result: ReturnType<typeof run>) => onToast(result.ok ? result.message : result.error);
   return <div className="stack"><div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. Card changes are saved in this browser only; no card network is connected yet.</p></div><section className="grid-2">
     <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={virtual.frozen ? 'Frozen' : 'Active'} tone={virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => act(run(toggleCardFreeze))} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button></div></div>
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle">{requested ? 'Requested — delivery tracking arrives with the card provider.' : 'Request a card for in-person spending.'}</p></div>{requested ? <StatusBadge status="Requested" tone="Pending" /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div><CardVisual name={state.profile.name} physical label={requested ? 'REQUESTED' : 'NOT REQUESTED'} /><div style={{ marginTop: 16 }}><div className="fee-row"><span>Issuance fee (from deposit balance)</span><strong>{money(PHYSICAL_CARD_FEE)}</strong></div><div className="fee-row"><span>Deposit balance</span><strong>{money(balances.deposit)}</strong></div><button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested} onClick={() => act(run(s => requestPhysicalCard(s, new Date())))} data-testid="button-request-physical-card">{requested ? 'Card requested' : 'Request physical card'}</button></div></div>
+    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle">{requested ? 'Requested — delivery tracking arrives with the card provider.' : 'Request a card for in-person spending.'}</p></div>{requested ? <StatusBadge status="Requested" tone="Pending" /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div><CardVisual name={state.profile.name} physical label={requested ? 'REQUESTED' : 'NOT REQUESTED'} /><div style={{ marginTop: 16 }}>
+      <div className="fee-row"><span>Issuance fee</span><strong>{money(treasury.physicalCardFee)}</strong></div>
+      {treasury.cardDeliveryFee > 0 && <div className="fee-row"><span>Delivery fee</span><strong>{money(treasury.cardDeliveryFee)}</strong></div>}
+      <div className="fee-row"><span>Deposit balance</span><strong>{money(balances.deposit)}</strong></div>
+      {treasury.depositThreshold > 0 && <div className="fee-row"><span>Required reserve after fees</span><strong>{money(treasury.depositThreshold)}</strong></div>}
+      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested} onClick={() => act(run(s => requestPhysicalCard(s, new Date())))} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
+      {!requested && balances.deposit - total < treasury.depositThreshold && <p className="field-hint" style={{ marginTop: 8 }}>Your deposit balance is too low. <Link href="/deposits" className="link-text">Add funds</Link></p>}
+    </div></div>
   </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Card limits</h2><p className="section-subtitle">Illustrative controls for your account tier.</p></div></div><div className="grid-3"><Metric label="Daily card limit" value={money(virtual.dailyLimit)} helper="Virtual card" /><Metric label="Deposit balance" value={money(balances.deposit)} helper="Covers card fees" /><Metric label="Card status" value={virtual.frozen ? 'Frozen' : 'Active'} helper="Virtual card" /></div></section></div>;
 }
-
-function TransactionTable({ rows }: { rows: Transaction[] }) {
-  if (!rows.length) return <div className="empty-state"><h3>No activity yet</h3><p>Awards, payouts, and fees will appear here.</p></div>;
-  return <div className="table-wrap"><table className="data-table"><thead><tr><th>Activity</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>{rows.map(tx => <tr key={tx.id} data-testid={`row-transaction-${tx.id}`}><td><div className="primary-cell">{tx.description}</div><div className="secondary-cell mono">{tx.id}</div>{tx.failureReason && <div className="secondary-cell danger-text">Failed: {tx.failureReason} The amount was returned to your grant balance.</div>}{tx.type === 'Withdrawal' && tx.status === 'Completed' && tx.processedAt && <div className="secondary-cell">Paid {fmtDate(tx.processedAt)}{tx.fee ? ` · you received ${money(Math.abs(tx.amount) - tx.fee)}` : ''}</div>}</td><td className="muted">{tx.type}</td><td className={`amount ${tx.amount < 0 ? 'muted' : ''}`}>{money(tx.amount)}</td><td><StatusBadge status={tx.status} /></td><td className="muted">{fmtDate(tx.createdAt)}</td></tr>)}</tbody></table></div>;
+function TransactionNote({ tx }: { tx: Transaction }) {
+  if (tx.status === 'Failed' && tx.failureReason) return <div className="secondary-cell danger-text">{tx.type === 'Deposit' ? 'Not credited' : 'Failed'}: {tx.failureReason}{tx.type === 'Withdrawal' ? ' The amount was returned to your grant balance.' : ''}</div>;
+  if (tx.status === 'Cancelled') return <div className="secondary-cell">Cancelled {tx.processedAt ? fmtDate(tx.processedAt) : ''}</div>;
+  if (tx.type === 'Withdrawal' && tx.status === 'Completed' && tx.processedAt) return <div className="secondary-cell">Paid {fmtDate(tx.processedAt)}{tx.fee ? ` · you received ${money(Math.abs(tx.amount) - tx.fee)}` : ''}</div>;
+  if (tx.type === 'Deposit' && tx.status === 'Pending') return <div className="secondary-cell">Waiting for funds · reference {tx.reference}</div>;
+  return null;
+}
+function TransactionTable({ rows, action }: { rows: Transaction[]; action?: (tx: Transaction) => ReactNode }) {
+  if (!rows.length) return <div className="empty-state"><h3>No activity yet</h3><p>Awards, deposits, payouts, and fees will appear here.</p></div>;
+  return <div className="table-wrap"><table className="data-table"><thead><tr><th>Activity</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th>{action && <th />}</tr></thead><tbody>{rows.map(tx => <tr key={tx.id} data-testid={`row-transaction-${tx.id}`}><td><div className="primary-cell">{tx.description}</div><div className="secondary-cell mono">{tx.reference ?? tx.id}</div><TransactionNote tx={tx} /></td><td className="muted">{tx.type}</td><td className={`amount ${tx.amount < 0 ? 'muted' : ''}`}>{money(tx.amount)}</td><td><StatusBadge status={tx.status} /></td><td className="muted">{fmtDate(tx.createdAt)}</td>{action && <td>{action(tx)}</td>}</tr>)}</tbody></table></div>;
 }
 function exportCsv(rows: Transaction[]) {
   const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
@@ -343,31 +361,79 @@ function TransactionsPage() {
   return <div className="stack"><div className="page-intro"><h2>Every movement, easy to follow.</h2><p>Grants, deposits, card fees, and payout requests in one activity ledger. Balances are calculated from these entries.</p></div><div className="card card-pad"><div className="toolbar"><div className="search-wrap"><Search size={16} /><input className="input" type="search" placeholder="Search activity" value={query} onChange={e => setQuery(e.target.value)} data-testid="input-search-transactions" /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><SlidersHorizontal size={15} color="hsl(var(--muted))" /><select className="select" style={{ width: 145 }} value={filter} onChange={e => setFilter(e.target.value)} data-testid="select-transaction-filter"><option>All</option><option>Grant</option><option>Deposit</option><option>Withdrawal</option><option>Card fee</option></select><button className="btn btn-ghost" disabled={!filtered.length} onClick={() => exportCsv(filtered)} data-testid="button-export-transactions"><Download size={14} /> Export</button></div></div>{filtered.length ? <TransactionTable rows={filtered} /> : <div className="empty-state"><div className="empty-icon"><Search size={19} /></div><h3>No activity found</h3><p>Try a different search term or reset the activity filter.</p></div>}</div></div>;
 }
 
+function CancelButton({ tx, onCancel, label }: { tx: Transaction; onCancel: (id: string) => void; label: string }) {
+  const [confirming, setConfirming] = useState(false);
+  if (tx.status !== 'Pending') return null;
+  return confirming
+    ? <span style={{ display: 'inline-flex', gap: 6 }}><button className="btn btn-ghost" onClick={() => onCancel(tx.id)} data-testid={`button-confirm-cancel-${tx.id}`}>Confirm</button><button className="btn btn-ghost" onClick={() => setConfirming(false)} aria-label="Keep request" data-testid={`button-keep-${tx.id}`}><X size={14} /></button></span>
+    : <button className="btn btn-ghost" onClick={() => setConfirming(true)} data-testid={`button-cancel-${tx.id}`}>{label}</button>;
+}
 function WithdrawalsPage({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
-  const [method, setMethod] = useState('bank');
+  const channels = enabledChannels(state);
+  const [channelId, setChannelId] = useState<ChannelId | ''>(channels[0]?.id ?? '');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const balances = computeBalances(ownTransactions(state));
+  const channel = channels.find(c => c.id === channelId) ?? channels[0];
   const value = amount.trim() === '' ? NaN : Number(amount);
-  const fee = withdrawalFee(value);
-  const payout = payoutMethods.find(p => p.id === method)!;
+  const fee = channel ? channelFee(channel, value) : 0;
+  const blocker = payoutBlocker(state);
   const history = ownTransactions(state).filter(t => t.type === 'Withdrawal').sort(byNewest(t => t.createdAt));
-  const preview = () => { const problem = validateWithdrawal(value, balances.grant); setError(problem); if (!problem) setShowModal(true); };
+  const preview = () => { if (!channel) return; const problem = validateWithdrawal(state, value, channel.id); setError(problem); if (!problem) setShowModal(true); };
   const confirm = () => {
-    const result = run(s => requestWithdrawal(s, value, payout, new Date()));
+    if (!channel) return;
+    const result = run(s => requestWithdrawal(s, value, channel.id, new Date()));
     setShowModal(false);
     if (!result.ok) { setError(result.error); return; }
     setAmount('');
     onToast(`${result.message} No money was sent — no payout provider is connected.`);
   };
-  return <div className="stack"><div className="detail-layout"><div className="stack"><div className="withdraw-summary"><div className="metric-label"><span>Available to request</span><WalletCards size={15} /></div><div className="metric-value">{money(balances.grant)}</div><div className="metric-helper">Grant balance{balances.pendingWithdrawals > 0 ? ` · ${money(balances.pendingWithdrawals)} held for pending payouts` : ''}</div></div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Request a payout</h2><p className="section-subtitle">Choose a destination and check the fee breakdown.</p></div></div><div className="notice mb"><Info size={16} />Payout requests are recorded in this browser only. No bank or mobile-money provider is connected, so no money moves.</div><div className="field mb"><label className="field-label" htmlFor="withdrawal-amount">Amount (USD)</label><input id="withdrawal-amount" type="number" inputMode="decimal" min={MIN_WITHDRAWAL} step="0.01" className="input" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-withdrawal-amount" aria-invalid={!!error} aria-describedby={error ? 'withdrawal-error' : undefined} />{error ? <FieldError id="withdrawal-error" message={error} /> : <span className="field-hint">Minimum {money(MIN_WITHDRAWAL)} · up to {money(balances.grant)}</span>}</div><div className="field"><span className="field-label">Payout destination</span><div className="stack" style={{ gap: 8 }}>{payoutMethods.map(p => <label key={p.id} className={`payout-method ${method === p.id ? 'active' : ''}`}><input type="radio" name="payout" checked={method === p.id} onChange={() => setMethod(p.id)} data-testid={`radio-payout-${p.id}`} /><div className="payout-icon">{p.id === 'bank' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{p.type}</strong><span>{p.label}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div><div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>No real payout will be created.</span><button className="btn btn-primary" onClick={preview} disabled={balances.grant <= 0} data-testid="button-preview-withdrawal">Review request <ArrowRight size={15} /></button></div></div></div><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Fee breakdown</h2><p className="section-subtitle">1.25% processing, capped at $14 (demo rate).</p></div></div><div className="fee-row"><span>Requested amount</span><strong>{money(value || 0)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(Math.max(0, (value || 0) - fee))}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The fee is deducted from the payout. Actual methods and fees will be set when a provider is chosen.</p></aside></div>
-    <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Payout requests</h2><p className="section-subtitle">Pending requests are held from your grant balance until the finance team marks them paid or failed.</p></div></div><TransactionTable rows={history} /></section>
-    {showModal && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="withdrawal-modal-title"><div className="modal"><div className="modal-head"><div><h2 id="withdrawal-modal-title">Confirm payout request</h2><p>The request is recorded as pending in this browser. No money moves.</p></div><button className="icon-btn" onClick={() => setShowModal(false)} aria-label="Close" data-testid="button-close-withdrawal-modal"><X size={16} /></button></div><div className="fee-row"><span>Destination</span><strong>{payout.type} · {payout.label}</strong></div><div className="fee-row"><span>Amount</span><strong>{money(value)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(value - fee)}</strong></div><div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)} data-testid="button-cancel-withdrawal">Cancel</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={confirm} data-testid="button-confirm-withdrawal">Submit request</button></div></div></div>}
+  const cancel = (id: string) => { const result = run(s => cancelWithdrawal(s, id, new Date())); onToast(result.ok ? result.message : result.error); };
+  const feeText = (c: PayoutChannel) => [c.feeRate ? `${+(c.feeRate * 100).toFixed(2)}%` : '', c.feeFixed ? `${money(c.feeFixed)} fixed` : ''].filter(Boolean).join(' + ') + (c.feeCap && c.feeRate ? `, max ${money(c.feeCap)}` : '') || 'No fee';
+  return <div className="stack"><div className="detail-layout"><div className="stack"><div className="withdraw-summary"><div className="metric-label"><span>Available to request</span><WalletCards size={15} /></div><div className="metric-value">{money(balances.grant)}</div><div className="metric-helper">Grant balance{balances.pendingWithdrawals > 0 ? ` · ${money(balances.pendingWithdrawals)} held for pending payouts` : ''}</div></div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Request a payout</h2><p className="section-subtitle">Choose a channel and check the fee breakdown.</p></div></div><div className="notice mb"><Info size={16} />Payout requests are recorded in this browser only. No bank, mobile-money, or crypto provider is connected, so no money moves.</div>
+    {blocker && <div className="notice mb" role="alert" data-testid="notice-payout-blocked"><Info size={16} /><div>{blocker}{blocker.includes('deposit balance') && <> <Link href="/deposits" className="link-text">Add funds</Link></>}</div></div>}
+    {channel && <><div className="field mb"><label className="field-label" htmlFor="withdrawal-amount">Amount (USD)</label><input id="withdrawal-amount" type="number" inputMode="decimal" min={channel.min} max={channel.max} step="0.01" className="input" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-withdrawal-amount" aria-invalid={!!error} aria-describedby={error ? 'withdrawal-error' : undefined} />{error ? <FieldError id="withdrawal-error" message={error} /> : <span className="field-hint">{channel.name}: {money(channel.min)} – {money(Math.min(channel.max, Math.max(balances.grant, 0)))}</span>}</div>
+    <div className="field"><span className="field-label">Payout channel</span><div className="stack" style={{ gap: 8 }}>{channels.map(c => <label key={c.id} className={`payout-method ${channel.id === c.id ? 'active' : ''}`}><input type="radio" name="payout" checked={channel.id === c.id} onChange={() => { setChannelId(c.id); setError(null); }} data-testid={`radio-payout-${c.id}`} /><div className="payout-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{c.name}</strong><span>{payoutDestinations[c.id]} · fee {feeText(c)}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div></>}
+    <div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>No real payout will be created.</span><button className="btn btn-primary" onClick={preview} disabled={!channel || !!blocker || balances.grant <= 0} data-testid="button-preview-withdrawal">Review request <ArrowRight size={15} /></button></div></div></div>
+    <aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Fee breakdown</h2><p className="section-subtitle">{channel ? `${channel.name}: ${feeText(channel)}` : 'No channel available'}</p></div></div><div className="fee-row"><span>Requested amount</span><strong>{money(value || 0)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(Math.max(0, (value || 0) - fee))}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The fee is deducted from the payout. Rates are set by the finance team and apply to new requests.</p></aside></div>
+    <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Payout requests</h2><p className="section-subtitle">Pending requests are held from your grant balance until the finance team marks them paid or failed. You can cancel a request while it's pending.</p></div></div><TransactionTable rows={history} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
+    {showModal && channel && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="withdrawal-modal-title"><div className="modal"><div className="modal-head"><div><h2 id="withdrawal-modal-title">Confirm payout request</h2><p>The request is recorded as pending in this browser. No money moves.</p></div><button className="icon-btn" onClick={() => setShowModal(false)} aria-label="Close" data-testid="button-close-withdrawal-modal"><X size={16} /></button></div><div className="fee-row"><span>Destination</span><strong>{channel.name} · {payoutDestinations[channel.id]}</strong></div><div className="fee-row"><span>Amount</span><strong>{money(value)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(value - fee)}</strong></div><div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)} data-testid="button-cancel-withdrawal">Cancel</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={confirm} data-testid="button-confirm-withdrawal">Submit request</button></div></div></div>}
   </div>;
 }
-
+function DepositsPage({ onToast }: { onToast: Toast }) {
+  const { state, run } = useDemoStore();
+  const [methodId, setMethodId] = useState<DepositMethodId>('bank');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [latest, setLatest] = useState<string | null>(null);
+  const balances = computeBalances(ownTransactions(state));
+  const { treasury } = state;
+  const method = DEPOSIT_METHODS.find(m => m.id === methodId)!;
+  const deposits = ownTransactions(state).filter(t => t.type === 'Deposit').sort(byNewest(t => t.createdAt));
+  const justCreated = latest ? deposits.find(t => t.id === latest && t.status === 'Pending') : undefined;
+  const submit = () => {
+    const value = amount.trim() === '' ? NaN : Number(amount);
+    const result = run(s => requestDeposit(s, value, methodId, new Date()));
+    if (!result.ok) { setError(result.error); return; }
+    setError(null); setAmount(''); setLatest(result.id ?? null);
+    onToast(result.message);
+  };
+  const cancel = (id: string) => { const result = run(s => cancelDeposit(s, id, new Date())); onToast(result.ok ? result.message : result.error); };
+  return <div className="stack"><div className="page-intro"><h2>Add funds to your deposit balance.</h2><p>Your deposit balance pays card fees and must hold a small reserve before payouts. Announce a transfer here, send it with the reference, and it's credited once the finance team confirms it arrived.</p></div>
+    <div className="detail-layout"><div className="card card-pad">
+      <div className="section-head"><div><h2 className="section-title">New deposit</h2><p className="section-subtitle">{money(treasury.minDeposit)} – {money(treasury.maxDeposit)} per deposit.</p></div></div>
+      <div className="notice mb"><Info size={16} />Demo only. The receiving details are fictional and no bank or mobile-money provider is connected. Don't send real money.</div>
+      <div className="field mb"><label className="field-label" htmlFor="deposit-amount">Amount (USD)</label><input id="deposit-amount" className="input" type="number" inputMode="decimal" min={treasury.minDeposit} max={treasury.maxDeposit} step="0.01" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-deposit-amount" aria-invalid={!!error} aria-describedby={error ? 'deposit-error' : undefined} /><FieldError id="deposit-error" message={error ?? undefined} /></div>
+      <div className="field"><span className="field-label">Method</span><div className="stack" style={{ gap: 8 }}>{DEPOSIT_METHODS.map(m => <label key={m.id} className={`payout-method ${methodId === m.id ? 'active' : ''}`}><input type="radio" name="deposit-method" checked={methodId === m.id} onChange={() => setMethodId(m.id)} data-testid={`radio-deposit-${m.id}`} /><div className="payout-icon">{m.id === 'bank' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{m.name}</strong><span>{m.timing}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div>
+      <div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>You'll get a reference to include with your transfer.</span><button className="btn btn-primary" onClick={submit} data-testid="button-submit-deposit">Get payment reference <ArrowRight size={15} /></button></div>
+      {justCreated && <div className="card mt" style={{ padding: 16, background: 'hsl(var(--background))' }} data-testid="panel-deposit-instructions"><strong style={{ fontSize: 13 }}>Send {money(justCreated.amount)} to:</strong><div className="fee-row"><span>Pay to</span><strong>{method.payTo}</strong></div><div className="fee-row"><span>Reference</span><strong className="mono" data-testid="text-deposit-reference">{justCreated.reference}</strong></div><p className="field-hint">Include the reference exactly, or finance can't match your transfer. {method.timing}.</p></div>}
+    </div>
+    <aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Deposit balance</h2><p className="section-subtitle">Confirmed funds only.</p></div></div><div className="fee-row"><span>Available</span><strong data-testid="text-deposit-balance">{money(balances.deposit)}</strong></div><div className="fee-row"><span>Awaiting confirmation</span><strong>{money(balances.pendingDeposits)}</strong></div><div className="fee-row"><span>Required reserve</span><strong>{money(treasury.depositThreshold)}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The reserve must stay in your deposit balance to request payouts or a physical card.</p></aside></div>
+    <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your deposits</h2><p className="section-subtitle">Cancel a deposit if you decide not to send it.</p></div></div><TransactionTable rows={deposits} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
+  </div>;
+}
 function SettingsPage({ onToast }: { onToast: Toast }) {
   const { state, run, reset } = useDemoStore();
   const { profile } = state;
@@ -396,11 +462,11 @@ function RouterView({ onToast }: { onToast: Toast }) {
     const titles: Record<string, string> = {
       '/': 'Dashboard', '/dashboard': 'Dashboard', '/grants': 'Grant categories',
       '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
-      '/withdrawals': 'Withdrawals', '/settings': 'Settings',
+      '/withdrawals': 'Withdrawals', '/deposits': 'Add funds', '/settings': 'Settings',
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
       '/admin': 'Admin overview', '/admin/applicants': 'Admin applicants',
       '/admin/inbox': 'Admin email inbox',
-      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/grants': 'Admin grants',
+      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants',
       '/admin/settings': 'Admin settings',
     };
     const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
@@ -425,6 +491,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/admin/inbox"><AdminPage section="inbox" /></Route>
     <Route path="/admin/applications"><AdminPage section="applications" /></Route>
     <Route path="/admin/payouts"><AdminPage section="payouts" /></Route>
+    <Route path="/admin/deposits"><AdminPage section="deposits" /></Route>
     <Route path="/admin/grants"><AdminPage section="grants" /></Route>
     <Route path="/admin/settings"><AdminPage section="settings" /></Route>
     <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
@@ -436,6 +503,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/cards"><Shell><CardsPage onToast={onToast} /></Shell></Route>
     <Route path="/transactions"><Shell><TransactionsPage /></Shell></Route>
     <Route path="/withdrawals"><Shell><WithdrawalsPage onToast={onToast} /></Shell></Route>
+    <Route path="/deposits"><Shell><DepositsPage onToast={onToast} /></Shell></Route>
     <Route path="/settings"><Shell><SettingsPage onToast={onToast} /></Shell></Route>
     <Route><NotFoundPage /></Route>
   </Switch>;

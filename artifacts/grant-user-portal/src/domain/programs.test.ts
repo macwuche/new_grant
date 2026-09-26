@@ -130,11 +130,13 @@ describe('editing', () => {
 });
 
 describe('saved-data migration', () => {
-  it('upgrades v2 data, keeping applications and adding the catalog', () => {
-    const { grants: _g, notifications: _n, ...rest } = createSeedState();
+  it('upgrades v2 data through v4, keeping applications and adding the catalog and money settings', () => {
+    const { grants: _g, notifications: _n, treasury: _t, staffFeed: _f, ...rest } = createSeedState();
     const v2 = { ...rest, version: 2, applications: rest.applications.slice(0, 1) };
     const migrated = migrateState(JSON.parse(JSON.stringify(v2)))!;
-    expect(migrated.version).toBe(3);
+    expect(migrated.version).toBe(4);
+    expect(migrated.treasury.channels.length).toBeGreaterThan(0);
+    expect(migrated.staffFeed).toEqual([]);
     expect(migrated.applications).toHaveLength(1);
     expect(migrated.grants.map(g => g.id)).toContain('momentum');
     expect(migrated.notifications).toEqual([]);

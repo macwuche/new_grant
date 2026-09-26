@@ -1,5 +1,5 @@
 import type { DemoState, Notification, Result } from './model';
-import { fail, nextIds } from './rules';
+import { fail, nextIds } from './core';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // In-app notifications. Review, payout, and program rules call `notify` in the

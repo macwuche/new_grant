@@ -13,7 +13,7 @@ const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
 const day = (iso: string) => format(new Date(iso), 'dd MMM yyyy');
 /** Finance wording for ledger statuses. */
 const label = (tx: Transaction) => tx.status === 'Completed' ? 'Paid' : tx.status;
-const badgeClass = (tx: Transaction) => `admin-badge ${tx.status === 'Completed' ? 'approved' : tx.status === 'Failed' ? 'declined' : 'submitted'}`;
+const badgeClass = (tx: Transaction) => `admin-badge ${tx.status === 'Completed' ? 'approved' : tx.status === 'Failed' ? 'declined' : tx.status === 'Cancelled' ? 'draft' : 'submitted'}`;
 
 export function AdminPayouts() {
   const { state } = useDemoStore();
@@ -35,7 +35,7 @@ export function AdminPayouts() {
     </div>
     <section className="admin-panel">
       <div className="admin-panel-head"><div><h2>Payout requests</h2><p>Withdrawal requests from applicants in this browser's demo data. No payment provider is connected; marking a payout paid only records it.</p></div></div>
-      <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search applicant, reference, destination" aria-label="Search payouts" data-testid="input-admin-search-payouts" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter payouts by status" data-testid="select-admin-filter-payouts"><option>All statuses</option><option>Pending</option><option>Paid</option><option>Failed</option></select></div><span className="admin-count" data-testid="text-admin-payouts-count">{rows.length} of {queue.length} requests</span></div>
+      <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search applicant, reference, destination" aria-label="Search payouts" data-testid="input-admin-search-payouts" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter payouts by status" data-testid="select-admin-filter-payouts"><option>All statuses</option><option>Pending</option><option>Paid</option><option>Failed</option><option>Cancelled</option></select></div><span className="admin-count" data-testid="text-admin-payouts-count">{rows.length} of {queue.length} requests</span></div>
       {rows.length ? <>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Destination</th><th>Amount</th><th>Applicant receives</th><th>Status</th><th>Requested</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Process</span></th></tr></thead><tbody>{rows.map(tx => { const a = payoutAmounts(tx); return <tr key={tx.id} data-testid={`row-admin-payout-${tx.id}`}><td><span className="admin-table-primary">{applicantName(state, tx.applicantId)}</span><span className="admin-table-secondary">{tx.id}</span></td><td className="admin-table-muted">{tx.destination ?? tx.description}</td><td className="admin-table-number">{usd(a.gross)}</td><td className="admin-table-number">{usd(a.net)}</td><td><span className={badgeClass(tx)}>{label(tx)}</span></td><td className="admin-table-muted">{day(tx.createdAt)}</td><td><button type="button" className="admin-icon-button" onClick={() => setOpenId(tx.id)} aria-label={`Open payout ${tx.id}`} data-testid={`button-open-admin-payout-${tx.id}`}><ArrowRight size={15} /></button></td></tr>; })}</tbody></table></div>
         <div className="admin-mobile-records" role="list" aria-label="Payout requests">{rows.map(tx => { const a = payoutAmounts(tx); return <article className="admin-mobile-record" role="listitem" key={tx.id} data-testid={`card-admin-payout-${tx.id}`}>
@@ -85,7 +85,7 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
     <p className="admin-detail-lead">{applicantName(state, tx.applicantId)} · requested {when(tx.createdAt)}</p>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-payout-flash">{flash.text}</div>}
     <dl className="admin-detail-fields">
-      {[['Destination', tx.destination ?? tx.description], ['Requested amount', usd(amounts.gross)], ['Processing fee', usd(amounts.fee)], ['Applicant receives', usd(amounts.net)], ...(tx.processedAt ? [['Processed', `${when(tx.processedAt)} by ${tx.processedBy ?? 'finance'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      {[['Destination', tx.destination ?? tx.description], ['Requested amount', usd(amounts.gross)], ['Processing fee', usd(amounts.fee)], ['Applicant receives', usd(amounts.net)], ...(tx.processedAt ? [[tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', `${when(tx.processedAt)} by ${tx.status === 'Cancelled' ? 'the applicant' : tx.processedBy ?? 'finance'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
     </dl>
     <section className="admin-review-section admin-review-actions" aria-label="Process payout">
       <h3>Process</h3>
@@ -98,7 +98,7 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
           <button type="button" className={`admin-btn ${mode === 'failed' ? 'danger' : 'primary'}`} onClick={submit} data-testid="button-admin-submit-payout">{confirming ? (mode === 'paid' ? `Confirm: paid ${usd(amounts.net)}` : 'Confirm failure') : mode === 'paid' ? 'Mark as paid' : 'Mark as failed'}</button>
         </div>
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
-      </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Recorded as paid. This is final.' : `Recorded as failed: ${tx.failureReason}. The amount was returned to the applicant's grant balance.`}</p>}
+      </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Recorded as paid. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this request before it was processed. Do not send it.' : `Recorded as failed: ${tx.failureReason}. The amount was returned to the applicant's grant balance.`}</p>}
     </section>
     <div className="admin-detail-note"><Info size={17} /><span>Demo finance workflow. No bank or mobile-money provider is connected, so no money moves. Results are saved in this browser only, and there is no staff sign-in or authorization yet.</span></div>
   </ReviewFrame>;
