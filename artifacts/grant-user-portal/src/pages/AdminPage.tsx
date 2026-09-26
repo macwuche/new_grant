@@ -7,19 +7,16 @@ import {
 } from 'lucide-react';
 import { AdminInbox } from './AdminInbox';
 import { AdminInboxLive } from './AdminInboxLive';
-import { AdminEmailSettings } from './AdminEmailSettings';
-import { AppNameSettings } from './AppNameSettings';
-import { BrandColorSettings } from './BrandColorSettings';
+import { AdminSettings, findSettingsSection } from './AdminSettings';
 import { AdminReviewPanel } from './AdminReviewPanel';
 import { AdminPayouts } from './AdminPayouts';
 import { AdminPrograms } from './AdminPrograms';
 import { AdminDeposits } from './AdminDeposits';
-import { AdminTreasurySettings } from './AdminTreasurySettings';
 import { ActivityItem, AdminActivityMenu, useOpenActivity } from './AdminActivityMenu';
 import { AdminApplicantPanel } from './AdminApplicantPanel';
 import { AdminAudit } from './AdminAudit';
 import { AdminSecurity } from './AdminSecurity';
-import { AdminTeamServer, AdminTeamSettings, StaffSwitcher } from './AdminStaff';
+import { StaffSwitcher } from './AdminStaff';
 import { AdminGate, AdminSessionMenu } from './AdminLogin';
 import { useSession } from '@/lib/session';
 import { RiskBadge } from './AdminRisk';
@@ -193,22 +190,6 @@ function Applications({ openReview }: { openReview: (id: string) => void }) {
 }
 
 
-function Settings() {
-  const signedIn = useSession().status === 'signedIn';
-  return <><AdminTreasurySettings />{signedIn ? <AdminTeamServer /> : <AdminTeamSettings />}<AppNameSettings /><BrandColorSettings /><div className="admin-settings-grid">
-    <section className="admin-panel"><SectionHead title="Workspace configuration" subtitle="A preview of where program controls could live. These settings cannot be changed here." />
-      <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published in this preview.</p></div><span>NOT CONNECTED</span></div>
-      <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
-      <div className="admin-setting-item"><ClipboardList size={18} /><div><strong>Review stages</strong><p>The review flow is fixed for now: Submitted → Under review → Approved, Declined, or Changes requested (back to the applicant). Configurable stages need a secured backend.</p></div><span>NOT CONNECTED</span></div>
-      <div className="admin-setting-item"><FileText size={18} /><div><strong>Program criteria</strong><p>Award range, budget, deadline, tier, and requirements are edited per program under Grant programs (browser only). Custom application questions are not supported yet.</p></div><span>BROWSER ONLY</span></div>
-    </section>
-    <div className="admin-grid">
-      <section className="admin-panel"><SectionHead title="Example sectors" subtitle="Illustrative labels, not live choices." /><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div><div className="admin-settings-callout"><strong>Configuration preview only</strong><p>Editing these options would require authenticated admin access and a backend. This screen does not save changes.</p></div></section>
-      <section className="admin-panel"><SectionHead title="Access & safety" subtitle="Important before a real admin rollout." /><div className="admin-mini-stat"><span>Staff sign-in</span><strong>{signedIn ? 'Supabase Auth' : 'Not enabled'}</strong></div><div className="admin-mini-stat"><span>Role checks</span><strong>{signedIn ? 'Enforced by the API' : 'Demo roles, this browser'}</strong></div><div className="admin-mini-stat"><span>Data source</span><strong>{signedIn ? 'Server database' : 'This browser'}</strong></div></section>
-    </div>
-  </div><AdminEmailSettings signedIn={signedIn} /></>;
-}
-
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Fictional applicants with their tier, identity status, balances, and fraud risk. Open a profile to change tier, lock the account, force credential resets, or review identity.' },
@@ -219,14 +200,14 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   security: { eyebrow: 'Trust / Security', title: 'Risk, identity, and controls.', description: 'Review identity checks, watch automated fraud scores, handle escalated applications, and trigger an emergency lockdown. Demo signals only.' },
   audit: { eyebrow: 'Trust / Audit', title: 'Who did what, and when.', description: 'An append-only record of every staff action in this browser, with the fields each one changed. Filter it or export it as CSV or JSON.' },
   grants: { eyebrow: 'Funding / Programs', title: 'Programs with a purpose.', description: 'Create, edit, publish, and close grant programs. Changes apply to the applicant portal in this browser.' },
-  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Set payout channels, fees, and deposit rules; assign staff roles; preview the brand color; and see where policies and sectors could be managed.' },
+  settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Settings are grouped by area. Open a section to see and change what it covers.' },
 };
 
-export function AdminPage({ section }: { section: AdminSection }) {
-  return <AdminGate><AdminWorkspace section={section} /></AdminGate>;
+export function AdminPage({ section, settingsSection }: { section: AdminSection; settingsSection?: string }) {
+  return <AdminGate><AdminWorkspace section={section} settingsSection={settingsSection} /></AdminGate>;
 }
 
-function AdminWorkspace({ section }: { section: AdminSection }) {
+function AdminWorkspace({ section, settingsSection }: { section: AdminSection; settingsSection?: string }) {
   const { state } = useDemoStore();
   const signedIn = useSession().status === 'signedIn';
   const [applicantId, setApplicantId] = useState<string | null>(null);
@@ -245,11 +226,11 @@ function AdminWorkspace({ section }: { section: AdminSection }) {
     grants: <AdminPrograms />,
     security: <><SecurityTabs tab="security" /><AdminSecurity openApplicant={setApplicantId} openReview={setReviewId} /></>,
     audit: <><SecurityTabs tab="audit" /><AdminAudit /></>,
-    settings: <Settings />,
+    settings: <AdminSettings sectionId={settingsSection} />,
   };
   return <div className="admin-shell">
     <aside className="admin-sidebar"><div className="admin-brand"><span className="admin-brand-mark"><BrandLetter /></span><span className="admin-brand-name"><Wordmark /></span><span className="admin-brand-divider" /><span className="admin-brand-role">Admin</span></div><div className="admin-sidebar-label">Workspace</div><nav className="admin-nav" aria-label="Admin navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={`admin-nav-link ${isActive(section, item.section) ? 'active' : ''}`} aria-current={isActive(section, item.section) ? 'page' : undefined} data-testid={`link-admin-nav-${item.section}`}><Icon size={17} strokeWidth={1.8} />{item.label}</Link>; })}</nav><div className="admin-sidebar-bottom"><div className="admin-sidebar-rule" /><div className="admin-sidebar-note"><strong>Preview workspace</strong>Demo records only, saved in this browser. {signedIn ? 'You are signed in; your role comes from the server, but the records themselves are not stored on it yet.' : 'Staff sign-in is not set up, so roles use a demo switcher.'}</div><div className="admin-sidebar-index">ARC / TEAM SPACE 001</div></div></aside>
-    <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark"><BrandLetter /></span><span><AppNameText /> <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section === 'audit' ? 'Audit log' : section[0].toUpperCase() + section.slice(1)}</strong></div></div><div className="admin-topbar-right">{state.lockdown && <Link href="/admin/security" className="admin-lockdown-pill" data-testid="status-admin-lockdown"><ShieldAlert size={13} /> Lockdown</Link>}<AdminActivityMenu /><span className="admin-preview-pill" data-testid="status-admin-preview">{signedIn ? 'Demo data' : 'Preview mode'}</span>{signedIn ? <AdminSessionMenu /> : <StaffSwitcher />}</div></header>
+    <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-left"><div className="admin-mobile-brand"><span className="admin-brand-mark"><BrandLetter /></span><span><AppNameText /> <span style={{ color: '#7b887b', fontWeight: 500 }}>/ admin</span></span></div><div className="admin-breadcrumb">Team workspace <span>/</span> <strong>{section === 'grants' ? 'Grant programs' : section === 'audit' ? 'Audit log' : section[0].toUpperCase() + section.slice(1)}</strong>{section === 'settings' && settingsSection && <> <span>/</span> <strong>{findSettingsSection(settingsSection)?.title ?? 'Not found'}</strong></>}</div></div><div className="admin-topbar-right">{state.lockdown && <Link href="/admin/security" className="admin-lockdown-pill" data-testid="status-admin-lockdown"><ShieldAlert size={13} /> Lockdown</Link>}<AdminActivityMenu /><span className="admin-preview-pill" data-testid="status-admin-preview">{signedIn ? 'Demo data' : 'Preview mode'}</span>{signedIn ? <AdminSessionMenu /> : <StaffSwitcher />}</div></header>
       <div className="admin-content"><div className="admin-pagehead"><div><p className="admin-eyebrow">{copy.eyebrow}</p><h1 data-testid={`heading-admin-${section}`}>{copy.title}</h1><p>{copy.description}</p></div><span className="admin-date">SAMPLE WORKSPACE / 2026</span></div>{content[section]}</div>
     </main>
     <nav className="admin-mobile-nav" aria-label="Admin mobile navigation">{navItems.map(item => { const Icon = item.icon; return <Link key={item.section} href={item.href} className={isActive(section, item.section) ? 'active' : ''} aria-current={isActive(section, item.section) ? 'page' : undefined} data-testid={`link-admin-mobile-${item.section}`}><Icon size={18} strokeWidth={1.8} /><span>{item.section === 'applications' ? 'Queue' : item.section === 'applicants' ? 'People' : item.section === 'overview' ? 'Home' : item.section === 'inbox' ? 'Inbox' : item.section === 'payouts' ? 'Money' : item.section === 'settings' ? 'Settings' : item.section === 'security' ? 'Security' : 'Grants'}</span></Link>; })}</nav>

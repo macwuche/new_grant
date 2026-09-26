@@ -798,7 +798,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
       '/admin/settings': 'Admin settings',
     };
-    const title = titles[location] ?? (location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
+    const title = titles[location] ?? (location.startsWith('/admin/settings/') ? 'Admin settings' : location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
     const description = location.startsWith('/admin')
       ? `Explore the ${appName} admin UI preview. Sample records only; admin access and changes are not active.`
       : `Explore the ${appName} grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.`;
@@ -828,6 +828,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/admin/security"><AdminPage section="security" /></Route>
     <Route path="/admin/audit"><AdminPage section="audit" /></Route>
     <Route path="/admin/settings"><AdminPage section="settings" /></Route>
+    <Route path="/admin/settings/:section">{params => <AdminPage section="settings" settingsSection={params.section} />}</Route>
     <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/dashboard"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/grants"><Shell><GrantsPage onToast={onToast} /></Shell></Route>

@@ -184,6 +184,7 @@ Every route except `GET /api/healthz` verifies a Supabase bearer token (503 unti
 **Portal** (`artifacts/grant-user-portal/src/`)
 
 - Routes and applicant pages `App.tsx`; admin pages `pages/Admin*.tsx`; sign-in pages `pages/AuthPages.tsx` and `pages/AdminLogin.tsx`.
+- Admin settings (`pages/AdminSettings.tsx`): `/admin/settings` lists sections as cards (Email, Money, Team & roles, App branding, App info) and `/admin/settings/<id>` opens one. A new settings feature is one entry in `SETTINGS_SECTIONS` (id, title, icon, description, who can change it, an optional one-line status, and its page).
 - Session: `lib/supabase.ts`, `lib/session.tsx`. Store: `lib/store.tsx` (key `arc.fund.demoState.v2`; saves `forStorage(state)`). Server data and action hooks: `lib/serverData.tsx` (`ServerDataProvider`, `useMoneyAction`, `useStaffMoney`, `apiError`).
 - Environment: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 

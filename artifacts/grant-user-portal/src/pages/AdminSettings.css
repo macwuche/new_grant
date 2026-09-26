@@ -1,0 +1,14 @@
+.admin-settings-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 14px; }
+.admin-settings-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 20px; border: 1px solid var(--admin-line); border-radius: 17px; background: var(--admin-panel); color: var(--admin-ink); text-decoration: none; transition: border-color .15s, transform .15s, box-shadow .15s; }
+.admin-settings-card:hover { border-color: #b9c2b4; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(32, 38, 50, .06); }
+.admin-settings-card-icon { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px; background: #eef1e7; color: #4f6b2c; }
+.admin-settings-card-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.admin-settings-card-body strong { font: 700 16px var(--app-font-display, sans-serif); letter-spacing: -.03em; }
+.admin-settings-card-text { color: var(--admin-muted); font-size: 11px; line-height: 1.5; }
+.admin-settings-card-status { align-self: flex-start; margin-top: 4px; padding: 5px 8px; border-radius: 6px; background: #f0f2ec; color: #4d5a50; font: 700 10px var(--app-font-mono, monospace); }
+.admin-settings-card-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e6eae4; color: #6d7a70; font: 700 10px var(--app-font-mono, monospace); letter-spacing: .06em; text-transform: uppercase; }
+.admin-settings-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: #4d5e50; font-size: 12px; font-weight: 700; text-decoration: none; }
+.admin-settings-back:hover { text-decoration: underline; }
+.admin-settings-section-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 17px; }
+.admin-settings-section-head h2 { margin: 0; font: 700 20px var(--app-font-display, sans-serif); letter-spacing: -.04em; }
+.admin-settings-section-head p { margin: 5px 0 0; max-width: 640px; color: var(--admin-muted); font-size: 12px; line-height: 1.5; }
