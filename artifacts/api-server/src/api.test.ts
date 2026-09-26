@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { memorySignInRepo } from "./lib/signIns";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -89,7 +90,7 @@ async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits
   inbox = memoryInboxRepo();
   providerCalls = []; providerReplies = {};
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, fetchImpl: providerFetch, limits }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, limits }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -641,12 +642,12 @@ describe("notifications, team activity, and the audit log", () => {
     const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
     await post(`/applications/${application.id}/approve`, { version: v, award: 3000 });
     const mine = await notes();
-    expect(mine.map((n: { title: string }) => n.title)).toEqual(["Creative Practice was approved", "Creative Practice is under review", "Identity verified"]);
+    expect(mine.map((n: { title: string }) => n.title)).toEqual(["Creative Practice was approved", "Creative Practice is under review", "Creative Practice application received", "Identity verified", "Identity check in progress"]);
     expect(await notes("tok-applicant")).toEqual([]);
     expect((await post(`/notifications/${mine[0].id}/read`, {}, "tok-applicant")).status).toBe(404);
     expect((await post(`/notifications/${mine[0].id}/read`, {}, "tok-maya")).status).toBe(200);
     expect((await notes())[0].read).toBe(true);
-    expect((await json(await post("/notifications/read-all", {}, "tok-maya"))).message).toMatch(/2 notifications/);
+    expect((await json(await post("/notifications/read-all", {}, "tok-maya"))).message).toMatch(/4 notifications/);
   });
 
   it("tells applicants holding drafts when a program closes", async () => {
@@ -937,6 +938,55 @@ describe("email", () => {
     expect(outbox.rows.length).toBe(before);
   });
 
+  it("emails the applicant about their own actions: deposits, payouts, applications, identity, cards, and password changes", async () => {
+    await call("/profile", "tok-maya");
+    const subjects = () => outbox.rows.filter(r => r.to === "maya@example.com").map(r => r.subject);
+    await post("/money/deposits", { amount: 300, method: "bank" }, "tok-maya");
+    expect(subjects()).toContain("Deposit pending");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    expect(subjects()).toContain("Identity check in progress");
+    await post("/money/cards/freeze", {}, "tok-maya");
+    expect(subjects()).toContain("Virtual card frozen");
+    await post("/money/cards/freeze", {}, "tok-maya");
+    expect(subjects()).toContain("Virtual card unfrozen");
+    await post("/money/cards/limit", { card: "virtual", limit: 400 }, "tok-maya");
+    expect(subjects()).toContain("Virtual card spending limit lowered");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    await submitApp({ grantId: "creative", application: input }, "tok-maya");
+    expect(subjects()).toContain("Creative Practice application received");
+    // Security notices go out even with email copies turned off.
+    await put("/profile/email-preference", { enabled: false }, "tok-maya");
+    const before = outbox.rows.length;
+    await post("/money/cards/freeze", {}, "tok-maya");
+    expect(outbox.rows.length).toBe(before);
+    expect((await post("/profile/password-changed", {}, "tok-maya")).status).toBe(200);
+    expect(outbox.rows.at(-1)).toMatchObject({ subject: "Password changed", to: "maya@example.com" });
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Password changed");
+  });
+
+  it("alerts on sign-ins: applicants in the app every time and by email for a new device; staff by email for a new device", async () => {
+    const DEVICE = "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55";
+    const signIn = (token: string, deviceId: string) => call("/sign-ins", token, { method: "POST", body: JSON.stringify({ deviceId }), headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36" } });
+    expect((await signIn("tok-maya", "short")).status).toBe(400);
+    await put("/profile/email-preference", { enabled: false }, "tok-maya");
+    expect(await json(await signIn("tok-maya", DEVICE))).toEqual({ recorded: true, newDevice: true });
+    const first = outbox.rows.filter(r => r.to === "maya@example.com" && r.subject === "New device signed in");
+    expect(first).toHaveLength(1); // sent even with email copies off
+    expect(first[0]!.text).toContain("Chrome on Windows");
+    expect(await json(await signIn("tok-maya", DEVICE))).toEqual({ recorded: true, newDevice: false });
+    const notes = (await json(await call("/notifications", "tok-maya"))).map((n: { title: string }) => n.title);
+    expect(notes.slice(0, 2)).toEqual(["Signed in", "New device signed in"]);
+    expect(outbox.rows.filter(r => r.to === "maya@example.com" && /sign/i.test(r.subject))).toHaveLength(1);
+
+    expect(await json(await signIn("tok-super", DEVICE))).toEqual({ recorded: true, newDevice: true });
+    expect(outbox.rows.at(-1)).toMatchObject({ kind: "security", to: "sam@example.org", subject: expect.stringContaining("staff account") });
+    const count = outbox.rows.length;
+    await signIn("tok-super", DEVICE);
+    expect(outbox.rows.length).toBe(count);
+    // The same browser id on another account is a new device there (ids are hashed per account).
+    expect((await json(await signIn("tok-applicant", DEVICE))).newDevice).toBe(true);
+  });
+
   it("emails new staff members how to sign in", async () => {
     await post("/staff", { email: "Casey@Example.org", name: "Casey <b>Brooks</b>", role: "reviewer" });
     const invite = outbox.rows.find(r => r.kind === "staff-invite")!;
@@ -1073,7 +1123,7 @@ describe("two-step sign-in", () => {
 
   it("can be switched off for staff (STAFF_MFA_REQUIRED=false)", async () => {
     await new Promise(r => server.close(r));
-    server = createApp({ verifier, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, fetchImpl: providerFetch, staffMfa: false }, ["https://app.example.org"]).listen(0);
+    server = createApp({ verifier, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, staffMfa: false }, ["https://app.example.org"]).listen(0);
     await new Promise(r => server.once("listening", r));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
     expect((await call("/applications", "tok-super-password-only")).status).toBe(200);

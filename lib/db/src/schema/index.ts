@@ -26,3 +26,4 @@ export * from "./money";
 export * from "./documents";
 export * from "./email";
 export * from "./mail";
+export * from "./signIns";

@@ -6,7 +6,7 @@ import { logger } from "./logger";
 // With RESEND_API_KEY unset, the worker marks queued mail "skipped" rather than
 // letting it pile up, so turning email on later doesn't send a stale backlog.
 
-export type EmailKind = "notification" | "staff-invite";
+export type EmailKind = "notification" | "staff-invite" | "security";
 export type NewEmail = { kind: EmailKind; to: string; subject: string; text: string; html: string };
 
 export type OutboxStatus = "queued" | "sending" | "sent" | "failed" | "skipped";

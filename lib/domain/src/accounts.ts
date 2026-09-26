@@ -103,7 +103,8 @@ export function submitKyc(state: DemoState, input: KycInput, now: Date): Result 
     kyc: { status: 'Pending', documentType: input.documentType, documentLast4: number.slice(-4).toUpperCase(), nameOnDocument: input.nameOnDocument.trim(), submittedAt: now.toISOString() },
   });
   const logged = logStaff(submitted, { kind: 'account', title: 'Identity check submitted', body: `${state.profile.name} · ${input.documentType}`, href: '/admin/security' }, now);
-  return { ok: true, message: 'Identity details submitted. The compliance team will review them (demo — no document is uploaded).', state: alertIfHighRisk(state, logged, CURRENT_APPLICANT_ID, now) };
+  const notified = notify(logged, CURRENT_APPLICANT_ID, 'Identity check in progress', "We received your identity details. The compliance team will review them and let you know the outcome.", '/settings', now);
+  return { ok: true, message: 'Identity details submitted. The compliance team will review them (demo — no document is uploaded).', state: alertIfHighRisk(state, notified, CURRENT_APPLICANT_ID, now) };
 }
 
 function loadPendingKyc(state: DemoState, applicantId: string) {
@@ -144,4 +145,11 @@ export function requestReverification(state: DemoState, applicantId: string, rea
   const next = notify(patchAccount(patchApplicant(state, applicantId, { identityVerified: false }), applicantId, { kyc }), applicantId,
     'Please verify your identity again', `${reason.trim()} Until then, you can't start new applications.`, '/settings', now);
   return { ok: true, id: applicantId, message: `${person.name} must verify their identity again.`, state: next };
+}
+
+/** The applicant changed their password (reported by the portal after Supabase accepted it), so they're told by email too. */
+export function recordPasswordChange(state: DemoState, now: Date): Result {
+  const next = notify(state, CURRENT_APPLICANT_ID, 'Password changed',
+    "Your password was just changed. If this wasn't you, reset your password now and contact the grant team.", '/settings', now);
+  return { ok: true, message: 'Password change recorded.', state: next };
 }

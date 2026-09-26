@@ -1,4 +1,5 @@
 import { createApp } from "./app";
+import { dbSignInRepo } from "./lib/signIns.db";
 import { supabaseVerifier } from "./lib/auth";
 import { logger } from "./lib/logger";
 import { ensureInitialSuperAdmin } from "./lib/staffRepo";
@@ -62,7 +63,7 @@ startEmailWorker(dbEmailOutbox, async () => mailerFor(effectiveConfig(await emai
 const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
-  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, emailSettings, inbox: dbInboxRepo,
+  documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, emailSettings, inbox: dbInboxRepo, signIns: dbSignInRepo,
   staffMfa: process.env["STAFF_MFA_REQUIRED"] !== "false",
 });
 

@@ -10,7 +10,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 export async function writeEffects(tx: Tx, effects: Effects): Promise<void> {
   if (effects.notifications.length) {
-    await tx.insert(notificationsTable).values(effects.notifications.map(n => ({ ...n, at: new Date(n.at) })));
+    await tx.insert(notificationsTable).values(effects.notifications.map(({ email: _email, ...n }) => ({ ...n, at: new Date(n.at) })));
   }
   // Email copies of notifications (for applicants who want them) and explicit emails, queued for the worker.
   const ids = [...new Set(effects.notifications.map(n => n.applicantId))];

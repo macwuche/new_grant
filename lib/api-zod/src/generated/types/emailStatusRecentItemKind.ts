@@ -12,4 +12,5 @@ export type EmailStatusRecentItemKind = typeof EmailStatusRecentItemKind[keyof t
 export const EmailStatusRecentItemKind = {
   notification: 'notification',
   'staff-invite': 'staff-invite',
+  security: 'security',
 } as const;

@@ -11,7 +11,7 @@ export const emailStatusEnum = pgEnum("email_status", ["queued", "sending", "sen
 
 export const emailOutboxTable = pgTable("email_outbox", {
   seq: bigserial("seq", { mode: "number" }).primaryKey(),
-  kind: text("kind").$type<"notification" | "staff-invite">().notNull(),
+  kind: text("kind").$type<"notification" | "staff-invite" | "security">().notNull(),
   toAddress: text("to_address").notNull(),
   subject: text("subject").notNull(),
   textBody: text("text_body").notNull(),

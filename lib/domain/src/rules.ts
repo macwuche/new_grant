@@ -2,6 +2,7 @@ import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant
 import { fail, nextIds, roundCents, usd } from './core';
 import { logStaff } from './activity';
 import { accountLockReason } from './applicants';
+import { notify } from './notifications';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // Pure business rules. Everything here takes state in and returns state out so it
@@ -181,7 +182,9 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
     body: `${state.profile.name} · ${grant.name} · $${input.requestedAmount.toLocaleString('en-US')}`,
     href: '/admin/applications',
   }, now);
-  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.${fee > 0 ? ` ${usd(fee)} application fee charged to your deposit balance.` : ''}`, state: logged };
+  const notified = notify(logged, CURRENT_APPLICANT_ID, `${grant.name} application ${resubmission ? 'resubmitted' : 'received'}`,
+    `Your application ${id} for ${usd(input.requestedAmount)} is pending review.${fee > 0 ? ` A ${usd(fee)} application fee was charged to your deposit balance.` : ''} We'll let you know when a reviewer picks it up and when there's a decision.`, `/applications/${id}`, now);
+  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.${fee > 0 ? ` ${usd(fee)} application fee charged to your deposit balance.` : ''}`, state: notified };
 }
 
 export function deleteDraft(state: DemoState, id: string): Result {

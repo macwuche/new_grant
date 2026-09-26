@@ -1,4 +1,4 @@
-import { completeCredentialReset } from '@workspace/api-client-react';
+import { completeCredentialReset, reportPasswordChanged } from '@workspace/api-client-react';
 import { AppNameText, brandLetter, useAppName, Wordmark } from '@/lib/appName';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -484,6 +484,8 @@ export function ResetPasswordPage() {
     if (problem) { setResult({ tone: 'error', text: problem }); return; }
     // If the grant team required a new password, this completes it (the server checks this session came from the reset email).
     await completeCredentialReset({ kind: 'password' }).catch(() => {});
+    // Tells the applicant (in the app and by email) that their password changed.
+    await reportPasswordChanged().catch(() => {});
     setResult({ tone: 'info', text: 'Password updated. Taking you to your workspace…' });
     window.setTimeout(() => setLocation('/', { replace: true }), 1200);
   };

@@ -57,7 +57,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 ## Gotchas
 
 - New tables must call `.enableRLS()`.
-- `email_settings.app_name` (the application name) has been pushed to Replit's database only: push the schema to Supabase when `SUPABASE_DATABASE_URL` is set, before starting the API there.
+- `email_settings.app_name` and the `sign_in_devices` table have been pushed to Replit's database only: push the schema to Supabase when `SUPABASE_DATABASE_URL` is set, before starting the API there.
 - `jsonb` reorders object keys, and Postgres timestamps have microseconds: storage code rebuilds nested objects in the domain's key order and compares versions at millisecond precision.
 - An empty `description:` in the OpenAPI spec makes orval fail and empty the generated folders.
 - The workspace sees the Supabase URL and keys but not the `SUPABASE_DATABASE_URL` secret; add it under Tools → Secrets in this workspace and restart (see `work.md` §6).

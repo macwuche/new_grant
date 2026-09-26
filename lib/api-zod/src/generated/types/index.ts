@@ -122,6 +122,8 @@ export * from './programStatus';
 export * from './programUpdate';
 export * from './programVersion';
 export * from './reason';
+export * from './signInReport';
+export * from './signInResult';
 export * from './signupEmailSetting';
 export * from './signupEmailSettingInput';
 export * from './signupEmailSettingSmtp';

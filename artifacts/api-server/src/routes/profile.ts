@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
 import { CompleteCredentialResetBody, GetProfileResponse, SubmitIdentityCheckBody, UpdateProfileBody } from "@workspace/api-zod";
-import { completeCredentialReset, submitKyc } from "@workspace/domain/accounts";
+import { completeCredentialReset, recordPasswordChange, submitKyc } from "@workspace/domain/accounts";
 import type { DemoState, Result } from "@workspace/domain/model";
 import { validateProfile } from "@workspace/domain/rules";
 import type { AuthUser } from "../lib/auth";
@@ -111,6 +111,12 @@ export function profileRouter(repo: ProfileRepo, documents: DocumentRepo): IRout
     const proof = resetProof(user, record, body.data.kind);
     if (proof) { res.status(400).json({ error: proof }); return; }
     await ownRule(res, s => completeCredentialReset(s, body.data.kind));
+  });
+
+  // The portal reports a password change after Supabase accepted it, so the applicant gets a notification
+  // and an email copy. It only ever notifies the signed-in account's own address.
+  router.post("/profile/password-changed", async (_req, res) => {
+    await ownRule(res, s => recordPasswordChange(s, new Date()));
   });
 
   return router;

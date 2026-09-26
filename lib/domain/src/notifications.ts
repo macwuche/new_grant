@@ -12,6 +12,9 @@ export function notify(state: DemoState, applicantId: string, title: string, bod
   return { ...state, nextId: ids.nextId, notifications: [notification, ...state.notifications] };
 }
 
+/** Security notices: their email copies are sent even to applicants who turned email copies off. */
+export const SECURITY_NOTICE_TITLES: ReadonlySet<string> = new Set(['Password changed', 'Password reset required', 'Set up two-step sign-in again', 'New device signed in']);
+
 /** The signed-in demo applicant's notifications, newest first. */
 export const ownNotifications = (state: DemoState) => state.notifications
   .filter(n => n.applicantId === CURRENT_APPLICANT_ID)

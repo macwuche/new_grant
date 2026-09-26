@@ -50,7 +50,8 @@ export function requestDeposit(state: DemoState, amount: number, methodId: Depos
     title: `${highValue ? 'High-value deposit' : 'Deposit'} announced: ${usd(amount)}`,
     body: `${state.profile.name} · ${method.name} · reference ${tx.reference}`, href: '/admin/deposits',
   }, now);
-  return { ok: true, id: tx.id, message: `Deposit ${tx.reference} recorded. Send ${usd(amount)} with that reference; it's added once finance confirms it arrived.`, state: alertIfHighRisk(state, next, CURRENT_APPLICANT_ID, now) };
+  const notified = notify(next, CURRENT_APPLICANT_ID, 'Deposit pending', `We're waiting for your ${usd(amount)} deposit by ${method.name}. Send it with reference ${tx.reference}; we'll let you know once finance confirms it arrived.`, '/deposits', now);
+  return { ok: true, id: tx.id, message: `Deposit ${tx.reference} recorded. Send ${usd(amount)} with that reference; it's added once finance confirms it arrived.`, state: alertIfHighRisk(state, notified, CURRENT_APPLICANT_ID, now) };
 }
 
 export function cancelDeposit(state: DemoState, txId: string, now: Date): Result {

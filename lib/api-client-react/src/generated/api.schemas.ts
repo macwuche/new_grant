@@ -129,6 +129,16 @@ export interface SignupEmailSetting {
   error?: string;
 }
 
+export interface SignInReport {
+  /** A random id this browser keeps for sign-in alerts */
+  deviceId: string;
+}
+
+export interface SignInResult {
+  recorded: boolean;
+  newDevice: boolean;
+}
+
 export interface Branding {
   appName: string;
   isDefault: boolean;
@@ -256,6 +266,7 @@ export type EmailStatusRecentItemKind = typeof EmailStatusRecentItemKind[keyof t
 export const EmailStatusRecentItemKind = {
   notification: 'notification',
   'staff-invite': 'staff-invite',
+  security: 'security',
 } as const;
 
 export type EmailStatusRecentItem = {

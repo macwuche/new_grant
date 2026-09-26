@@ -51,6 +51,10 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **Application name (26 Sep 2026):** super admins rename the app in Settings → Application name; the name is stored on the server (`email_settings.app_name`) and used in every wordmark, page title, sign-in page (public `GET /api/branding`), email, Supabase sign-in email wording (after **Reapply**), and as the authenticator issuer for new two-step setups. Demo mode keeps a browser-only preview. The column is pushed to Replit's database; **run `pnpm --filter @workspace/db run push` against Supabase once `SUPABASE_DATABASE_URL` is set**, or the API can't read its email settings there. 1 new API test.
 
+**Applicant action emails (26 Sep 2026):** applicants now also get a notification, and its email copy, for their own actions: deposit pending, payout requested, application received or resubmitted (pending review), identity check in progress, physical card ordered, virtual card frozen or unfrozen, card spending limit raised or lowered, and password changed (reported by the reset-password page after Supabase accepts the new password; `POST /api/profile/password-changed`). Staff outcomes were already covered: deposit received or not credited, payout sent or failed, application under review, approved, changes requested, or declined, identity verified, rejected, or asked again, tier changes, locks. Security notices (password changed, password or two-step reset required) are emailed even when the applicant turned email copies off. There's no separate card-funding action: cards spend from the deposit balance, so "Deposit received" covers it. 1 new API test.
+
+**Sign-in alerts (26 Sep 2026):** after a completed password sign-in (two-step included) the portal reports it with a random id the browser keeps (`POST /api/sign-ins`); the server stores only a per-account hash in `sign_in_devices` (row-level security on). Applicants see every sign-in in the bell ("Signed in", no email) and get an email for a new device ("New device signed in", sent even with email copies off); active staff get an email for a new device. Each alert names the browser and system and the IP address. Forgotten-password emails remain Supabase's own (see the unresolved item above); our "Password changed" email follows the reset. `sign_in_devices` is pushed to Replit's database only. 1 new API test.
+
 **Hardening (26 Sep 2026):** every API response carries security headers (no caching, no framing, no sniffing, no referrer, HSTS, a deny-all content policy) and the API is rate-limited: 300 requests and 60 changes a minute per signed-in user, 30 uploads per 10 minutes per user, and 30 failed sign-in checks per 10 minutes per address (successful requests from a shared address don't count). Limits are counted in the API process's memory, so they're per instance. 4 new API tests.
 
 14. **Real financial operations — Not started**
@@ -58,12 +62,14 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 ## Not yet implemented
 
+- **Unresolved (paused 26 Sep 2026): Supabase sign-in emails through Resend.** The buttons are built, but no Supabase access token has been saved yet, so sign-up verification, **Use Resend**, and the app's email wording haven't been applied to the real project. Next: create a scoped Project token (this project only, Auth read & write, 7 days), save it in Settings → Email connection, press the three controls, then remove the token.
+
 - Live check with a real Supabase sign-in: the running app can't reach its Supabase database yet (`SUPABASE_DATABASE_URL` is missing from the workspace's secrets), so everything since phase 11 has been tested against the real database with a stand-in for sign-in only.
 - A payment provider: deposits are confirmed and payouts marked paid by finance by hand, cards are fictional, and receiving details are fictional (phase 14).
 - Real risk signals (sign-in location, device), an automated identity-verification provider (staff review uploaded documents by hand), SMS and push, and downloading received email attachments in the app (outgoing email and the team inbox are built and wait on the Resend key; phase 13).
 - Recovery codes for two-step sign-in.
 - Removing a lost authenticator from the app (needs a Supabase service-role key; today a Supabase admin does it in the dashboard).
-- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 96 API tests).
+- Committed end-to-end, accessibility, and security test suites (unit tests exist: 157 rule tests in 14 files and 98 API tests).
 
 ## Frontend foundation
 

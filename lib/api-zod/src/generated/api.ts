@@ -661,6 +661,55 @@ export const SubmitIdentityCheckResponse = zod.object({
 
 
 /**
+ * Called by the portal after sign-in (and two-step, when needed). Applicants get an in-app notice every time and an email for a new device; staff get an email for a new device.
+ * @summary Record a completed sign-in from this browser
+ */
+export const ReportSignInBody = zod.object({
+  "deviceId": zod.string().describe('A random id this browser keeps for sign-in alerts')
+})
+
+export const ReportSignInResponse = zod.object({
+  "recorded": zod.boolean(),
+  "newDevice": zod.boolean()
+})
+
+
+/**
+ * Called by the portal after Supabase accepted a new password. Notifies the applicant in the app and by email.
+ * @summary Record that the applicant changed their password
+ */
+export const ReportPasswordChangedResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+})
+}).describe('Staff-managed controls on an applicant account')
+})
+
+
+/**
  * Records that you chose a new password or set up two-step sign-in again.
  * @summary Confirm a reset the grant team asked for
  */
@@ -3361,7 +3410,7 @@ export const GetEmailStatusResponse = zod.object({
 }),
   "recent": zod.array(zod.object({
   "seq": zod.number().int(),
-  "kind": zod.enum(['notification', 'staff-invite']),
+  "kind": zod.enum(['notification', 'staff-invite', 'security']),
   "to": zod.string(),
   "subject": zod.string(),
   "status": zod.enum(['queued', 'sending', 'sent', 'failed', 'skipped']),

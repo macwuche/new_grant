@@ -374,6 +374,44 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Stale"
+  /sign-ins:
+    post:
+      operationId: reportSignIn
+      tags: [profile]
+      summary: Record a completed sign-in from this browser
+      description: Called by the portal after sign-in (and two-step, when needed). Applicants get an in-app notice every time and an email for a new device; staff get an email for a new device.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInReport"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /profile/password-changed:
+    post:
+      operationId: reportPasswordChanged
+      tags: [profile]
+      summary: Record that the applicant changed their password
+      description: Called by the portal after Supabase accepted a new password. Notifies the applicant in the app and by email.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /profile/credential-reset:
     post:
       operationId: completeCredentialReset
@@ -2228,6 +2266,17 @@ components:
         appTemplates: { type: boolean }
         error: { type: string }
       required: [connected, emailConfirmation]
+    SignInReport:
+      type: object
+      properties:
+        deviceId: { type: string, description: A random id this browser keeps for sign-in alerts }
+      required: [deviceId]
+    SignInResult:
+      type: object
+      properties:
+        recorded: { type: boolean }
+        newDevice: { type: boolean }
+      required: [recorded, newDevice]
     Branding:
       type: object
       properties:
@@ -2339,7 +2388,7 @@ components:
                 type: integer
               kind:
                 type: string
-                enum: [notification, staff-invite]
+                enum: [notification, staff-invite, security]
               to:
                 type: string
               subject:

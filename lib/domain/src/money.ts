@@ -3,6 +3,7 @@ import { fail, nextIds, roundCents, usd } from './core';
 import { alertIfHighRisk, logStaff } from './activity';
 import { accountLockReason, patchAccount } from './applicants';
 import { computeBalances, ownTransactions } from './rules';
+import { notify } from './notifications';
 import { lockdownMessage } from './security';
 import { CURRENT_APPLICANT_ID } from './seed';
 
@@ -57,7 +58,8 @@ export function requestWithdrawal(state: DemoState, amount: number, channelId: C
   const logged = logStaff({ ...state, nextId: ids.nextId, transactions: [tx, ...state.transactions] }, {
     kind: 'withdrawal', highlight: !!tx.dualControl, title: `Payout request ${tx.id}${tx.dualControl ? ' (needs two sign-offs)' : ''}`, body: `${state.profile.name} · ${usd(amount)} via ${channel.name}`, href: '/admin/payouts',
   }, now);
-  return { ok: true, id: tx.id, message: `Payout request ${tx.id} recorded as pending.`, state: alertIfHighRisk(state, logged, CURRENT_APPLICANT_ID, now) };
+  const notified = notify(logged, CURRENT_APPLICANT_ID, 'Payout requested', `Your ${usd(amount)} payout to ${channel.name} (${tx.id}) is pending${tx.fee ? `; a ${usd(tx.fee)} fee applies` : ''}. We'll let you know when it's sent.`, '/withdrawals', now);
+  return { ok: true, id: tx.id, message: `Payout request ${tx.id} recorded as pending.`, state: alertIfHighRisk(state, notified, CURRENT_APPLICANT_ID, now) };
 }
 
 /** The applicant may withdraw a request finance hasn't processed yet; the held amount returns. */
@@ -88,22 +90,29 @@ export function validateCardLimit(state: DemoState, amount: number): string | nu
   return null;
 }
 
-export function setCardLimit(state: DemoState, card: 'virtual' | 'physical', amount: number): Result {
+export function setCardLimit(state: DemoState, card: 'virtual' | 'physical', amount: number, now = new Date()): Result {
   const locked = accountLockReason(state);
   if (locked) return fail(locked);
   if (card === 'physical' && state.cards.physical.status !== 'Requested') return fail('Request a physical card first.');
   const error = validateCardLimit(state, amount);
   if (error) return fail(error, { limit: error });
   if (state.cards[card].dailyLimit === amount) return fail('That is already the daily limit.');
+  const label = card === 'virtual' ? 'Virtual' : 'Physical';
+  const previous = state.cards[card].dailyLimit;
   const cards = { ...state.cards, [card]: { ...state.cards[card], dailyLimit: amount } };
-  return { ok: true, message: `${card === 'virtual' ? 'Virtual' : 'Physical'} card daily limit set to ${usd(amount)}.`, state: { ...state, cards } };
+  const next = notify({ ...state, cards }, CURRENT_APPLICANT_ID, `${label} card spending limit ${amount > previous ? 'raised' : 'lowered'}`,
+    `Your ${label.toLowerCase()} card can now spend up to ${usd(amount)} a day (was ${usd(previous)}). If you didn't make this change, freeze the card and contact the grant team.`, '/cards', now);
+  return { ok: true, message: `${label} card daily limit set to ${usd(amount)}.`, state: next };
 }
 
-export function toggleCardFreeze(state: DemoState): Result {
+export function toggleCardFreeze(state: DemoState, now = new Date()): Result {
   const frozen = !state.cards.virtual.frozen;
   const locked = accountLockReason(state);
   if (locked && !frozen) return fail(locked);
-  return { ok: true, message: frozen ? 'Virtual card frozen.' : 'Virtual card unfrozen.', state: { ...state, cards: { ...state.cards, virtual: { ...state.cards.virtual, frozen } } } };
+  const next = notify({ ...state, cards: { ...state.cards, virtual: { ...state.cards.virtual, frozen } } }, CURRENT_APPLICANT_ID,
+    frozen ? 'Virtual card frozen' : 'Virtual card unfrozen',
+    frozen ? 'Your virtual card is frozen, so no payments can be made with it until you unfreeze it.' : "Your virtual card is active again. If you didn't unfreeze it, freeze it now and contact the grant team.", '/cards', now);
+  return { ok: true, message: frozen ? 'Virtual card frozen.' : 'Virtual card unfrozen.', state: next };
 }
 
 /** Charges issuance + delivery to the deposit balance, which must still hold the reserve afterwards. */
@@ -120,7 +129,8 @@ export function requestPhysicalCard(state: DemoState, now: Date): Result {
   const next = logStaff({ ...state, nextId: ids.nextId, transactions: [fee, ...state.transactions], cards: { ...state.cards, physical: { ...state.cards.physical, status: 'Requested' } } }, {
     kind: 'card', title: 'Physical card requested', body: `${state.profile.name} · ${usd(total)} in fees charged`, href: '/admin/applicants',
   }, now);
-  return { ok: true, message: `Physical card requested. ${usd(total)} in fees deducted from your deposit balance.`, state: next };
+  const notified = notify(next, CURRENT_APPLICANT_ID, 'Physical card ordered', `Your physical card is on order. ${usd(total)} in card fees was charged to your deposit balance.`, '/cards', now);
+  return { ok: true, message: `Physical card requested. ${usd(total)} in fees deducted from your deposit balance.`, state: notified };
 }
 
 // ---------- Payout destinations ----------

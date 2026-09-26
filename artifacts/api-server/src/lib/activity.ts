@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { SECURITY_NOTICE_TITLES } from "@workspace/domain/notifications";
 import { recordAudit } from "@workspace/domain/audit";
 import type { AuditChange, DemoState, StaffMember } from "@workspace/domain/model";
 import { CURRENT_APPLICANT_ID } from "@workspace/domain/seed";
@@ -9,7 +10,8 @@ import { appUrl, notificationEmail, type NewEmail } from "./email";
 // their result; the audit entry is built with the same `recordAudit` the
 // browser uses. Repos write effects in the same transaction as the change.
 
-export type NewNotification = { applicantId: string; at: string; title: string; body: string; href: string };
+/** `email: false`: in-app only, no email copy (e.g. a sign-in from a known device). */
+export type NewNotification = { applicantId: string; at: string; title: string; body: string; href: string; email?: false };
 export type NewStaffEvent = { at: string; kind: "application" | "deposit" | "withdrawal" | "card" | "security" | "account"; title: string; body: string; href: string; highlight: boolean };
 export type NewAudit = {
   at: string; staffId: string; staffName: string; role: string; action: string; target: string;
@@ -21,11 +23,11 @@ export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffE
 /** Who a notification's email copy goes to; null or opted out means no email. */
 export type EmailRecipient = { email: string; name: string; emailNotifications: boolean };
 
-/** The emails a change sends: a copy of each notification to applicants who want them, plus any explicit emails. */
+/** The emails a change sends: a copy of each notification to applicants who want them (security notices always), plus any explicit emails. */
 export function emailsFor(effects: Effects, recipient: (applicantId: string) => EmailRecipient | null | undefined, baseUrl = appUrl()): NewEmail[] {
   const copies = effects.notifications.flatMap(n => {
     const to = recipient(n.applicantId);
-    return to?.emailNotifications && to.email ? [notificationEmail(n, to, baseUrl)] : [];
+    return n.email !== false && to?.email && (to.emailNotifications || SECURITY_NOTICE_TITLES.has(n.title)) ? [notificationEmail(n, to, baseUrl)] : [];
   });
   return [...copies, ...(effects.emails ?? [])];
 }
@@ -116,7 +118,7 @@ export function memoryActivity(email?: { outbox: { enqueue(emails: NewEmail[]): 
   return {
     write: effects => {
       if (email) email.outbox.enqueue(emailsFor(effects, email.recipient, "https://app.example.org"));
-      for (const n of effects.notifications) notifications.push({ ...n, seq: ++seq, read: false });
+      for (const { email: _email, ...n } of effects.notifications) notifications.push({ ...n, seq: ++seq, read: false });
       for (const e of effects.staffEvents) events.push({ ...e, seq: ++seq });
       for (const a of effects.audit) {
         const prevHash = audit.at(-1)?.hash ?? GENESIS_HASH;

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAppName } from './appName';
 import type { Session as AuthSession } from '@supabase/supabase-js';
-import { getMe, setAuthTokenGetter, type Me } from '@workspace/api-client-react';
+import { getMe, reportSignIn, setAuthTokenGetter, type Me } from '@workspace/api-client-react';
 import { supabase } from './supabase';
 
 // Sign-in state shared by the applicant portal and /admin. The browser holds the
@@ -62,6 +62,28 @@ function apiErrorMessage(err: unknown): string {
   return 'Couldn\'t load your staff access. Try again in a moment.';
 }
 
+// Sign-in alerts: a password sign-in sets a flag in this tab; once the session is complete (two-step
+// included) it's reported to the API with a random id this browser keeps, so the server can tell a
+// new device from a known one. Page loads of an existing session aren't reported.
+const SIGN_IN_FLAG = 'arc.fund.reportSignIn';
+const DEVICE_KEY = 'arc.fund.deviceId';
+const storage = <T,>(fn: () => T): T | null => { try { return fn(); } catch { return null; } };
+function browserDeviceId(): string {
+  const saved = storage(() => window.localStorage.getItem(DEVICE_KEY));
+  if (saved) return saved;
+  const id = crypto.randomUUID();
+  storage(() => window.localStorage.setItem(DEVICE_KEY, id));
+  return id;
+}
+async function reportSignInOnce(me: Me, accessToken: string) {
+  if (storage(() => window.sessionStorage.getItem(SIGN_IN_FLAG)) !== '1') return;
+  if (me.twoStep.enrolled && me.twoStep.level !== 'aal2') return; // reported after the code step
+  try {
+    const { recorded } = await reportSignIn({ deviceId: browserDeviceId() }, { headers: { authorization: `Bearer ${accessToken}` } });
+    if (recorded) storage(() => window.sessionStorage.removeItem(SIGN_IN_FLAG));
+  } catch { storage(() => window.sessionStorage.removeItem(SIGN_IN_FLAG)); }
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   // The name authenticator apps show for this account.
   const { name: appName } = useAppName();
@@ -89,6 +111,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const result = await getMe({ headers: { authorization: `Bearer ${session.access_token}` } });
       if (id !== request.current) return;
       setMe(result); setMeError(null); setStatus('signedIn');
+      void reportSignInOnce(result, session.access_token);
     } catch (err) {
       if (id !== request.current) return;
       if ((err as { status?: number }).status === 401) { await supabase?.auth.signOut(); return; }
@@ -112,6 +135,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     signIn: async (email, password) => {
       if (!supabase) return 'Sign-in isn\'t set up yet.';
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (!error) storage(() => window.sessionStorage.setItem(SIGN_IN_FLAG, '1'));
       return error ? authErrorMessage(error.message) : null;
     },
     signUp: async (email, password, details) => {

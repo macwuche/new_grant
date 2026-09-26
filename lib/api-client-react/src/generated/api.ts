@@ -76,6 +76,8 @@ import type {
   ProgramUpdate,
   ProgramVersion,
   Reason,
+  SignInReport,
+  SignInResult,
   SignupEmailSetting,
   SignupEmailSettingInput,
   StaffFeedItem,
@@ -1311,6 +1313,170 @@ export const useSubmitIdentityCheck = <TError = ErrorType<InvalidResponse | Unau
         TContext
       > => {
       return useMutation(getSubmitIdentityCheckMutationOptions(options));
+    }
+
+export const getReportSignInUrl = () => {
+
+
+
+
+  return `/api/sign-ins`
+}
+
+/**
+ * Called by the portal after sign-in (and two-step, when needed). Applicants get an in-app notice every time and an email for a new device; staff get an email for a new device.
+ * @summary Record a completed sign-in from this browser
+ */
+export const reportSignIn = async (signInReport: SignInReport, options?: Parameters<typeof customFetch>[1]): Promise<SignInResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SignInResult>(getReportSignInUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(signInReport)
+  }
+);}
+
+
+
+
+
+export const getReportSignInMutationKey = () => ['reportSignIn'] as const;
+
+export const getReportSignInMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSignIn>>, TError,ReportSignInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportSignIn>>, TError,ReportSignInMutationVariables, TContext> => {
+
+const mutationKey = getReportSignInMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportSignIn>>, ReportSignInMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  reportSignIn(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportSignInMutationResult = NonNullable<Awaited<ReturnType<typeof reportSignIn>>>
+    export type ReportSignInMutationBody = BodyType<SignInReport>
+    export type ReportSignInMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type ReportSignInMutationVariables = {data: BodyType<SignInReport>}
+
+    /**
+ * @summary Record a completed sign-in from this browser
+ */
+export const useReportSignIn = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSignIn>>, TError,ReportSignInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportSignIn>>,
+        TError,
+        ReportSignInMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReportSignInMutationOptions(options));
+    }
+
+export const getReportPasswordChangedUrl = () => {
+
+
+
+
+  return `/api/profile/password-changed`
+}
+
+/**
+ * Called by the portal after Supabase accepted a new password. Notifies the applicant in the app and by email.
+ * @summary Record that the applicant changed their password
+ */
+export const reportPasswordChanged = async ( options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+  return customFetch<Profile>(getReportPasswordChangedUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportPasswordChangedMutationKey = () => ['reportPasswordChanged'] as const;
+
+export const getReportPasswordChangedMutationOptions = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportPasswordChanged>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportPasswordChanged>>, TError,void, TContext> => {
+
+const mutationKey = getReportPasswordChangedMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportPasswordChanged>>, void> = () => {
+
+
+          return  reportPasswordChanged(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportPasswordChangedMutationResult = NonNullable<Awaited<ReturnType<typeof reportPasswordChanged>>>
+
+    export type ReportPasswordChangedMutationError = ErrorType<UnauthorizedResponse>
+
+
+    /**
+ * @summary Record that the applicant changed their password
+ */
+export const useReportPasswordChanged = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportPasswordChanged>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportPasswordChanged>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReportPasswordChangedMutationOptions(options));
     }
 
 export const getCompleteCredentialResetUrl = () => {
