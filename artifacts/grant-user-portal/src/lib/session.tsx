@@ -31,6 +31,13 @@ type Session = {
   sendReset: (email: string, path: string) => Promise<string | null>;
   setNewPassword: (password: string) => Promise<string | null>;
   reloadMe: () => void;
+  /** Verified authenticator apps on the account (from the Supabase session). */
+  factors: { id: string; name: string; createdAt: string }[];
+  /** Starts adding an authenticator app: a QR code and the secret to type in instead. */
+  startTwoStepSetup: () => Promise<{ factorId: string; qr: string; secret: string } | { error: string }>;
+  /** Checks a 6-digit code (for a new factor, or the account's first verified one) and upgrades the session. */
+  verifyTwoStep: (code: string, factorId?: string) => Promise<string | null>;
+  removeTwoStep: (factorId: string) => Promise<string | null>;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -61,6 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [recovery, setRecovery] = useState(false);
   const [accountName, setAccountName] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [factors, setFactors] = useState<Session['factors']>([]);
   const token = useRef<string | null>(null);
   const request = useRef(0);
 
@@ -70,6 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const fullName = session?.user.user_metadata?.['full_name'];
     setAccountName(typeof fullName === 'string' && fullName.trim() ? fullName.trim() : null);
     setAccountEmail(session?.user.email ?? null);
+    setFactors((session?.user.factors ?? []).filter(f => f.status === 'verified').map(f => ({ id: f.id, name: f.friendly_name ?? 'Authenticator app', createdAt: f.created_at })));
     if (!session) { setMe(null); setMeError(null); setStatus('signedOut'); return; }
     setStatus('loading');
     try {
@@ -131,6 +140,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return error ? authErrorMessage(error.message) : null;
     },
     reloadMe: () => { void supabase?.auth.getSession().then(({ data }) => loadMe(data.session)); },
+    factors,
+    startTwoStepSetup: async () => {
+      if (!supabase) return { error: 'Sign-in isn\'t set up yet.' };
+      // Setups that were started but never confirmed would block a new one; clear them first.
+      const { data: list } = await supabase.auth.mfa.listFactors();
+      for (const f of list?.all ?? []) if (f.status === 'unverified') await supabase.auth.mfa.unenroll({ factorId: f.id });
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Authenticator ${new Date().toISOString().slice(0, 16).replace('T', ' ')}` });
+      if (error || !data) return { error: authErrorMessage(error?.message ?? 'Couldn\'t start the setup.') };
+      return { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
+    },
+    verifyTwoStep: async (code, factorId) => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const id = factorId ?? factors[0]?.id;
+      if (!id) return 'Set up an authenticator app first.';
+      const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: id, code: code.replace(/\s/g, '') });
+      if (error) return /invalid|expired/i.test(error.message) ? 'That code didn\'t work. Check your authenticator app and try the current code.' : authErrorMessage(error.message);
+      // The verified session arrives through onAuthStateChange (MFA_CHALLENGE_VERIFIED).
+      return null;
+    },
+    removeTwoStep: async factorId => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const { error } = await supabase.auth.mfa.unenroll({ factorId });
+      if (error) return authErrorMessage(error.message);
+      const { data } = await supabase.auth.refreshSession();
+      await loadMe(data.session);
+      return null;
+    },
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

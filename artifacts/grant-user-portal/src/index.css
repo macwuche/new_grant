@@ -370,4 +370,6 @@ button { cursor: pointer; }
 .settings-layout > aside { position: sticky; top: 16px; }
 @media (max-width: 820px) { .detail-layout.settings-layout { grid-template-columns: minmax(0, 1fr); } .settings-layout > aside { position: static; } }
 /* Shown while checking the applicant's session. */
+.gate-two-step { min-height: 70vh; display: grid; place-items: center; padding: 24px 16px; }
+.gate-two-step > .card { width: min(420px, 100%); }
 .gate-loading { min-height: 60vh; display: flex; align-items: center; justify-content: center; gap: 10px; color: hsl(var(--muted)); font-size: 13px; }

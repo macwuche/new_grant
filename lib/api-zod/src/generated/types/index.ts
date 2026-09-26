@@ -72,6 +72,8 @@ export * from './listDocumentsParams';
 export * from './lockdown';
 export * from './me';
 export * from './message';
+export * from './meTwoStep';
+export * from './meTwoStepLevel';
 export * from './meUser';
 export * from './moneyResult';
 export * from './moneySettings';

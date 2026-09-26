@@ -5,12 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MeTwoStep } from './meTwoStep';
 import type { MeUser } from './meUser';
 import type { StaffMember } from './staffMember';
 
 export interface Me {
   user: MeUser;
   staff: StaffMember | null;
-  /** Staff permissions for this user (empty for applicants) */
+  /** Staff permissions for this user (empty for applicants, and for staff until two-step sign-in is done) */
   permissions: string[];
+  /** The session's two-step sign-in state. Staff access needs level aal2 when requiredForStaff; anyone enrolled needs aal2 for everything except this endpoint. */
+  twoStep: MeTwoStep;
 }

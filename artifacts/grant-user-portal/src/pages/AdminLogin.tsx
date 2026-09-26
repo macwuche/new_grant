@@ -5,6 +5,7 @@ import { ROLE_LABELS } from '@workspace/authz';
 import { adoptSessionStaff } from '@workspace/domain/staff';
 import { useDemoStore } from '@/lib/store';
 import { useSession } from '@/lib/session';
+import { TwoStepCodeForm, TwoStepSetupForm } from '@/components/TwoStep';
 import './AuthPages.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -165,7 +166,10 @@ export function AdminGate({ children }: { children: ReactNode }) {
   const session = useSession();
   const { state, run } = useDemoStore();
   const staff = session.me?.staff;
-  const allowed = session.status === 'signedIn' && !!staff?.active;
+  const twoStep = session.me?.twoStep;
+  // Staff need a two-step session (when the server requires it for staff, or once they've set it up).
+  const needsTwoStep = session.status === 'signedIn' && !!staff?.active && !!twoStep && twoStep.level !== 'aal2' && (twoStep.requiredForStaff || twoStep.enrolled);
+  const allowed = session.status === 'signedIn' && !!staff?.active && !needsTwoStep;
   useEffect(() => {
     if (allowed && staff) run(s => adoptSessionStaff(s, { id: staff.id, name: staff.name, role: staff.role }));
   }, [allowed, staff?.id, staff?.name, staff?.role, run]);
@@ -173,6 +177,13 @@ export function AdminGate({ children }: { children: ReactNode }) {
   if (session.status === 'unconfigured') return <>{children}</>;
   if (session.status === 'loading') return <div className="admin-gate-loading" role="status" data-testid="status-admin-gate-loading"><LoaderCircle size={22} className="auth-spin" aria-hidden="true" /> Checking your staff access…</div>;
   if (session.status === 'signedOut') return <Redirect to="/admin/login" replace />;
+  if (needsTwoStep) return <StaffFrame serial="01 / TWO-STEP" title={<>One more <em>step.</em></>}><div className="auth-form-wrap" data-testid="panel-admin-two-step">
+    <div className="auth-eyebrow"><ShieldCheck size={13} aria-hidden="true" style={{ display: 'inline', verticalAlign: '-2px' }} /> Two-step sign-in</div>
+    {twoStep!.enrolled
+      ? <><h1>Enter your code.</h1><p className="auth-lede">Open your authenticator app and enter the current code for arc.fund.</p><TwoStepCodeForm /></>
+      : <><h1>Protect your staff account.</h1><p className="auth-lede">Staff access needs two-step sign-in: your password plus a code from an authenticator app. Set it up once; you'll enter a code each time you sign in.</p><TwoStepSetupForm /></>}
+    <p className="auth-aside"><button type="button" className="auth-inline-link auth-link-button" onClick={() => void session.signOut()} data-testid="button-admin-two-step-signout">Sign out</button></p>
+  </div></StaffFrame>;
   if (!allowed) return <StaffFrame serial="00 / NO ACCESS" title={<>This area is for <em>the grant team.</em></>}><div className="auth-form-wrap"><h1>You can't open the team workspace.</h1><NoAccessMessage /><p className="auth-aside"><Link href="/" className="auth-inline-link">Go to the applicant workspace</Link></p></div></StaffFrame>;
   if (state.actingStaffId !== staff!.id) return <div className="admin-gate-loading" role="status"><LoaderCircle size={22} className="auth-spin" aria-hidden="true" /> Opening your workspace…</div>;
   return <>{children}</>;

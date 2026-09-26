@@ -20,6 +20,7 @@ import * as api from '@workspace/api-client-react';
 import { ServerDataProvider, apiError, useMoneyAction, useServerData, type Outcome as MoneyOutcome } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
 import { DocumentFiles, UploadButton, useMyDocuments } from './lib/documents';
+import { TwoStepCodeForm, TwoStepSetupForm } from './components/TwoStep';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
@@ -88,6 +89,12 @@ function ApplicantGate({ children }: { children: ReactNode }) {
   if (session.status === 'unconfigured') return <>{children}</>;
   if (session.status === 'signedOut') return <Redirect to={`/login?next=${encodeURIComponent(location)}`} replace />;
   if (session.status === 'loading') return <div className="gate-loading" role="status" data-testid="status-applicant-gate-loading"><LoaderCircle size={20} className="auth-spin" aria-hidden="true" /> Opening your workspace…</div>;
+  if (session.me?.twoStep.enrolled && session.me.twoStep.level !== 'aal2') return <div className="gate-two-step" data-testid="panel-applicant-two-step"><div className="card card-pad">
+    <h1 className="section-title" style={{ fontSize: 20 }}>Enter your two-step code</h1>
+    <p className="section-subtitle" style={{ marginBottom: 14 }}>Open your authenticator app and enter the current code for arc.fund.</p>
+    <TwoStepCodeForm ui="app" />
+    <button type="button" className="btn btn-ghost mt" onClick={() => void session.signOut()} data-testid="button-two-step-signout">Sign out</button>
+  </div></div>;
   return <>{children}</>;
 }
 
@@ -660,6 +667,25 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
     </div>}
   </div><StatusBadge status={kyc.status} tone={tone} /></div>;
 }
+/** Signed in only: the account's authenticator apps, and completing a two-step reset the grant team required. */
+function TwoStepSettings({ pendingReset, onReset, onToast }: { pendingReset: boolean; onReset: () => Promise<void>; onToast: Toast }) {
+  const session = useSession();
+  const [adding, setAdding] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const enrolled = session.factors.length > 0;
+  const remove = async (id: string) => { const failure = await session.removeTwoStep(id); setConfirmRemove(null); onToast(failure ?? 'Authenticator app removed.'); };
+  return <div className="verification-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }} data-testid="section-two-step"><div className="verification-icon"><LockKeyhole size={15} /></div>
+    <div className="verification-copy" style={{ flex: '1 1 240px' }}><strong>Two-step sign-in</strong>
+      <span>{pendingReset ? 'The grant team reset this. Remove your old authenticator app, add a new one, then confirm.' : enrolled ? 'On. You enter a code from your authenticator app each time you sign in.' : 'Off. Add an authenticator app so a stolen password isn\'t enough to get in.'}</span>
+      {session.factors.map(f => <div key={f.id} className="doc-row" style={{ marginTop: 8 }}><span className="doc-name">{f.name}</span><span className="doc-meta">Added {fmtDate(f.createdAt)}</span><span className="doc-actions">{confirmRemove === f.id
+        ? <button className="btn btn-ghost danger-text" onClick={() => void remove(f.id)} data-testid={`button-confirm-remove-factor-${f.id}`}>Confirm remove</button>
+        : <button className="btn btn-ghost" onClick={() => setConfirmRemove(f.id)} data-testid={`button-remove-factor-${f.id}`}>Remove</button>}</span></div>)}
+      {adding ? <div style={{ marginTop: 12 }}><TwoStepSetupForm ui="app" onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onToast('Two-step sign-in is on.'); if (pendingReset) void onReset(); }} /></div>
+        : (!enrolled || pendingReset) && <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setAdding(true)} data-testid="button-add-two-step">{pendingReset ? 'Add new authenticator app' : 'Turn on two-step sign-in'}</button>}
+    </div>
+    <StatusBadge status={enrolled ? 'On' : 'Off'} tone={enrolled ? 'Completed' : 'Draft'} /></div>;
+}
+
 /** Signed in only: whether notifications are also emailed to the account's address. */
 function EmailPreferenceCard({ onToast }: { onToast: Toast }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -745,8 +771,8 @@ function SettingsPage({ onToast }: { onToast: Toast }) {
     <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
       <IdentityCheck onToast={onToast} />
       <div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for. The grant team changes tiers after review.</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div>
-      <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => void complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>
-      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>{connected ? 'Requested by the grant team. Change it with “Forgot password?” on the sign-in page, then confirm here.' : "Requested by the grant team. Sign-in isn't connected, so nothing is stored."}</span></div><button className="btn btn-ghost" onClick={() => void complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
+      {connected ? <TwoStepSettings pendingReset={account.twoFactorResetRequired} onReset={() => complete('twoFactor')} onToast={onToast} /> : <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => void complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>}
+      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>{connected ? 'Requested by the grant team. Sign out, use “Forgot password?” on the sign-in page, and choose a new password from the emailed link; that completes it.' : "Requested by the grant team. Sign-in isn't connected, so nothing is stored."}</span></div><button className="btn btn-ghost" onClick={() => void complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
     </div>
     {connected && <EmailPreferenceCard onToast={onToast} />}
     <PayoutDestinationsCard onToast={onToast} />

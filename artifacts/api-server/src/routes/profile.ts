@@ -37,6 +37,25 @@ export async function ownProfile(repo: ProfileRepo, user: AuthUser): Promise<Pro
   });
 }
 
+/**
+ * Why a staff-required reset can't be marked done yet, or null. A new password
+ * needs a session from the reset-password email sent after the reset was
+ * required (and the account updated since); two-step needs a two-step session
+ * and an authenticator set up after the reset was required.
+ */
+export function resetProof(user: AuthUser, record: ProfileRecord, kind: "password" | "twoFactor"): string | null {
+  const required = record.resetsRequiredAt[kind];
+  if (!required) return null;
+  const since = Date.parse(required);
+  if (kind === "password") {
+    const recovery = user.amr?.find(a => a.method === "recovery" && a.timestamp * 1000 >= since);
+    const changed = !!recovery && !!user.updatedAt && Date.parse(user.updatedAt) >= recovery.timestamp * 1000;
+    return changed ? null : "Use “Forgot password?” on the sign-in page, open the link we email you, and choose a new password. Then confirm here.";
+  }
+  const fresh = user.factors?.some(f => Date.parse(f.createdAt) >= since);
+  return user.aal === "aal2" && fresh ? null : "Set up your authenticator app again (remove the old one and add a new one), sign in with a code, then confirm here.";
+}
+
 export function profileRouter(repo: ProfileRepo, documents: DocumentRepo): IRouter {
   const router: IRouter = Router();
 
@@ -87,6 +106,10 @@ export function profileRouter(repo: ProfileRepo, documents: DocumentRepo): IRout
   router.post("/profile/credential-reset", async (req, res) => {
     const body = CompleteCredentialResetBody.safeParse(req.body);
     if (!body.success) { res.status(400).json({ error: "Say which reset you completed." }); return; }
+    const { user } = authLocals(res);
+    const record = await ownProfile(repo, user);
+    const proof = resetProof(user, record, body.data.kind);
+    if (proof) { res.status(400).json({ error: proof }); return; }
     await ownRule(res, s => completeCredentialReset(s, body.data.kind));
   });
 

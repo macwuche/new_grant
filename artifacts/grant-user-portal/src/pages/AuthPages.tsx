@@ -1,3 +1,4 @@
+import { completeCredentialReset } from '@workspace/api-client-react';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info, LoaderCircle, MailCheck } from 'lucide-react';
@@ -479,6 +480,8 @@ export function ResetPasswordPage() {
     setBusy(false);
     form.reset();
     if (problem) { setResult({ tone: 'error', text: problem }); return; }
+    // If the grant team required a new password, this completes it (the server checks this session came from the reset email).
+    await completeCredentialReset({ kind: 'password' }).catch(() => {});
     setResult({ tone: 'info', text: 'Password updated. Taking you to your workspace…' });
     window.setTimeout(() => setLocation('/', { replace: true }), 1200);
   };

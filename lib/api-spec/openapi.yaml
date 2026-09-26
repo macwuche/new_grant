@@ -2784,8 +2784,20 @@ components:
           type: array
           items:
             type: string
-          description: Staff permissions for this user (empty for applicants)
-      required: [user, staff, permissions]
+          description: Staff permissions for this user (empty for applicants, and for staff until two-step sign-in is done)
+        twoStep:
+          type: object
+          description: The session's two-step sign-in state. Staff access needs level aal2 when requiredForStaff; anyone enrolled needs aal2 for everything except this endpoint.
+          properties:
+            level:
+              type: string
+              enum: [aal1, aal2]
+            enrolled:
+              type: boolean
+            requiredForStaff:
+              type: boolean
+          required: [level, enrolled, requiredForStaff]
+      required: [user, staff, permissions, twoStep]
     HealthStatus:
       type: object
       properties:

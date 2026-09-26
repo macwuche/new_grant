@@ -43,6 +43,9 @@ export const applicantProfilesTable = pgTable("applicant_profiles", {
   lockedBy: text("locked_by"),
   passwordResetRequired: boolean("password_reset_required").notNull().default(false),
   twoFactorResetRequired: boolean("two_factor_reset_required").notNull().default(false),
+  /** When staff required each reset; completing it needs proof from after this time. */
+  passwordResetRequiredAt: timestamp("password_reset_required_at", { withTimezone: true }),
+  twoFactorResetRequiredAt: timestamp("two_factor_reset_required_at", { withTimezone: true }),
   kyc: jsonb("kyc").$type<KycJson>().notNull().default({ status: "Not submitted" }),
   /** Virtual and physical card settings (fictional: no card provider is connected). */
   cards: jsonb("cards").$type<CardsJson | null>(),

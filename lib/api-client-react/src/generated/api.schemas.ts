@@ -791,11 +791,30 @@ export type MeUser = {
   emailConfirmed: boolean;
 };
 
+export type MeTwoStepLevel = typeof MeTwoStepLevel[keyof typeof MeTwoStepLevel];
+
+
+export const MeTwoStepLevel = {
+  aal1: 'aal1',
+  aal2: 'aal2',
+} as const;
+
+/**
+ * The session's two-step sign-in state. Staff access needs level aal2 when requiredForStaff; anyone enrolled needs aal2 for everything except this endpoint.
+ */
+export type MeTwoStep = {
+  level: MeTwoStepLevel;
+  enrolled: boolean;
+  requiredForStaff: boolean;
+};
+
 export interface Me {
   user: MeUser;
   staff: StaffMember | null;
-  /** Staff permissions for this user (empty for applicants) */
+  /** Staff permissions for this user (empty for applicants, and for staff until two-step sign-in is done) */
   permissions: string[];
+  /** The session's two-step sign-in state. Staff access needs level aal2 when requiredForStaff; anyone enrolled needs aal2 for everything except this endpoint. */
+  twoStep: MeTwoStep;
 }
 
 export interface HealthStatus {

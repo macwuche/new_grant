@@ -17,12 +17,21 @@ import { seedTreasury } from "@workspace/domain/seed";
 import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
+// Staff sign in with two-step (aal2 and a verified authenticator), as the API requires.
+const TWO_STEP = { aal: "aal2" as const, factors: [{ id: "factor-1", createdAt: "2025-01-01T00:00:00.000Z" }] };
 const USERS: Record<string, AuthUser> = {
-  "tok-super": { id: "11111111-1111-4111-8111-111111111111", email: "sam@example.org", emailConfirmed: true },
-  "tok-finance": { id: "22222222-2222-4222-8222-222222222222", email: "jordan@example.org", emailConfirmed: true },
+  "tok-super": { id: "11111111-1111-4111-8111-111111111111", email: "sam@example.org", emailConfirmed: true, ...TWO_STEP },
+  "tok-finance": { id: "22222222-2222-4222-8222-222222222222", email: "jordan@example.org", emailConfirmed: true, ...TWO_STEP },
   "tok-applicant": { id: "33333333-3333-4333-8333-333333333333", email: "alex@example.com", emailConfirmed: true },
   "tok-unconfirmed": { id: "44444444-4444-4444-8444-444444444444", email: "riley@example.org", emailConfirmed: false },
-  "tok-riley": { id: "55555555-5555-4555-8555-555555555555", email: "riley@example.org", emailConfirmed: true },
+  "tok-riley": { id: "55555555-5555-4555-8555-555555555555", email: "riley@example.org", emailConfirmed: true, ...TWO_STEP },
+  // Maya's account in other sessions: from the reset-password email, and with two-step sign-in.
+  "tok-maya-recovery": { id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true, amr: [{ method: "recovery", timestamp: Date.parse("2030-01-01T00:00:00Z") / 1000 }], updatedAt: "2030-01-01T00:05:00Z" },
+  "tok-maya-new-factor": { id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true, aal: "aal2", factors: [{ id: "factor-new", createdAt: "2030-01-01T00:00:00.000Z" }] },
+  "tok-maya-old-factor": { id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true, aal: "aal2", factors: [{ id: "factor-old", createdAt: "2025-01-01T00:00:00.000Z" }] },
+  "tok-maya-code-needed": { id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true, aal: "aal1", factors: [{ id: "factor-old", createdAt: "2025-01-01T00:00:00.000Z" }] },
+  "tok-super-password-only": { id: "11111111-1111-4111-8111-111111111111", email: "sam@example.org", emailConfirmed: true },
+  "tok-finance-code-needed": { id: "22222222-2222-4222-8222-222222222222", email: "jordan@example.org", emailConfirmed: true, aal: "aal1", factors: [{ id: "factor-1", createdAt: "2025-01-01T00:00:00.000Z" }] },
   "tok-maya": {
     id: "66666666-6666-4666-8666-666666666666", email: "maya@example.com", emailConfirmed: true,
     metadata: { full_name: "  Maya Okafor ", phone: "+44 20 7946 0000", country: "United Kingdom", sector: "Creative industries", birth_date: "1990-04-02", role: "super" },
@@ -103,7 +112,7 @@ describe("authentication", () => {
 describe("GET /me", () => {
   it("returns applicants with no staff record and no permissions", async () => {
     const body = await json(await call("/me", "tok-applicant"));
-    expect(body).toEqual({ user: USERS["tok-applicant"], staff: null, permissions: [] });
+    expect(body).toEqual({ user: USERS["tok-applicant"], staff: null, permissions: [], twoStep: { level: "aal1", enrolled: false, requiredForStaff: true } });
   });
 
   it("returns staff with their role's permissions", async () => {
@@ -351,7 +360,7 @@ describe("applicant profile", () => {
 describe("account controls and identity checks", () => {
   const MAYA = USERS["tok-maya"]!.id;
   const act = (path: string, body: unknown = {}, token = "tok-super") => post(`/applicants/${MAYA}/${path}`, body, token);
-  const maya = async () => json(await call("/profile", "tok-maya"));
+  const maya = async (token = "tok-maya") => json(await call("/profile", token));
   const identity = { documentType: "Passport", documentNumber: "AB 1234-5678", nameOnDocument: "Maya Okafor" };
   beforeEach(async () => { await call("/profile", "tok-maya"); });
 
@@ -413,12 +422,29 @@ describe("account controls and identity checks", () => {
     expect(after).not.toHaveProperty("lockReason");
   });
 
-  it("records required resets, which the applicant then completes", async () => {
+  it("enforces a required password reset until the applicant proves it with the reset email", async () => {
     expect((await act("credential-reset", { kind: "password" })).status).toBe(200);
     expect((await maya()).account.passwordResetRequired).toBe(true);
-    expect((await post("/profile/credential-reset", { kind: "password" }, "tok-maya")).status).toBe(200);
+    const blocked = await call("/applications/mine", "tok-maya");
+    expect(blocked.status).toBe(403);
+    expect((await json(blocked)).code).toBe("password_reset_required");
+    expect((await call("/notifications", "tok-maya")).status).toBe(200);
+    const unproven = await post("/profile/credential-reset", { kind: "password" }, "tok-maya");
+    expect(unproven.status).toBe(400);
+    expect((await json(unproven)).error).toMatch(/Forgot password/);
+    expect((await post("/profile/credential-reset", { kind: "password" }, "tok-maya-recovery")).status).toBe(200);
     expect((await maya()).account.passwordResetRequired).toBe(false);
+    expect((await call("/applications/mine", "tok-maya")).status).toBe(200);
     expect((await post("/profile/credential-reset", { kind: "password" }, "tok-maya")).status).toBe(400);
+  });
+
+  it("enforces a required two-step reset until a new authenticator is set up", async () => {
+    expect((await act("credential-reset", { kind: "twoFactor" })).status).toBe(200);
+    expect((await json(await call("/money/mine", "tok-maya"))).code).toBe("two_factor_reset_required");
+    expect((await post("/profile/credential-reset", { kind: "twoFactor" }, "tok-maya")).status).toBe(400);
+    expect((await post("/profile/credential-reset", { kind: "twoFactor" }, "tok-maya-old-factor")).status).toBe(400);
+    expect((await post("/profile/credential-reset", { kind: "twoFactor" }, "tok-maya-new-factor")).status).toBe(200);
+    expect((await maya("tok-maya-new-factor")).account.twoFactorResetRequired).toBe(false);
   });
 
   it("shows the directory to active staff only", async () => {
@@ -995,5 +1021,41 @@ describe("protections", () => {
     expect((await upload("tok-maya", "purpose=identity")).status).toBe(201);
     expect((await upload("tok-maya", "purpose=identity")).status).toBe(201);
     expect((await upload("tok-maya", "purpose=identity")).status).toBe(429);
+  });
+});
+
+describe("two-step sign-in", () => {
+  it("lets staff see who they are, but nothing else, until they sign in with a code", async () => {
+    const me = await json(await call("/me", "tok-super-password-only"));
+    expect(me).toMatchObject({ staff: { email: "sam@example.org" }, permissions: [], twoStep: { level: "aal1", enrolled: false, requiredForStaff: true } });
+    const res = await call("/applications", "tok-super-password-only");
+    expect(res.status).toBe(403);
+    expect((await json(res)).code).toBe("mfa_enrollment_required");
+    expect((await json(await call("/applicants", "tok-finance-code-needed"))).code).toBe("mfa_required");
+    expect((await call("/applications", "tok-super")).status).toBe(200);
+  });
+
+  it("doesn't let a staff session without two-step open documents as staff", async () => {
+    await call("/profile", "tok-maya");
+    const doc = await json(await upload("tok-maya", "purpose=identity"));
+    expect((await call(`/documents/${doc.id}/file`, "tok-super-password-only")).status).toBe(404);
+    expect((await call(`/documents/${doc.id}/file`, "tok-super")).status).toBe(200);
+  });
+
+  it("requires a code on every request once someone has set up two-step sign-in", async () => {
+    await call("/profile", "tok-maya");
+    const res = await call("/profile", "tok-maya-code-needed");
+    expect(res.status).toBe(403);
+    expect((await json(res)).code).toBe("mfa_required");
+    expect((await json(await call("/me", "tok-maya-code-needed"))).twoStep).toMatchObject({ level: "aal1", enrolled: true });
+    expect((await call("/profile", "tok-maya-old-factor")).status).toBe(200);
+  });
+
+  it("can be switched off for staff (STAFF_MFA_REQUIRED=false)", async () => {
+    await new Promise(r => server.close(r));
+    server = createApp({ verifier, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, mailer, staffMfa: false }, ["https://app.example.org"]).listen(0);
+    await new Promise(r => server.once("listening", r));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+    expect((await call("/applications", "tok-super-password-only")).status).toBe(200);
   });
 });

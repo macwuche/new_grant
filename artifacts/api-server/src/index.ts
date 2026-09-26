@@ -56,6 +56,7 @@ const app = createApp({
   verifier: supabaseUrl && supabaseAnonKey ? supabaseVerifier(supabaseUrl, supabaseAnonKey) : null,
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
   documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, mailer,
+  staffMfa: process.env["STAFF_MFA_REQUIRED"] !== "false",
 });
 
 app.listen(port, (err) => {

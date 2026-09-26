@@ -10,7 +10,7 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push schema changes (to Supabase when `SUPABASE_DATABASE_URL` is set, otherwise Replit's database; it prints which)
 - Environment:
-  - Server: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (secret), `INITIAL_SUPER_ADMIN_EMAIL`; optional `INITIAL_SUPER_ADMIN_NAME`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `DOCUMENTS_DIR` (where uploaded files are kept; default `data/documents` under the API's working directory); email: `RESEND_API_KEY` (secret), `EMAIL_FROM` (e.g. `arc.fund <grants@yourdomain>`, on a Resend-verified domain), optional `EMAIL_REPLY_TO`, `APP_URL` (portal address for links in emails)
+  - Server: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (secret), `INITIAL_SUPER_ADMIN_EMAIL`; optional `INITIAL_SUPER_ADMIN_NAME`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `DOCUMENTS_DIR` (where uploaded files are kept; default `data/documents` under the API's working directory); email: `RESEND_API_KEY` (secret), `EMAIL_FROM` (e.g. `arc.fund <grants@yourdomain>`, on a Resend-verified domain), optional `EMAIL_REPLY_TO`, `APP_URL` (portal address for links in emails); `STAFF_MFA_REQUIRED` (default on; `false` lets staff in without two-step)
   - Browser: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
   - Without the Supabase variables, the app runs as a browser-only demo.
 
@@ -41,6 +41,7 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - The audit log is append-only and hash-chained; the API reports whether the chain is intact.
 - Uploaded documents are files on the API server's disk (`DOCUMENTS_DIR`), never in Supabase Storage; Supabase holds only their records and SHA-256, checked on every download. Back up that directory with the database.
 - Server-loaded records are never written to browser storage.
+- Two-step sign-in is Supabase TOTP; the API reads the session's `aal` from the verified token. Staff need aal2; anyone enrolled needs aal2; pending staff-required resets block the account until proven.
 - Outgoing email uses an outbox table written in the same transaction as the change; a worker in the API sends it through Resend with a per-row idempotency key and retries with backoff.
 
 ## Product

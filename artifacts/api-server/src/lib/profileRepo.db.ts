@@ -16,6 +16,7 @@ export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
     passwordResetRequired: row.passwordResetRequired, twoFactorResetRequired: row.twoFactorResetRequired, kyc: row.kyc,
   },
   emailNotifications: row.emailNotifications,
+  resetsRequiredAt: { password: row.passwordResetRequiredAt?.toISOString() ?? null, twoFactor: row.twoFactorResetRequiredAt?.toISOString() ?? null },
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
 });
 
@@ -29,6 +30,9 @@ const accountColumns = (patch: AccountPatch) => ({
     lockedBy: patch.account.lockedBy ?? null,
     passwordResetRequired: patch.account.passwordResetRequired,
     twoFactorResetRequired: patch.account.twoFactorResetRequired,
+    // Keep the first time each reset was required while it stays pending.
+    passwordResetRequiredAt: patch.account.passwordResetRequired ? sql`coalesce(${applicantProfilesTable.passwordResetRequiredAt}, now())` : null,
+    twoFactorResetRequiredAt: patch.account.twoFactorResetRequired ? sql`coalesce(${applicantProfilesTable.twoFactorResetRequiredAt}, now())` : null,
     kyc: patch.account.kyc,
   } : {}),
 });

@@ -9,7 +9,7 @@ import type { MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
 import type { StaffRepo } from "../lib/staffRepo";
-import { authenticate, loadStaff } from "../middlewares/auth";
+import { authenticate, loadStaff, resetGate } from "../middlewares/auth";
 import { byUser, failureLimiter, LIMITS, rateLimiter, type Limit } from "../middlewares/protect";
 import { activityRouter } from "./activity";
 import { applicantsRouter } from "./applicants";
@@ -25,9 +25,11 @@ import { staffRouter } from "./staff";
 
 export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; programRepo: ProgramRepo; profileRepo: ProfileRepo; applicationRepo: ApplicationRepo; activityRepo: ActivityRepo; moneyRepo: MoneyRepo; documentRepo: DocumentRepo; fileStore: FileStore; emailOutbox: EmailOutbox; mailer: Mailer;
   /** Overrides for the rate limits (tests). */
-  limits?: Partial<Record<keyof typeof LIMITS, Limit>> };
+  limits?: Partial<Record<keyof typeof LIMITS, Limit>>;
+  /** Staff access needs a two-step (aal2) session (STAFF_MFA_REQUIRED, on unless "false"). */
+  staffMfa?: boolean };
 
-export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, mailer, limits = {} }: ApiDeps): IRouter {
+export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, mailer, limits = {}, staffMfa = true }: ApiDeps): IRouter {
   const router: IRouter = Router();
   const limit = { ...LIMITS, ...limits };
   router.use(healthRouter);
@@ -37,8 +39,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(failureLimiter(limit.anonymous), authenticate(verifier), rateLimiter(limit.user, byUser));
   router.use((req, res, next) => req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS" ? next() : writes(req, res, next));
   router.post("/documents", uploads);
-  router.use(loadStaff(staffRepo));
-  router.use(meRouter);
+  router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
+  router.use(meRouter(staffMfa));
   router.use(staffRouter(staffRepo));
   router.use(programsRouter(programRepo, applicationRepo));
   router.use(profileRouter(profileRepo, documentRepo));

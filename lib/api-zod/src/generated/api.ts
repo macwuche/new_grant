@@ -35,7 +35,12 @@ export const GetMeResponse = zod.object({
   "active": zod.boolean(),
   "linked": zod.boolean().describe('Whether this member has signed in at least once')
 }).nullable(),
-  "permissions": zod.array(zod.string()).describe('Staff permissions for this user (empty for applicants)')
+  "permissions": zod.array(zod.string()).describe('Staff permissions for this user (empty for applicants, and for staff until two-step sign-in is done)'),
+  "twoStep": zod.object({
+  "level": zod.enum(['aal1', 'aal2']),
+  "enrolled": zod.boolean(),
+  "requiredForStaff": zod.boolean()
+}).describe('The session\'s two-step sign-in state. Staff access needs level aal2 when requiredForStaff; anyone enrolled needs aal2 for everything except this endpoint.')
 })
 
 

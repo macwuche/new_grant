@@ -22,6 +22,8 @@ export type ProfileRecord = {
   account: StoredAccount;
   /** Whether notifications are also emailed. */
   emailNotifications: boolean;
+  /** When staff required each pending reset (server-only; null when none is pending). */
+  resetsRequiredAt: { password: string | null; twoFactor: string | null };
   /** ISO timestamp the profile was created. */
   createdAt: string;
   /** Record version for account-control writes. */
@@ -60,7 +62,7 @@ export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write
       const existing = rows.get(profile.authUserId);
       if (existing) return structuredClone(existing);
       const at = stamp();
-      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, createdAt: at, updatedAt: at, ...profile };
+      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, resetsRequiredAt: { password: null, twoFactor: null }, createdAt: at, updatedAt: at, ...profile };
       rows.set(row.authUserId, row);
       return structuredClone(row);
     },
@@ -73,7 +75,12 @@ export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write
     saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => {
       const row = rows.get(id);
       if (!row || row.updatedAt !== expectedVersion) return "stale";
-      Object.assign(row, structuredClone(patch), { updatedAt: stamp() });
+      const at = stamp();
+      if (patch.account) row.resetsRequiredAt = {
+        password: patch.account.passwordResetRequired ? row.resetsRequiredAt.password ?? at : null,
+        twoFactor: patch.account.twoFactorResetRequired ? row.resetsRequiredAt.twoFactor ?? at : null,
+      };
+      Object.assign(row, structuredClone(patch), { updatedAt: at });
       activity?.write(effects);
       return structuredClone(row);
     },
