@@ -62,6 +62,21 @@ describe('roles and permissions', () => {
   });
 });
 
+describe('signed-in staff', () => {
+  it('becomes the acting member with their server role, and is updated in place', () => {
+    accept(S.adoptSessionStaff(s, { id: 'b7c1e2d4-0000-4000-8000-000000000001', name: 'Dana Real', role: 'finance' }));
+    expect(S.actingStaff(s)).toMatchObject({ name: 'Dana Real', role: 'finance', active: true });
+    expect(S.can(s, 'payments.process')).toBe(true);
+    expect(S.can(s, 'staff.manage')).toBe(false);
+    const count = s.staff.length;
+    accept(S.adoptSessionStaff(s, { id: 'b7c1e2d4-0000-4000-8000-000000000001', name: 'Dana Real', role: 'super' }));
+    expect(s.staff.length).toBe(count);
+    expect(S.can(s, 'staff.manage')).toBe(true);
+    const same = S.adoptSessionStaff(s, { id: 'b7c1e2d4-0000-4000-8000-000000000001', name: 'Dana Real', role: 'super' });
+    expect(same.ok && same.state).toBe(s);
+  });
+});
+
 describe('audit log', () => {
   it('records who did what, to which record, with the field changes and risk score', () => {
     as('STF-2');

@@ -29,7 +29,8 @@ Build the application logic first, client-side, against browser-local demo data.
 11. **Authentication and staff authorization — In progress** (Supabase Auth, chosen 26 Sep 2026; plan in `work.md` §6)
    - Needs from the team: a Supabase project, its URL and anon key as secrets, and the app's URLs in Supabase Auth settings.
    - Done: (a) shared role/permission list (`lib/authz`); (b) `staff_members` table in the existing Postgres; (c) API token check, `GET /api/me`, and staff endpoints, with 16 API tests.
-   - Waiting on Supabase keys: (d) real applicant sign-up / sign-in / reset / sign-out; (e) `/admin` limited to signed-in staff, replacing the "acting as" switcher; (f) browser test of the full sign-in flow.
+   - Done (26 Sep 2026): (e) staff login page `/admin/login` with password reset (`/admin/reset-password`) and sign-out; `/admin` requires a signed-in, active staff member once the Supabase keys are set, and the signed-in person replaces the "acting as" switcher. Until the keys are set, the login page says sign-in isn't set up and the admin stays in demo mode.
+   - Waiting on Supabase keys: (d) real applicant sign-up / sign-in / reset / sign-out; (f) browser test of the full sign-in flow against a real Supabase project.
    - Business data (applications, money) stays browser-local until phase 12, so this phase protects who can open screens and call the API, not the demo records themselves.
 12. **Database and API — Not started**
    - Schema, migrations, OpenAPI contracts; move `src/domain` rules server-side.

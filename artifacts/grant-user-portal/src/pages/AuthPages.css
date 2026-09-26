@@ -204,3 +204,11 @@
   .auth-form-wrap, .auth-step-pane { animation: none; }
   .auth-page a, .auth-page button, .auth-page input { transition: none !important; }
 }
+/* Staff sign-in (shares the applicant auth layout) */
+.auth-feedback.auth-feedback-error { background: #fbeeea; color: #8f3b2b; border-color: #efc6bb; }
+.auth-link-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; cursor: pointer; }
+.auth-field-header .auth-link-button { font-size: 12px; }
+.auth-button:disabled { opacity: .55; cursor: not-allowed; }
+.auth-spin { display: inline-block; margin-right: 6px; vertical-align: -3px; animation: auth-spin 1s linear infinite; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .auth-spin { animation: none; } }

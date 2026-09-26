@@ -36,6 +36,17 @@ export function asStaff(state: DemoState, permission: Permission, meta: StaffAct
   return { ...result, state: recordAudit(state, result.state, actor, meta.action, meta.target || result.id || '', result.message, now) };
 }
 
+/**
+ * Makes the signed-in staff member (from the server) the acting member in this
+ * browser's demo store, adding them to its staff list with their real role.
+ */
+export function adoptSessionStaff(state: DemoState, member: { id: string; name: string; role: StaffRole }): Result {
+  const existing = state.staff.find(m => m.id === member.id);
+  if (existing && existing.name === member.name && existing.role === member.role && existing.active && state.actingStaffId === member.id) return { ok: true, message: '', state };
+  const staff = existing ? state.staff.map(m => m.id === member.id ? { ...m, ...member, active: true } : m) : [...state.staff, { ...member, active: true }];
+  return { ok: true, message: `Signed in as ${member.name}.`, state: { ...state, staff, actingStaffId: member.id } };
+}
+
 /** Demo stand-in for signing in as a different staff member. */
 export function switchStaff(state: DemoState, staffId: string): Result {
   const member = state.staff.find(m => m.id === staffId);

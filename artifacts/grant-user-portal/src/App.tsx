@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
+import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
+import { StaffSessionProvider } from './lib/staffSession';
 import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Transaction } from './domain/model';
 import { CURRENT_APPLICANT_ID } from './domain/seed';
 import { accountLockReason, accountOf } from './domain/applicants';
@@ -613,7 +615,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
       '/withdrawals': 'Withdrawals', '/deposits': 'Add funds', '/settings': 'Settings',
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password',
-      '/admin': 'Admin overview', '/admin/applicants': 'Admin applicants',
+      '/admin': 'Admin overview', '/admin/login': 'Staff sign-in', '/admin/reset-password': 'Reset staff password', '/admin/applicants': 'Admin applicants',
       '/admin/inbox': 'Admin email inbox',
       '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
       '/admin/settings': 'Admin settings',
@@ -635,6 +637,8 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/login"><LoginPage /></Route>
     <Route path="/signup"><SignUpPage /></Route>
     <Route path="/forgot-password"><ForgotPasswordPage /></Route>
+    <Route path="/admin/login"><AdminLoginPage /></Route>
+    <Route path="/admin/reset-password"><AdminResetPasswordPage /></Route>
     <Route path="/admin"><AdminPage section="overview" /></Route>
     <Route path="/admin/applicants"><AdminPage section="applicants" /></Route>
     <Route path="/admin/inbox"><AdminPage section="inbox" /></Route>
@@ -662,7 +666,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
 function App() {
   const [toast, setToast] = useState<string | null>(null);
   const onToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(current => current === message ? null : current), 4200); };
-  return <DemoStoreProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></DemoStoreProvider>;
+  return <DemoStoreProvider><StaffSessionProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><RouterView onToast={onToast} />{toast && <DemoToast message={toast} onClose={() => setToast(null)} />}</WouterRouter></StaffSessionProvider></DemoStoreProvider>;
 }
 
 export default App;
