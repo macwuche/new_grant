@@ -4,7 +4,7 @@ Short phase checklist. `work.md` is the detailed source of truth; keep the two c
 
 ## Current direction
 
-The application logic was built client-side first (decision of 25 Sep 2026), then moved behind the API with the same rule functions (`lib/domain`). As of 26 Sep 2026 the app runs in two modes: **signed in** (Supabase configured), every record lives on the server; **without sign-in configured**, the original browser-only demo. Next: the live check with a real Supabase sign-in, which is blocked until the running app can reach its Supabase database: the `SUPABASE_DATABASE_URL` secret is still missing, and the schema must be pushed there first (see `work.md` §6). Also open: the Supabase sign-in email setup (unresolved, below).
+The application logic was built client-side first (decision of 25 Sep 2026), then moved behind the API with the same rule functions (`lib/domain`). As of 26 Sep 2026 the app runs in two modes: **signed in** (Supabase configured), every record lives on the server; **without sign-in configured**, the original browser-only demo. Next: the live check with a real Supabase sign-in, which is blocked until the running app can reach its Supabase database: the `SUPABASE_DATABASE_URL` secret is still missing, and the schema must be pushed there first (see `work.md` §6). Also open: the Supabase sign-in email setup (unresolved, below). **Deployment (27 Sep 2026, in progress):** to our own VPS at `https://access.novabridgegrant.org`. The first (shared) server was abandoned after cloning; it has been cleaned up, and we deploy to a new VPS today — see `server.md`.
 
 ## Build plan
 

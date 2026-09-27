@@ -1,0 +1,21 @@
+# systemd unit for the API. Install: cp deploy/novabridgegrant-api.service /etc/systemd/system/
+[Unit]
+Description=Nova Bridge Grant API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=novabridgegrant
+Group=novabridgegrant
+WorkingDirectory=/var/www/novabridgegrant/artifacts/api-server
+EnvironmentFile=/etc/novabridgegrant/api.env
+ExecStart=/opt/novabridgegrant-node/bin/node --enable-source-maps dist/index.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/novabridgegrant
+
+[Install]
+WantedBy=multi-user.target
