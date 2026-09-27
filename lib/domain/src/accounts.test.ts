@@ -49,7 +49,7 @@ describe('account lock', () => {
     expect(R.saveDraft(s, 'green', draft(), now, 'APP-2101').ok).toBe(false);
     expect(D.requestDeposit(s, 50, 'bank', now).ok).toBe(false);
     expect(M.payoutBlocker(s)).toMatch(/locked/);
-    expect(M.requestPhysicalCard(s, now).ok).toBe(false);
+    expect(M.requestPhysicalCard(s, { name: 'Alex Morgan', line1: '1 Main St', city: 'Austin', postalCode: '73301', country: 'United States' }, now).ok).toBe(false);
     expect(M.setCardLimit(s, 'virtual', 1000).ok).toBe(false);
     expect(M.savePayoutDestination(s, 'mobile', { primary: '+44 7700 900123' }, now).ok).toBe(false);
     accept(M.toggleCardFreeze(s)); // freezing is still allowed

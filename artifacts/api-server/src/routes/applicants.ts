@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
-import { LockApplicantBody, RequireCredentialResetBody, SetApplicantTierBody, UnlockApplicantParams as ApplicantIdParams } from "@workspace/api-zod";
+import { LockApplicantBody, RequireCredentialResetBody, SetApplicantTierBody, SetCardSettingsBody, UnlockApplicantParams as ApplicantIdParams } from "@workspace/api-zod";
+import { setCardSettings } from "@workspace/domain/cards";
 import type { Permission } from "@workspace/authz";
 import { approveKyc, lockAccount, rejectKyc, requestReverification, requireCredentialReset, setApplicantTier, unlockAccount } from "@workspace/domain/accounts";
 import type { DemoState, Result, Tier } from "@workspace/domain/model";
@@ -59,6 +60,10 @@ export function applicantsRouter(repo: ProfileRepo): IRouter {
   action("credential-reset", "accounts.manage", body => (body as { kind?: string })?.kind === "twoFactor" ? "Reset two-step sign-in" : "Force password reset", body => {
     const parsed = RequireCredentialResetBody.safeParse(body);
     return parsed.success ? { ok: true, command: s => requireCredentialReset(s, SLOT, parsed.data.kind, new Date()) } : { ok: false, error: "Say which reset to require." };
+  });
+  action("card-settings", "accounts.manage", "Change card settings", body => {
+    const parsed = SetCardSettingsBody.safeParse(body);
+    return parsed.success ? { ok: true, command: s => setCardSettings(s, SLOT, parsed.data, new Date()) } : { ok: false, error: "Choose the funding balances and whether cards need an identity check." };
   });
   action("identity/approve", "kyc.review", "Approve identity check", none((s, by) => approveKyc(s, SLOT, by, new Date())));
   action("identity/reject", "kyc.review", "Reject identity check", reason(text => (s, by) => rejectKyc(s, SLOT, text, by, new Date())));

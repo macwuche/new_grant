@@ -32,7 +32,7 @@ function toV5(data: V4State): DemoState {
     treasury: { ...data.treasury, dualControlThreshold: data.treasury.dualControlThreshold ?? seedTreasury().dualControlThreshold, applicationFee: data.treasury.applicationFee ?? 0 },
     profile: { ...seed.profile, ...data.profile },
     otherApplicants: data.otherApplicants.map(p => ({ ...p, tier: p.tier ?? seedTiers.get(p.id) ?? 1 })),
-    cards: { ...data.cards, virtual: { ...seed.cards.virtual, ...data.cards.virtual } },
+    cards: { ...data.cards, virtual: { ...seed.cards.virtual!, ...data.cards.virtual } },
     payoutDestinations: seedPayoutDestinations(),
     // Keep visitors' verification status in step with the seeded KYC records.
     accounts: data.profile.identityVerified ? accounts : { ...accounts, [CURRENT_APPLICANT_ID]: { ...accounts[CURRENT_APPLICANT_ID]!, kyc: { status: 'Not submitted' } } },

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
+import { Link } from 'wouter';
 import { differenceInDays, format } from 'date-fns';
 import * as api from '@workspace/api-client-react';
 import type { DemoState, Result, StaffMember, Tier } from '@workspace/domain/model';
@@ -27,14 +28,28 @@ type Outcome = { ok: true; message: string } | { ok: false; error: string; field
 /** One account action: the permission and audit label, the browser rule, and the API call used when signed in. */
 type Act = { permission: Parameters<ReturnType<typeof useStaffCommand>>[0]; action: string; local: (s: DemoState, actor: StaffMember) => Result; remote: () => Promise<api.ApplicantResult> };
 
-/** Staff view of one applicant: profile, money, risk, identity check, and account controls. */
+/** The applicant side panel (Security page and elsewhere): the same details as the profile page, in a dialog. */
 export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: string; onClose: () => void }) {
+  const { state } = useDemoStore();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${findApplicant(state, applicantId)?.id ?? applicantId} / Applicant`}>
+    <ApplicantDetails applicantId={applicantId} profileLink />
+  </ReviewFrame>;
+}
+
+/** Staff view of one applicant: profile, money, risk, identity check, and account controls. */
+export function ApplicantDetails({ applicantId, profileLink = false }: { applicantId: string; profileLink?: boolean }) {
   const { state, run } = useDemoStore();
   const { connected, refreshApplicants } = useServerData();
   const [busy, setBusy] = useState(false);
   const command = useStaffCommand();
   const can = useCan();
-  const closeRef = useRef<HTMLButtonElement>(null);
   const [tier, setTier] = useState<Tier | null>(null);
   const [reason, setReason] = useState('');
   const [pending, setPending] = useState<Action | null>(null);
@@ -42,15 +57,8 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
   const [flash, setFlash] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const identityDocs = useStaffDocuments(connected && can('kyc.review'), { applicantId });
 
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const person = findApplicant(state, applicantId);
-  if (!person) return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={applicantId}><h2 id="admin-detail-title">Applicant not found</h2></ReviewFrame>;
+  if (!person) return <h2 id="admin-detail-title">Applicant not found</h2>;
 
   const now = new Date();
   const risk = assessRisk(state, applicantId, now);
@@ -111,9 +119,9 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
   };
   const pendingButton: Record<Action, string> = { tier: 'Confirm tier change', lock: 'Confirm lock', 'kyc-reject': 'Confirm rejection', reverify: 'Ask to verify again' };
 
-  return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${person.id} / Applicant`}>
+  return <>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{person.name}</h2><span className="admin-review-badges">{account.status === 'Locked' && <span className="admin-badge declined" data-testid="status-admin-account-locked">Locked</span>}<RiskBadge risk={risk} /></span></div>
-    <p className="admin-detail-lead">{person.email} · {person.sector} · {person.country}{person.current ? ' · applicant-portal demo user' : ''}</p>
+    <p className="admin-detail-lead">{person.email} · {person.sector} · {person.country}{person.current ? ' · applicant-portal demo user' : ''}{profileLink && <> · <Link href={`/admin/applicants/${person.id}`} className="link-text" data-testid="link-admin-applicant-profile">Open full profile</Link></>}</p>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-applicant-flash">{flash.text}</div>}
 
     <dl className="admin-detail-fields">
@@ -121,6 +129,7 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
       <Field label="Account age" value={`${differenceInDays(now, new Date(`${person.joined}T00:00:00`))} days (joined ${day(person.joined)})`} />
       <Field label="Grant balance" value={usd(balances.grant)} />
       <Field label="Deposit balance" value={`${usd(balances.deposit)}${balances.pendingDeposits ? ` (+${usd(balances.pendingDeposits)} pending)` : ''}`} />
+      <Field label="Card balance" value={usd(balances.card)} />
       <Field label="Active grants" value={`${apps.filter(a => a.status === 'Approved').length} approved · ${usd(awarded)} awarded`} />
       <Field label="Applications" value={apps.length ? apps.map(a => `${a.id} ${findGrant(state, a.grantId)?.name ?? ''} (${a.status.toLowerCase()})`).join(', ') : 'None submitted'} />
     </dl>
@@ -175,7 +184,7 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
     <div className="admin-detail-note"><Info size={17} /><span>{connected
       ? 'Account changes are saved on the server and role-checked there. Password and two-step resets are recorded for the applicant to complete, not enforced at sign-in.'
       : 'Fictional applicant. Account changes are saved in this browser, role-checked, and audited. Sign-in isn\'t connected, so password and two-step resets are recorded, not enforced.'}</span></div>
-  </ReviewFrame>;
+  </>;
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {

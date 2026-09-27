@@ -15,6 +15,12 @@ export function notify(state: DemoState, applicantId: string, title: string, bod
 /** Security notices: their email copies are sent even to applicants who turned email copies off. */
 export const SECURITY_NOTICE_TITLES: ReadonlySet<string> = new Set(['Password changed', 'Password reset required', 'Set up two-step sign-in again', 'New device signed in']);
 
+/** Card shipping news staff write to the applicant: always emailed, like security notices. */
+export const CARD_SHIPPED_TITLE = 'Your physical card is on its way';
+export const CARD_DECLINED_TITLE = 'Physical card application declined';
+/** Notifications whose email copy is sent even to applicants who turned email copies off. */
+export const ALWAYS_EMAILED_TITLES: ReadonlySet<string> = new Set([...SECURITY_NOTICE_TITLES, CARD_SHIPPED_TITLE, CARD_DECLINED_TITLE]);
+
 /** The signed-in demo applicant's notifications, newest first. */
 export const ownNotifications = (state: DemoState) => state.notifications
   .filter(n => n.applicantId === CURRENT_APPLICANT_ID)

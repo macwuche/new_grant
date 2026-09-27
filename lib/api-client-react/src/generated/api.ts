@@ -31,7 +31,15 @@ import type {
   BadRequestResponse,
   Branding,
   BrandingInput,
+  CardActivation,
+  CardChoice,
+  CardFunding,
+  CardHolder,
+  CardHolderResult,
+  CardIssue,
   CardLimit,
+  CardSettings,
+  CardShipment,
   ChangeRequest,
   CredentialReset,
   DeclineDecision,
@@ -76,10 +84,14 @@ import type {
   ProgramUpdate,
   ProgramVersion,
   Reason,
+  ShippingAddress,
   SignInReport,
   SignInResult,
   SignupEmailSetting,
   SignupEmailSettingInput,
+  StaffCardDeduction,
+  StaffCardFreeze,
+  StaffCardFunding,
   StaffFeedItem,
   StaffMember,
   StaffMemberCreate,
@@ -1734,6 +1746,96 @@ export const useSetApplicantTier = <TError = ErrorType<InvalidResponse | Unautho
         TContext
       > => {
       return useMutation(getSetApplicantTierMutationOptions(options));
+    }
+
+export const getSetCardSettingsUrl = (id: string,) => {
+
+
+
+
+  return `/api/applicants/${id}/card-settings`
+}
+
+/**
+ * Requires accounts.manage. Which balances they may fund their card from, and whether cards need a verified identity.
+ * @summary Set an applicant's card rules
+ */
+export const setCardSettings = async (id: string,
+    cardSettings: CardSettings, options?: Parameters<typeof customFetch>[1]): Promise<ApplicantResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApplicantResult>(getSetCardSettingsUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardSettings)
+  }
+);}
+
+
+
+
+
+export const getSetCardSettingsMutationKey = () => ['setCardSettings'] as const;
+
+export const getSetCardSettingsMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardSettings>>, TError,SetCardSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCardSettings>>, TError,SetCardSettingsMutationVariables, TContext> => {
+
+const mutationKey = getSetCardSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCardSettings>>, SetCardSettingsMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setCardSettings(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetCardSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof setCardSettings>>>
+    export type SetCardSettingsMutationBody = BodyType<CardSettings>
+    export type SetCardSettingsMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type SetCardSettingsMutationVariables = {id: string;data: BodyType<CardSettings>}
+
+    /**
+ * @summary Set an applicant's card rules
+ */
+export const useSetCardSettings = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardSettings>>, TError,SetCardSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setCardSettings>>,
+        TError,
+        SetCardSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetCardSettingsMutationOptions(options));
     }
 
 export const getLockApplicantUrl = (id: string,) => {
@@ -4234,17 +4336,31 @@ export const getToggleCardFreezeUrl = () => {
 }
 
 /**
- * A locked account can freeze but not unfreeze.
- * @summary Freeze or unfreeze your virtual card
+ * The virtual card unless another is named; the physical card only once active. A locked account can freeze but not unfreeze, and a freeze put on by staff can only be lifted by staff.
+ * @summary Freeze or unfreeze one of your cards
  */
-export const toggleCardFreeze = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+export const toggleCardFreeze = async (cardChoice?: CardChoice, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
 
-  return customFetch<MoneyResult>(getToggleCardFreezeUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getToggleCardFreezeUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardChoice)
   }
 );}
 
@@ -4255,8 +4371,8 @@ export const toggleCardFreeze = async ( options?: Parameters<typeof customFetch>
 export const getToggleCardFreezeMutationKey = () => ['toggleCardFreeze'] as const;
 
 export const getToggleCardFreezeMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,ToggleCardFreezeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,ToggleCardFreezeMutationVariables, TContext> => {
 
 const mutationKey = getToggleCardFreezeMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4268,10 +4384,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleCardFreeze>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleCardFreeze>>, ToggleCardFreezeMutationVariables> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  toggleCardFreeze(requestOptions)
+          return  toggleCardFreeze(data,requestOptions)
         }
 
 
@@ -4282,19 +4398,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ToggleCardFreezeMutationResult = NonNullable<Awaited<ReturnType<typeof toggleCardFreeze>>>
-
+    export type ToggleCardFreezeMutationBody = BodyType<CardChoice> | undefined
     export type ToggleCardFreezeMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
-
+    export type ToggleCardFreezeMutationVariables = {data?: BodyType<CardChoice>}
 
     /**
- * @summary Freeze or unfreeze your virtual card
+ * @summary Freeze or unfreeze one of your cards
  */
 export const useToggleCardFreeze = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCardFreeze>>, TError,ToggleCardFreezeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof toggleCardFreeze>>,
         TError,
-        void,
+        ToggleCardFreezeMutationVariables,
         TContext
       > => {
       return useMutation(getToggleCardFreezeMutationOptions(options));
@@ -4389,21 +4505,21 @@ export const useSetCardLimit = <TError = ErrorType<InvalidResponse | Unauthorize
       return useMutation(getSetCardLimitMutationOptions(options));
     }
 
-export const getRequestPhysicalCardUrl = () => {
+export const getCreateVirtualCardUrl = () => {
 
 
 
 
-  return `/api/money/cards/physical`
+  return `/api/money/cards/virtual`
 }
 
 /**
- * Fees come from your deposit balance, which must keep the reserve.
- * @summary Request a physical card
+ * Comes before any physical card. Needs a verified identity when staff require one.
+ * @summary Create your virtual card
  */
-export const requestPhysicalCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+export const createVirtualCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
 
-  return customFetch<MoneyResult>(getRequestPhysicalCardUrl(),
+  return customFetch<MoneyResult>(getCreateVirtualCardUrl(),
   {
     ...options,
     method: 'POST'
@@ -4416,11 +4532,189 @@ export const requestPhysicalCard = async ( options?: Parameters<typeof customFet
 
 
 
+export const getCreateVirtualCardMutationKey = () => ['createVirtualCard'] as const;
+
+export const getCreateVirtualCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirtualCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVirtualCard>>, TError,void, TContext> => {
+
+const mutationKey = getCreateVirtualCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVirtualCard>>, void> = () => {
+
+
+          return  createVirtualCard(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVirtualCardMutationResult = NonNullable<Awaited<ReturnType<typeof createVirtualCard>>>
+
+    export type CreateVirtualCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+
+
+    /**
+ * @summary Create your virtual card
+ */
+export const useCreateVirtualCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirtualCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVirtualCard>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateVirtualCardMutationOptions(options));
+    }
+
+export const getFundCardUrl = () => {
+
+
+
+
+  return `/api/money/cards/fund`
+}
+
+/**
+ * From a balance staff allow for your account; the deposit reserve stays.
+ * @summary Move money onto your card
+ */
+export const fundCard = async (cardFunding: CardFunding, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getFundCardUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardFunding)
+  }
+);}
+
+
+
+
+
+export const getFundCardMutationKey = () => ['fundCard'] as const;
+
+export const getFundCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fundCard>>, TError,FundCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fundCard>>, TError,FundCardMutationVariables, TContext> => {
+
+const mutationKey = getFundCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fundCard>>, FundCardMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  fundCard(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FundCardMutationResult = NonNullable<Awaited<ReturnType<typeof fundCard>>>
+    export type FundCardMutationBody = BodyType<CardFunding>
+    export type FundCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type FundCardMutationVariables = {data: BodyType<CardFunding>}
+
+    /**
+ * @summary Move money onto your card
+ */
+export const useFundCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fundCard>>, TError,FundCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof fundCard>>,
+        TError,
+        FundCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getFundCardMutationOptions(options));
+    }
+
+export const getRequestPhysicalCardUrl = () => {
+
+
+
+
+  return `/api/money/cards/physical`
+}
+
+/**
+ * Needs a virtual card. The card and shipping fees come from your deposit balance (reserve kept); staff approve or decline, and a decline refunds the fees.
+ * @summary Apply for a physical card
+ */
+export const requestPhysicalCard = async (shippingAddress: ShippingAddress, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getRequestPhysicalCardUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(shippingAddress)
+  }
+);}
+
+
+
+
+
 export const getRequestPhysicalCardMutationKey = () => ['requestPhysicalCard'] as const;
 
 export const getRequestPhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,RequestPhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,RequestPhysicalCardMutationVariables, TContext> => {
 
 const mutationKey = getRequestPhysicalCardMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4432,10 +4726,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestPhysicalCard>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestPhysicalCard>>, RequestPhysicalCardMutationVariables> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  requestPhysicalCard(requestOptions)
+          return  requestPhysicalCard(data,requestOptions)
         }
 
 
@@ -4446,22 +4740,972 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RequestPhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof requestPhysicalCard>>>
-
+    export type RequestPhysicalCardMutationBody = BodyType<ShippingAddress>
     export type RequestPhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
-
+    export type RequestPhysicalCardMutationVariables = {data: BodyType<ShippingAddress>}
 
     /**
- * @summary Request a physical card
+ * @summary Apply for a physical card
  */
 export const useRequestPhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPhysicalCard>>, TError,RequestPhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof requestPhysicalCard>>,
         TError,
-        void,
+        RequestPhysicalCardMutationVariables,
         TContext
       > => {
       return useMutation(getRequestPhysicalCardMutationOptions(options));
+    }
+
+export const getActivatePhysicalCardUrl = () => {
+
+
+
+
+  return `/api/money/cards/physical/activate`
+}
+
+/**
+ * Confirms the card arrived, with the last four digits printed on it.
+ * @summary Activate your shipped physical card
+ */
+export const activatePhysicalCard = async (cardActivation: CardActivation, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getActivatePhysicalCardUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardActivation)
+  }
+);}
+
+
+
+
+
+export const getActivatePhysicalCardMutationKey = () => ['activatePhysicalCard'] as const;
+
+export const getActivatePhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activatePhysicalCard>>, TError,ActivatePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof activatePhysicalCard>>, TError,ActivatePhysicalCardMutationVariables, TContext> => {
+
+const mutationKey = getActivatePhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof activatePhysicalCard>>, ActivatePhysicalCardMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  activatePhysicalCard(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActivatePhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof activatePhysicalCard>>>
+    export type ActivatePhysicalCardMutationBody = BodyType<CardActivation>
+    export type ActivatePhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
+    export type ActivatePhysicalCardMutationVariables = {data: BodyType<CardActivation>}
+
+    /**
+ * @summary Activate your shipped physical card
+ */
+export const useActivatePhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activatePhysicalCard>>, TError,ActivatePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof activatePhysicalCard>>,
+        TError,
+        ActivatePhysicalCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getActivatePhysicalCardMutationOptions(options));
+    }
+
+export const getListCardHoldersUrl = () => {
+
+
+
+
+  return `/api/money/card-holders`
+}
+
+/**
+ * Any active staff member. Includes each card balance and card settings; never PINs.
+ * @summary Every applicant's cards
+ */
+export const listCardHolders = async ( options?: Parameters<typeof customFetch>[1]): Promise<CardHolder[]> => {
+
+  return customFetch<CardHolder[]>(getListCardHoldersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCardHoldersQueryKey = () => {
+    return [
+    `/api/money/card-holders`
+    ] as const;
+    }
+
+
+export const getListCardHoldersQueryOptions = <TData = Awaited<ReturnType<typeof listCardHolders>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCardHolders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCardHoldersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCardHolders>>> = ({ signal }) => listCardHolders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCardHolders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCardHoldersQueryResult = NonNullable<Awaited<ReturnType<typeof listCardHolders>>>
+export type ListCardHoldersQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+/**
+ * @summary Every applicant's cards
+ */
+
+export function useListCardHolders<TData = Awaited<ReturnType<typeof listCardHolders>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCardHolders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCardHoldersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCardHolderUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}`
+}
+
+/**
+ * Any active staff member. An applicant without cards yet has none listed.
+ * @summary One applicant's cards
+ */
+export const getCardHolder = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<CardHolder> => {
+
+  return customFetch<CardHolder>(getGetCardHolderUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCardHolderQueryKey = (id: string,) => {
+    return [
+    `/api/money/card-holders/${id}`
+    ] as const;
+    }
+
+
+export const getGetCardHolderQueryOptions = <TData = Awaited<ReturnType<typeof getCardHolder>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCardHolder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCardHolderQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCardHolder>>> = ({ signal }) => getCardHolder(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCardHolder>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCardHolderQueryResult = NonNullable<Awaited<ReturnType<typeof getCardHolder>>>
+export type GetCardHolderQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+
+
+/**
+ * @summary One applicant's cards
+ */
+
+export function useGetCardHolder<TData = Awaited<ReturnType<typeof getCardHolder>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCardHolder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCardHolderQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateVirtualCardAsStaffUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/virtual`
+}
+
+/**
+ * Requires payments.process.
+ * @summary Create an applicant's virtual card
+ */
+export const createVirtualCardAsStaff = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+  return customFetch<CardHolderResult>(getCreateVirtualCardAsStaffUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateVirtualCardAsStaffMutationKey = () => ['createVirtualCardAsStaff'] as const;
+
+export const getCreateVirtualCardAsStaffMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirtualCardAsStaff>>, TError,CreateVirtualCardAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVirtualCardAsStaff>>, TError,CreateVirtualCardAsStaffMutationVariables, TContext> => {
+
+const mutationKey = getCreateVirtualCardAsStaffMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVirtualCardAsStaff>>, CreateVirtualCardAsStaffMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  createVirtualCardAsStaff(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVirtualCardAsStaffMutationResult = NonNullable<Awaited<ReturnType<typeof createVirtualCardAsStaff>>>
+
+    export type CreateVirtualCardAsStaffMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type CreateVirtualCardAsStaffMutationVariables = {id: string}
+
+    /**
+ * @summary Create an applicant's virtual card
+ */
+export const useCreateVirtualCardAsStaff = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirtualCardAsStaff>>, TError,CreateVirtualCardAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVirtualCardAsStaff>>,
+        TError,
+        CreateVirtualCardAsStaffMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateVirtualCardAsStaffMutationOptions(options));
+    }
+
+export const getIssuePhysicalCardUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/physical`
+}
+
+/**
+ * Requires payments.process. No application or fee; the card ships at once and the message is emailed to the applicant.
+ * @summary Issue a physical card directly
+ */
+export const issuePhysicalCard = async (id: string,
+    cardIssue: CardIssue, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getIssuePhysicalCardUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardIssue)
+  }
+);}
+
+
+
+
+
+export const getIssuePhysicalCardMutationKey = () => ['issuePhysicalCard'] as const;
+
+export const getIssuePhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issuePhysicalCard>>, TError,IssuePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof issuePhysicalCard>>, TError,IssuePhysicalCardMutationVariables, TContext> => {
+
+const mutationKey = getIssuePhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof issuePhysicalCard>>, IssuePhysicalCardMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  issuePhysicalCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IssuePhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof issuePhysicalCard>>>
+    export type IssuePhysicalCardMutationBody = BodyType<CardIssue>
+    export type IssuePhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type IssuePhysicalCardMutationVariables = {id: string;data: BodyType<CardIssue>}
+
+    /**
+ * @summary Issue a physical card directly
+ */
+export const useIssuePhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issuePhysicalCard>>, TError,IssuePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof issuePhysicalCard>>,
+        TError,
+        IssuePhysicalCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getIssuePhysicalCardMutationOptions(options));
+    }
+
+export const getApprovePhysicalCardUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/approve`
+}
+
+/**
+ * Requires payments.process. The card ships and the message (with tracking) is emailed to the applicant.
+ * @summary Approve a physical card application
+ */
+export const approvePhysicalCard = async (id: string,
+    cardShipment: CardShipment, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getApprovePhysicalCardUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cardShipment)
+  }
+);}
+
+
+
+
+
+export const getApprovePhysicalCardMutationKey = () => ['approvePhysicalCard'] as const;
+
+export const getApprovePhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvePhysicalCard>>, TError,ApprovePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approvePhysicalCard>>, TError,ApprovePhysicalCardMutationVariables, TContext> => {
+
+const mutationKey = getApprovePhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approvePhysicalCard>>, ApprovePhysicalCardMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approvePhysicalCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApprovePhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof approvePhysicalCard>>>
+    export type ApprovePhysicalCardMutationBody = BodyType<CardShipment>
+    export type ApprovePhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type ApprovePhysicalCardMutationVariables = {id: string;data: BodyType<CardShipment>}
+
+    /**
+ * @summary Approve a physical card application
+ */
+export const useApprovePhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approvePhysicalCard>>, TError,ApprovePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approvePhysicalCard>>,
+        TError,
+        ApprovePhysicalCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApprovePhysicalCardMutationOptions(options));
+    }
+
+export const getDeclinePhysicalCardUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/decline`
+}
+
+/**
+ * Requires payments.process. The fees are refunded and the reason emailed to the applicant.
+ * @summary Decline a physical card application
+ */
+export const declinePhysicalCard = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getDeclinePhysicalCardUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getDeclinePhysicalCardMutationKey = () => ['declinePhysicalCard'] as const;
+
+export const getDeclinePhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declinePhysicalCard>>, TError,DeclinePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof declinePhysicalCard>>, TError,DeclinePhysicalCardMutationVariables, TContext> => {
+
+const mutationKey = getDeclinePhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof declinePhysicalCard>>, DeclinePhysicalCardMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  declinePhysicalCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeclinePhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof declinePhysicalCard>>>
+    export type DeclinePhysicalCardMutationBody = BodyType<Reason>
+    export type DeclinePhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeclinePhysicalCardMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Decline a physical card application
+ */
+export const useDeclinePhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declinePhysicalCard>>, TError,DeclinePhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof declinePhysicalCard>>,
+        TError,
+        DeclinePhysicalCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeclinePhysicalCardMutationOptions(options));
+    }
+
+export const getCancelPhysicalCardUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/cancel`
+}
+
+/**
+ * Requires payments.process. No refund. The reason is shown to the applicant.
+ * @summary Cancel a shipped or active physical card
+ */
+export const cancelPhysicalCard = async (id: string,
+    reason: Reason, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getCancelPhysicalCardUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reason)
+  }
+);}
+
+
+
+
+
+export const getCancelPhysicalCardMutationKey = () => ['cancelPhysicalCard'] as const;
+
+export const getCancelPhysicalCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPhysicalCard>>, TError,CancelPhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelPhysicalCard>>, TError,CancelPhysicalCardMutationVariables, TContext> => {
+
+const mutationKey = getCancelPhysicalCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelPhysicalCard>>, CancelPhysicalCardMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelPhysicalCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelPhysicalCardMutationResult = NonNullable<Awaited<ReturnType<typeof cancelPhysicalCard>>>
+    export type CancelPhysicalCardMutationBody = BodyType<Reason>
+    export type CancelPhysicalCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type CancelPhysicalCardMutationVariables = {id: string;data: BodyType<Reason>}
+
+    /**
+ * @summary Cancel a shipped or active physical card
+ */
+export const useCancelPhysicalCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelPhysicalCard>>, TError,CancelPhysicalCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelPhysicalCard>>,
+        TError,
+        CancelPhysicalCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelPhysicalCardMutationOptions(options));
+    }
+
+export const getSetCardFreezeAsStaffUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/freeze`
+}
+
+/**
+ * Requires accounts.manage. Freezing needs a note, shown to the applicant, who can't lift a staff freeze.
+ * @summary Freeze or unfreeze an applicant's card
+ */
+export const setCardFreezeAsStaff = async (id: string,
+    staffCardFreeze: StaffCardFreeze, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getSetCardFreezeAsStaffUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffCardFreeze)
+  }
+);}
+
+
+
+
+
+export const getSetCardFreezeAsStaffMutationKey = () => ['setCardFreezeAsStaff'] as const;
+
+export const getSetCardFreezeAsStaffMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardFreezeAsStaff>>, TError,SetCardFreezeAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setCardFreezeAsStaff>>, TError,SetCardFreezeAsStaffMutationVariables, TContext> => {
+
+const mutationKey = getSetCardFreezeAsStaffMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setCardFreezeAsStaff>>, SetCardFreezeAsStaffMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setCardFreezeAsStaff(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetCardFreezeAsStaffMutationResult = NonNullable<Awaited<ReturnType<typeof setCardFreezeAsStaff>>>
+    export type SetCardFreezeAsStaffMutationBody = BodyType<StaffCardFreeze>
+    export type SetCardFreezeAsStaffMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type SetCardFreezeAsStaffMutationVariables = {id: string;data: BodyType<StaffCardFreeze>}
+
+    /**
+ * @summary Freeze or unfreeze an applicant's card
+ */
+export const useSetCardFreezeAsStaff = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setCardFreezeAsStaff>>, TError,SetCardFreezeAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setCardFreezeAsStaff>>,
+        TError,
+        SetCardFreezeAsStaffMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetCardFreezeAsStaffMutationOptions(options));
+    }
+
+export const getFundCardAsStaffUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/fund`
+}
+
+/**
+ * Requires payments.process. From the deposit or grant balance, or none (added by staff). Reason required and shown.
+ * @summary Add money to an applicant's card
+ */
+export const fundCardAsStaff = async (id: string,
+    staffCardFunding: StaffCardFunding, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getFundCardAsStaffUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffCardFunding)
+  }
+);}
+
+
+
+
+
+export const getFundCardAsStaffMutationKey = () => ['fundCardAsStaff'] as const;
+
+export const getFundCardAsStaffMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fundCardAsStaff>>, TError,FundCardAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fundCardAsStaff>>, TError,FundCardAsStaffMutationVariables, TContext> => {
+
+const mutationKey = getFundCardAsStaffMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fundCardAsStaff>>, FundCardAsStaffMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  fundCardAsStaff(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FundCardAsStaffMutationResult = NonNullable<Awaited<ReturnType<typeof fundCardAsStaff>>>
+    export type FundCardAsStaffMutationBody = BodyType<StaffCardFunding>
+    export type FundCardAsStaffMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type FundCardAsStaffMutationVariables = {id: string;data: BodyType<StaffCardFunding>}
+
+    /**
+ * @summary Add money to an applicant's card
+ */
+export const useFundCardAsStaff = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fundCardAsStaff>>, TError,FundCardAsStaffMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof fundCardAsStaff>>,
+        TError,
+        FundCardAsStaffMutationVariables,
+        TContext
+      > => {
+      return useMutation(getFundCardAsStaffMutationOptions(options));
+    }
+
+export const getDeductFromCardUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/card-holders/${id}/deduct`
+}
+
+/**
+ * Requires payments.process. Back to the deposit or grant balance, or none (removed). Reason required and shown.
+ * @summary Take money off an applicant's card
+ */
+export const deductFromCard = async (id: string,
+    staffCardDeduction: StaffCardDeduction, options?: Parameters<typeof customFetch>[1]): Promise<CardHolderResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CardHolderResult>(getDeductFromCardUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffCardDeduction)
+  }
+);}
+
+
+
+
+
+export const getDeductFromCardMutationKey = () => ['deductFromCard'] as const;
+
+export const getDeductFromCardMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deductFromCard>>, TError,DeductFromCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deductFromCard>>, TError,DeductFromCardMutationVariables, TContext> => {
+
+const mutationKey = getDeductFromCardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deductFromCard>>, DeductFromCardMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  deductFromCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeductFromCardMutationResult = NonNullable<Awaited<ReturnType<typeof deductFromCard>>>
+    export type DeductFromCardMutationBody = BodyType<StaffCardDeduction>
+    export type DeductFromCardMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeductFromCardMutationVariables = {id: string;data: BodyType<StaffCardDeduction>}
+
+    /**
+ * @summary Take money off an applicant's card
+ */
+export const useDeductFromCard = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deductFromCard>>, TError,DeductFromCardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deductFromCard>>,
+        TError,
+        DeductFromCardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeductFromCardMutationOptions(options));
     }
 
 export const getSavePayoutDestinationUrl = () => {

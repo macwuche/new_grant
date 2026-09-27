@@ -1,4 +1,4 @@
-import type { ChannelId, DemoState, PayoutChannel, Result, Tier, Transaction, Treasury } from './model';
+import type { ChannelId, DemoState, PayoutChannel, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { alertIfHighRisk, logStaff } from './activity';
 import { accountLockReason, patchAccount } from './applicants';
@@ -7,7 +7,7 @@ import { notify } from './notifications';
 import { lockdownMessage } from './security';
 import { CURRENT_APPLICANT_ID } from './seed';
 
-// Applicant money actions: withdrawals and cards. Limits and fees come from the
+// Applicant money actions: withdrawals and payout destinations (cards: ./cards). Limits and fees come from the
 // treasury settings finance manages in /admin/settings. No provider is connected.
 
 /** Fee = min(fixed + amount × rate, cap), never more than the amount itself. */
@@ -74,64 +74,8 @@ export function cancelWithdrawal(state: DemoState, txId: string, now: Date): Res
   return { ok: true, id: txId, message: `Payout request ${txId} cancelled. ${usd(Math.abs(tx.amount))} is back in your grant balance.`, state: next };
 }
 
-// ---------- Cards ----------
-
-export const physicalCardTotal = (treasury: Treasury) => roundCents(treasury.physicalCardFee + treasury.cardDeliveryFee);
-
-/** Highest daily spending limit per account tier. Illustrative values. */
-export const TIER_CARD_LIMITS: Record<Tier, number> = { 1: 500, 2: 2500, 3: 10000 };
-export const MIN_CARD_LIMIT = 50;
-
-export function validateCardLimit(state: DemoState, amount: number): string | null {
-  const max = TIER_CARD_LIMITS[state.profile.tier];
-  if (!Number.isFinite(amount) || !Number.isInteger(amount)) return 'Enter a whole-dollar amount.';
-  if (amount < MIN_CARD_LIMIT) return `The lowest daily limit is ${usd(MIN_CARD_LIMIT)}.`;
-  if (amount > max) return `Tier ${state.profile.tier} accounts can set up to ${usd(max)} a day.`;
-  return null;
-}
-
-export function setCardLimit(state: DemoState, card: 'virtual' | 'physical', amount: number, now = new Date()): Result {
-  const locked = accountLockReason(state);
-  if (locked) return fail(locked);
-  if (card === 'physical' && state.cards.physical.status !== 'Requested') return fail('Request a physical card first.');
-  const error = validateCardLimit(state, amount);
-  if (error) return fail(error, { limit: error });
-  if (state.cards[card].dailyLimit === amount) return fail('That is already the daily limit.');
-  const label = card === 'virtual' ? 'Virtual' : 'Physical';
-  const previous = state.cards[card].dailyLimit;
-  const cards = { ...state.cards, [card]: { ...state.cards[card], dailyLimit: amount } };
-  const next = notify({ ...state, cards }, CURRENT_APPLICANT_ID, `${label} card spending limit ${amount > previous ? 'raised' : 'lowered'}`,
-    `Your ${label.toLowerCase()} card can now spend up to ${usd(amount)} a day (was ${usd(previous)}). If you didn't make this change, freeze the card and contact the grant team.`, '/cards', now);
-  return { ok: true, message: `${label} card daily limit set to ${usd(amount)}.`, state: next };
-}
-
-export function toggleCardFreeze(state: DemoState, now = new Date()): Result {
-  const frozen = !state.cards.virtual.frozen;
-  const locked = accountLockReason(state);
-  if (locked && !frozen) return fail(locked);
-  const next = notify({ ...state, cards: { ...state.cards, virtual: { ...state.cards.virtual, frozen } } }, CURRENT_APPLICANT_ID,
-    frozen ? 'Virtual card frozen' : 'Virtual card unfrozen',
-    frozen ? 'Your virtual card is frozen, so no payments can be made with it until you unfreeze it.' : "Your virtual card is active again. If you didn't unfreeze it, freeze it now and contact the grant team.", '/cards', now);
-  return { ok: true, message: frozen ? 'Virtual card frozen.' : 'Virtual card unfrozen.', state: next };
-}
-
-/** Charges issuance + delivery to the deposit balance, which must still hold the reserve afterwards. */
-export function requestPhysicalCard(state: DemoState, now: Date): Result {
-  if (state.cards.physical.status !== 'Not requested') return fail('A physical card has already been requested.');
-  const locked = accountLockReason(state);
-  if (locked) return fail(locked);
-  const total = physicalCardTotal(state.treasury);
-  const reserve = state.treasury.depositThreshold;
-  const { deposit } = computeBalances(ownTransactions(state));
-  if (deposit - total < reserve) return fail(`Your deposit balance must cover the ${usd(total)} card fees${reserve ? ` and keep ${usd(reserve)} in reserve` : ''}. You have ${usd(deposit)}.`);
-  const ids = nextIds(state);
-  const fee: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Card fee', description: `Physical card issuance${state.treasury.cardDeliveryFee ? ' and delivery' : ''}`, amount: -total, status: 'Completed', createdAt: now.toISOString() };
-  const next = logStaff({ ...state, nextId: ids.nextId, transactions: [fee, ...state.transactions], cards: { ...state.cards, physical: { ...state.cards.physical, status: 'Requested' } } }, {
-    kind: 'card', title: 'Physical card requested', body: `${state.profile.name} · ${usd(total)} in fees charged`, href: '/admin/applicants',
-  }, now);
-  const notified = notify(next, CURRENT_APPLICANT_ID, 'Physical card ordered', `Your physical card is on order. ${usd(total)} in card fees was charged to your deposit balance.`, '/cards', now);
-  return { ok: true, message: `Physical card requested. ${usd(total)} in fees deducted from your deposit balance.`, state: notified };
-}
+// Cards live in ./cards; re-exported so existing imports keep working.
+export * from './cards';
 
 // ---------- Payout destinations ----------
 

@@ -717,10 +717,10 @@ describe("money", () => {
   };
   const withdraw = (amount: number) => post("/money/withdrawals", { amount, channel: "bank" }, "tok-maya");
 
-  it("starts with fictional cards and no entries, and hides who changed the settings", async () => {
+  it("starts with no cards and no entries, and hides who changed the settings", async () => {
     const m = await mine();
     expect(m.transactions).toEqual([]);
-    expect(m.cards.virtual.lastFour).toMatch(/^\d{4}$/);
+    expect(m.cards).toMatchObject({ virtual: null, physical: { status: "Not requested" } });
     expect(m.treasury.changeLog).toEqual([]);
   });
 
@@ -800,6 +800,116 @@ describe("money", () => {
     await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
     expect((await submitApp({ grantId: "creative", application: input }, "tok-maya")).status).toBe(200);
     expect((await mine()).transactions.find((t: { type: string }) => t.type === "Application fee")).toMatchObject({ amount: -10, id: expect.stringMatching(/^TX-\d+$/) });
+  });
+
+  describe("cards", () => {
+    const address = { name: "Maya Okafor", line1: "12 Canal Street", city: "London", postalCode: "E1 6AN", country: "United Kingdom" };
+    const message = "Your card is on its way with Royal Mail: https://track.example/RM4471";
+    const holder = async (token = "tok-finance") => json(await call(`/money/card-holders/${MAYA}`, token));
+    /** Maya with a confirmed deposit, so she can pay the card fees. */
+    const funded = async (amount = 200) => {
+      await call("/profile", "tok-maya");
+      const d = (await json(await deposit(amount))).money.transactions[0];
+      await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
+    };
+
+    it("starts without cards: the virtual card comes first, then a physical card", async () => {
+      await funded();
+      expect((await mine()).cards.virtual).toBeNull();
+      expect((await json(await post("/money/cards/physical", address, "tok-maya"))).error).toMatch(/virtual card first/);
+      const created = await json(await post("/money/cards/virtual", {}, "tok-maya"));
+      expect(created.money.cards.virtual).toMatchObject({ lastFour: expect.stringMatching(/^\d{4}$/), frozen: false });
+      expect((await post("/money/cards/virtual", {}, "tok-maya")).status).toBe(400);
+    });
+
+    it("runs an application through approval with a message that is always emailed, then activation", async () => {
+      await funded();
+      await put("/profile/email-preference", { enabled: false }, "tok-maya");
+      await post("/money/cards/virtual", {}, "tok-maya");
+      expect((await post("/money/cards/physical", { ...address, city: "" }, "tok-maya")).status).toBe(400);
+      expect((await post("/money/cards/physical", address, "tok-maya")).status).toBe(200);
+      expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Physical card application received");
+      expect((await call("/money/card-holders", "tok-maya")).status).toBe(403);
+      const listed = (await json(await call("/money/card-holders", "tok-finance"))).find((h: { applicantId: string }) => h.applicantId === MAYA);
+      expect(listed.cards.physical).toMatchObject({ status: "Requested", shippingAddress: { city: "London" } });
+      expect(JSON.stringify(listed)).not.toContain('"pin"');
+
+      expect((await post(`/money/card-holders/${MAYA}/approve`, { message }, "tok-riley")).status).toBe(403);
+      const approved = await json(await post(`/money/card-holders/${MAYA}/approve`, { message, trackingRef: "RM4471" }, "tok-finance"));
+      expect(approved.holder.cards.physical).toMatchObject({ status: "Shipped", shippingMessage: message, trackingRef: "RM4471", shippedBy: "Jordan Lee" });
+      expect((await json(await call("/notifications", "tok-maya")))[0]).toMatchObject({ title: "Your physical card is on its way", body: message });
+      expect(outbox.rows.some(r => r.to === "maya@example.com" && r.subject === "Your physical card is on its way" && r.text.includes("RM4471"))).toBe(true); // email copies are off
+
+      const lastFour = approved.holder.cards.physical.lastFour;
+      expect((await post("/money/cards/physical/activate", { lastFour }, "tok-maya")).status).toBe(200);
+      const audit = (await json(await call("/audit", "tok-super"))).events.find((e: { action: string }) => e.action === "Approve physical card");
+      expect(audit).toMatchObject({ target: MAYA, applicantId: MAYA, staffName: "Jordan Lee" });
+      expect(audit.changes).toEqual(expect.arrayContaining([expect.objectContaining({ field: "cards.physical.status", before: "Requested", after: "Shipped" })]));
+    });
+
+    it("refunds the fee when an application is declined", async () => {
+      await funded();
+      await post("/money/cards/virtual", {}, "tok-maya");
+      const fee = (await json(await post("/money/cards/physical", address, "tok-maya"))).money.transactions.find((t: { type: string }) => t.type === "Card fee");
+      expect((await post(`/money/card-holders/${MAYA}/decline`, { reason: "We can't ship to this address yet" }, "tok-finance")).status).toBe(200);
+      expect(await entry(fee.id)).toMatchObject({ status: "Cancelled" });
+      expect((await mine()).cards.physical).toMatchObject({ status: "Declined", declineReason: "We can't ship to this address yet" });
+    });
+
+    it("moves money onto the card within the funding rules staff set", async () => {
+      await funded(200);
+      await post("/money/cards/virtual", {}, "tok-maya");
+      expect((await json(await post("/money/cards/fund", { amount: 50, source: "grant" }, "tok-maya"))).error).toMatch(/deposit balance only/);
+      expect((await post("/money/cards/fund", { amount: 180, source: "deposit" }, "tok-maya")).status).toBe(400); // the $25 reserve stays
+      expect((await post("/money/cards/fund", { amount: 100, source: "deposit" }, "tok-maya")).status).toBe(200);
+      expect((await holder()).balance).toBe(100);
+
+      expect((await post(`/applicants/${MAYA}/card-settings`, { funding: "both", kycRequired: false }, "tok-finance")).status).toBe(403);
+      const changed = await json(await post(`/applicants/${MAYA}/card-settings`, { funding: "both", kycRequired: true }, "tok-riley"));
+      expect(changed.applicant.profile.account.cardSettings).toEqual({ funding: "both", kycRequired: true });
+      expect((await json(await call("/profile", "tok-maya"))).account.cardSettings).toEqual({ funding: "both", kycRequired: true });
+      expect((await holder()).settings).toEqual({ funding: "both", kycRequired: true });
+    });
+
+    it("lets finance fund with or without a balance and deduct to a balance or out", async () => {
+      await funded(200);
+      await post(`/money/card-holders/${MAYA}/virtual`, {}, "tok-finance");
+      expect((await post(`/money/card-holders/${MAYA}/fund`, { amount: 60, source: "none", reason: "Goodwill credit for the delay" }, "tok-riley")).status).toBe(403);
+      expect((await post(`/money/card-holders/${MAYA}/fund`, { amount: 60, source: "none", reason: "short" }, "tok-finance")).status).toBe(400);
+      expect((await json(await post(`/money/card-holders/${MAYA}/fund`, { amount: 60, source: "none", reason: "Goodwill credit for the delay" }, "tok-finance"))).holder.balance).toBe(60);
+      expect((await json(await post(`/money/card-holders/${MAYA}/fund`, { amount: 150, source: "deposit", reason: "Moving the deposit onto the card" }, "tok-finance"))).holder.balance).toBe(210);
+      expect((await post(`/money/card-holders/${MAYA}/deduct`, { amount: 500, destination: "none", reason: "Correction of a duplicate credit" }, "tok-finance")).status).toBe(400);
+      expect((await json(await post(`/money/card-holders/${MAYA}/deduct`, { amount: 10, destination: "none", reason: "Correction of a duplicate credit" }, "tok-finance"))).holder.balance).toBe(200);
+      expect((await json(await post(`/money/card-holders/${MAYA}/deduct`, { amount: 50, destination: "deposit", reason: "Returning unused card money" }, "tok-finance"))).holder.balance).toBe(150);
+      const moves = (await mine()).transactions.filter((t: { type: string }) => t.type.startsWith("Card "));
+      expect(moves.map((t: { type: string; counterpart: string; amount: number }) => [t.type, t.counterpart, t.amount])).toEqual(expect.arrayContaining([
+        ["Card top-up", "none", 60], ["Card top-up", "deposit", 150], ["Card deduction", "none", -10], ["Card deduction", "deposit", -50],
+      ]));
+      expect((await json(await call("/notifications", "tok-maya")))[0].body).toContain("Returning unused card money");
+    });
+
+    it("lets compliance freeze with a note the applicant sees when they try to unfreeze", async () => {
+      await call("/profile", "tok-maya");
+      await post("/money/cards/virtual", {}, "tok-maya");
+      expect((await post(`/money/card-holders/${MAYA}/freeze`, { card: "virtual", frozen: true, reason: "Unusual activity on the card" }, "tok-finance")).status).toBe(403);
+      expect((await post(`/money/card-holders/${MAYA}/freeze`, { card: "virtual", frozen: true, reason: "Unusual activity on the card" }, "tok-riley")).status).toBe(200);
+      expect((await json(await post("/money/cards/freeze", {}, "tok-maya"))).error).toBe("The grant team froze this card: Unusual activity on the card. It stays frozen until they lift the freeze.");
+      expect((await post(`/money/card-holders/${MAYA}/freeze`, { card: "virtual", frozen: false }, "tok-riley")).status).toBe(200);
+      expect((await post("/money/cards/freeze", {}, "tok-maya")).status).toBe(200);
+    });
+
+    it("lets finance issue cards for someone who never opened their money pages, but not their own", async () => {
+      await call("/profile", "tok-maya");
+      expect((await holder()).cards.virtual).toBeNull();
+      expect((await json(await post(`/money/card-holders/${MAYA}/physical`, { address, message }, "tok-finance"))).error).toMatch(/virtual card/);
+      await post(`/money/card-holders/${MAYA}/virtual`, {}, "tok-finance");
+      const issued = await json(await post(`/money/card-holders/${MAYA}/physical`, { address, message }, "tok-finance"));
+      expect(issued.holder.cards.physical).toMatchObject({ status: "Shipped", issuedBy: "Jordan Lee" });
+      expect((await mine()).transactions.filter((t: { type: string }) => t.type === "Card fee")).toEqual([]);
+      await call("/profile", "tok-super");
+      expect((await post(`/money/card-holders/${USERS["tok-super"]!.id}/virtual`, {})).status).toBe(403);
+      expect((await post("/money/card-holders/99999999-9999-4999-8999-999999999999/virtual", {})).status).toBe(404);
+    });
   });
 
   it("keeps each applicant to their own money, and staff off their own", async () => {
@@ -945,6 +1055,8 @@ describe("email", () => {
     expect(subjects()).toContain("Deposit pending");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     expect(subjects()).toContain("Identity check in progress");
+    await post("/money/cards/virtual", {}, "tok-maya");
+    expect(subjects()).toContain("Virtual card created");
     await post("/money/cards/freeze", {}, "tok-maya");
     expect(subjects()).toContain("Virtual card frozen");
     await post("/money/cards/freeze", {}, "tok-maya");

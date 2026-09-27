@@ -1,8 +1,15 @@
+import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
-  ConfirmDepositParams as LedgerIdParams, MarkPayoutFailedBody as ReasonBody, RemovePayoutDestinationParams, RequestDepositBody,
-  RequestWithdrawalBody, SavePayoutDestinationBody, SetCardLimitBody, UpdateMoneySettingsBody,
+  ActivatePhysicalCardBody, ApprovePhysicalCardBody, ConfirmDepositParams as LedgerIdParams, DeductFromCardBody, FundCardAsStaffBody, FundCardBody,
+  GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RemovePayoutDestinationParams, RequestDepositBody,
+  RequestPhysicalCardBody, RequestWithdrawalBody, SavePayoutDestinationBody, SetCardFreezeAsStaffBody, SetCardLimitBody, ToggleCardFreezeBody, UpdateMoneySettingsBody,
 } from "@workspace/api-zod";
+import {
+  activatePhysicalCard, approvePhysicalCard, cancelPhysicalCard, cardQueue, createVirtualCard, declinePhysicalCard, DEFAULT_CARD_SETTINGS, fundCard,
+  staffCards, staffCreateVirtualCard, staffDeductCard, staffFundCard, staffIssuePhysicalCard, staffSetCardFreeze,
+} from "@workspace/domain/cards";
+import { computeBalances } from "@workspace/domain/rules";
 import type { Permission } from "@workspace/authz";
 import { cancelDeposit, confirmDeposit, rejectDeposit, requestDeposit } from "@workspace/domain/deposits";
 import {
@@ -12,13 +19,14 @@ import type { ChannelId, DemoState, Result, Transaction, Treasury, TreasuryInput
 import { approvePayoutRelease, markPayoutFailed, markPayoutPaid } from "@workspace/domain/payouts";
 import { endLockdown, startLockdown } from "@workspace/domain/security";
 import { applicantState, readApplicantSlot, serverState } from "@workspace/domain/server";
+import { CURRENT_APPLICANT_ID as SLOT } from "@workspace/domain/seed";
 import { updateTreasury } from "@workspace/domain/treasury";
 import { effectsOf } from "../lib/activity";
 import { slotApplicant } from "../lib/applicantRules";
 import { storeLedgerChanges } from "../lib/ledger";
 import { logger } from "../lib/logger";
-import type { MoneyRepo } from "../lib/moneyRepo";
-import type { ProfileRepo } from "../lib/profileRepo";
+import { newCards, type MoneyRepo } from "../lib/moneyRepo";
+import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 import { ownProfile } from "./profile";
 
@@ -32,6 +40,9 @@ import { ownProfile } from "./profile";
 type Failure = { status: 400 | 403 | 404 | 409; body: { error: string; fieldErrors?: Record<string, string> } };
 const refused = (r: Result & { ok: false }): Failure => ({ status: 400, body: { error: r.error, ...(r.fieldErrors ? { fieldErrors: r.fieldErrors } : {}) } });
 const send = (res: Response, f: Failure) => res.status(f.status).json(f.body);
+
+/** No card issuer is connected, so card endings and PINs are random. */
+const fourDigits = () => String(randomInt(10_000)).padStart(4, "0");
 
 /** What applicants see of the settings: the rules that apply to them, not who changed what. */
 const forApplicants = (t: Treasury): Treasury => ({ ...t, changeLog: [] });
@@ -98,13 +109,32 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
     if (!id) { res.status(404).json({ error: "That payout request could not be found." }); return; }
     await asApplicant(res, s => cancelWithdrawal(s, id, new Date()));
   });
-  router.post("/money/cards/freeze", async (_req, res) => { await asApplicant(res, toggleCardFreeze); });
+  router.post("/money/cards/freeze", async (req, res) => {
+    const b = ToggleCardFreezeBody.safeParse(req.body ?? {});
+    if (!b.success) { res.status(400).json({ error: "Choose the virtual or physical card." }); return; }
+    await asApplicant(res, s => toggleCardFreeze(s, new Date(), b.data.card ?? "virtual"));
+  });
+  router.post("/money/cards/physical/activate", async (req, res) => {
+    const b = ActivatePhysicalCardBody.safeParse(req.body);
+    if (!b.success) { res.status(400).json({ error: "Enter the last four digits on the front of your card.", fieldErrors: { lastFour: "Enter four digits." } }); return; }
+    await asApplicant(res, s => activatePhysicalCard(s, b.data.lastFour, new Date()));
+  });
   router.post("/money/cards/limit", async (req, res) => {
     const b = SetCardLimitBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Send the card and a daily limit." }); return; }
     await asApplicant(res, s => setCardLimit(s, b.data.card, b.data.limit));
   });
-  router.post("/money/cards/physical", async (_req, res) => { await asApplicant(res, s => requestPhysicalCard(s, new Date())); });
+  router.post("/money/cards/virtual", async (_req, res) => { await asApplicant(res, s => createVirtualCard(s, fourDigits(), fourDigits(), new Date())); });
+  router.post("/money/cards/fund", async (req, res) => {
+    const b = FundCardBody.safeParse(req.body);
+    if (!b.success) { res.status(400).json({ error: "Send an amount and the balance to take it from." }); return; }
+    await asApplicant(res, s => fundCard(s, b.data.amount, b.data.source, new Date()));
+  });
+  router.post("/money/cards/physical", async (req, res) => {
+    const b = RequestPhysicalCardBody.safeParse(req.body);
+    if (!b.success) { res.status(400).json({ error: "Enter the shipping address: name, address, city, postal code, and country." }); return; }
+    await asApplicant(res, s => requestPhysicalCard(s, b.data, new Date()));
+  });
   router.post("/money/destinations", async (req, res) => {
     const b = SavePayoutDestinationBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Send the channel and the destination details." }); return; }
@@ -164,6 +194,72 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
     return markPayoutPaid(s, tx.id, a.name, new Date());
   }));
   txAction("withdrawals/:id/failed", "payments.process", "Mark payout failed", reason(text => (s, a, tx) => markPayoutFailed(s, tx.id, text, a.name, new Date()), "Explain why the payout failed."));
+
+  // ---------- Staff: cards ----------
+
+  /** An applicant's cards as staff see them: no PIN, with the card balance and their card settings. */
+  async function holderOf(record: ProfileRecord) {
+    const [profile, ledger] = await Promise.all([money.moneyProfile(record.authUserId), money.ledgerFor(record.authUserId)]);
+    return { applicantId: record.authUserId, name: record.name, email: record.email, cards: staffCards(profile?.cards ?? newCards()), balance: computeBalances(ledger).card, settings: record.account.cardSettings ?? DEFAULT_CARD_SETTINGS };
+  }
+
+  router.get("/money/card-holders", requireStaff, async (_req, res) => {
+    const [holders, ledger] = await Promise.all([money.cardHolders(), money.ledger()]);
+    res.json(cardQueue(holders.map(h => ({ ...h, cards: staffCards(h.cards), balance: computeBalances(ledger.filter(t => t.applicantId === h.applicantId)).card }))));
+  });
+  router.get("/money/card-holders/:id", requireStaff, async (req, res) => {
+    const p = ApplicantIdParams.safeParse(req.params);
+    const record = p.success ? await profiles.get(p.data.id) : null;
+    if (!record) { res.status(404).json({ error: "That applicant could not be found." }); return; }
+    res.json(await holderOf(record));
+  });
+
+  type CardCommand = (state: DemoState, actor: { id: string; name: string }) => Result;
+
+  /** A staff card rule on one applicant, run with them in the rules' slot under their money lock. */
+  const cardAction = (path: string, permission: Permission, label: string, parse: (body: unknown) => { ok: true; command: CardCommand } | { ok: false; error: string }) =>
+    router.post(`/money/card-holders/:id/${path}`, requireStaff, requirePermission(permission), async (req, res) => {
+      const p = ApplicantIdParams.safeParse(req.params);
+      const record = p.success ? await profiles.get(p.data.id) : null;
+      if (!record) { res.status(404).json({ error: "That applicant could not be found." }); return; }
+      if (record.authUserId === authLocals(res).user.id) { res.status(403).json({ error: "You can't manage your own cards. Ask another team member." }); return; }
+      const parsed = parse(req.body);
+      if (!parsed.ok) { res.status(400).json({ error: parsed.error }); return; }
+      const actor = authLocals(res).staff!;
+      const nextId = await money.nextBlock();
+      const outcome = await money.withApplicant(record.authUserId, async (scope): Promise<{ message: string } | { failure: Failure }> => {
+        const base = slotApplicant(scope.applicant);
+        const before = applicantState({ transactions: scope.transactions, treasury: scope.treasury, lockdown: scope.lockdown, nextId },
+          { ...base, cards: scope.money.cards, payoutDestinations: scope.money.payoutDestinations });
+        const result = parsed.command(before, actor);
+        if (!result.ok) return { failure: refused(result) };
+        const slot = readApplicantSlot(result.state, record.authUserId);
+        await storeLedgerChanges(scope.transactions, slot.transactions, scope.saveTransaction);
+        await scope.saveMoney({ ...scope.money, cards: slot.cards });
+        // The audit target is the rules' slot id; it's stored as the applicant's real id.
+        await scope.record(effectsOf(before, result.state, new Date(), { slotId: record.authUserId, audit: auditContext(req, res, label, SLOT), summary: result.message }));
+        return { message: result.message };
+      });
+      if ("failure" in outcome) { send(res, outcome.failure); return; }
+      logger.info({ actor: actor.id, applicant: record.authUserId, action: path }, "card changed by staff");
+      res.json({ holder: await holderOf(record), message: outcome.message });
+    });
+
+  const body = <T,>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, error: string, make: (data: T) => CardCommand) => (raw: unknown) => {
+    const b = schema.safeParse(raw ?? {});
+    return b.success ? { ok: true as const, command: make(b.data) } : { ok: false as const, error };
+  };
+  cardAction("virtual", "payments.process", "Create virtual card", () => ({ ok: true, command: (s, a) => staffCreateVirtualCard(s, fourDigits(), fourDigits(), a.name, new Date()) }));
+  cardAction("physical", "payments.process", "Issue physical card", body(IssuePhysicalCardBody, "Send the shipping address and the message for the applicant.",
+    d => (s, a) => staffIssuePhysicalCard(s, d.address, fourDigits(), d.message, d.trackingRef ?? "", a.name, new Date())));
+  cardAction("approve", "payments.process", "Approve physical card", body(ApprovePhysicalCardBody, "Write the message for the applicant (up to 2000 characters).",
+    d => (s, a) => approvePhysicalCard(s, fourDigits(), d.message, d.trackingRef ?? "", a.name, new Date())));
+  cardAction("decline", "payments.process", "Decline physical card", body(ReasonBody, "Explain why the application is declined.", d => (s, a) => declinePhysicalCard(s, d.reason, a.name, new Date())));
+  cardAction("cancel", "payments.process", "Cancel physical card", body(ReasonBody, "Explain why the card is being cancelled.", d => (s, a) => cancelPhysicalCard(s, d.reason, a.name, new Date())));
+  cardAction("freeze", "accounts.manage", "Change card freeze", body(SetCardFreezeAsStaffBody, "Say which card, whether to freeze it, and the note for the applicant.",
+    d => s => staffSetCardFreeze(s, d.card, d.frozen, d.reason ?? "", new Date())));
+  cardAction("fund", "payments.process", "Fund card", body(FundCardAsStaffBody, "Send an amount, where it comes from, and a reason.", d => (s, a) => staffFundCard(s, d.amount, d.source, d.reason, a.name, new Date())));
+  cardAction("deduct", "payments.process", "Deduct from card", body(DeductFromCardBody, "Send an amount, where it goes, and a reason.", d => (s, a) => staffDeductCard(s, d.amount, d.destination, d.reason, a.name, new Date())));
 
   // ---------- Staff: settings and lockdown ----------
 

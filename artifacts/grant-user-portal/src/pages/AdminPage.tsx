@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppNameText, BrandLetter, Wordmark } from '@/lib/appName';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import {
   ArrowRight, Banknote, ClipboardList, FileText, FolderOpen,
   LayoutDashboard, Mail, Search, Settings2, ShieldAlert, ShieldCheck, Users,
@@ -12,6 +12,8 @@ import { AdminReviewPanel } from './AdminReviewPanel';
 import { AdminPayouts } from './AdminPayouts';
 import { AdminPrograms } from './AdminPrograms';
 import { AdminDeposits } from './AdminDeposits';
+import { AdminCards } from './AdminCards';
+import { AdminApplicantProfile } from './AdminApplicantProfile';
 import { ActivityItem, AdminActivityMenu, useOpenActivity } from './AdminActivityMenu';
 import { AdminApplicantPanel } from './AdminApplicantPanel';
 import { AdminAudit } from './AdminAudit';
@@ -35,7 +37,7 @@ import { format } from 'date-fns';
 import './AdminPage.css';
 import './AdminSecurity.css';
 
-export type AdminSection = 'overview' | 'applicants' | 'inbox' | 'applications' | 'payouts' | 'deposits' | 'grants' | 'security' | 'audit' | 'settings';
+export type AdminSection = 'overview' | 'applicants' | 'applicant' | 'inbox' | 'applications' | 'payouts' | 'deposits' | 'cards' | 'grants' | 'security' | 'audit' | 'settings';
 type Applicant = { id: string; name: string; email: string; sector: string; country: string; status: string; joined: string; applications: number; tier: number; kyc: string; locked: boolean; risk: RiskAssessment; wallet: number; activeGrants: number };
 /** Queue row derived from the shared store. */
 type Application = { id: string; title: string; applicant: string; amount: number; status: string; date: string; program: string; escalated: boolean };
@@ -63,12 +65,13 @@ function useApplicants(): Applicant[] {
   });
 }
 
-/** Deposits live under Payments; the audit log under Security. */
-const isActive = (current: AdminSection, item: AdminSection) => current === item || (item === 'payouts' && current === 'deposits') || (item === 'security' && current === 'audit');
-function PaymentsTabs({ tab }: { tab: 'payouts' | 'deposits' }) {
+/** Deposits and cards live under Payments; the audit log under Security. */
+const isActive = (current: AdminSection, item: AdminSection) => current === item || (item === 'applicants' && current === 'applicant') || (item === 'payouts' && (current === 'deposits' || current === 'cards')) || (item === 'security' && current === 'audit');
+function PaymentsTabs({ tab }: { tab: 'payouts' | 'deposits' | 'cards' }) {
   return <nav className="admin-tabs" aria-label="Payments">
     <Link href="/admin/payouts" className={tab === 'payouts' ? 'active' : ''} aria-current={tab === 'payouts' ? 'page' : undefined} data-testid="tab-admin-payments-payouts">Payouts</Link>
     <Link href="/admin/deposits" className={tab === 'deposits' ? 'active' : ''} aria-current={tab === 'deposits' ? 'page' : undefined} data-testid="tab-admin-payments-deposits">Deposits</Link>
+    <Link href="/admin/cards" className={tab === 'cards' ? 'active' : ''} aria-current={tab === 'cards' ? 'page' : undefined} data-testid="tab-admin-payments-cards">Cards</Link>
   </nav>;
 }
 function SecurityTabs({ tab }: { tab: 'security' | 'audit' }) {
@@ -192,9 +195,11 @@ function Applications({ openReview }: { openReview: (id: string) => void }) {
 
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
+  applicant: { eyebrow: 'People / Profile', title: 'One applicant, everything in one place.', description: 'Identity, account controls, balances, cards, and card rules for this applicant. Every change is role-checked and audited.' },
   applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Fictional applicants with their tier, identity status, balances, and fraud risk. Open a profile to change tier, lock the account, force credential resets, or review identity.' },
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'Mail to and from the grant team\'s address.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
+  cards: { eyebrow: 'Funding / Cards', title: 'Cards, from application to doorstep.', description: 'Approve or decline physical card applications, issue cards, fund or deduct from card balances, and freeze cards. The cards are fictional: no card issuer is connected.' },
   deposits: { eyebrow: 'Funding / Deposits', title: 'Money in, matched by reference.', description: 'Confirm deposits applicants have announced once the transfer arrives, or reject them with a reason. No bank feed is connected.' },
   payouts: { eyebrow: 'Funding / Payouts', title: 'Money out, on the record.', description: 'Process applicant withdrawal requests: record each as paid or failed. No payment provider is connected, so nothing is actually sent.' },
   security: { eyebrow: 'Trust / Security', title: 'Risk, identity, and controls.', description: 'Review identity checks, watch automated fraud scores, handle escalated applications, and trigger an emergency lockdown. Demo signals only.' },
@@ -203,12 +208,13 @@ const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; descri
   settings: { eyebrow: 'Workspace / Configuration', title: 'A place for the rules.', description: 'Settings are grouped by area. Open a section to see and change what it covers.' },
 };
 
-export function AdminPage({ section, settingsSection }: { section: AdminSection; settingsSection?: string }) {
-  return <AdminGate><AdminWorkspace section={section} settingsSection={settingsSection} /></AdminGate>;
+export function AdminPage({ section, settingsSection, applicantId }: { section: AdminSection; settingsSection?: string; applicantId?: string }) {
+  return <AdminGate><AdminWorkspace section={section} settingsSection={settingsSection} applicantId={applicantId} /></AdminGate>;
 }
 
-function AdminWorkspace({ section, settingsSection }: { section: AdminSection; settingsSection?: string }) {
+function AdminWorkspace({ section, settingsSection, applicantId: profileId }: { section: AdminSection; settingsSection?: string; applicantId?: string }) {
   const { state } = useDemoStore();
+  const [, navigate] = useLocation();
   const signedIn = useSession().status === 'signedIn';
   const [applicantId, setApplicantId] = useState<string | null>(null);
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -218,11 +224,13 @@ function AdminWorkspace({ section, settingsSection }: { section: AdminSection; s
   const copy = sectionCopy[section];
   const content: Record<AdminSection, ReactNode> = {
     overview: <Overview openReview={setReviewId} />,
-    applicants: <Applicants openApplicant={setApplicantId} />,
+    applicants: <Applicants openApplicant={id => navigate(`/admin/applicants/${id}`)} />,
+    applicant: <AdminApplicantProfile applicantId={profileId ?? ''} />,
     inbox: signedIn ? <AdminInboxLive /> : <AdminInbox />,
     applications: <Applications openReview={setReviewId} />,
     payouts: <><PaymentsTabs tab="payouts" /><AdminPayouts /></>,
     deposits: <><PaymentsTabs tab="deposits" /><AdminDeposits /></>,
+    cards: <><PaymentsTabs tab="cards" /><AdminCards /></>,
     grants: <AdminPrograms />,
     security: <><SecurityTabs tab="security" /><AdminSecurity openApplicant={setApplicantId} openReview={setReviewId} /></>,
     audit: <><SecurityTabs tab="audit" /><AdminAudit /></>,

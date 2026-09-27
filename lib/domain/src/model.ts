@@ -92,7 +92,9 @@ export type Application = {
 
 export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
 
-export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee';
+export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Card top-up' | 'Card deduction';
+/** Card top-ups and deductions: the balance on the other side of the move, or 'none' when staff add or remove money outright. */
+export type CardCounterpart = 'deposit' | 'grant' | 'none';
 export type TransactionStatus = 'Completed' | 'Pending' | 'Failed' | 'Cancelled';
 
 export type Transaction = {
@@ -120,6 +122,10 @@ export type Transaction = {
   dualControl?: boolean;
   /** Withdrawals only: the second sign-off, by someone other than whoever marks it paid. */
   releaseApproval?: { by: string; at: string; /** Server records only: the approver's staff id, compared instead of the name. */ byId?: string };
+  /** Card top-ups and deductions only (see CardCounterpart). */
+  counterpart?: CardCounterpart;
+  /** Staff card moves: the reason, shown to the applicant. */
+  note?: string;
 };
 
 export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
@@ -223,7 +229,13 @@ export type AccountControls = {
   signals: RiskSignals;
   /** Last time a payout destination was added or changed (a fraud signal). */
   destinationChangedAt?: string;
+  /** Staff-set card rules for this applicant; defaults in cards.ts when absent. */
+  cardSettings?: CardSettings;
 };
+
+/** Which balances an applicant may move onto their card themselves (staff can use either). */
+export type CardFunding = 'deposit' | 'grant' | 'both';
+export type CardSettings = { funding: CardFunding; /** Cards can't be created until the identity check is verified. */ kycRequired: boolean };
 
 import type { StaffRole } from '@workspace/authz';
 export type { StaffRole };
@@ -251,9 +263,45 @@ export type AuditEvent = {
 
 export type Lockdown = { since: string; by: string; reason: string };
 
+export type CardKind = 'virtual' | 'physical';
+/**
+ * Physical card lifecycle: the applicant applies (shipping address and fee)
+ * and the application waits for staff, who approve it with a shipping message
+ * (Shipped) or decline it (fee refunded). Staff can also issue a card directly.
+ * The applicant activates a shipped card with its last four digits. Staff can
+ * cancel a shipped or active card. After a decline or cancellation the
+ * applicant may apply again. A physical card needs a virtual card first.
+ */
+export type PhysicalCardStatus = 'Not requested' | 'Requested' | 'Shipped' | 'Active' | 'Declined' | 'Cancelled';
+/** Who froze a card. An applicant can't lift a freeze staff put on; they see the staff note instead. */
+export type CardFreeze = { frozenBy?: 'applicant' | 'staff'; frozenReason?: string };
+export type ShippingAddress = { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string };
+
+export type VirtualCard = { lastFour: string; dailyLimit: number; frozen: boolean; pin: string; createdAt?: string; createdBy?: string } & CardFreeze;
+export type PhysicalCard = {
+  status: PhysicalCardStatus; dailyLimit: number;
+  /** Printed on the card; set when it ships. */
+  lastFour?: string;
+  frozen?: boolean;
+  shippingAddress?: ShippingAddress;
+  requestedAt?: string;
+  /** The ledger entry for the fees, so a decline can refund them. */
+  feeTxId?: string;
+  /** Staff issued the card directly (no application, no fee). */
+  issuedBy?: string;
+  shippedAt?: string; shippedBy?: string; trackingRef?: string;
+  /** The message staff wrote when approving or issuing, emailed to the applicant. */
+  shippingMessage?: string;
+  activatedAt?: string;
+  declinedAt?: string; declinedBy?: string; declineReason?: string;
+  cancelledAt?: string; cancelledBy?: string; cancelReason?: string;
+} & CardFreeze;
+
+/** One card balance (derived from the ledger) is shared by both cards. */
 export type CardsState = {
-  virtual: { lastFour: string; dailyLimit: number; frozen: boolean; pin: string };
-  physical: { status: 'Not requested' | 'Requested'; dailyLimit: number };
+  /** Created by the applicant or staff; null until then. */
+  virtual: VirtualCard | null;
+  physical: PhysicalCard;
 };
 
 export type DemoState = {

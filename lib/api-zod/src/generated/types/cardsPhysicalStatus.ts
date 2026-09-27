@@ -12,4 +12,8 @@ export type CardsPhysicalStatus = typeof CardsPhysicalStatus[keyof typeof CardsP
 export const CardsPhysicalStatus = {
   Not_requested: 'Not requested',
   Requested: 'Requested',
+  Shipped: 'Shipped',
+  Active: 'Active',
+  Declined: 'Declined',
+  Cancelled: 'Cancelled',
 } as const;

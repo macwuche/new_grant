@@ -23,7 +23,7 @@ import { ServerDataProvider, apiError, useMoneyAction, useServerData, type Outco
 import { SessionProvider, useSession } from './lib/session';
 import { DocumentFiles, UploadButton, useMyDocuments } from './lib/documents';
 import { TwoStepCodeForm, TwoStepSetupForm } from './components/TwoStep';
-import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, Tier, Transaction } from '@workspace/domain/model';
+import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, PhysicalCardStatus, ShippingAddress, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
 import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
@@ -35,7 +35,7 @@ import {
 } from '@workspace/domain/rules';
 import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
-  cancelWithdrawal, channelFee, DESTINATION_FIELDS, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
+  activatePhysicalCard, canRequestPhysical, cancelWithdrawal, cardKycBlocker, cardSettingsOf, channelFee, checkAddress, createVirtualCard, DEFAULT_CARD_LIMIT, DESTINATION_FIELDS, formatAddress, fundableFrom, fundCard, fundingSources, physicalInUse, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
   requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateCardLimit, validateWithdrawal, type DestinationInput,
 } from '@workspace/domain/money';
 import { cancelDeposit, DEPOSIT_METHODS, requestDeposit, validateDeposit } from '@workspace/domain/deposits';
@@ -195,7 +195,7 @@ function Dashboard({ onToast }: { onToast: Toast }) {
         {recentApps.length ? <div className="timeline">{recentApps.map(app => <TimelineRow key={app.id} title={grantName(state, app.grantId)} text={app.status === 'Draft' ? 'Continue where you left off when ready.' : app.status === 'Changes requested' ? `Action needed: ${app.history[app.history.length - 1]!.note}` : app.history[app.history.length - 1]!.note} status={app.status} current={app.status === 'Submitted' || app.status === 'Under review' || app.status === 'Changes requested'} done={app.status === 'Approved'} href={`/applications/${app.id}`} />)}</div>
           : <div className="empty-state"><h3>No applications yet</h3><p>Browse grant categories to start your first application.</p></div>}
       </div>
-      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your active card</h2><p className="section-subtitle">{virtual.frozen ? 'Frozen — unfreeze it from Cards.' : 'Ready for everyday spending.'}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">Manage</Link></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} /><div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><Link className="quick-action" href="/deposits" data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</Link></div></div>
+      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your card</h2><p className="section-subtitle">{!virtual ? 'No card yet — create one from Cards.' : virtual.frozen ? 'Frozen — see Cards.' : `Card balance ${money(balances.card)}`}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">{virtual ? 'Manage' : 'Create'}</Link></div>{virtual ? <CardVisual name={state.profile.name} lastFour={virtual.lastFour} /> : <CardVisual name={state.profile.name} label="NO CARD YET" />}<div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><Link className="quick-action" href="/deposits" data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</Link></div></div>
     </section>
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Recent activity</h2><p className="section-subtitle">Latest entries in your demo ledger.</p></div><Link className="link-text" href="/transactions" data-testid="link-view-transactions">See activity</Link></div><TransactionTable rows={recentTx} /></section>
   </div>;
@@ -432,8 +432,8 @@ function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: G
 }
 
 function CardLimitEditor({ card, onToast }: { card: 'virtual' | 'physical'; onToast: Toast }) {
-  const { state, run } = useDemoStore();
-  const current = state.cards[card].dailyLimit;
+  const { state } = useDemoStore();
+  const current = state.cards[card]?.dailyLimit ?? DEFAULT_CARD_LIMIT;
   const [value, setValue] = useState(String(current));
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { setValue(String(current)); }, [current]);
@@ -453,37 +453,176 @@ function CardLimitEditor({ card, onToast }: { card: 'virtual' | 'physical'; onTo
     {error ? <FieldError id={`${id}-error`} message={error} /> : <span className="field-hint">{money(MIN_CARD_LIMIT)} – {money(max)} for Tier {state.profile.tier} accounts</span>}
   </div>;
 }
+/** A random card ending or PIN for the browser demo (the server makes its own). */
+const fourDigits = () => String(Math.floor(Math.random() * 10_000)).padStart(4, '0');
 function CardsPage({ onToast }: { onToast: Toast }) {
-  const { state, run } = useDemoStore();
+  const { state } = useDemoStore();
   const [revealed, setRevealed] = useState(false);
   const [pinShown, setPinShown] = useState(false);
+  const [freezeNote, setFreezeNote] = useState<string | null>(null);
   useEffect(() => { if (!pinShown) return; const timer = window.setTimeout(() => setPinShown(false), 10_000); return () => window.clearTimeout(timer); }, [pinShown]);
   const { virtual, physical } = state.cards;
-  const { treasury } = state;
-  const balances = computeBalances(ownTransactions(state));
-  const requested = physical.status === 'Requested';
   const locked = !!accountLockReason(state);
-  const total = physicalCardTotal(treasury);
   const moneyAction = useMoneyAction();
   const cardsNote = useServerData().connected ? 'Card settings are saved to your account, but the cards are fictional: no card network is connected yet.' : 'Card changes are saved in this browser only; no card network is connected yet.';
-  const act = (result: MoneyOutcome) => onToast(result.ok ? result.message : result.error);
-  return <div className="stack"><div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. {cardsNote}</p></div><section className="grid-2">
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} /><div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => void moneyAction(toggleCardFreeze, api.toggleCardFreeze).then(act)} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Demo PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle">{requested ? 'Requested — delivery tracking arrives with the card provider.' : 'Request a card for in-person spending.'}</p></div>{requested ? <StatusBadge status="Requested" tone="Pending" /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div><CardVisual name={state.profile.name} physical label={requested ? 'REQUESTED' : 'NOT REQUESTED'} /><div style={{ marginTop: 16 }}>
-      <div className="fee-row"><span>Issuance fee</span><strong>{money(treasury.physicalCardFee)}</strong></div>
-      {treasury.cardDeliveryFee > 0 && <div className="fee-row"><span>Delivery fee</span><strong>{money(treasury.cardDeliveryFee)}</strong></div>}
-      <div className="fee-row"><span>Deposit balance</span><strong>{money(balances.deposit)}</strong></div>
-      {treasury.depositThreshold > 0 && <div className="fee-row"><span>Required reserve after fees</span><strong>{money(treasury.depositThreshold)}</strong></div>}
-      <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={requested || locked} onClick={() => void moneyAction(s => requestPhysicalCard(s, new Date()), api.requestPhysicalCard).then(act)} data-testid="button-request-physical-card">{requested ? 'Card requested' : `Request physical card · ${money(total)}`}</button>
-      {!requested && balances.deposit - total < treasury.depositThreshold && <p className="field-hint" style={{ marginTop: 8 }}>Your deposit balance is too low. <Link href="/deposits" className="link-text">Add funds</Link></p>}
-    </div></div>
-  </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Daily spending limits</h2><p className="section-subtitle">Set your own limit up to your tier's maximum. Illustrative — no card network enforces it yet.</p></div></div><div className="field-grid"><CardLimitEditor card="virtual" onToast={onToast} />{requested ? <CardLimitEditor card="physical" onToast={onToast} /> : <div className="field"><span className="field-label">Physical card daily limit</span><span className="field-hint">Available once you request a physical card.</span></div>}</div></section></div>;
+  const intro = <div className="page-intro"><h2>Spend with context.</h2><p>Manage your cards here. {cardsNote}</p></div>;
+  if (!virtual) return <div className="stack">{intro}<CreateVirtualCard onToast={onToast} /></div>;
+  const staffFrozen = virtual.frozen && virtual.frozenBy === 'staff';
+  const toggle = async () => {
+    const result = await moneyAction(toggleCardFreeze, () => api.toggleCardFreeze({ card: 'virtual' }));
+    if (!result.ok && staffFrozen) { setFreezeNote(result.error); return; }
+    setFreezeNote(null); onToast(result.ok ? result.message : result.error);
+  };
+  return <div className="stack">{intro}<CardBalancePanel onToast={onToast} /><section className="grid-2">
+    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : staffFrozen ? 'Frozen by the grant team.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} />
+      {freezeNote && <StaffFreezeNote text={freezeNote} />}
+      <div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => void toggle()} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Demo PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
+    <PhysicalCardPanel onToast={onToast} />
+  </section><section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Daily spending limits</h2><p className="section-subtitle">Set your own limit up to your tier's maximum. Illustrative — no card network enforces it yet.</p></div></div><div className="field-grid"><CardLimitEditor card="virtual" onToast={onToast} />{physicalInUse(physical.status) ? <CardLimitEditor card="physical" onToast={onToast} /> : <div className="field"><span className="field-label">Physical card daily limit</span><span className="field-hint">Available once you apply for a physical card.</span></div>}</div></section></div>;
+}
+/** Shown when the applicant tries to lift a freeze the grant team put on: the note staff wrote. */
+function StaffFreezeNote({ text }: { text: string }) {
+  return <div className="notice mt danger-text" role="alert" data-testid="text-card-staff-freeze"><Info size={16} />{text}</div>;
+}
+function CreateVirtualCard({ onToast }: { onToast: Toast }) {
+  const { state } = useDemoStore();
+  const moneyAction = useMoneyAction();
+  const blocked = accountLockReason(state) ?? cardKycBlocker(state);
+  const create = async () => {
+    const result = await moneyAction(s => createVirtualCard(s, fourDigits(), fourDigits(), new Date()), api.createVirtualCard);
+    onToast(result.ok ? result.message : result.error);
+  };
+  return <section className="card card-pad" style={{ maxWidth: 560 }} data-testid="panel-create-virtual-card"><div className="section-head"><div><h2 className="section-title">Create your virtual card</h2><p className="section-subtitle">Your virtual card comes first: your card balance sits behind it, and a physical card can be linked to it later.</p></div><CreditCard size={19} color="hsl(var(--muted))" /></div>
+    <CardVisual name={state.profile.name} label="NO CARD YET" />
+    {blocked && <div className="notice mt" data-testid="text-create-card-blocked"><Info size={16} /><span>{blocked}{cardKycBlocker(state) && <> <Link href="/settings" className="link-text">Go to Settings</Link></>}</span></div>}
+    <button className="btn btn-dark" style={{ width: '100%', marginTop: 14 }} disabled={!!blocked} onClick={() => void create()} data-testid="button-create-virtual-card">Create virtual card</button>
+  </section>;
+}
+function CardBalancePanel({ onToast }: { onToast: Toast }) {
+  const { state } = useDemoStore();
+  const moneyAction = useMoneyAction();
+  const balances = computeBalances(ownTransactions(state));
+  const sources = fundingSources(cardSettingsOf(state).funding);
+  const [source, setSource] = useState<'deposit' | 'grant'>(sources[0]!);
+  useEffect(() => { if (!sources.includes(source)) setSource(sources[0]!); }, [sources.join(), source]);
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const available = fundableFrom(state, source, true);
+  const submit = async () => {
+    const value = amount.trim() === '' ? NaN : Number(amount);
+    const result = await moneyAction(s => fundCard(s, value, source, new Date()), () => api.fundCard({ amount: value, source }));
+    if (!result.ok) { setError(result.fieldErrors?.amount ?? result.error); return; }
+    setError(null); setAmount(''); onToast(result.message);
+  };
+  return <section className="card card-pad" data-testid="panel-card-balance"><div className="section-head"><div><h2 className="section-title">Card balance</h2><p className="section-subtitle">Shared by your virtual and physical card.</p></div><strong className="mono" style={{ fontSize: 22 }} data-testid="text-card-balance">{money(balances.card)}</strong></div>
+    <div className="field-grid">
+      <div className="field"><label className="field-label" htmlFor="fund-source">Move money from</label>
+        <select id="fund-source" className="input" value={source} onChange={e => { setSource(e.target.value as 'deposit' | 'grant'); setError(null); }} disabled={sources.length === 1} data-testid="select-fund-source">{sources.map(src => <option key={src} value={src}>{src === 'deposit' ? `Deposit balance (${money(balances.deposit)})` : `Grant balance (${money(balances.grant)})`}</option>)}</select>
+        <span className="field-hint">{sources.length === 1 ? `Your account can fund the card from your ${sources[0]} balance.` : 'Your account can fund the card from either balance.'}</span></div>
+      <div className="field"><label className="field-label" htmlFor="fund-amount">Amount (USD)</label>
+        <div style={{ display: 'flex', gap: 8 }}><input id="fund-amount" className="input" type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} aria-invalid={!!error} aria-describedby={error ? 'fund-amount-error' : undefined} data-testid="input-fund-amount" /><button className="btn btn-dark" disabled={!amount} onClick={() => void submit()} data-testid="button-fund-card">Add to card</button></div>
+        {error ? <FieldError id="fund-amount-error" message={error} /> : <span className="field-hint">Up to {money(available)}{source === 'deposit' && state.treasury.depositThreshold ? ` (${money(state.treasury.depositThreshold)} stays as your reserve)` : ''}.</span>}</div>
+    </div>
+  </section>;
+}
+const PHYSICAL_COPY: Record<PhysicalCardStatus, { subtitle: string; badge: string; tone: string; label: string }> = {
+  'Not requested': { subtitle: 'Apply for a card for in-person spending, mailed to you.', badge: '', tone: '', label: 'NOT REQUESTED' },
+  Requested: { subtitle: "Application received and under review. We'll email you when your card ships.", badge: 'Under review', tone: 'Pending', label: 'UNDER REVIEW' },
+  Shipped: { subtitle: 'On its way. Activate it when it arrives.', badge: 'Shipped', tone: 'Pending', label: 'ON ITS WAY' },
+  Active: { subtitle: 'Ready for in-person spending.', badge: 'Active', tone: 'Completed', label: '' },
+  Declined: { subtitle: 'Your application was declined. You can apply again.', badge: 'Declined', tone: 'Failed', label: 'DECLINED' },
+  Cancelled: { subtitle: 'This card was cancelled. You can apply for a new one.', badge: 'Cancelled', tone: 'Failed', label: 'CANCELLED' },
+};
+const isLink = (value: string) => /^https?:\/\/\S+$/i.test(value);
+function PhysicalCardPanel({ onToast }: { onToast: Toast }) {
+  const { state } = useDemoStore();
+  const physical = state.cards.physical;
+  const locked = !!accountLockReason(state);
+  const moneyAction = useMoneyAction();
+  const [digits, setDigits] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [freezeNote, setFreezeNote] = useState<string | null>(null);
+  const copy = PHYSICAL_COPY[physical.status];
+  const active = physical.status === 'Active';
+  const frozen = active && !!physical.frozen;
+  const staffFrozen = frozen && physical.frozenBy === 'staff';
+  const activate = async () => {
+    const result = await moneyAction(s => activatePhysicalCard(s, digits, new Date()), () => api.activatePhysicalCard({ lastFour: digits.trim() }));
+    if (!result.ok) { setError(result.fieldErrors?.lastFour ?? result.error); return; }
+    setError(null); setDigits(''); onToast(result.message);
+  };
+  const toggle = async () => {
+    const result = await moneyAction(s => toggleCardFreeze(s, new Date(), 'physical'), () => api.toggleCardFreeze({ card: 'physical' }));
+    if (!result.ok && staffFrozen) { setFreezeNote(result.error); return; }
+    setFreezeNote(null); onToast(result.ok ? result.message : result.error);
+  };
+  const facts: [string, ReactNode][] = [
+    ...(physical.requestedAt && !canRequestPhysical(physical.status) ? [['Applied', fmtDate(physical.requestedAt)] as [string, ReactNode]] : []),
+    ...(physical.shippingAddress && physical.status !== 'Active' && !canRequestPhysical(physical.status) ? [['Shipping to', formatAddress(physical.shippingAddress)] as [string, ReactNode]] : []),
+    ...(physical.shippedAt ? [['Shipped', fmtDate(physical.shippedAt)] as [string, ReactNode]] : []),
+    ...(physical.trackingRef && physical.status === 'Shipped' ? [['Tracking', isLink(physical.trackingRef) ? <a className="link-text" href={physical.trackingRef} target="_blank" rel="noreferrer noopener">Track delivery</a> : physical.trackingRef] as [string, ReactNode]] : []),
+    ...(physical.activatedAt && active ? [['Activated', fmtDate(physical.activatedAt)] as [string, ReactNode]] : []),
+  ];
+  const reason = physical.status === 'Declined' ? physical.declineReason : physical.status === 'Cancelled' ? physical.cancelReason : undefined;
+  return <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle" data-testid="text-physical-card-status">{frozen ? (staffFrozen ? 'Frozen by the grant team.' : 'Frozen — new spending is blocked.') : copy.subtitle}</p></div>{copy.badge ? <StatusBadge status={frozen ? 'Frozen' : copy.badge} tone={frozen ? 'Pending' : copy.tone} /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div>
+    <CardVisual name={state.profile.name} physical {...(active ? { lastFour: physical.lastFour, revealed: true } : { label: copy.label })} />
+    {freezeNote && <StaffFreezeNote text={freezeNote} />}
+    {reason && <p className="field-hint" style={{ marginTop: 10 }} data-testid="text-physical-card-reason">{physical.status === 'Declined' ? 'Declined' : 'Cancelled'}: {reason}</p>}
+    {physical.status === 'Shipped' && physical.shippingMessage && <div className="notice mt" data-testid="text-physical-card-message"><Info size={16} /><span style={{ whiteSpace: 'pre-wrap' }}>{physical.shippingMessage}</span></div>}
+    <div style={{ marginTop: 16 }}>
+      {facts.map(([k, v]) => <div className="fee-row" key={k}><span>{k}</span><strong>{v}</strong></div>)}
+      {physical.status === 'Shipped' && <div className="field" style={{ marginTop: 12 }}><label className="field-label" htmlFor="activate-card">Last four digits on the front of your card</label>
+        <div style={{ display: 'flex', gap: 8 }}><input id="activate-card" className="input mono" inputMode="numeric" maxLength={4} autoComplete="off" value={digits} onChange={e => { setDigits(e.target.value.replace(/\D/g, '')); setError(null); }} aria-invalid={!!error} aria-describedby={error ? 'activate-card-error' : undefined} data-testid="input-activate-card" /><button className="btn btn-dark" disabled={digits.length !== 4 || locked} onClick={() => void activate()} data-testid="button-activate-card">Activate</button></div>
+        {error ? <FieldError id="activate-card-error" message={error} /> : <span className="field-hint">This confirms the card reached you.</span>}</div>}
+      {active && <div className="quick-actions mt"><button className="quick-action" onClick={() => void toggle()} data-testid="button-freeze-physical-card"><span className="action-icon"><ShieldCheck size={15} /></span>{frozen ? 'Unfreeze card' : 'Freeze card'}</button></div>}
+      {canRequestPhysical(physical.status) && (applying ? <PhysicalCardApplication onDone={() => setApplying(false)} onToast={onToast} />
+        : <button className="btn btn-dark" style={{ width: '100%', marginTop: 12 }} disabled={locked} onClick={() => setApplying(true)} data-testid="button-apply-physical-card">{physical.status === 'Not requested' ? 'Apply for a physical card' : 'Apply again'}</button>)}
+    </div></div>;
+}
+const ADDRESS_FIELDS: { key: keyof ShippingAddress; label: string; optional?: boolean; autoComplete: string }[] = [
+  { key: 'name', label: 'Name on the parcel', autoComplete: 'name' }, { key: 'line1', label: 'Address', autoComplete: 'address-line1' }, { key: 'line2', label: 'Address line 2', optional: true, autoComplete: 'address-line2' },
+  { key: 'city', label: 'City', autoComplete: 'address-level2' }, { key: 'region', label: 'State or region', optional: true, autoComplete: 'address-level1' },
+  { key: 'postalCode', label: 'Postal code', autoComplete: 'postal-code' }, { key: 'country', label: 'Country', autoComplete: 'country-name' },
+];
+function PhysicalCardApplication({ onDone, onToast }: { onDone: () => void; onToast: Toast }) {
+  const { state } = useDemoStore();
+  const moneyAction = useMoneyAction();
+  const balances = computeBalances(ownTransactions(state));
+  const { treasury } = state;
+  const total = physicalCardTotal(treasury);
+  const [address, setAddress] = useState<ShippingAddress>({ name: state.profile.name, line1: '', line2: '', city: '', region: '', postalCode: '', country: state.profile.country });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const blocked = cardKycBlocker(state);
+  const short = balances.deposit - total < treasury.depositThreshold;
+  const submit = async () => {
+    const checked = checkAddress(address);
+    if ('errors' in checked) { setErrors(checked.errors); return; }
+    const result = await moneyAction(s => requestPhysicalCard(s, checked.address, new Date()), () => api.requestPhysicalCard(checked.address));
+    if (!result.ok) { setErrors(result.fieldErrors ?? {}); setFormError(result.error); return; }
+    onToast(result.message); onDone();
+  };
+  return <div className="stack" style={{ marginTop: 14, gap: 10 }} data-testid="form-physical-card-application">
+    <p className="field-hint">We'll mail the card to this address. Your application is reviewed by the grant team; we'll email you when the card ships, and refund the fee if it can't be approved.</p>
+    {ADDRESS_FIELDS.map(f => <div className="field" key={f.key}><label className="field-label" htmlFor={`ship-${f.key}`}>{f.label}{f.optional ? ' (optional)' : ''}</label>
+      <input id={`ship-${f.key}`} className="input" autoComplete={f.autoComplete} value={address[f.key] ?? ''} onChange={e => { setAddress(a => ({ ...a, [f.key]: e.target.value })); setErrors(({ [f.key]: _, ...rest }) => rest); setFormError(null); }} aria-invalid={!!errors[f.key]} aria-describedby={errors[f.key] ? `ship-${f.key}-error` : undefined} data-testid={`input-ship-${f.key}`} />
+      <FieldError id={`ship-${f.key}-error`} message={errors[f.key]} /></div>)}
+    <div className="fee-row"><span>Card fee</span><strong>{money(treasury.physicalCardFee)}</strong></div>
+    {treasury.cardDeliveryFee > 0 && <div className="fee-row"><span>Shipping</span><strong>{money(treasury.cardDeliveryFee)}</strong></div>}
+    <div className="fee-row"><span>Paid from your deposit balance</span><strong>{money(balances.deposit)}</strong></div>
+    {treasury.depositThreshold > 0 && <div className="fee-row"><span>Required reserve after fees</span><strong>{money(treasury.depositThreshold)}</strong></div>}
+    {(blocked || formError) && <FieldError id="ship-form-error" message={blocked ?? formError ?? undefined} />}
+    {short && <p className="field-hint">Your deposit balance is too low. <Link href="/deposits" className="link-text">Add funds</Link></p>}
+    <div style={{ display: 'flex', gap: 8 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={onDone}>Cancel</button><button className="btn btn-dark" style={{ flex: 2 }} disabled={!!blocked || short} onClick={() => void submit()} data-testid="button-submit-physical-card">Pay {money(total)} and apply</button></div>
+  </div>;
 }
 function TransactionNote({ tx }: { tx: Transaction }) {
   if (tx.status === 'Failed' && tx.failureReason) return <div className="secondary-cell danger-text">{tx.type === 'Deposit' ? 'Not credited' : 'Failed'}: {tx.failureReason}{tx.type === 'Withdrawal' ? ' The amount was returned to your grant balance.' : ''}</div>;
-  if (tx.status === 'Cancelled') return <div className="secondary-cell">Cancelled {tx.processedAt ? fmtDate(tx.processedAt) : ''}</div>;
+  if (tx.status === 'Cancelled') return <div className="secondary-cell">{tx.type === 'Card fee' ? 'Refunded' : 'Cancelled'} {tx.processedAt ? fmtDate(tx.processedAt) : ''}</div>;
   if (tx.type === 'Withdrawal' && tx.status === 'Completed' && tx.processedAt) return <div className="secondary-cell">Paid {fmtDate(tx.processedAt)}{tx.fee ? ` · you received ${money(Math.abs(tx.amount) - tx.fee)}` : ''}</div>;
   if (tx.type === 'Deposit' && tx.status === 'Pending') return <div className="secondary-cell">Waiting for funds · reference {tx.reference}</div>;
+  if (tx.note) return <div className="secondary-cell">Grant team: {tx.note}</div>;
   return null;
 }
 function TransactionTable({ rows, action }: { rows: Transaction[]; action?: (tx: Transaction) => ReactNode }) {
@@ -506,6 +645,7 @@ function receiptLines(tx: Transaction, name: string): [string, string][] {
   if (tx.destination) lines.push(['Destination', tx.destination]);
   if (tx.processedAt) lines.push([tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', format(new Date(tx.processedAt), 'MMM dd, yyyy HH:mm')]);
   if (tx.failureReason) lines.push(['Reason', tx.failureReason]);
+  if (tx.note) lines.push(['Note from the grant team', tx.note]);
   return lines;
 }
 function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
@@ -521,7 +661,7 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
 }
 const TRANSACTION_TABS: { label: string; types: Transaction['type'][] | null }[] = [
   { label: 'All', types: null }, { label: 'Grants', types: ['Grant'] }, { label: 'Deposits', types: ['Deposit'] },
-  { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
+  { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Card', types: ['Card top-up', 'Card deduction'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
 ];
 function TransactionsPage() {
   const { name: appName } = useAppName();
@@ -795,7 +935,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password', '/reset-password': 'Choose a new password',
       '/admin': 'Admin overview', '/admin/login': 'Staff sign-in', '/admin/reset-password': 'Reset staff password', '/admin/applicants': 'Admin applicants',
       '/admin/inbox': 'Admin email inbox',
-      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
+      '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/cards': 'Admin cards', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
       '/admin/settings': 'Admin settings',
     };
     const title = titles[location] ?? (location.startsWith('/admin/settings/') ? 'Admin settings' : location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
@@ -824,10 +964,12 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/admin/applications"><AdminPage section="applications" /></Route>
     <Route path="/admin/payouts"><AdminPage section="payouts" /></Route>
     <Route path="/admin/deposits"><AdminPage section="deposits" /></Route>
+    <Route path="/admin/cards"><AdminPage section="cards" /></Route>
     <Route path="/admin/grants"><AdminPage section="grants" /></Route>
     <Route path="/admin/security"><AdminPage section="security" /></Route>
     <Route path="/admin/audit"><AdminPage section="audit" /></Route>
     <Route path="/admin/settings"><AdminPage section="settings" /></Route>
+    <Route path="/admin/applicants/:id">{params => <AdminPage section="applicant" applicantId={params.id} />}</Route>
     <Route path="/admin/settings/:section">{params => <AdminPage section="settings" settingsSection={params.section} />}</Route>
     <Route path="/"><Shell><Dashboard onToast={onToast} /></Shell></Route>
     <Route path="/dashboard"><Shell><Dashboard onToast={onToast} /></Shell></Route>

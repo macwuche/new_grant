@@ -5,9 +5,30 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CardsPhysicalFrozenBy } from './cardsPhysicalFrozenBy';
 import type { CardsPhysicalStatus } from './cardsPhysicalStatus';
+import type { ShippingAddress } from './shippingAddress';
 
 export type CardsPhysical = {
   status: CardsPhysicalStatus;
   dailyLimit: number;
+  lastFour?: string;
+  frozen?: boolean;
+  frozenBy?: CardsPhysicalFrozenBy;
+  frozenReason?: string;
+  shippingAddress?: ShippingAddress;
+  requestedAt?: string;
+  feeTxId?: string;
+  issuedBy?: string;
+  shippedAt?: string;
+  shippedBy?: string;
+  trackingRef?: string;
+  shippingMessage?: string;
+  activatedAt?: string;
+  declinedAt?: string;
+  declinedBy?: string;
+  declineReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
 };

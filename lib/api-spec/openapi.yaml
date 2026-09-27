@@ -489,6 +489,37 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Stale"
+  /applicants/{id}/card-settings:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: setCardSettings
+      tags: [applicants]
+      summary: Set an applicant's card rules
+      description: Requires accounts.manage. Which balances they may fund their card from, and whether cards need a verified identity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardSettings"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
   /applicants/{id}/lock:
     parameters:
       - $ref: "#/components/parameters/ApplicantId"
@@ -1211,8 +1242,14 @@ paths:
     post:
       operationId: toggleCardFreeze
       tags: [money]
-      summary: Freeze or unfreeze your virtual card
-      description: A locked account can freeze but not unfreeze.
+      summary: Freeze or unfreeze one of your cards
+      description: The virtual card unless another is named; the physical card only once active. A locked account can freeze but not unfreeze, and a freeze put on by staff can only be lifted by staff.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardChoice"
       responses:
         "200":
           description: OK
@@ -1247,12 +1284,12 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /money/cards/physical:
+  /money/cards/virtual:
     post:
-      operationId: requestPhysicalCard
+      operationId: createVirtualCard
       tags: [money]
-      summary: Request a physical card
-      description: Fees come from your deposit balance, which must keep the reserve.
+      summary: Create your virtual card
+      description: Comes before any physical card. Needs a verified identity when staff require one.
       responses:
         "200":
           description: OK
@@ -1264,6 +1301,341 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /money/cards/fund:
+    post:
+      operationId: fundCard
+      tags: [money]
+      summary: Move money onto your card
+      description: From a balance staff allow for your account; the deposit reserve stays.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardFunding"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/cards/physical:
+    post:
+      operationId: requestPhysicalCard
+      tags: [money]
+      summary: Apply for a physical card
+      description: Needs a virtual card. The card and shipping fees come from your deposit balance (reserve kept); staff approve or decline, and a decline refunds the fees.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShippingAddress"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/cards/physical/activate:
+    post:
+      operationId: activatePhysicalCard
+      tags: [money]
+      summary: Activate your shipped physical card
+      description: Confirms the card arrived, with the last four digits printed on it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardActivation"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /money/card-holders:
+    get:
+      operationId: listCardHolders
+      tags: [money]
+      summary: Every applicant's cards
+      description: Any active staff member. Includes each card balance and card settings; never PINs.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CardHolder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /money/card-holders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    get:
+      operationId: getCardHolder
+      tags: [money]
+      summary: One applicant's cards
+      description: Any active staff member. An applicant without cards yet has none listed.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/virtual:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: createVirtualCardAsStaff
+      tags: [money]
+      summary: Create an applicant's virtual card
+      description: Requires payments.process.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/physical:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: issuePhysicalCard
+      tags: [money]
+      summary: Issue a physical card directly
+      description: Requires payments.process. No application or fee; the card ships at once and the message is emailed to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardIssue"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: approvePhysicalCard
+      tags: [money]
+      summary: Approve a physical card application
+      description: Requires payments.process. The card ships and the message (with tracking) is emailed to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardShipment"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/decline:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: declinePhysicalCard
+      tags: [money]
+      summary: Decline a physical card application
+      description: Requires payments.process. The fees are refunded and the reason emailed to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: cancelPhysicalCard
+      tags: [money]
+      summary: Cancel a shipped or active physical card
+      description: Requires payments.process. No refund. The reason is shown to the applicant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/freeze:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: setCardFreezeAsStaff
+      tags: [money]
+      summary: Freeze or unfreeze an applicant's card
+      description: Requires accounts.manage. Freezing needs a note, shown to the applicant, who can't lift a staff freeze.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffCardFreeze"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/fund:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: fundCardAsStaff
+      tags: [money]
+      summary: Add money to an applicant's card
+      description: Requires payments.process. From the deposit or grant balance, or none (added by staff). Reason required and shown.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffCardFunding"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/deduct:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: deductFromCard
+      tags: [money]
+      summary: Take money off an applicant's card
+      description: Requires payments.process. Back to the deposit or grant balance, or none (removed). Reason required and shown.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffCardDeduction"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /money/destinations:
     post:
       operationId: savePayoutDestination
@@ -2445,7 +2817,7 @@ components:
           type: string
         type:
           type: string
-          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee]
+          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee, Card top-up, Card deduction]
         description:
           type: string
         amount:
@@ -2482,6 +2854,13 @@ components:
             byId:
               type: string
           required: [by, at]
+        counterpart:
+          type: string
+          enum: [deposit, grant, none]
+          description: Card moves only - the other balance moved, or none
+        note:
+          type: string
+          description: Staff card moves - the reason shown to the applicant
       required: [id, applicantId, type, description, amount, status, createdAt]
     PayoutChannel:
       type: object
@@ -2586,6 +2965,7 @@ components:
       properties:
         virtual:
           type: object
+          nullable: true
           properties:
             lastFour:
               type: string
@@ -2593,6 +2973,15 @@ components:
               type: number
             frozen:
               type: boolean
+            createdAt:
+              type: string
+            createdBy:
+              type: string
+            frozenBy:
+              type: string
+              enum: [applicant, staff]
+            frozenReason:
+              type: string
             pin:
               type: string
               description: Fictional; no card provider is connected
@@ -2602,11 +2991,272 @@ components:
           properties:
             status:
               type: string
-              enum: [Not requested, Requested]
+              enum: [Not requested, Requested, Shipped, Active, Declined, Cancelled]
             dailyLimit:
               type: number
+            lastFour:
+              type: string
+            frozen:
+              type: boolean
+            frozenBy:
+              type: string
+              enum: [applicant, staff]
+            frozenReason:
+              type: string
+            shippingAddress:
+              $ref: "#/components/schemas/ShippingAddress"
+            requestedAt:
+              type: string
+            feeTxId:
+              type: string
+            issuedBy:
+              type: string
+            shippedAt:
+              type: string
+            shippedBy:
+              type: string
+            trackingRef:
+              type: string
+            shippingMessage:
+              type: string
+            activatedAt:
+              type: string
+            declinedAt:
+              type: string
+            declinedBy:
+              type: string
+            declineReason:
+              type: string
+            cancelledAt:
+              type: string
+            cancelledBy:
+              type: string
+            cancelReason:
+              type: string
           required: [status, dailyLimit]
       required: [virtual, physical]
+    StaffCards:
+      type: object
+      description: An applicant's cards as staff see them (no PIN)
+      properties:
+        virtual:
+          type: object
+          nullable: true
+          properties:
+            lastFour:
+              type: string
+            dailyLimit:
+              type: number
+            frozen:
+              type: boolean
+            createdAt:
+              type: string
+            createdBy:
+              type: string
+            frozenBy:
+              type: string
+              enum: [applicant, staff]
+            frozenReason:
+              type: string
+          required: [lastFour, dailyLimit, frozen]
+        physical:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [Not requested, Requested, Shipped, Active, Declined, Cancelled]
+            dailyLimit:
+              type: number
+            lastFour:
+              type: string
+            frozen:
+              type: boolean
+            frozenBy:
+              type: string
+              enum: [applicant, staff]
+            frozenReason:
+              type: string
+            shippingAddress:
+              $ref: "#/components/schemas/ShippingAddress"
+            requestedAt:
+              type: string
+            feeTxId:
+              type: string
+            issuedBy:
+              type: string
+            shippedAt:
+              type: string
+            shippedBy:
+              type: string
+            trackingRef:
+              type: string
+            shippingMessage:
+              type: string
+            activatedAt:
+              type: string
+            declinedAt:
+              type: string
+            declinedBy:
+              type: string
+            declineReason:
+              type: string
+            cancelledAt:
+              type: string
+            cancelledBy:
+              type: string
+            cancelReason:
+              type: string
+          required: [status, dailyLimit]
+      required: [virtual, physical]
+    ShippingAddress:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        line1:
+          type: string
+          maxLength: 120
+        line2:
+          type: string
+          maxLength: 120
+        city:
+          type: string
+          maxLength: 60
+        region:
+          type: string
+          maxLength: 60
+        postalCode:
+          type: string
+          maxLength: 20
+        country:
+          type: string
+          maxLength: 60
+      required: [name, line1, city, postalCode, country]
+      additionalProperties: false
+    CardSettings:
+      type: object
+      properties:
+        funding:
+          type: string
+          enum: [deposit, grant, both]
+        kycRequired:
+          type: boolean
+      required: [funding, kycRequired]
+      additionalProperties: false
+    CardHolder:
+      type: object
+      properties:
+        applicantId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        cards:
+          $ref: "#/components/schemas/StaffCards"
+        balance:
+          type: number
+          description: The card balance, shared by both cards
+        settings:
+          $ref: "#/components/schemas/CardSettings"
+      required: [applicantId, name, email, cards, balance, settings]
+    CardHolderResult:
+      type: object
+      properties:
+        holder:
+          $ref: "#/components/schemas/CardHolder"
+        message:
+          type: string
+      required: [holder, message]
+    CardChoice:
+      type: object
+      properties:
+        card:
+          type: string
+          enum: [virtual, physical]
+      additionalProperties: false
+    CardActivation:
+      type: object
+      properties:
+        lastFour:
+          type: string
+          maxLength: 4
+      required: [lastFour]
+      additionalProperties: false
+    CardFunding:
+      type: object
+      properties:
+        amount:
+          type: number
+        source:
+          type: string
+          enum: [deposit, grant]
+      required: [amount, source]
+      additionalProperties: false
+    StaffCardFunding:
+      type: object
+      properties:
+        amount:
+          type: number
+        source:
+          type: string
+          enum: [deposit, grant, none]
+        reason:
+          type: string
+          maxLength: 1000
+      required: [amount, source, reason]
+      additionalProperties: false
+    StaffCardDeduction:
+      type: object
+      properties:
+        amount:
+          type: number
+        destination:
+          type: string
+          enum: [deposit, grant, none]
+        reason:
+          type: string
+          maxLength: 1000
+      required: [amount, destination, reason]
+      additionalProperties: false
+    CardShipment:
+      type: object
+      properties:
+        message:
+          type: string
+          maxLength: 2000
+        trackingRef:
+          type: string
+          maxLength: 200
+      required: [message]
+      additionalProperties: false
+    CardIssue:
+      type: object
+      properties:
+        address:
+          $ref: "#/components/schemas/ShippingAddress"
+        message:
+          type: string
+          maxLength: 2000
+        trackingRef:
+          type: string
+          maxLength: 200
+      required: [address, message]
+      additionalProperties: false
+    StaffCardFreeze:
+      type: object
+      properties:
+        card:
+          type: string
+          enum: [virtual, physical]
+        frozen:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 1000
+      required: [card, frozen]
+      additionalProperties: false
     MyMoney:
       type: object
       properties:
@@ -3188,6 +3838,8 @@ components:
           type: boolean
         kyc:
           $ref: "#/components/schemas/Kyc"
+        cardSettings:
+          $ref: "#/components/schemas/CardSettings"
       required: [status, passwordResetRequired, twoFactorResetRequired, kyc]
     ApplicantEntry:
       type: object

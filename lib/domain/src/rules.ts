@@ -196,7 +196,7 @@ export function deleteDraft(state: DemoState, id: string): Result {
 
 // ---------- Balances & ledger ----------
 
-export type Balances = { grant: number; deposit: number; pendingWithdrawals: number; pendingDeposits: number };
+export type Balances = { grant: number; deposit: number; pendingWithdrawals: number; pendingDeposits: number; /** Shared by the virtual and physical card. */ card: number };
 
 /**
  * Balances are derived from the ledger, never stored. Grant awards fund payouts;
@@ -205,15 +205,21 @@ export type Balances = { grant: number; deposit: number; pendingWithdrawals: num
  * cancelled entries are ignored.
  */
 export function computeBalances(transactions: Transaction[]): Balances {
-  let grant = 0, deposit = 0, pendingWithdrawals = 0, pendingDeposits = 0;
+  let grant = 0, deposit = 0, pendingWithdrawals = 0, pendingDeposits = 0, card = 0;
   for (const tx of transactions) {
     if (tx.status === 'Failed' || tx.status === 'Cancelled') continue;
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
     if (tx.type === 'Withdrawal') { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; }
     if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
     if (tx.type === 'Card fee' || tx.type === 'Application fee') deposit += tx.amount;
+    // Card moves: the amount is the change to the card balance; the other side moves the opposite way.
+    if (tx.type === 'Card top-up' || tx.type === 'Card deduction') {
+      card += tx.amount;
+      if (tx.counterpart === 'deposit') deposit -= tx.amount;
+      if (tx.counterpart === 'grant') grant -= tx.amount;
+    }
   }
-  return { grant: roundCents(grant), deposit: roundCents(deposit), pendingWithdrawals: roundCents(pendingWithdrawals), pendingDeposits: roundCents(pendingDeposits) };
+  return { grant: roundCents(grant), deposit: roundCents(deposit), pendingWithdrawals: roundCents(pendingWithdrawals), pendingDeposits: roundCents(pendingDeposits), card: roundCents(card) };
 }
 
 // ---------- Profile ----------

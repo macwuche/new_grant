@@ -1,4 +1,5 @@
-import type { CardsState, Lockdown, PayoutDestinations, Transaction, Treasury } from "@workspace/domain/model";
+import type { CardSettings, CardsState, Lockdown, PayoutDestinations, Transaction, Treasury } from "@workspace/domain/model";
+import { DEFAULT_CARD_SETTINGS } from "@workspace/domain/cards";
 import type { Effects } from "./activity";
 import type { ProfileRecord, ProfileRepo } from "./profileRepo";
 
@@ -47,14 +48,15 @@ export interface MoneyRepo {
   ledger(): Promise<Transaction[]>;
   moneyProfile(applicantId: string): Promise<MoneyProfile | null>;
   findTransaction(id: string): Promise<Transaction | null>;
+  /** Staff: every applicant who has cards (created on their first money visit). */
+  cardHolders(): Promise<{ applicantId: string; name: string; email: string; cards: CardsState; settings: CardSettings }[]>;
   /** Start of a block of ten ids for one request (see ledger_number_seq). */
   nextBlock(): Promise<number>;
 }
 
-/** Fictional cards for a new account: a random card ending and PIN, limits within Tier 1. */
-export function newCards(random: () => number = Math.random): CardsState {
-  const digits = () => String(Math.floor(random() * 10_000)).padStart(4, "0");
-  return { virtual: { lastFour: digits(), dailyLimit: 500, frozen: false, pin: digits() }, physical: { status: "Not requested", dailyLimit: 500 } };
+/** A new account's cards: none yet. The applicant or staff create the virtual card; a physical card needs it. */
+export function newCards(): CardsState {
+  return { virtual: null, physical: { status: "Not requested", dailyLimit: 500 } };
 }
 
 /** Serializes async work per key (the in-memory stand-in for advisory locks). */
@@ -102,6 +104,13 @@ export function memoryMoneyRepo(profiles: ProfileRepo, seed: SystemSettings, act
     ledger: async () => [...ledgerRows.values()].sort(newestFirst).map(t => structuredClone(t)),
     moneyProfile: async id => structuredClone(moneyRows.get(id) ?? null),
     findTransaction: async id => structuredClone(ledgerRows.get(id) ?? null),
+    cardHolders: async () => {
+      const holders = await Promise.all([...moneyRows.entries()].map(async ([applicantId, m]) => {
+        const p = await profiles.get(applicantId);
+        return p ? { applicantId, name: p.name, email: p.email, cards: structuredClone(m.cards), settings: p.account.cardSettings ?? DEFAULT_CARD_SETTINGS } : null;
+      }));
+      return holders.filter(h => h !== null);
+    },
     nextBlock: async () => (block += 10),
   };
 }

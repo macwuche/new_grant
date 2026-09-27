@@ -42,7 +42,7 @@ describe('mark paid', () => {
   it('completes the payout and keeps the balance deducted', () => {
     accept(P.markPayoutPaid(s, 'TX-84077', FINANCE, now));
     expect(tx('TX-84077')).toMatchObject({ status: 'Completed', processedBy: FINANCE, processedAt: now.toISOString() });
-    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 0, pendingDeposits: 0 });
+    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 0, pendingDeposits: 0, card: 0 });
   });
 
   it('cannot be processed twice', () => {
@@ -69,7 +69,7 @@ describe('mark failed', () => {
   it('returns the held amount to the grant balance', () => {
     accept(P.markPayoutFailed(s, 'TX-84077', '  Account number did not match.  ', FINANCE, now));
     expect(tx('TX-84077')).toMatchObject({ status: 'Failed', failureReason: 'Account number did not match.' });
-    expect(mine()).toEqual({ grant: 4200, deposit: 441.5, pendingWithdrawals: 0, pendingDeposits: 0 });
+    expect(mine()).toEqual({ grant: 4200, deposit: 441.5, pendingWithdrawals: 0, pendingDeposits: 0, card: 0 });
   });
 
   it('lets the applicant request again with the returned funds', () => {

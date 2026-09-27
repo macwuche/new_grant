@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { SECURITY_NOTICE_TITLES } from "@workspace/domain/notifications";
+import { ALWAYS_EMAILED_TITLES } from "@workspace/domain/notifications";
 import { recordAudit } from "@workspace/domain/audit";
 import type { AuditChange, DemoState, StaffMember } from "@workspace/domain/model";
 import { CURRENT_APPLICANT_ID } from "@workspace/domain/seed";
@@ -23,11 +23,11 @@ export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffE
 /** Who a notification's email copy goes to; null or opted out means no email. */
 export type EmailRecipient = { email: string; name: string; emailNotifications: boolean };
 
-/** The emails a change sends: a copy of each notification to applicants who want them (security notices always), plus any explicit emails. */
+/** The emails a change sends: a copy of each notification to applicants who want them (security notices and card shipping news always), plus any explicit emails. */
 export function emailsFor(effects: Effects, recipient: (applicantId: string) => EmailRecipient | null | undefined, baseUrl = appUrl()): NewEmail[] {
   const copies = effects.notifications.flatMap(n => {
     const to = recipient(n.applicantId);
-    return n.email !== false && to?.email && (to.emailNotifications || SECURITY_NOTICE_TITLES.has(n.title)) ? [notificationEmail(n, to, baseUrl)] : [];
+    return n.email !== false && to?.email && (to.emailNotifications || ALWAYS_EMAILED_TITLES.has(n.title)) ? [notificationEmail(n, to, baseUrl)] : [];
   });
   return [...copies, ...(effects.emails ?? [])];
 }

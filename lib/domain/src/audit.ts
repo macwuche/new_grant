@@ -2,6 +2,7 @@ import type { AuditChange, AuditEvent, DemoState, StaffMember } from './model';
 import { nextIds } from './core';
 import { findApplicant } from './applicants';
 import { assessRisk } from './risk';
+import { CURRENT_APPLICANT_ID } from './seed';
 
 // Append-only audit trail of staff actions. Entries are added by `asStaff`
 // (./staff) in the same step as the change; no rule edits or removes them.
@@ -26,13 +27,20 @@ function flatten(value: unknown, prefix: string, out: Flat) {
 }
 
 /** The record a target id refers to, flattened to field → value. */
+/** The current applicant's cards (only they have cards in a rule state), never the PIN. */
+function auditedCards(state: DemoState) {
+  if (!state.cards.virtual) return { virtual: null, physical: state.cards.physical };
+  const { pin: _pin, ...virtual } = state.cards.virtual;
+  return { virtual, physical: state.cards.physical };
+}
+
 export function snapshot(state: DemoState, target: string): Flat {
   const out: Flat = {};
   const record = target === 'treasury' ? state.treasury
     : target === 'lockdown' ? { lockdown: state.lockdown }
     : target.startsWith('APP-') ? state.applications.find(a => a.id === target)
     : target.startsWith('TX-') ? state.transactions.find(t => t.id === target)
-    : target.startsWith('APL-') ? (() => { const a = findApplicant(state, target); return a && { tier: a.tier, identityVerified: a.identityVerified, ...a.account }; })()
+    : target.startsWith('APL-') ? (() => { const a = findApplicant(state, target); return a && { tier: a.tier, identityVerified: a.identityVerified, ...a.account, ...(target === CURRENT_APPLICANT_ID ? { cards: auditedCards(state) } : {}) }; })()
     : target.startsWith('STF-') ? state.staff.find(m => m.id === target)
     : state.grants.find(g => g.id === target);
   if (record) flatten(record, '', out);

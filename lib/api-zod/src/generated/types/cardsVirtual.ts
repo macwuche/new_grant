@@ -5,11 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CardsVirtualFrozenBy } from './cardsVirtualFrozenBy';
 
 export type CardsVirtual = {
   lastFour: string;
   dailyLimit: number;
   frozen: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  frozenBy?: CardsVirtualFrozenBy;
+  frozenReason?: string;
   /** Fictional; no card provider is connected */
   pin: string;
-};
+} | null;

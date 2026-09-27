@@ -559,7 +559,11 @@ export const GetProfileResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 
@@ -608,7 +612,11 @@ export const UpdateProfileResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 
@@ -655,7 +663,11 @@ export const SubmitIdentityCheckResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 
@@ -704,7 +716,11 @@ export const ReportPasswordChangedResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 
@@ -743,7 +759,11 @@ export const CompleteCredentialResetResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 
@@ -780,7 +800,11 @@ export const ListApplicantsResponseItem = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 })
@@ -833,7 +857,65 @@ export const SetApplicantTierResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
+}).describe('Staff-managed controls on an applicant account')
 })
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage. Which balances they may fund their card from, and whether cards need a verified identity.
+ * @summary Set an applicant's card rules
+ */
+export const SetCardSettingsParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const SetCardSettingsBody = zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+
+export const SetCardSettingsResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -886,7 +968,11 @@ export const LockApplicantResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -931,7 +1017,11 @@ export const UnlockApplicantResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -980,7 +1070,11 @@ export const RequireCredentialResetResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -1025,7 +1119,11 @@ export const ApproveIdentityCheckResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -1078,7 +1176,11 @@ export const RejectIdentityCheckResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -1131,7 +1233,11 @@ export const RequestReverificationResponse = zod.object({
   "reviewedAt": zod.string().optional(),
   "reviewedBy": zod.string().optional(),
   "rejectionReason": zod.string().optional()
-})
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
 }),
@@ -1948,6 +2054,20 @@ export const GetAuditLogResponse = zod.object({
  * Balances are derived from the ledger.
  * @summary Your ledger, cards, payout destinations, and the money rules
  */
+export const getMyMoneyResponseCardsPhysicalShippingAddressNameMax = 80;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressLine1Max = 120;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressLine2Max = 120;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressCityMax = 60;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressRegionMax = 60;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const getMyMoneyResponseCardsPhysicalShippingAddressCountryMax = 60;
+
 export const getMyMoneyResponseTreasuryOneChannelsMax = 10;
 
 
@@ -1956,7 +2076,7 @@ export const GetMyMoneyResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -1973,18 +2093,51 @@ export const GetMyMoneyResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(getMyMoneyResponseCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2033,6 +2186,20 @@ export const RequestDepositBody = zod.object({
   "method": zod.enum(['bank', 'mobile'])
 })
 
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const requestDepositResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const requestDepositResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2042,7 +2209,7 @@ export const RequestDepositResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2059,18 +2226,51 @@ export const RequestDepositResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(requestDepositResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2124,6 +2324,20 @@ export const CancelDepositParams = zod.object({
   "id": zod.coerce.string().regex(cancelDepositPathIdRegExp)
 })
 
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const cancelDepositResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const cancelDepositResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2133,7 +2347,7 @@ export const CancelDepositResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2150,18 +2364,51 @@ export const CancelDepositResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(cancelDepositResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2213,6 +2460,20 @@ export const RequestWithdrawalBody = zod.object({
   "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
 })
 
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const requestWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2222,7 +2483,7 @@ export const RequestWithdrawalResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2239,18 +2500,51 @@ export const RequestWithdrawalResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(requestWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2304,6 +2598,20 @@ export const CancelWithdrawalParams = zod.object({
   "id": zod.coerce.string().regex(cancelWithdrawalPathIdRegExp)
 })
 
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const cancelWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2313,7 +2621,7 @@ export const CancelWithdrawalResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2330,18 +2638,51 @@ export const CancelWithdrawalResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2385,9 +2726,27 @@ export const CancelWithdrawalResponse = zod.object({
 
 
 /**
- * A locked account can freeze but not unfreeze.
- * @summary Freeze or unfreeze your virtual card
+ * The virtual card unless another is named; the physical card only once active. A locked account can freeze but not unfreeze, and a freeze put on by staff can only be lifted by staff.
+ * @summary Freeze or unfreeze one of your cards
  */
+export const ToggleCardFreezeBody = zod.object({
+  "card": zod.enum(['virtual', 'physical']).optional()
+})
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const toggleCardFreezeResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2397,7 +2756,7 @@ export const ToggleCardFreezeResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2414,18 +2773,51 @@ export const ToggleCardFreezeResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2477,6 +2869,20 @@ export const SetCardLimitBody = zod.object({
   "limit": zod.number()
 })
 
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const setCardLimitResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const setCardLimitResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2486,7 +2892,7 @@ export const SetCardLimitResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2503,18 +2909,51 @@ export const SetCardLimitResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(setCardLimitResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2558,19 +2997,33 @@ export const SetCardLimitResponse = zod.object({
 
 
 /**
- * Fees come from your deposit balance, which must keep the reserve.
- * @summary Request a physical card
+ * Comes before any physical card. Needs a verified identity when staff require one.
+ * @summary Create your virtual card
  */
-export const requestPhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
+export const createVirtualCardResponseMoneyTreasuryOneChannelsMax = 10;
 
 
 
-export const RequestPhysicalCardResponse = zod.object({
+export const CreateVirtualCardResponse = zod.object({
   "money": zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2587,18 +3040,344 @@ export const RequestPhysicalCardResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(createVirtualCardResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(createVirtualCardResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * From a balance staff allow for your account; the deposit reserve stays.
+ * @summary Move money onto your card
+ */
+export const FundCardBody = zod.object({
+  "amount": zod.number(),
+  "source": zod.enum(['deposit', 'grant'])
+})
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const fundCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
+export const fundCardResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const FundCardResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(fundCardResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(fundCardResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Needs a virtual card. The card and shipping fees come from your deposit balance (reserve kept); staff approve or decline, and a decline refunds the fees.
+ * @summary Apply for a physical card
+ */
+export const requestPhysicalCardBodyNameMax = 80;
+
+export const requestPhysicalCardBodyLine1Max = 120;
+
+export const requestPhysicalCardBodyLine2Max = 120;
+
+export const requestPhysicalCardBodyCityMax = 60;
+
+export const requestPhysicalCardBodyRegionMax = 60;
+
+export const requestPhysicalCardBodyPostalCodeMax = 20;
+
+export const requestPhysicalCardBodyCountryMax = 60;
+
+
+
+export const RequestPhysicalCardBody = zod.object({
+  "name": zod.string().max(requestPhysicalCardBodyNameMax),
+  "line1": zod.string().max(requestPhysicalCardBodyLine1Max),
+  "line2": zod.string().max(requestPhysicalCardBodyLine2Max).optional(),
+  "city": zod.string().max(requestPhysicalCardBodyCityMax),
+  "region": zod.string().max(requestPhysicalCardBodyRegionMax).optional(),
+  "postalCode": zod.string().max(requestPhysicalCardBodyPostalCodeMax),
+  "country": zod.string().max(requestPhysicalCardBodyCountryMax)
+})
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
+export const requestPhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const RequestPhysicalCardResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2642,31 +3421,41 @@ export const RequestPhysicalCardResponse = zod.object({
 
 
 /**
- * Only a masked label is stored.
- * @summary Save a payout destination
+ * Confirms the card arrived, with the last four digits printed on it.
+ * @summary Activate your shipped physical card
  */
-export const savePayoutDestinationBodyPrimaryMax = 80;
-
-export const savePayoutDestinationBodySecondaryMax = 80;
+export const activatePhysicalCardBodyLastFourMax = 4;
 
 
 
-export const SavePayoutDestinationBody = zod.object({
-  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "primary": zod.string().max(savePayoutDestinationBodyPrimaryMax),
-  "secondary": zod.string().max(savePayoutDestinationBodySecondaryMax).optional()
+export const ActivatePhysicalCardBody = zod.object({
+  "lastFour": zod.string().max(activatePhysicalCardBodyLastFourMax)
 })
 
-export const savePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
+export const activatePhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
 
 
 
-export const SavePayoutDestinationResponse = zod.object({
+export const ActivatePhysicalCardResponse = zod.object({
   "money": zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2683,18 +3472,1086 @@ export const SavePayoutDestinationResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}),
+  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "destinationChangedAt": zod.string().optional(),
+  "treasury": zod.object({
+  "channels": zod.array(zod.object({
+  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "name": zod.string(),
+  "enabled": zod.boolean(),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number(),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number()
+})).max(activatePhysicalCardResponseMoneyTreasuryOneChannelsMax),
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).and(zod.object({
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+})
+
+
+/**
+ * Any active staff member. Includes each card balance and card settings; never PINs.
+ * @summary Every applicant's cards
+ */
+export const listCardHoldersResponseCardsPhysicalShippingAddressNameMax = 80;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressLine1Max = 120;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressLine2Max = 120;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressCityMax = 60;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressRegionMax = 60;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const listCardHoldersResponseCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const ListCardHoldersResponseItem = zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(listCardHoldersResponseCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+})
+export const ListCardHoldersResponse = zod.array(ListCardHoldersResponseItem)
+
+
+/**
+ * Any active staff member. An applicant without cards yet has none listed.
+ * @summary One applicant's cards
+ */
+export const GetCardHolderParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const getCardHolderResponseCardsPhysicalShippingAddressNameMax = 80;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressLine1Max = 120;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressLine2Max = 120;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressCityMax = 60;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressRegionMax = 60;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const getCardHolderResponseCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const GetCardHolderResponse = zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(getCardHolderResponseCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+})
+
+
+/**
+ * Requires payments.process.
+ * @summary Create an applicant's virtual card
+ */
+export const CreateVirtualCardAsStaffParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const CreateVirtualCardAsStaffResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(createVirtualCardAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. No application or fee; the card ships at once and the message is emailed to the applicant.
+ * @summary Issue a physical card directly
+ */
+export const IssuePhysicalCardParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const issuePhysicalCardBodyAddressNameMax = 80;
+
+export const issuePhysicalCardBodyAddressLine1Max = 120;
+
+export const issuePhysicalCardBodyAddressLine2Max = 120;
+
+export const issuePhysicalCardBodyAddressCityMax = 60;
+
+export const issuePhysicalCardBodyAddressRegionMax = 60;
+
+export const issuePhysicalCardBodyAddressPostalCodeMax = 20;
+
+export const issuePhysicalCardBodyAddressCountryMax = 60;
+
+export const issuePhysicalCardBodyMessageMax = 2000;
+
+export const issuePhysicalCardBodyTrackingRefMax = 200;
+
+
+
+export const IssuePhysicalCardBody = zod.object({
+  "address": zod.object({
+  "name": zod.string().max(issuePhysicalCardBodyAddressNameMax),
+  "line1": zod.string().max(issuePhysicalCardBodyAddressLine1Max),
+  "line2": zod.string().max(issuePhysicalCardBodyAddressLine2Max).optional(),
+  "city": zod.string().max(issuePhysicalCardBodyAddressCityMax),
+  "region": zod.string().max(issuePhysicalCardBodyAddressRegionMax).optional(),
+  "postalCode": zod.string().max(issuePhysicalCardBodyAddressPostalCodeMax),
+  "country": zod.string().max(issuePhysicalCardBodyAddressCountryMax)
+}),
+  "message": zod.string().max(issuePhysicalCardBodyMessageMax),
+  "trackingRef": zod.string().max(issuePhysicalCardBodyTrackingRefMax).optional()
+})
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const issuePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const IssuePhysicalCardResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(issuePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. The card ships and the message (with tracking) is emailed to the applicant.
+ * @summary Approve a physical card application
+ */
+export const ApprovePhysicalCardParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const approvePhysicalCardBodyMessageMax = 2000;
+
+export const approvePhysicalCardBodyTrackingRefMax = 200;
+
+
+
+export const ApprovePhysicalCardBody = zod.object({
+  "message": zod.string().max(approvePhysicalCardBodyMessageMax),
+  "trackingRef": zod.string().max(approvePhysicalCardBodyTrackingRefMax).optional()
+})
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const approvePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const ApprovePhysicalCardResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(approvePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. The fees are refunded and the reason emailed to the applicant.
+ * @summary Decline a physical card application
+ */
+export const DeclinePhysicalCardParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const declinePhysicalCardBodyReasonMax = 1000;
+
+
+
+export const DeclinePhysicalCardBody = zod.object({
+  "reason": zod.string().max(declinePhysicalCardBodyReasonMax)
+})
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const declinePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const DeclinePhysicalCardResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(declinePhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. No refund. The reason is shown to the applicant.
+ * @summary Cancel a shipped or active physical card
+ */
+export const CancelPhysicalCardParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const cancelPhysicalCardBodyReasonMax = 1000;
+
+
+
+export const CancelPhysicalCardBody = zod.object({
+  "reason": zod.string().max(cancelPhysicalCardBodyReasonMax)
+})
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const CancelPhysicalCardResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(cancelPhysicalCardResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage. Freezing needs a note, shown to the applicant, who can't lift a staff freeze.
+ * @summary Freeze or unfreeze an applicant's card
+ */
+export const SetCardFreezeAsStaffParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const setCardFreezeAsStaffBodyReasonMax = 1000;
+
+
+
+export const SetCardFreezeAsStaffBody = zod.object({
+  "card": zod.enum(['virtual', 'physical']),
+  "frozen": zod.boolean(),
+  "reason": zod.string().max(setCardFreezeAsStaffBodyReasonMax).optional()
+})
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const SetCardFreezeAsStaffResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(setCardFreezeAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. From the deposit or grant balance, or none (added by staff). Reason required and shown.
+ * @summary Add money to an applicant's card
+ */
+export const FundCardAsStaffParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const fundCardAsStaffBodyReasonMax = 1000;
+
+
+
+export const FundCardAsStaffBody = zod.object({
+  "amount": zod.number(),
+  "source": zod.enum(['deposit', 'grant', 'none']),
+  "reason": zod.string().max(fundCardAsStaffBodyReasonMax)
+})
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const fundCardAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const FundCardAsStaffResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(fundCardAsStaffResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires payments.process. Back to the deposit or grant balance, or none (removed). Reason required and shown.
+ * @summary Take money off an applicant's card
+ */
+export const DeductFromCardParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const deductFromCardBodyReasonMax = 1000;
+
+
+
+export const DeductFromCardBody = zod.object({
+  "amount": zod.number(),
+  "destination": zod.enum(['deposit', 'grant', 'none']),
+  "reason": zod.string().max(deductFromCardBodyReasonMax)
+})
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const deductFromCardResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const DeductFromCardResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(deductFromCardResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Only a masked label is stored.
+ * @summary Save a payout destination
+ */
+export const savePayoutDestinationBodyPrimaryMax = 80;
+
+export const savePayoutDestinationBodySecondaryMax = 80;
+
+
+
+export const SavePayoutDestinationBody = zod.object({
+  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
+  "primary": zod.string().max(savePayoutDestinationBodyPrimaryMax),
+  "secondary": zod.string().max(savePayoutDestinationBodySecondaryMax).optional()
+})
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
+export const savePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+
+
+
+export const SavePayoutDestinationResponse = zod.object({
+  "money": zod.object({
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "applicantId": zod.string(),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "description": zod.string(),
+  "amount": zod.number().describe('Signed; credits positive, debits negative'),
+  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
+  "createdAt": zod.string(),
+  "method": zod.string().optional(),
+  "fee": zod.number().optional(),
+  "destination": zod.string().optional(),
+  "reference": zod.string().optional(),
+  "processedAt": zod.string().optional(),
+  "processedBy": zod.string().optional(),
+  "failureReason": zod.string().optional(),
+  "dualControl": zod.boolean().optional(),
+  "releaseApproval": zod.object({
+  "by": zod.string(),
+  "at": zod.string(),
+  "byId": zod.string().optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+})),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "pin": zod.string().describe('Fictional; no card provider is connected')
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2745,6 +4602,20 @@ export const RemovePayoutDestinationParams = zod.object({
   "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
 })
 
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+
 export const removePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
 
 
@@ -2754,7 +4625,7 @@ export const RemovePayoutDestinationResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2771,18 +4642,51 @@ export const RemovePayoutDestinationResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })),
   "cards": zod.object({
   "virtual": zod.object({
   "lastFour": zod.string(),
   "dailyLimit": zod.number(),
   "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
   "pin": zod.string().describe('Fictional; no card provider is connected')
-}),
+}).nullable(),
   "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested']),
-  "dailyLimit": zod.number()
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
 })
 }),
   "payoutDestinations": zod.record(zod.string(), zod.string()),
@@ -2832,7 +4736,7 @@ export const RemovePayoutDestinationResponse = zod.object({
 export const GetLedgerResponseItem = zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2849,7 +4753,9 @@ export const GetLedgerResponseItem = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 })
 export const GetLedgerResponse = zod.array(GetLedgerResponseItem)
 
@@ -3092,7 +4998,7 @@ export const ConfirmDepositResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3109,7 +5015,9 @@ export const ConfirmDepositResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 }),
   "message": zod.string()
 })
@@ -3138,7 +5046,7 @@ export const RejectDepositResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3155,7 +5063,9 @@ export const RejectDepositResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 }),
   "message": zod.string()
 })
@@ -3176,7 +5086,7 @@ export const ApprovePayoutReleaseResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3193,7 +5103,9 @@ export const ApprovePayoutReleaseResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 }),
   "message": zod.string()
 })
@@ -3214,7 +5126,7 @@ export const MarkPayoutPaidResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3231,7 +5143,9 @@ export const MarkPayoutPaidResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 }),
   "message": zod.string()
 })
@@ -3260,7 +5174,7 @@ export const MarkPayoutFailedResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3277,7 +5191,9 @@ export const MarkPayoutFailedResponse = zod.object({
   "by": zod.string(),
   "at": zod.string(),
   "byId": zod.string().optional()
-}).optional()
+}).optional(),
+  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
+  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
 }),
   "message": zod.string()
 })

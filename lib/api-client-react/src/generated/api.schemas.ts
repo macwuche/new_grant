@@ -340,6 +340,8 @@ export const LedgerEntryType = {
   Withdrawal: 'Withdrawal',
   Card_fee: 'Card fee',
   Application_fee: 'Application fee',
+  'Card_top-up': 'Card top-up',
+  Card_deduction: 'Card deduction',
 } as const;
 
 export type LedgerEntryStatus = typeof LedgerEntryStatus[keyof typeof LedgerEntryStatus];
@@ -357,6 +359,18 @@ export type LedgerEntryReleaseApproval = {
   at: string;
   byId?: string;
 };
+
+/**
+ * Card moves only - the other balance moved, or none
+ */
+export type LedgerEntryCounterpart = typeof LedgerEntryCounterpart[keyof typeof LedgerEntryCounterpart];
+
+
+export const LedgerEntryCounterpart = {
+  deposit: 'deposit',
+  grant: 'grant',
+  none: 'none',
+} as const;
 
 export interface LedgerEntry {
   id: string;
@@ -376,6 +390,10 @@ export interface LedgerEntry {
   failureReason?: string;
   dualControl?: boolean;
   releaseApproval?: LedgerEntryReleaseApproval;
+  /** Card moves only - the other balance moved, or none */
+  counterpart?: LedgerEntryCounterpart;
+  /** Staff card moves - the reason shown to the applicant */
+  note?: string;
 }
 
 export interface PayoutChannel {
@@ -436,13 +454,25 @@ export interface MoneySettingsUpdate {
   treasury: TreasuryInput;
 }
 
+export type CardsVirtualFrozenBy = typeof CardsVirtualFrozenBy[keyof typeof CardsVirtualFrozenBy];
+
+
+export const CardsVirtualFrozenBy = {
+  applicant: 'applicant',
+  staff: 'staff',
+} as const;
+
 export type CardsVirtual = {
   lastFour: string;
   dailyLimit: number;
   frozen: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  frozenBy?: CardsVirtualFrozenBy;
+  frozenReason?: string;
   /** Fictional; no card provider is connected */
   pin: string;
-};
+} | null;
 
 export type CardsPhysicalStatus = typeof CardsPhysicalStatus[keyof typeof CardsPhysicalStatus];
 
@@ -450,16 +480,255 @@ export type CardsPhysicalStatus = typeof CardsPhysicalStatus[keyof typeof CardsP
 export const CardsPhysicalStatus = {
   Not_requested: 'Not requested',
   Requested: 'Requested',
+  Shipped: 'Shipped',
+  Active: 'Active',
+  Declined: 'Declined',
+  Cancelled: 'Cancelled',
 } as const;
+
+export type CardsPhysicalFrozenBy = typeof CardsPhysicalFrozenBy[keyof typeof CardsPhysicalFrozenBy];
+
+
+export const CardsPhysicalFrozenBy = {
+  applicant: 'applicant',
+  staff: 'staff',
+} as const;
+
+export interface ShippingAddress {
+  /** @maxLength 80 */
+  name: string;
+  /** @maxLength 120 */
+  line1: string;
+  /** @maxLength 120 */
+  line2?: string;
+  /** @maxLength 60 */
+  city: string;
+  /** @maxLength 60 */
+  region?: string;
+  /** @maxLength 20 */
+  postalCode: string;
+  /** @maxLength 60 */
+  country: string;
+}
 
 export type CardsPhysical = {
   status: CardsPhysicalStatus;
   dailyLimit: number;
+  lastFour?: string;
+  frozen?: boolean;
+  frozenBy?: CardsPhysicalFrozenBy;
+  frozenReason?: string;
+  shippingAddress?: ShippingAddress;
+  requestedAt?: string;
+  feeTxId?: string;
+  issuedBy?: string;
+  shippedAt?: string;
+  shippedBy?: string;
+  trackingRef?: string;
+  shippingMessage?: string;
+  activatedAt?: string;
+  declinedAt?: string;
+  declinedBy?: string;
+  declineReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
 };
 
 export interface Cards {
   virtual: CardsVirtual;
   physical: CardsPhysical;
+}
+
+export type StaffCardsVirtualFrozenBy = typeof StaffCardsVirtualFrozenBy[keyof typeof StaffCardsVirtualFrozenBy];
+
+
+export const StaffCardsVirtualFrozenBy = {
+  applicant: 'applicant',
+  staff: 'staff',
+} as const;
+
+export type StaffCardsVirtual = {
+  lastFour: string;
+  dailyLimit: number;
+  frozen: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  frozenBy?: StaffCardsVirtualFrozenBy;
+  frozenReason?: string;
+} | null;
+
+export type StaffCardsPhysicalStatus = typeof StaffCardsPhysicalStatus[keyof typeof StaffCardsPhysicalStatus];
+
+
+export const StaffCardsPhysicalStatus = {
+  Not_requested: 'Not requested',
+  Requested: 'Requested',
+  Shipped: 'Shipped',
+  Active: 'Active',
+  Declined: 'Declined',
+  Cancelled: 'Cancelled',
+} as const;
+
+export type StaffCardsPhysicalFrozenBy = typeof StaffCardsPhysicalFrozenBy[keyof typeof StaffCardsPhysicalFrozenBy];
+
+
+export const StaffCardsPhysicalFrozenBy = {
+  applicant: 'applicant',
+  staff: 'staff',
+} as const;
+
+export type StaffCardsPhysical = {
+  status: StaffCardsPhysicalStatus;
+  dailyLimit: number;
+  lastFour?: string;
+  frozen?: boolean;
+  frozenBy?: StaffCardsPhysicalFrozenBy;
+  frozenReason?: string;
+  shippingAddress?: ShippingAddress;
+  requestedAt?: string;
+  feeTxId?: string;
+  issuedBy?: string;
+  shippedAt?: string;
+  shippedBy?: string;
+  trackingRef?: string;
+  shippingMessage?: string;
+  activatedAt?: string;
+  declinedAt?: string;
+  declinedBy?: string;
+  declineReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
+};
+
+/**
+ * An applicant's cards as staff see them (no PIN)
+ */
+export interface StaffCards {
+  virtual: StaffCardsVirtual;
+  physical: StaffCardsPhysical;
+}
+
+export type CardSettingsFunding = typeof CardSettingsFunding[keyof typeof CardSettingsFunding];
+
+
+export const CardSettingsFunding = {
+  deposit: 'deposit',
+  grant: 'grant',
+  both: 'both',
+} as const;
+
+export interface CardSettings {
+  funding: CardSettingsFunding;
+  kycRequired: boolean;
+}
+
+export interface CardHolder {
+  applicantId: string;
+  name: string;
+  email: string;
+  cards: StaffCards;
+  /** The card balance, shared by both cards */
+  balance: number;
+  settings: CardSettings;
+}
+
+export interface CardHolderResult {
+  holder: CardHolder;
+  message: string;
+}
+
+export type CardChoiceCard = typeof CardChoiceCard[keyof typeof CardChoiceCard];
+
+
+export const CardChoiceCard = {
+  virtual: 'virtual',
+  physical: 'physical',
+} as const;
+
+export interface CardChoice {
+  card?: CardChoiceCard;
+}
+
+export interface CardActivation {
+  /** @maxLength 4 */
+  lastFour: string;
+}
+
+export type CardFundingSource = typeof CardFundingSource[keyof typeof CardFundingSource];
+
+
+export const CardFundingSource = {
+  deposit: 'deposit',
+  grant: 'grant',
+} as const;
+
+export interface CardFunding {
+  amount: number;
+  source: CardFundingSource;
+}
+
+export type StaffCardFundingSource = typeof StaffCardFundingSource[keyof typeof StaffCardFundingSource];
+
+
+export const StaffCardFundingSource = {
+  deposit: 'deposit',
+  grant: 'grant',
+  none: 'none',
+} as const;
+
+export interface StaffCardFunding {
+  amount: number;
+  source: StaffCardFundingSource;
+  /** @maxLength 1000 */
+  reason: string;
+}
+
+export type StaffCardDeductionDestination = typeof StaffCardDeductionDestination[keyof typeof StaffCardDeductionDestination];
+
+
+export const StaffCardDeductionDestination = {
+  deposit: 'deposit',
+  grant: 'grant',
+  none: 'none',
+} as const;
+
+export interface StaffCardDeduction {
+  amount: number;
+  destination: StaffCardDeductionDestination;
+  /** @maxLength 1000 */
+  reason: string;
+}
+
+export interface CardShipment {
+  /** @maxLength 2000 */
+  message: string;
+  /** @maxLength 200 */
+  trackingRef?: string;
+}
+
+export interface CardIssue {
+  address: ShippingAddress;
+  /** @maxLength 2000 */
+  message: string;
+  /** @maxLength 200 */
+  trackingRef?: string;
+}
+
+export type StaffCardFreezeCard = typeof StaffCardFreezeCard[keyof typeof StaffCardFreezeCard];
+
+
+export const StaffCardFreezeCard = {
+  virtual: 'virtual',
+  physical: 'physical',
+} as const;
+
+export interface StaffCardFreeze {
+  card: StaffCardFreezeCard;
+  frozen: boolean;
+  /** @maxLength 1000 */
+  reason?: string;
 }
 
 export type MyMoneyPayoutDestinations = {[key: string]: string};
@@ -894,6 +1163,7 @@ export interface Account {
   passwordResetRequired: boolean;
   twoFactorResetRequired: boolean;
   kyc: Kyc;
+  cardSettings?: CardSettings;
 }
 
 export interface Profile {

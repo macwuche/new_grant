@@ -15,4 +15,6 @@ export const LedgerEntryType = {
   Withdrawal: 'Withdrawal',
   Card_fee: 'Card fee',
   Application_fee: 'Application fee',
+  'Card_top-up': 'Card top-up',
+  Card_deduction: 'Card deduction',
 } as const;

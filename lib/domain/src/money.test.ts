@@ -91,23 +91,24 @@ describe('withdrawal requests', () => {
 });
 
 describe('cards', () => {
-  it('charges issuance plus delivery once, keeping the reserve', () => {
-    accept(M.requestPhysicalCard(s, now));
+  const address = { name: 'Alex Morgan', line1: '1 Main St', city: 'Austin', postalCode: '73301', country: 'United States' };
+  it('charges issuance plus shipping once, keeping the reserve', () => {
+    accept(M.requestPhysicalCard(s, address, now));
     expect(mine().deposit).toBe(429.5);
-    expect(s.transactions[0]).toMatchObject({ type: 'Card fee', amount: -12, description: 'Physical card issuance and delivery' });
+    expect(s.transactions[0]).toMatchObject({ type: 'Card fee', amount: -12, description: 'Physical card and shipping' });
     expect(s.staffFeed[0]!.kind).toBe('card');
-    expect(M.requestPhysicalCard(s, now).ok).toBe(false);
+    expect(M.requestPhysicalCard(s, address, now).ok).toBe(false);
   });
 
   it('refuses when fees would breach the reserve', () => {
     setTreasury({ depositThreshold: 435 });
-    const result = M.requestPhysicalCard(s, now);
+    const result = M.requestPhysicalCard(s, address, now);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/keep \$435\.00 in reserve/);
   });
 
   it('toggles the virtual card freeze', () => {
     accept(M.toggleCardFreeze(s));
-    expect(s.cards.virtual.frozen).toBe(true);
+    expect(s.cards.virtual!.frozen).toBe(true);
   });
 });

@@ -232,3 +232,7 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-shell *, .admin-shell *:before, .admin-shell *:after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+/* Applicant profile page: details and cards side by side, stacked when narrow. */
+.admin-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.admin-profile-panel { padding-block: 20px; }
+.admin-profile-panel .admin-review-title h2 { font-size: 26px; }

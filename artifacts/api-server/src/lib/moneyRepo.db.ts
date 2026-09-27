@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, ledgerEntriesTable, ledgerNumberSeq, systemSettingsTable, type LedgerRow, type TreasuryJson } from "@workspace/db";
 import type { Lockdown, Transaction, Treasury } from "@workspace/domain/model";
 import { seedTreasury } from "@workspace/domain/seed";
@@ -32,6 +32,8 @@ export const toTransaction = (r: LedgerRow): Transaction => ({
   ...(r.failureReason !== null ? { failureReason: r.failureReason } : {}),
   ...(r.dualControl !== null ? { dualControl: r.dualControl } : {}),
   ...(r.releaseApproval ? { releaseApproval: { by: r.releaseApproval.by, at: r.releaseApproval.at, ...(r.releaseApproval.byId ? { byId: r.releaseApproval.byId } : {}) } } : {}),
+  ...(r.counterpart !== null ? { counterpart: r.counterpart } : {}),
+  ...(r.note !== null ? { note: r.note } : {}),
 });
 
 const toRow = (t: Transaction) => ({
@@ -39,6 +41,7 @@ const toRow = (t: Transaction) => ({
   createdAt: new Date(t.createdAt), method: t.method ?? null, fee: t.fee ?? null, destination: t.destination ?? null,
   reference: t.reference ?? null, processedAt: t.processedAt ? new Date(t.processedAt) : null, processedBy: t.processedBy ?? null,
   failureReason: t.failureReason ?? null, dualControl: t.dualControl ?? null, releaseApproval: t.releaseApproval ?? null,
+  counterpart: t.counterpart ?? null, note: t.note ?? null,
 });
 
 export async function saveTransaction(tx: Tx, t: Transaction) {
@@ -114,6 +117,11 @@ export const dbMoneyRepo: MoneyRepo = {
     return { cards: row.cards, payoutDestinations: row.payoutDestinations, ...(row.destinationChangedAt ? { destinationChangedAt: row.destinationChangedAt.toISOString() } : {}) };
   },
   findTransaction: async id => { const [row] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, id)); return row ? toTransaction(row) : null; },
+  cardHolders: async () => {
+    const rows = await db.select({ applicantId: applicantProfilesTable.authUserId, name: applicantProfilesTable.name, email: applicantProfilesTable.email, cards: applicantProfilesTable.cards, funding: applicantProfilesTable.cardFunding, kycRequired: applicantProfilesTable.cardKycRequired })
+      .from(applicantProfilesTable).where(isNotNull(applicantProfilesTable.cards));
+    return rows.map(r => ({ applicantId: r.applicantId, name: r.name, email: r.email, cards: r.cards!, settings: { funding: r.funding, kycRequired: r.kycRequired } }));
+  },
   nextBlock: async () => {
     const { rows } = await db.execute<{ n: string }>(sql`select nextval(${ledgerNumberSeq.seqName}) as n`);
     return Number(rows[0]!.n);

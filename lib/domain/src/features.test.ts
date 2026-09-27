@@ -99,7 +99,7 @@ describe('card limits', () => {
     expect(M.setCardLimit(s, 'virtual', 99.5).ok).toBe(false);
     expect(M.setCardLimit(s, 'physical', 500).ok).toBe(false); // not requested yet
     accept(M.setCardLimit(s, 'virtual', 2500));
-    expect(s.cards.virtual.dailyLimit).toBe(2500);
+    expect(s.cards.virtual!.dailyLimit).toBe(2500);
   });
 });
 
@@ -120,6 +120,6 @@ describe('saved-data migration v4 → v5', () => {
     expect(migrated.accounts['APL-1001']!.kyc.status).toBe('Not submitted');
     expect(migrated.treasury.dualControlThreshold).toBe(2500);
     expect(migrated.lockdown).toBeNull();
-    expect(migrated.cards.virtual.pin).toBeDefined();
+    expect(migrated.cards.virtual!.pin).toBeDefined();
   });
 });

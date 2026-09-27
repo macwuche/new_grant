@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AccountStatus } from './accountStatus';
+import type { CardSettings } from './cardSettings';
 import type { Kyc } from './kyc';
 
 /**
@@ -19,4 +20,5 @@ export interface Account {
   passwordResetRequired: boolean;
   twoFactorResetRequired: boolean;
   kyc: Kyc;
+  cardSettings?: CardSettings;
 }

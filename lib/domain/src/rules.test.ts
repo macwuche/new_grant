@@ -24,7 +24,7 @@ beforeEach(() => { s = createSeedState(); });
 
 describe('balances', () => {
   it('derives balances from the ledger, holding pending withdrawals', () => {
-    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 125, pendingDeposits: 0 });
+    expect(mine()).toEqual({ grant: 4075, deposit: 441.5, pendingWithdrawals: 125, pendingDeposits: 0, card: 0 });
   });
 
   it('ignores failed entries', () => {
