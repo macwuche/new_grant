@@ -195,7 +195,7 @@ function WebhookPanel({ settings }: { settings: EmailSettings }) {
       <span className="admin-email-settings-state">{settings.webhook.secretSet ? 'SECRET SAVED' : 'NO SECRET'}</span></div>
     <div className="admin-email-settings-row"><span className="admin-email-settings-icon"><Webhook size={17} /></span><div><strong>Endpoint URL</strong><p>{url ? <code data-testid="text-webhook-url">{url}</code> : 'Save the portal address first.'}</p></div>{url && <button type="button" className="admin-btn" onClick={() => void copy()} data-testid="button-copy-webhook"><Copy size={13} /> {copied ? 'Copied' : 'Copy'}</button>}</div>
     <ol className="admin-review-hint" style={{ paddingLeft: 18, lineHeight: 1.7 }}>
-      <li>In Resend, open <strong>Webhooks → Add endpoint</strong> and paste the URL above.</li>
+      <li>In Resend, open <strong>Webhooks → Add endpoint</strong> and paste the whole URL above, ending in <code>/api/email/webhook</code> (the site address alone gets a 404).</li>
       <li>Select the events <code>email.received</code>, <code>email.delivered</code>, <code>email.bounced</code>, <code>email.complained</code>, and <code>email.delivery_delayed</code>.</li>
       <li>Copy the endpoint's <strong>signing secret</strong> (whsec_…) into <em>Webhook signing secret</em> above and save.</li>
       <li>For receiving, the domain above needs receiving turned on and its MX record in your DNS.</li>
