@@ -4,8 +4,8 @@ How the grant portal (applicant portal + admin + API) is deployed to our VPS, st
 The owner runs every command on the server; paste the output of the **check** steps back so the "Server inventory" and "Decisions" sections can be filled in.
 
 > **Status (28 Sep 2026): LIVE** at https://access.novabridgegrant.org — on the new VPS `77.68.98.14`, behind Cloudflare, HTTPS by Let's Encrypt, super admin signed in.
-> Auth emails (sign-up, reset, sign-in links) now go through **our own server** via Supabase's Send Email Hook — code deployed and the secret set (28 Sep); the hook stays **off in Supabase** until Resend is set up (Step 11b).
-> Still open: Resend (key, verified domain, sender), app name, Supabase URL settings, enabling the hook, the applicant smoke test, backups, and rotating the secrets that were typed into the chat — see "Status" below.
+> **Auth emails work through our own system (evening of 28 Sep 2026):** Supabase's Send Email Hook is on, our server writes every sign-up, reset and sign-in email and **Resend** sends it from `novabridgegrant.org`. Supabase stores the data and sends no email (owner's rule). Cloudflare's **Bot Fight Mode is off**, because it was blocking Supabase's calls to the hook (the "hook: 403" sign-up error). Full story: "Auth emails — what happened on 28 Sep and why" under Step 11b.
+> Still open: confirm the Supabase URL settings, the app name and the Resend webhook; the applicant smoke test; backups; rotating the secrets that were typed into the chat — see "Status" below.
 
 > **Server history:** we started on a shared VPS (`195.20.255.153`), got as far as cloning, then moved to a **new, empty VPS** on 27 Sep 2026.
 > Everything we put on the old server was removed and verified — see "Old server — retired" at the end.
@@ -358,7 +358,7 @@ Without this, Supabase sends sign-up confirmations, password resets and sign-in 
 
 Order matters — switch the hook on **last**, or sign-ups fail while email isn't ready:
 
-1. **Resend:** API key; domain `novabridgegrant.org` added and **Verified** (DNS records in Cloudflare, grey cloud).
+1. **Resend:** API key; domain `novabridgegrant.org` added and **Verified** (DNS records in Cloudflare, grey cloud). Done 28 Sep: region Ireland (`eu-west-1`); records DKIM `resend._domainkey` (TXT), sending `send` and `rsend` (CNAME to Resend's `…forge.rmta.net`), receiving MX `@` → `inbound-smtp.eu-west-1.amazonaws.com`, tracking `mail` → `links2.resend-dns.com`, all "DNS only".
 2. **Admin → Settings → Email:** save the Resend key, sender (e.g. `Nova Bridge Grant <noreply@novabridgegrant.org>`), reply-to, portal address `https://access.novabridgegrant.org`; send a test. **Settings → App branding:** set the application name (default "arc.fund").
 3. **Supabase → Authentication → URL Configuration:** Site URL `https://access.novabridgegrant.org`, Redirect URLs `https://access.novabridgegrant.org/**`.
 4. **Supabase → Authentication → Hooks → Add hook → Send Email hook:** type **HTTPS**, URL `https://access.novabridgegrant.org/api/auth/email-hook`, **Generate secret**, copy it (`v1,whsec_…`). Don't enable yet if the form allows saving disabled.
@@ -372,9 +372,30 @@ Order matters — switch the hook on **last**, or sign-ups fail while email isn'
    sh deploy/build.sh
    systemctl restart novabridgegrant-api
    ```
-6. **Enable** the hook in Supabase, then sign up with a test address: the email should come from our sender with our wording.
+6. **Cloudflare:** Security → Settings → search "bot" → **Bot Fight Mode off**. Supabase calls the hook from its servers in Ireland; Bot Fight Mode answers those calls with a "Managed Challenge" (a browser check a server can't pass), which Supabase reports as `Unexpected status code returned from hook: 403`. On the free plan Bot Fight Mode can't be skipped for one path, so it has to be off. Safe for us: the hook refuses any call without Supabase's signature, and `/api/email/webhook` (Resend's calls, blocked the same way) refuses any call without Resend's. There are no custom WAF or rate-limit rules on the zone.
+7. **Enable** the hook in Supabase, then sign up with a test address: the email should come from our sender with our wording.
 
-If the hook answers with an error, Supabase shows the sign-up/reset as failed and nothing is sent: check `journalctl -u novabridgegrant-api -n 50 --no-pager | grep -i "auth email"`. To go back to Supabase's mailer, disable the hook in Supabase.
+**Admin check:** Settings → Email → "Sign-up and sign-in emails" shows the chain as a checklist: (1) Resend key and sender saved, (2) hook secret on the server, (3) hook on in Supabase at our URL (needs a Supabase access token to check; says "Not checked" without one). The badge reads RESEND when all three are done, and a warning appears if the hook is on while Resend isn't set up.
+
+If the hook answers with an error, Supabase shows the sign-up/reset as failed and nothing is sent: check `journalctl -u novabridgegrant-api -n 50 --no-pager | grep -i "auth email"`. To go back to Supabase's mailer (emergency only: it breaks the rule below and allows only a few emails an hour from `noreply@mail.app.supabase.io`), disable the hook in Supabase.
+
+**Which error means what** (the message Supabase shows on the sign-up page):
+
+| Status | From | Meaning / fix |
+|---|---|---|
+| 403 | Cloudflare, not our app | Bot Fight Mode (or another Cloudflare protection) blocked Supabase. Check Security → Analytics → **Events**, filter *Path equals* `/api/auth/email-hook`; the "Service" column names the feature. Our hook route never answers 403. |
+| 401 | our API | Signature check failed: the `SUPABASE_EMAIL_HOOK_SECRET` line doesn't match the hook's secret in Supabase. |
+| 503 | our API | Resend key or sender not saved in Settings → Email, or the hook secret / `SUPABASE_URL` missing on the server. |
+| 502 | our API | Resend refused or timed out (4 s). Check Resend → Logs. |
+
+### Auth emails — what happened on 28 Sep and why
+
+- **The rule (owner, 28 Sep):** Supabase is our database and sign-in system; its job is storing data, not sending email. **Resend is our only email driver**, and every email comes from our own address.
+- **What we found:** the first test sign-up's confirmation came from `Supabase Auth <noreply@mail.app.supabase.io>` with Supabase's wording. That's Supabase's built-in mailer: generic sender, only a few emails an hour.
+- **What we built:** Supabase's **Send Email Hook** (`POST /api/auth/email-hook`, `0524e86`). With it on, Supabase still creates accounts and makes the verification links, but hands every auth email to our server, which writes it in the app's wording and sends it through Resend. Supabase's mailer and its SMTP settings are unused.
+- **Why the SMTP route was removed:** the admin used to offer a second route, pointing Supabase's own mailer at Resend's SMTP relay ("Use Resend", "Use app wording"). That still has Supabase sending, which breaks the rule, so it was removed (`bad06bc`). The panel now shows the hook checklist instead.
+- **The sign-up error:** once the hook was switched on, sign-ups failed with *"Unexpected status code returned from hook: 403 — go back to step 1"*. Our hook code never answers 403, and unsigned calls from outside reached it and got 401, so the 403 came from in front of the app. Cloudflare → Security → Analytics → Events showed it: calls to `/api/auth/email-hook` from Ireland (Supabase's region) at 11:33 and 12:01 got **Managed Challenge** by **Bot Fight Mode**. The hook was switched off to let sign-ups work again meanwhile.
+- **The fix, in order:** Resend domain verified (7:43 PM) → Resend key and sender saved in Settings → Email → **Bot Fight Mode turned off** → hook switched back on → test sign-up: the confirmation came from our address through Resend. Working since the evening of 28 Sep.
 
 ## Step 12 — Smoke test
 
@@ -473,14 +494,20 @@ New VPS `77.68.98.14` (27 Sep 2026):
 - [x] First super admin `info@novabridgegrant.org` added in the Supabase SQL editor (seed skipped because `staff_members` already had a row); signed in and linked.
 
 Still to do:
-- [ ] Supabase → Authentication → URL configuration: Site URL `https://access.novabridgegrant.org`; add `https://access.novabridgegrant.org/**` to Redirect URLs.
-- [ ] Email: Resend API key + webhook secret in the admin settings; Resend webhook → `https://access.novabridgegrant.org/api/email/webhook`.
+- [ ] Confirm Supabase → Authentication → URL configuration: Site URL `https://access.novabridgegrant.org`; `https://access.novabridgegrant.org/**` in Redirect URLs (verification links redirect here).
+- [ ] Resend webhook → `https://access.novabridgegrant.org/api/email/webhook` (events `email.received`, `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`) and its signing secret in Settings → Email, for the team inbox and delivery status. Bot Fight Mode is already off, so Resend's calls get through.
 New VPS, 28 Sep 2026:
 - [x] Docs brought up to date with the whole deployment (this file, `BUILD_STATUS.md`, `work.md`, `replit.md`).
 - [x] Found that sign-up confirmations came from Supabase's mailer (`noreply@mail.app.supabase.io`, Supabase's wording). Decision (owner): our own system sends every auth email, not Supabase.
 - [x] Built Supabase's Send Email Hook: `POST /api/auth/email-hook` (`routes/authEmailHook.ts`, templates in `lib/authEmails.ts`); 5 new API tests, 110 API + 171 rule tests pass, type check clean. Pushed as `0524e86`.
 - [x] 2026-09-28 — Step 11b, server side: code `0524e86` deployed (`git pull`, `sh deploy/build.sh`, restart); `SUPABASE_EMAIL_HOOK_SECRET` in `api.env`; the hook endpoint answers unsigned calls with 401 (secret loaded).
-- [ ] Step 11b, remaining: Resend key + verified domain, sender and app name in the admin, Supabase URL configuration, then **enable** the Send Email hook in Supabase and test a sign-up.
+- [x] Sign-ups failed with "hook: 403"; traced to Cloudflare Bot Fight Mode (Security → Analytics → Events: Managed Challenge on `/api/auth/email-hook` from Ireland). Hook switched off meanwhile.
+- [x] Owner's rule recorded: Supabase sends no email, Resend sends everything. Removed the Supabase-SMTP route from the admin and API; the email panel shows the hook checklist. 109 API + 171 rule tests pass. Pushed and deployed as `bad06bc`.
+- [x] Resend: domain `novabridgegrant.org` verified (Ireland, sending + receiving + tracking); key and sender saved in the admin.
+- [x] Cloudflare: Bot Fight Mode off.
+- [x] Send Email hook enabled in Supabase; test sign-up confirmation arrived from our address through Resend.
+- [ ] Set the application name (Settings → App branding; default "arc.fund") if not done — it appears in every email's subject and text.
+- [ ] Optional: DMARC record in Cloudflare (`TXT` `_dmarc` = `v=DMARC1; p=none;`) to help deliverability. Resend lists `rsend` → `rsend-euw1.forge.rmta.net` while Cloudflare has `rsend.forge.rmta.net`; Resend shows it verified, so leave it unless it turns red.
 - [ ] After go-live: regenerate the Send Email hook secret in Supabase (it was typed into the chat on 28 Sep 2026) and replace the `SUPABASE_EMAIL_HOOK_SECRET` line (Step 11b, step 5).
 - [ ] Step 12 — applicant smoke test (sign up → confirmation email → apply → upload → file in `/var/lib/novabridgegrant/documents`).
 - [ ] Decide about the leftover super admin `benmacwuche+newnovabridgegrant@gmail.com` (keep, or set `active = false`).
@@ -554,3 +581,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-28 — Docs updated with everything done on 27–28 Sep (status banner, 28 Sep checklist, deployed code, open items).
 - 2026-09-28 — Test sign-ups failed with "Unexpected status code returned from hook: 403": the hook had been switched on before Resend was ready, and the 403 came from in front of the app (our hook route never answers 403; unsigned calls from outside reach it and get 401), most likely Cloudflare blocking Supabase's server-to-server calls. Hook to stay off until Resend is set up and Cloudflare lets `/api/auth/email-hook` and `/api/email/webhook` through (Security → Events; turn off Bot Fight Mode or add a Skip rule).
 - 2026-09-28 — Owner's rule: Supabase stores data and sends no email; Resend sends everything. Deployed `bad06bc` (removed the Supabase SMTP and wording controls; Settings → Email shows the hook checklist). Build OK, service restarted, `/api/healthz` 200 and the hook still answers unsigned calls with 401.
+- 2026-09-28 — Traced the "hook: 403" sign-up error in Cloudflare → Security → Analytics → Events: Supabase's calls to `/api/auth/email-hook` (Ireland) got a Managed Challenge from Bot Fight Mode. Resend domain verified, key and sender saved, **Bot Fight Mode turned off**, hook switched back on: test sign-up confirmation came from our address through Resend. Step 11b gains the Cloudflare step, an error table, and the full story of the day.
