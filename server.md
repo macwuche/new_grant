@@ -4,7 +4,8 @@ How the grant portal (applicant portal + admin + API) is deployed to our VPS, st
 The owner runs every command on the server; paste the output of the **check** steps back so the "Server inventory" and "Decisions" sections can be filled in.
 
 > **Status (28 Sep 2026): LIVE** at https://access.novabridgegrant.org — on the new VPS `77.68.98.14`, behind Cloudflare, HTTPS by Let's Encrypt, super admin signed in.
-> Still open: Supabase URL settings, email (Resend), the applicant smoke test, backups, and two password changes — see "Status" below.
+> Auth emails (sign-up, reset, sign-in links) now go through **our own server** via Supabase's Send Email Hook — code deployed and the secret set (28 Sep); the hook stays **off in Supabase** until Resend is set up (Step 11b).
+> Still open: Resend (key, verified domain, sender), app name, Supabase URL settings, enabling the hook, the applicant smoke test, backups, and rotating the secrets that were typed into the chat — see "Status" below.
 
 > **Server history:** we started on a shared VPS (`195.20.255.153`), got as far as cloning, then moved to a **new, empty VPS** on 27 Sep 2026.
 > Everything we put on the old server was removed and verified — see "Old server — retired" at the end.
@@ -442,7 +443,7 @@ _Fill in from step 1's output on the new server._
 
 ## Status
 
-**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org, code `8dfe7be`.
+**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org. Deployed code: `0524e86` (28 Sep, adds the auth email hook); first deploy was `8dfe7be`.
 
 Preparation (27 Sep 2026):
 - [x] Reviewed the app's structure and runtime needs; wrote this runbook.
@@ -474,6 +475,10 @@ New VPS `77.68.98.14` (27 Sep 2026):
 Still to do:
 - [ ] Supabase → Authentication → URL configuration: Site URL `https://access.novabridgegrant.org`; add `https://access.novabridgegrant.org/**` to Redirect URLs.
 - [ ] Email: Resend API key + webhook secret in the admin settings; Resend webhook → `https://access.novabridgegrant.org/api/email/webhook`.
+New VPS, 28 Sep 2026:
+- [x] Docs brought up to date with the whole deployment (this file, `BUILD_STATUS.md`, `work.md`, `replit.md`).
+- [x] Found that sign-up confirmations came from Supabase's mailer (`noreply@mail.app.supabase.io`, Supabase's wording). Decision (owner): our own system sends every auth email, not Supabase.
+- [x] Built Supabase's Send Email Hook: `POST /api/auth/email-hook` (`routes/authEmailHook.ts`, templates in `lib/authEmails.ts`); 5 new API tests, 110 API + 171 rule tests pass, type check clean. Pushed as `0524e86`.
 - [x] 2026-09-28 — Step 11b, server side: code `0524e86` deployed (`git pull`, `sh deploy/build.sh`, restart); `SUPABASE_EMAIL_HOOK_SECRET` in `api.env`; the hook endpoint answers unsigned calls with 401 (secret loaded).
 - [ ] Step 11b, remaining: Resend key + verified domain, sender and app name in the admin, Supabase URL configuration, then **enable** the Send Email hook in Supabase and test a sign-up.
 - [ ] After go-live: regenerate the Send Email hook secret in Supabase (it was typed into the chat on 28 Sep 2026) and replace the `SUPABASE_EMAIL_HOOK_SECRET` line (Step 11b, step 5).
@@ -546,3 +551,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-28 — Docs brought up to date after go-live: status rewritten, PowerShell lessons section, steps 5/6/7/10 describe what was actually run, first-super-admin fix recorded under step 11, remaining work listed.
 - 2026-09-28 — Sign-up confirmation arrived from Supabase's mailer (`noreply@mail.app.supabase.io`). Built Supabase's Send Email Hook (`POST /api/auth/email-hook`) so our server writes and sends every auth email through Resend; setup is Step 11b.
 - 2026-09-28 — Hook code `0524e86` deployed; hook secret set on the server; `/api/auth/email-hook` checked from outside (401 without a signature). Hook not yet enabled in Supabase — waiting for Resend.
+- 2026-09-28 — Docs updated with everything done on 27–28 Sep (status banner, 28 Sep checklist, deployed code, open items).
