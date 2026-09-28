@@ -1396,3 +1396,87 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect((await json(await call("/inbox?folder=archive", "tok-super"))).messages).toHaveLength(1);
   });
 });
+
+describe("Supabase's Send Email Hook", () => {
+  const HOOK_SECRET = `v1,whsec_${Buffer.from("another-secret-signing-key-32byt").toString("base64")}`;
+  const sign = (body: string, id = "hook_1", ts = Math.floor(Date.now() / 1000)) => ({
+    "webhook-id": id, "webhook-timestamp": String(ts),
+    "webhook-signature": `v1,${createHmac("sha256", Buffer.from(HOOK_SECRET.slice(9), "base64")).update(`${id}.${ts}.${body}`).digest("base64")}`,
+  });
+  const send = (payload: unknown, headers?: Record<string, string>) => {
+    const body = JSON.stringify(payload);
+    return fetch(`${base}/auth/email-hook`, { method: "POST", body, headers: { "content-type": "application/json", ...(headers ?? sign(body)) } });
+  };
+  const signup = { user: { email: "maya@example.com" }, email_data: { token: "123456", token_hash: "hash-abc", redirect_to: "https://app.example.org/login", site_url: "https://app.example.org", email_action_type: "signup" } };
+  const sentEmails = () => providerCalls.filter(c => c.method === "POST" && c.url.endsWith("/emails")).map(c => ({ ...(c.body as { to: string[]; subject: string; html: string; from: string }), key: c.headers["idempotency-key"] }));
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(async () => {
+    for (const k of ["SUPABASE_EMAIL_HOOK_SECRET", "SUPABASE_URL"]) saved[k] = process.env[k];
+    process.env["SUPABASE_EMAIL_HOOK_SECRET"] = HOOK_SECRET;
+    process.env["SUPABASE_URL"] = "https://abcdefghijklmnop.supabase.co";
+    providerReplies["GET /domains"] = { status: 200, body: { data: [] } };
+    providerReplies["POST /emails"] = { status: 200, body: { id: "re_sent_1" } };
+  });
+  afterEach(() => { for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v; });
+  const configure = () => put("/email/settings", { resendKey: "re_test_1234567890abcd", fromAddress: "Nova Bridge Grant <noreply@novabridgegrant.org>", replyTo: "info@novabridgegrant.org" });
+
+  it("sends the sign-up confirmation from our sender, with a link to Supabase's verify endpoint", async () => {
+    await configure();
+    providerCalls = [];
+    const res = await send(signup);
+    expect(res.status).toBe(200);
+    const [email, ...rest] = sentEmails();
+    expect(rest).toHaveLength(0);
+    expect(email).toMatchObject({ from: "Nova Bridge Grant <noreply@novabridgegrant.org>", to: ["maya@example.com"], reply_to: "info@novabridgegrant.org", subject: "Confirm your arc.fund email", key: "auth-hook_1-0" });
+    expect(email!.html).toContain("https://abcdefghijklmnop.supabase.co/auth/v1/verify?token=hash-abc&amp;type=signup&amp;redirect_to=https%3A%2F%2Fapp.example.org%2Flogin");
+    expect(email!.html).not.toContain("supabase.io");
+  });
+
+  it("refuses unsigned, wrongly signed, and stale calls, and says when sending isn't set up", async () => {
+    expect((await send(signup)).status).toBe(503);
+    await configure();
+    expect((await send(signup, { "webhook-id": "x", "webhook-timestamp": String(Math.floor(Date.now() / 1000)), "webhook-signature": "v1,AAAA" })).status).toBe(401);
+    expect((await send(signup, sign(JSON.stringify(signup), "hook_2", Math.floor(Date.now() / 1000) - 3600))).status).toBe(401);
+    delete process.env["SUPABASE_EMAIL_HOOK_SECRET"];
+    expect(await json(await send(signup))).toEqual({ error: { http_code: 503, message: "The email hook isn't set up on the server." } });
+  });
+
+  it("sends a secure email change to both addresses with the right link each, and resets and codes", async () => {
+    await configure();
+    providerCalls = [];
+    const change = { user: { email: "old@example.com", new_email: "new@example.com" }, email_data: { token: "111111", token_hash: "hash-for-new", token_new: "222222", token_hash_new: "hash-for-old", email_action_type: "email_change", site_url: "https://app.example.org" } };
+    expect((await send(change)).status).toBe(200);
+    const [toOld, toNew] = sentEmails();
+    expect(toOld!.to).toEqual(["old@example.com"]);
+    expect(toOld!.html).toContain("token=hash-for-old&amp;type=email_change");
+    expect(toNew!.to).toEqual(["new@example.com"]);
+    expect(toNew!.html).toContain("token=hash-for-new&amp;type=email_change");
+    expect(toNew!.html).toContain("from old@example.com to new@example.com");
+
+    providerCalls = [];
+    await send({ user: { email: "maya@example.com" }, email_data: { token_hash: "r1", email_action_type: "recovery", site_url: "https://app.example.org" } }, undefined);
+    await send({ user: { email: "maya@example.com" }, email_data: { token: "654321", email_action_type: "reauthentication" } });
+    const [reset, code] = sentEmails();
+    expect(reset).toMatchObject({ subject: "Reset your arc.fund password" });
+    expect(reset!.html).toContain("token=r1&amp;type=recovery");
+    expect(code!.html).toContain("654321");
+  });
+
+  it("answers with an error Supabase shows when Resend fails, and ignores unknown types", async () => {
+    await configure();
+    providerReplies["POST /emails"] = { status: 500, body: { message: "down" } };
+    const res = await send(signup);
+    expect(res.status).toBe(502);
+    expect(await json(res)).toEqual({ error: { http_code: 502, message: "We couldn't send the email. Try again in a minute." } });
+    providerCalls = [];
+    expect((await send({ user: { email: "maya@example.com" }, email_data: { email_action_type: "something_new" } })).status).toBe(200);
+    expect(sentEmails()).toHaveLength(0);
+  });
+
+  it("keeps the templates pushed to Supabase as Go placeholders", () => {
+    const config = authEmailTemplateConfig();
+    expect(config["mailer_templates_confirmation_content"]).toContain("{{ .ConfirmationURL }}");
+    expect(config["mailer_templates_email_change_content"]).toContain("from {{ .Email }} to {{ .NewEmail }}");
+    expect(config["mailer_templates_reauthentication_content"]).toContain("{{ .Token }}");
+  });
+});

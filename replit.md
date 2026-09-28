@@ -9,9 +9,9 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - `pnpm run build` — typecheck + build all packages (the portal build needs `PORT` and `BASE_PATH`)
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push schema changes (to Supabase when `SUPABASE_DATABASE_URL` is set, otherwise Replit's database; it prints which)
-- Production: deployed to our own VPS at https://access.novabridgegrant.org — step-by-step runbook, server facts, and redeploy commands in `server.md` (deployment in progress, moving to a new VPS on 27 Sep 2026)
+- Production: live on our own VPS at https://access.novabridgegrant.org (since 27 Sep 2026). Redeploy on the server: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`; runbook, server facts, and history in `server.md`; service file, nginx site, and build script in `deploy/`
 - Environment:
-  - Server: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (secret), `INITIAL_SUPER_ADMIN_EMAIL`; optional `INITIAL_SUPER_ADMIN_NAME`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `DOCUMENTS_DIR` (where uploaded files are kept; default `data/documents` under the API's working directory); email: `RESEND_API_KEY` (secret), `EMAIL_FROM` (e.g. `arc.fund <grants@yourdomain>`, on a Resend-verified domain), optional `EMAIL_REPLY_TO`, `APP_URL` (portal address for links in emails); `STAFF_MFA_REQUIRED` (default on; `false` lets staff in without two-step; currently `false` in `.replit`); `SETTINGS_ENCRYPTION_KEY` (optional base64 32-byte key for secrets saved in the admin; otherwise `data/settings.key` is generated, so back it up); optional `RESEND_WEBHOOK_SECRET`, `SUPABASE_ACCESS_TOKEN`, `INBOX_ADDRESS` (all can instead be saved in Settings → Email)
+  - Server: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (secret), `INITIAL_SUPER_ADMIN_EMAIL`; optional `INITIAL_SUPER_ADMIN_NAME`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `DOCUMENTS_DIR` (where uploaded files are kept; default `data/documents` under the API's working directory); email: `RESEND_API_KEY` (secret), `EMAIL_FROM` (e.g. `arc.fund <grants@yourdomain>`, on a Resend-verified domain), optional `EMAIL_REPLY_TO`, `APP_URL` (portal address for links in emails); `STAFF_MFA_REQUIRED` (default on; `false` lets staff in without two-step; currently `false` in `.replit`); `SETTINGS_ENCRYPTION_KEY` (optional base64 32-byte key for secrets saved in the admin; otherwise `data/settings.key` is generated, so back it up); optional `RESEND_WEBHOOK_SECRET`, `SUPABASE_ACCESS_TOKEN`, `INBOX_ADDRESS` (all can instead be saved in Settings → Email); `SUPABASE_EMAIL_HOOK_SECRET` (`v1,whsec_…` from Supabase → Authentication → Hooks → Send Email hook; turns on `POST /api/auth/email-hook`)
   - Browser: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
   - Without the Supabase variables, the app runs as a browser-only demo.
 
@@ -43,7 +43,7 @@ A grant-funding workspace: an applicant portal to find programs, apply, and mana
 - Uploaded documents are files on the API server's disk (`DOCUMENTS_DIR`), never in Supabase Storage; Supabase holds only their records and SHA-256, checked on every download. Back up that directory with the database.
 - Server-loaded records are never written to browser storage.
 - Two-step sign-in is Supabase TOTP; the API reads the session's `aal` from the verified token. Staff need aal2; anyone enrolled needs aal2; pending staff-required resets block the account until proven.
-- Email settings saved by a super admin (encrypted) override the email environment variables. Supabase's own auth emails are pointed at Resend's SMTP relay and given the app's wording through the Supabase Management API (Settings → Email). Resend webhooks (received mail, delivery results) arrive at `POST /api/email/webhook`, verified by signature.
+- Email settings saved by a super admin (encrypted) override the email environment variables. Supabase's own auth emails (sign-up confirmation, password reset, sign-in links, invites, email change, codes) are sent by this server: Supabase's Send Email Hook calls `POST /api/auth/email-hook` (signed with `SUPABASE_EMAIL_HOOK_SECRET`), and the API renders the email (`lib/authEmails.ts`) and sends it through Resend straight away. The older route — Resend's SMTP relay plus the app's templates pushed through the Management API from Settings → Email — still works but isn't needed with the hook. Resend webhooks (received mail, delivery results) arrive at `POST /api/email/webhook`, verified by signature.
 - Sign-in and password-change alerts are reported by the portal (`POST /api/sign-ins`, `POST /api/profile/password-changed`); devices are known by a per-account hash of a random browser id (`sign_in_devices`). Security notices are emailed even when an applicant turned email copies off.
 - The failed sign-in rate limit counts only requests with a token Supabase rejected; public routes (`/api/healthz`, `/api/branding`, the signed webhook) are mounted before sign-in.
 - Outgoing email uses an outbox table written in the same transaction as the change; a worker in the API sends it through Resend with a per-row idempotency key and retries with backoff.
@@ -60,10 +60,12 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 ## Gotchas
 
 - New tables must call `.enableRLS()`.
-- `email_settings.app_name`, the `sign_in_devices` table, `ledger_entries.counterpart`/`note`, and `applicant_profiles.card_funding`/`card_kyc_required` have been pushed to Replit's database only: push the schema to Supabase when `SUPABASE_DATABASE_URL` is set, before starting the API there.
+- `email_settings.app_name`, the `sign_in_devices` table, `ledger_entries.counterpart`/`note`, and `applicant_profiles.card_funding`/`card_kyc_required` were pushed to Supabase on 27 Sep 2026 (from the production server). After any schema change, push to Supabase before restarting the API there.
 - `jsonb` reorders object keys, and Postgres timestamps have microseconds: storage code rebuilds nested objects in the domain's key order and compares versions at millisecond precision.
 - An empty `description:` in the OpenAPI spec makes orval fail and empty the generated folders.
 - The workspace sees the Supabase URL and keys but not the `SUPABASE_DATABASE_URL` secret; add it under Tools → Secrets in this workspace and restart (see `work.md` §6).
+- The first super admin is seeded from `INITIAL_SUPER_ADMIN_EMAIL` only when `staff_members` is empty; otherwise add the row yourself (SQL in `server.md` → Step 11).
+- Production reaches Supabase through the session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`); the direct `db.<ref>.supabase.co` host is IPv6-only.
 
 ## Pointers
 

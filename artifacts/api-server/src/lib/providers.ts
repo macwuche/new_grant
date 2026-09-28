@@ -47,17 +47,19 @@ export function resendApi(apiKey: string, fetchImpl: Fetch = fetch) {
 }
 
 /**
- * Checks a Resend (Svix) webhook signature: HMAC-SHA256 over
- * `${svix-id}.${svix-timestamp}.${raw body}` with the base64 part of the
- * `whsec_` secret, compared with each `v1,<base64>` in svix-signature, and a
- * timestamp within five minutes.
+ * Checks a Standard Webhooks signature (Resend signs with Svix, Supabase's
+ * auth hooks with the same scheme under webhook-* headers): HMAC-SHA256 over
+ * `${id}.${timestamp}.${raw body}` with the base64 part of the secret
+ * (`whsec_…`, or Supabase's `v1,whsec_…`), compared with each `v1,<base64>`
+ * in the signature header, and a timestamp within five minutes.
  */
 export function verifyWebhook(secret: string, headers: { id?: string; timestamp?: string; signature?: string }, rawBody: Buffer | string, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
   const { id, timestamp, signature } = headers;
   if (!id || !timestamp || !signature) return false;
   const ts = Number(timestamp);
   if (!Number.isFinite(ts) || Math.abs(nowSeconds - ts) > 300) return false;
-  const key = Buffer.from(secret.startsWith("whsec_") ? secret.slice(6) : secret, "base64");
+  const bare = secret.replace(/^v1,/, "");
+  const key = Buffer.from(bare.startsWith("whsec_") ? bare.slice(6) : bare, "base64");
   const expected = createHmac("sha256", key).update(`${id}.${timestamp}.`).update(rawBody).digest();
   return signature.split(" ").some(part => {
     const [version, sig] = part.split(",");

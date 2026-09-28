@@ -3,12 +3,28 @@
 How the grant portal (applicant portal + admin + API) is deployed to our VPS, step by step.
 The owner runs every command on the server; paste the output of the **check** steps back so the "Server inventory" and "Decisions" sections can be filled in.
 
-> **Server change (27 Sep 2026):** we started on a shared VPS (`195.20.255.153`), then moved to a **new VPS** before finishing.
-> Everything we put on the old server is being removed — see "Old server — retired" at the end. The steps below now target the new VPS.
+> **Status (28 Sep 2026): LIVE** at https://access.novabridgegrant.org — on the new VPS `77.68.98.14`, behind Cloudflare, HTTPS by Let's Encrypt, super admin signed in.
+> Still open: Supabase URL settings, email (Resend), the applicant smoke test, backups, and two password changes — see "Status" below.
 
-> **Rule if the server runs other apps:** (it did on the old server; check the new one in step 1) Nothing below edits, restarts, or replaces anything that belongs to it.
+> **Server history:** we started on a shared VPS (`195.20.255.153`), got as far as cloning, then moved to a **new, empty VPS** on 27 Sep 2026.
+> Everything we put on the old server was removed and verified — see "Old server — retired" at the end.
+
+> **Rule for shared servers:** (applied on the old server; the new VPS runs nothing else, but we kept the habit) Nothing below edits, restarts, or replaces anything that belongs to another app.
 > We only *add* things: our own folder, our own Node.js, our own systemd service, our own nginx site file.
 > nginx is only ever **reloaded** (never restarted) and only after `nginx -t` passes.
+
+## Working on the server from Windows PowerShell (read this first)
+
+The owner runs every command over `ssh root@77.68.98.14` from Windows PowerShell. What we learned the hard way on 27 Sep:
+
+- **Copying from the Claude Code terminal wraps long lines**, and the wrap breaks are copied as real line breaks. Long or multi-line commands then fall apart (half-commands, `command not found`, a stray `>` that truncated the env file once). **Keep every command short (under ~90 characters) and paste one line at a time**, waiting for the prompt before the next.
+- **Each right-click pastes again** — double clicks produced duplicate lines. Commands that append (`>>`) are made safe with a dedupe afterwards (`sort -u -o $F $F`), or replaced by commands that are safe to repeat.
+- A `>` prompt means the shell is waiting for a closing quote: press **Ctrl+C**.
+- Placeholders get pasted literally (`your-password`, `REAL-PASSWORD`, `aws-0-xxxx`). Give real values, or tell the owner to type that line by hand.
+- Anything longer than a few lines (service file, nginx site, build) goes **into the repo** (`deploy/`), and the server only runs `git pull`, `cp`, or `sh`.
+- On this server `sudo -E` is refused ("preserving the entire environment is not supported") — pass variables with `sudo --preserve-env=VAR1,VAR2 …` and set `PATH` with `env PATH=$PATH`.
+
+## Target
 
 ## Target
 
@@ -20,22 +36,24 @@ The owner runs every command on the server; paste the output of the **check** st
 | Private Node.js 24 | `/opt/novabridgegrant-node` (does not touch the system `node` the other app may use) |
 | Secrets file | `/etc/novabridgegrant/api.env` (mode `600`, never in git or in this file) |
 | Uploaded documents | `/var/lib/novabridgegrant/documents` |
-| API service | systemd unit `novabridgegrant-api`, listening on `127.0.0.1:<API_PORT>` (a free port found in step 2) |
+| API service | systemd unit `novabridgegrant-api`, listening on `127.0.0.1:3100` |
 | nginx site | `/etc/nginx/sites-available/novabridgegrant` → symlinked into `sites-enabled` |
 | DNS / proxy | Cloudflare in front of the VPS |
 | Database | Supabase Postgres (hosted, not on the VPS); project `tynjqjukramcmtotgfdw`, session pooler `aws-1-eu-west-1.pooler.supabase.com:5432`, user `postgres.tynjqjukramcmtotgfdw` |
 | Email | Resend (API key is saved in the admin settings, not in the env file) |
-| Code | `https://github.com/macwuche/new_grant`, branch `main` |
+| Code | `https://github.com/macwuche/new_grant`, branch `main` (deployed: `8dfe7be`) |
+| Deploy files | `deploy/novabridgegrant-api.service`, `deploy/nginx-novabridgegrant.conf`, `deploy/build.sh` (in the repo) |
+| TLS | Let's Encrypt certificate from certbot, renewed automatically by `certbot.timer`; Cloudflare SSL mode Full (strict) |
 
 ### How it fits together
 
 ```
 Browser ─▶ Cloudflare ─▶ nginx :80/:443 (server_name access.novabridgegrant.org)
-                           ├─ /api/*  ─▶ 127.0.0.1:<API_PORT>  (node, systemd: novabridgegrant-api)
+                           ├─ /api/*  ─▶ 127.0.0.1:3100  (node, systemd: novabridgegrant-api)
                            └─ /*      ─▶ /var/www/novabridgegrant/artifacts/grant-user-portal/dist/public (static, SPA fallback)
 ```
 
-nginx shares ports 80/443 with the existing app — it picks the site by `server_name`, so nginx itself doesn't need a new port.
+nginx picks the site by `server_name` (on a shared server it shares 80/443 with the other apps), so nginx itself doesn't need a new port.
 Only the **API** needs a free local port, and that port is bound to `127.0.0.1` so it is never exposed to the internet.
 
 ---
@@ -110,11 +128,11 @@ for p in $(seq 3100 3199); do
 done
 ```
 
-Write the port down — it's used as `<API_PORT>` in steps 6, 8 and 9. Record it in "Decisions" below.
+On the new VPS the port is **3100**, and it is written into `api.env` (`PORT`), `deploy/build.sh`, and `deploy/nginx-novabridgegrant.conf`. If you ever pick a different port, change all three.
 To make the rest copy-pasteable, set it in your shell (redo this if you log in again):
 
 ```bash
-export API_PORT=3100   # ← replace with the free port printed above
+export API_PORT=3100
 ```
 
 ## Step 3 — Install Node.js 24 + pnpm, privately
@@ -177,66 +195,70 @@ cd /var/www/novabridgegrant && sudo -u novabridgegrant git log --oneline -1   # 
 mkdir -p /etc/novabridgegrant /var/lib/novabridgegrant/documents
 chown -R novabridgegrant:novabridgegrant /var/lib/novabridgegrant
 chmod 700 /var/lib/novabridgegrant
-
-# Settings encryption key (32 random bytes). BACK THIS UP somewhere safe (password manager):
-# losing it means every secret saved in the admin settings (e.g. the Resend key) must be entered again.
-openssl rand -base64 32
 ```
 
-Create the env file (`nano /etc/novabridgegrant/api.env`) — replace each `<…>`:
+The env file ends up with these 13 lines (order doesn't matter):
 
 ```ini
 NODE_ENV=production
-PORT=<API_PORT>
+PORT=3100
 APP_URL=https://access.novabridgegrant.org
 CORS_ORIGINS=https://access.novabridgegrant.org
-# Cloudflare → nginx → API
-TRUST_PROXY_HOPS=2
-
+TRUST_PROXY_HOPS=2                      # Cloudflare → nginx → API
 SUPABASE_URL=https://tynjqjukramcmtotgfdw.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_9TfKJrlrzqYmtZBnwUdibw_g2wPKQS8
-# Use the SESSION POOLER string (…pooler.supabase.com:5432): the direct db.<ref>.supabase.co address is IPv6-only and the new VPS has no IPv6
-SUPABASE_DATABASE_URL=<Supabase → Connect → Session pooler connection string, with the real password>
-
+SUPABASE_DATABASE_URL=postgresql://postgres.tynjqjukramcmtotgfdw:<password>@aws-1-eu-west-1.pooler.supabase.com:5432/postgres
 INITIAL_SUPER_ADMIN_EMAIL=info@novabridgegrant.org
-INITIAL_SUPER_ADMIN_NAME=Super admin
+INITIAL_SUPER_ADMIN_NAME="Super admin"  # quoted: the space breaks `. api.env` in a shell
 STAFF_MFA_REQUIRED=false
-
 DOCUMENTS_DIR=/var/lib/novabridgegrant/documents
-SETTINGS_ENCRYPTION_KEY=<output of openssl rand -base64 32>
-# Optional
-# INBOX_ADDRESS=
-# LOG_LEVEL=info
+SETTINGS_ENCRYPTION_KEY=<openssl rand -base64 32>
 ```
+
+(The `#` comments above are notes for this file only — don't put them in `api.env`.)
+
+- **`SUPABASE_DATABASE_URL` must be the Session pooler string** (Supabase → Connect → Session pooler; host `aws-1-eu-west-1.pooler.supabase.com`, user `postgres.tynjqjukramcmtotgfdw`). The "Direct connection" host `db.<ref>.supabase.co` is IPv6-only and this VPS has no IPv6. A password containing `@ # / ? % '` must be URL-encoded.
+- **`SETTINGS_ENCRYPTION_KEY`: back it up** (password manager). Losing it means every secret saved in the admin settings (e.g. the Resend key) must be entered again. View it on the server with `grep SETTINGS /etc/novabridgegrant/api.env`.
+
+How it was written (short lines, safe to paste from PowerShell):
 
 ```bash
-chown root:novabridgegrant /etc/novabridgegrant/api.env
-chmod 640 /etc/novabridgegrant/api.env
+F=/etc/novabridgegrant/api.env
+echo 'NODE_ENV=production' >> $F
+echo 'PORT=3100' >> $F
+# … one echo per line above …
+echo "SETTINGS_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> $F
+sort -u -o $F $F                                   # drops lines pasted twice
+
+# Database line, built in short pieces (safe to redo: the sed removes the old line)
+sed -i '/^SUPABASE_DATABASE_URL=/d' $F
+P='<database password>'
+H='aws-1-eu-west-1.pooler.supabase.com'
+U="postgresql://postgres.tynjqjukramcmtotgfdw:$P@$H"
+echo "SUPABASE_DATABASE_URL=$U:5432/postgres" >> $F
+unset P U
+
+chown root:novabridgegrant $F
+chmod 640 $F
+sed -E 's/(KEY|URL)=.*/\1=<set>/' $F | cat -n     # check without showing secrets: 13 lines
 ```
+
+To change one value later (e.g. the database password): redo the database-line block, then `systemctl restart novabridgegrant-api`.
 
 ## Step 6 — Install and build
 
 ```bash
 cd /var/www/novabridgegrant
-export PATH=/opt/novabridgegrant-node/bin:$PATH
-
-sudo -u novabridgegrant env PATH=$PATH CI=true pnpm install --frozen-lockfile
-
-# Low-memory build (server has 1.8 GB RAM shared with ~20 other apps):
-# - builds only the two apps we deploy (skips mockup-sandbox)
-# - skips the root `pnpm run build`, which type-checks everything first (tsc is the memory hog;
-#   the type check already runs in Replit before pushing)
-# - one package at a time, at low CPU priority so the other apps stay responsive
-# The libs under lib/ export their TypeScript source, so no lib build step is needed.
-# The portal's build needs these (PORT only has to be a number at build time)
-sudo -u novabridgegrant env PATH=$PATH NODE_ENV=production PORT=$API_PORT BASE_PATH=/ \
-  VITE_SUPABASE_URL=https://tynjqjukramcmtotgfdw.supabase.co \
-  VITE_SUPABASE_ANON_KEY=sb_publishable_9TfKJrlrzqYmtZBnwUdibw_g2wPKQS8 \
-  nice -n 10 pnpm --workspace-concurrency=1 \
-    --filter @workspace/api-server --filter @workspace/grant-user-portal run build
-
-ls artifacts/api-server/dist/index.mjs artifacts/grant-user-portal/dist/public/index.html   # both must exist
+sh deploy/build.sh          # ends with "Build OK"
 ```
+
+`deploy/build.sh` (in the repo) does, as the `novabridgegrant` user:
+- `pnpm install --frozen-lockfile`;
+- builds **only** the two apps we deploy, one at a time under `nice`: `@workspace/api-server` (esbuild → `artifacts/api-server/dist/index.mjs`) and `@workspace/grant-user-portal` (vite → `artifacts/grant-user-portal/dist/public/`). It skips the root `pnpm run build`, whose type check (`tsc`) is the memory hog and already runs in Replit. The libs under `lib/` export TypeScript source, so they need no build;
+- passes the portal's build settings with `sudo --preserve-env` (`sudo -E` is refused on this server): `NODE_ENV=production PORT=3100 BASE_PATH=/ VITE_SUPABASE_URL=… VITE_SUPABASE_ANON_KEY=…` — vite's config refuses to load without `PORT`;
+- makes `dist` readable for nginx.
+
+On the first deploy (27 Sep) the same thing was run by hand: install took 16 s (503 packages), the API build ~1 s, the portal build ~16 s. The warnings "Error when using sourcemap for reporting an error" (label.tsx) and "Some chunks are larger than 500 kB" are harmless.
 
 ## Step 7 — Push the database schema to Supabase (first deploy, and after schema changes)
 
@@ -244,9 +266,12 @@ Adds the tables/columns that so far exist only in Replit's database (`replit.md`
 
 ```bash
 cd /var/www/novabridgegrant
+export PATH=/opt/novabridgegrant-node/bin:$PATH
 set -a; . /etc/novabridgegrant/api.env; set +a
-pnpm --filter @workspace/db run push     # should print "using the supabase database"; answer its prompts
+pnpm -F @workspace/db run push     # should print "using the supabase database (aws-1-eu-west-1.pooler.supabase.com)"
 ```
+
+First run (27 Sep): "Pulling schema from database… Changes applied", no prompts. This also proved the pooler string and password work.
 
 If it asks about **dropping or renaming** anything, answer no and stop — send the output back first.
 
@@ -291,22 +316,64 @@ Also check the other app still answers exactly as before (use its own domain): `
 
 ## Step 10 — DNS and HTTPS
 
-1. **Cloudflare DNS:** `access` → `A` record → `77.68.98.14` (the name already resolves somewhere today — replace that record), proxied (orange cloud).
-2. **Certificate** — use whatever the other site already uses (from step 1):
-   - **certbot present:**
-     ```bash
-     certbot --nginx -d access.novabridgegrant.org
-     nginx -t && systemctl reload nginx
-     ```
-     If validation fails behind Cloudflare, switch the `access` record to *DNS only* (grey cloud), run certbot again, then switch it back.
-   - **Cloudflare origin certificate:** Cloudflare → SSL/TLS → Origin Server → Create certificate for `access.novabridgegrant.org`; save as `/etc/ssl/novabridgegrant/origin.pem` and `origin.key` (`chmod 600` the key), then add a `listen 443 ssl;` server block with the same content as step 9 plus `ssl_certificate`/`ssl_certificate_key`, `nginx -t`, reload.
-3. **Cloudflare → SSL/TLS mode:** Full (strict).
-4. Check: `curl -sI https://access.novabridgegrant.org/ | head -5` and `curl -s https://access.novabridgegrant.org/api/healthz`.
+What was done (27 Sep 2026), in this order:
 
-## Step 11 — Outside services
+1. **Cloudflare DNS:** `access` → `A` → `77.68.98.14`, set to **DNS only (grey cloud)** so Let's Encrypt reaches the server directly. No `AAAA` record (the VPS has no IPv6).
+2. **Certificate:**
+   ```bash
+   certbot --nginx -d access.novabridgegrant.org
+   ```
+   It asks for an email (used only for expiry warnings — `ovundahben@gmail.com` was given), terms (**Y**), and EFF sharing (**N**). certbot added the HTTPS server block and an HTTP→HTTPS redirect to `/etc/nginx/sites-enabled/novabridgegrant` and reloaded nginx. Certificate: `/etc/letsencrypt/live/access.novabridgegrant.org/`, expires 2026-12-26, renewed automatically by `certbot.timer`.
+3. **Cloudflare:** `access` switched back to **Proxied (orange cloud)**; **SSL/TLS → Overview → Full (strict)**.
+4. Checked from outside: `https://access.novabridgegrant.org/` 200, `/login` 200, `/api/healthz` `{"status":"ok"}`, `http://` → 301 to `https://`; through Cloudflare's edge: HTTP/2 200 with `server: cloudflare`.
+
+Note: after certbot, the installed nginx file differs from `deploy/nginx-novabridgegrant.conf` (it has the 443 block). Don't copy the repo file over it again unless you re-run certbot straight after.
+
+Renewal behind the orange cloud: certbot renews with an HTTP challenge on port 80, which Cloudflare passes through. If a renewal ever fails (`certbot renew --dry-run` to test), switch `access` to grey, run `certbot renew`, and switch back.
+
+## Step 11 — Outside services and the first super admin
+
+**First super admin.** On start, the API adds `INITIAL_SUPER_ADMIN_EMAIL` as a super admin **only if `staff_members` is empty**. A staff record is linked to a Supabase login on that person's first sign-in, and only once their email is **confirmed**.
+On 27 Sep the Supabase database already held a super admin from earlier setup (`benmacwuche+newnovabridgegrant@gmail.com`, never signed in), so the seed was skipped and `info@novabridgegrant.org` saw "isn't on the grant team". Fixed in Supabase → SQL Editor:
+
+```sql
+insert into staff_members (email, name, role)
+values ('info@novabridgegrant.org', 'Super admin', 'super')
+on conflict (email) do update
+  set role = 'super', active = true, auth_user_id = null, updated_at = now();
+
+-- check
+select email, name, role, active, auth_user_id is not null as linked from staff_members order by created_at;
+```
+
+After signing in again, `info@novabridgegrant.org` shows `linked: true`. (`journalctl -u novabridgegrant-api | grep -i "super admin"` prints "initial super admin created" only when the seed actually ran.)
 
 - **Supabase** → Authentication → URL configuration: Site URL `https://access.novabridgegrant.org`; add `https://access.novabridgegrant.org/**` to Redirect URLs.
 - **Resend:** sending domain verified; webhook URL `https://access.novabridgegrant.org/api/email/webhook`. Enter the Resend API key and webhook secret in the admin settings (they're stored encrypted with `SETTINGS_ENCRYPTION_KEY`).
+
+## Step 11b — Auth emails from our own server (Supabase Send Email Hook)
+
+Without this, Supabase sends sign-up confirmations, password resets and sign-in links itself, from `noreply@mail.app.supabase.io` with its own wording (seen on 28 Sep 2026). With the **Send Email Hook** on, Supabase sends nothing: it calls `POST https://access.novabridgegrant.org/api/auth/email-hook` for every auth email, and our API writes the email (app name and wording, `lib/authEmails.ts`) and sends it through Resend from our sender. Supabase still creates the accounts and checks the links (they go to `…supabase.co/auth/v1/verify`, which then redirects to our site).
+
+Order matters — switch the hook on **last**, or sign-ups fail while email isn't ready:
+
+1. **Resend:** API key; domain `novabridgegrant.org` added and **Verified** (DNS records in Cloudflare, grey cloud).
+2. **Admin → Settings → Email:** save the Resend key, sender (e.g. `Nova Bridge Grant <noreply@novabridgegrant.org>`), reply-to, portal address `https://access.novabridgegrant.org`; send a test. **Settings → App branding:** set the application name (default "arc.fund").
+3. **Supabase → Authentication → URL Configuration:** Site URL `https://access.novabridgegrant.org`, Redirect URLs `https://access.novabridgegrant.org/**`.
+4. **Supabase → Authentication → Hooks → Add hook → Send Email hook:** type **HTTPS**, URL `https://access.novabridgegrant.org/api/auth/email-hook`, **Generate secret**, copy it (`v1,whsec_…`). Don't enable yet if the form allows saving disabled.
+5. **Server** — add the secret and deploy the code that has the hook:
+   ```bash
+   F=/etc/novabridgegrant/api.env
+   sed -i '/^SUPABASE_EMAIL_HOOK_SECRET=/d' $F
+   echo 'SUPABASE_EMAIL_HOOK_SECRET=v1,whsec_PASTE' >> $F
+   cd /var/www/novabridgegrant
+   sudo -u novabridgegrant git pull --ff-only
+   sh deploy/build.sh
+   systemctl restart novabridgegrant-api
+   ```
+6. **Enable** the hook in Supabase, then sign up with a test address: the email should come from our sender with our wording.
+
+If the hook answers with an error, Supabase shows the sign-up/reset as failed and nothing is sent: check `journalctl -u novabridgegrant-api -n 50 --no-pager | grep -i "auth email"`. To go back to Supabase's mailer, disable the hook in Supabase.
 
 ## Step 12 — Smoke test
 
@@ -314,7 +381,6 @@ Also check the other app still answers exactly as before (use its own domain): `
 - [ ] Sign up → confirmation email arrives → sign in
 - [ ] Upload a document → file appears in `/var/lib/novabridgegrant/documents`
 - [ ] Super admin (`info@novabridgegrant.org`) signs in to the admin area
-- [ ] The other app on this server still works
 
 ## Step 13 — Backups
 
@@ -351,7 +417,7 @@ _Fill in from step 1's output on the new server._
 | Provider | IONOS VPS 1-2-60, UK data centre, created 27 Sep 2026; host name `1z0jt3t.cserverhost.cloud` |
 | IP / SSH | `77.68.98.14` (IPv4 only, no IPv6); `ssh root@77.68.98.14`. The initial root password from IONOS must be changed on first login and is never written here |
 | OS / resources (CPU, RAM, swap, disk) | Ubuntu 26.04; 1 vCore, 2 GB RAM, 60 GB NVMe (from IONOS — confirm swap in step 1) |
-| Firewall | IONOS panel firewall ("My firewall policy") in front of the server — must allow 22, 80, 443; plus ufw on the server if enabled |
+| Firewall | IONOS panel firewall ("My firewall policy") in front of the server — 22, 80, 443 confirmed open; ufw inactive |
 | Other apps on it? (decides whether the "only add things" rule applies) | **None** — fresh server, only stock Ubuntu services running. The rule still costs nothing, so we keep it |
 | Checked (step 1, 27 Sep 2026 22:02 UTC) | Ubuntu 26.04.1 LTS, kernel 7.0.0-34; 1 CPU; 1.8 GiB RAM (1.4 GiB available); **no swap**; 58 GB disk, 5% used |
 | System Node / pnpm / pm2 | none installed; git 2.53.0 present |
@@ -369,48 +435,52 @@ _Fill in from step 1's output on the new server._
 | Process manager | systemd (`novabridgegrant-api`) |
 | Node.js | private copy in `/opt/novabridgegrant-node` (keeps any system Node untouched) |
 | API port | `3100` (nothing else listens on the new server; bound to 127.0.0.1) |
-| TLS method | certbot (`certbot --nginx`, apt package) behind Cloudflare |
+| TLS method | Let's Encrypt via certbot (`certbot --nginx`), cert at `/etc/letsencrypt/live/access.novabridgegrant.org/`, renewed by `certbot.timer`; Cloudflare in front |
 | Swap | 2 GB swap file `/swapfile` (the server had none; needed for the build on 1.8 GiB RAM) |
 | GitHub access | read-only deploy key "novabridgegrant new VPS" (`SHA256:W1va3z6nBq9aB/iHAAJjtY6jQY3GRsBTCZunkRHyroU`) owned by `novabridgegrant` (`/home/novabridgegrant/.ssh/id_ed25519`); no access token needed for pulls. It grants nothing on the server itself. Revoke at GitHub → repo → Settings → Deploy keys |
 | Build on the server | lean build: only `api-server` + `grant-user-portal`, no type check (it runs in Replit), one package at a time under `nice`. Safe on small servers; if it still runs out of memory, build in GitHub Actions and copy `dist/` over instead |
 
 ## Status
 
+**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org, code `8dfe7be`.
+
 Preparation (27 Sep 2026):
 - [x] Reviewed the app's structure and runtime needs; wrote this runbook.
 - [x] Access decision: the owner runs the commands; Claude has no key on any server.
-- [x] Step 0: `money-flows` merged into `main` and pushed; GitHub `main` is at `b930d1c`.
+- [x] Step 0: `money-flows` merged into `main` and pushed; GitHub `main` was at `b930d1c`.
 
 Old server `195.20.255.153` (abandoned 27 Sep 2026 — see "Old server — retired"):
 - [x] Steps 1–4 reached (port 3100, private Node, user, deploy key, clone). Nothing was built, no service or nginx site was created.
-- [x] 2026-09-27 — Cleanup: our folders, private Node, and the `novabridgegrant` user + home (deploy key) deleted; confirmed no service or nginx site of ours existed; final check shows every path and the user gone. Other apps untouched
-- [x] 2026-09-27 — Old deploy key "novabridgegrant server" deleted on GitHub (owner confirmed)
+- [x] Cleanup: our folders, private Node, and the `novabridgegrant` user + home (deploy key) deleted; confirmed no service or nginx site of ours existed; final check shows every path and the user gone. Other apps untouched.
+- [x] Old deploy key "novabridgegrant server" deleted on GitHub.
 
-New VPS — **plan for today (27 Sep 2026)**:
-- [x] 2026-09-27 — Owner sent the new server's details: `77.68.98.14`, IONOS, Ubuntu 26.04, 1 vCore / 2 GB RAM / 60 GB
-- [ ] Change the initial root password (`passwd`) — IONOS didn't force it on first login. **Deferred by the owner (27 Sep 2026) until after deployment — do it before calling the server done**
-- [x] 2026-09-27 — Step 1: logged in and looked around; "Server inventory (new VPS)" filled in. Fresh server: no other apps, no nginx/certbot/Node/Docker, no swap, ufw off
-- [ ] Check the IONOS panel firewall allows TCP 22, 80, 443
-- [x] 2026-09-27 — Step 1b: 2 GB swap file `/swapfile` active and in `/etc/fstab`
-- [x] 2026-09-27 — Step 1b: `apt upgrade` done (7 packages, no reboot or service restarts needed)
-- [x] 2026-09-27 — Step 1b: nginx 1.28.3 and certbot 4.0.0 installed (apt; certbot renewal timer enabled)
-- [x] 2026-09-27 — Step 2: API port `3100` (only 22 and 53 are in use)
-- [x] 2026-09-27 — Step 3: private Node v24.21.0 + pnpm 10.34.5 in `/opt/novabridgegrant-node`
-- [x] 2026-09-27 — Step 4: system user `novabridgegrant` and `/var/www/novabridgegrant` created
-- [x] 2026-09-27 — Step 4: deploy key generated on the server (`SHA256:W1va3z6nBq9aB/iHAAJjtY6jQY3GRsBTCZunkRHyroU`)
-- [x] 2026-09-27 — Step 4: key added on GitHub as "novabridgegrant new VPS", read-only (fingerprint matches)
-- [x] 2026-09-27 — Step 4: cloned into `/var/www/novabridgegrant` at `b930d1c` (matches GitHub `main`)
-- [x] 2026-09-27 — Step 5: data folders created; `api.env` has its 12 non-database lines (checked)
-- [x] 2026-09-27 — Step 5: `SUPABASE_DATABASE_URL` (session pooler) added; file locked (`640`, `root:novabridgegrant`); 13 lines
-- [x] 2026-09-27 — Step 6: `pnpm install` (503 packages) and API build done
-- [x] 2026-09-27 — Step 6: portal built (vite, 16 s) after passing its settings with `sudo --preserve-env=…` (`sudo -E` is refused here); both `dist` files exist
-- [x] 2026-09-27 — Step 7: schema pushed to Supabase through the pooler ("Changes applied", no drop/rename prompts). `INITIAL_SUPER_ADMIN_NAME` value quoted so the env file can be sourced by a shell
-- [ ] Step 8 — API as a systemd service; `/api/healthz` answers
-- [ ] Step 9 — nginx site (HTTP)
-- [ ] Step 10 — Cloudflare `access` record → new IP; HTTPS with certbot; SSL mode Full (strict)
-- [ ] Steps 11–13 — Supabase URLs, Resend webhook, smoke test, backups
-- [ ] After go-live: reset the Supabase database password (it was typed into the chat on 27 Sep 2026), then update `SUPABASE_DATABASE_URL` in `api.env` and `systemctl restart novabridgegrant-api`
-- [ ] After go-live: change the VPS root password (`passwd`)
+New VPS `77.68.98.14` (27 Sep 2026):
+- [x] Details from the owner: IONOS UK, Ubuntu 26.04, 1 vCore / 2 GB RAM / 60 GB.
+- [x] Step 1 — looked around: fresh server (no other apps, no nginx/certbot/Node/Docker, no swap, ufw off). "Server inventory" filled in.
+- [x] Step 1b — 2 GB swap file `/swapfile` (in `/etc/fstab`); `apt upgrade` (7 packages, no reboot needed); nginx 1.28.3 + certbot 4.0.0 installed from apt.
+- [x] Step 2 — API port `3100` (only 22 and 53 were in use).
+- [x] Step 3 — private Node v24.21.0 + pnpm 10.34.5 in `/opt/novabridgegrant-node`.
+- [x] Step 4 — system user `novabridgegrant`; deploy key generated (`SHA256:W1va3z6nBq9aB/iHAAJjtY6jQY3GRsBTCZunkRHyroU`) and added on GitHub as "novabridgegrant new VPS" (read-only); cloned at `b930d1c`.
+- [x] Step 5 — data folders; `api.env` with 13 lines, locked `640 root:novabridgegrant`. (First attempts were wiped/duplicated by PowerShell paste problems; rebuilt with short lines — see "Working on the server from Windows PowerShell".)
+- [x] Step 6 — install and build (portal build first failed on `sudo -E`; fixed with `sudo --preserve-env`).
+- [x] Step 7 — schema pushed to Supabase through the pooler, no drop/rename prompts.
+- [x] Added `deploy/` (service, nginx site, `build.sh`) to the repo, pushed as `8dfe7be`, pulled on the server.
+- [x] Step 8 — `novabridgegrant-api` enabled and running; `/api/healthz` → `{"status":"ok"}`.
+- [x] Step 9 — nginx site enabled, default site removed, `nginx -t` ok, reloaded; portal and API answer through nginx; port 80 reachable from outside.
+- [x] Step 10 — DNS → `77.68.98.14`; Let's Encrypt certificate (expires 2026-12-26, auto-renews); Cloudflare proxied, Full (strict). Checked from outside and through Cloudflare.
+- [x] IONOS firewall: 22, 80 and 443 all reach the server (80 tested directly; 443 works through Cloudflare Full (strict)).
+- [x] First super admin `info@novabridgegrant.org` added in the Supabase SQL editor (seed skipped because `staff_members` already had a row); signed in and linked.
+
+Still to do:
+- [ ] Supabase → Authentication → URL configuration: Site URL `https://access.novabridgegrant.org`; add `https://access.novabridgegrant.org/**` to Redirect URLs.
+- [ ] Email: Resend API key + webhook secret in the admin settings; Resend webhook → `https://access.novabridgegrant.org/api/email/webhook`.
+- [ ] Auth emails from our server: Step 11b (Send Email Hook). Code built and tested on 28 Sep 2026; needs Resend, the hook secret on the server, a redeploy, and the hook enabled in Supabase.
+- [ ] Step 12 — applicant smoke test (sign up → confirmation email → apply → upload → file in `/var/lib/novabridgegrant/documents`).
+- [ ] Decide about the leftover super admin `benmacwuche+newnovabridgegrant@gmail.com` (keep, or set `active = false`).
+- [ ] Step 13 — backups: `api.env` copy off the server, `SETTINGS_ENCRYPTION_KEY` in a password manager, documents folder.
+- [ ] Reset the Supabase database password (it was typed into the chat on 27 Sep 2026), then redo the database line in `api.env` (Step 5) and `systemctl restart novabridgegrant-api`.
+- [ ] Change the VPS root password (`passwd`) — IONOS didn't force it on first login; deferred by the owner until after go-live.
+- [ ] Optional hardening: SSH keys instead of the root password, then `PasswordAuthentication no`.
 
 ## Old server — retired
 
@@ -470,3 +540,6 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-27 — Code cloned on the new VPS. Step 5 notes: use Supabase's session pooler string (the VPS has no IPv6); write the env file line by line with `echo` because pasting multi-line blocks through PowerShell mangles them.
 - 2026-09-27 — Step 5 on the new VPS: copying long commands from the Claude Code terminal inserts line breaks at the wrap, which broke multi-line and long pastes. Fix that worked: keep each command short (`F=/etc/novabridgegrant/api.env`, then `echo '…' >> $F`), then `sort -u -o $F $F` to drop pasted-twice lines.
 - 2026-09-27 — Build and schema push done on the new VPS. Added `deploy/` to the repo (systemd unit, nginx site, `build.sh`) so steps 8–9 and redeploys are short `cp`/`sh` commands instead of long pastes; steps 8, 9 and the redeploy section now use them.
+- 2026-09-27 — Steps 7–10 done: schema pushed, API service running, nginx site live, HTTPS certificate issued. The portal is live at https://access.novabridgegrant.org.
+- 2026-09-28 — Docs brought up to date after go-live: status rewritten, PowerShell lessons section, steps 5/6/7/10 describe what was actually run, first-super-admin fix recorded under step 11, remaining work listed.
+- 2026-09-28 — Sign-up confirmation arrived from Supabase's mailer (`noreply@mail.app.supabase.io`). Built Supabase's Send Email Hook (`POST /api/auth/email-hook`) so our server writes and sends every auth email through Resend; setup is Step 11b.

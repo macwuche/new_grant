@@ -19,6 +19,7 @@ import { activityRouter } from "./activity";
 import { applicantsRouter } from "./applicants";
 import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
+import { authEmailHookRouter } from "./authEmailHook";
 import { brandingRouter, emailRouter, emailWebhookRouter } from "./email";
 import { moneyRouter } from "./money";
 import healthRouter from "./health";
@@ -43,6 +44,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(healthRouter);
   // Resend's webhook signs its requests instead of signing in.
   router.use(emailWebhookRouter(email));
+  // Supabase's Send Email Hook: auth emails (sign-up, reset, sign-in links) rendered and sent here, signed with the hook secret.
+  router.use(authEmailHookRouter(email));
   // The application name, for pages shown before sign-in.
   router.use(brandingRouter(emailSettings));
   // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
