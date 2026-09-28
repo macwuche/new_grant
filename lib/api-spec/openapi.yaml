@@ -2244,8 +2244,8 @@ paths:
     get:
       operationId: getSignupEmailSetting
       tags: [email]
-      summary: Whether new accounts must confirm their email (super admin)
-      description: Read from Supabase with the saved access token; connected is false without one.
+      summary: Sign-up email confirmation and the Send Email Hook status (super admin)
+      description: The hook's server side (secret, Resend) always; Supabase's side (confirmation, hook enabled and its URL) only with the saved access token, else connected is false.
       responses:
         "200":
           description: OK
@@ -2270,44 +2270,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/SignupEmailSettingInput"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SignupEmailSetting"
-        "400":
-          $ref: "#/components/responses/Invalid"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-  /email/auth-settings/smtp:
-    post:
-      operationId: sendAuthEmailsThroughResend
-      tags: [email]
-      summary: Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
-      description: Sets the Supabase project's custom SMTP to Resend's relay with the saved Resend key and sender. Refused while the saved domain isn't verified. Audited.
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SignupEmailSetting"
-        "400":
-          $ref: "#/components/responses/Invalid"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-  /email/auth-settings/templates:
-    post:
-      operationId: setAuthEmailTemplates
-      tags: [email]
-      summary: Use the app's wording for Supabase's sign-in emails (super admin)
-      description: Sets the subject and body of the confirmation, reset, invite, email-change, sign-in link, and verification-code emails. Audited.
       responses:
         "200":
           description: OK
@@ -2627,17 +2589,18 @@ components:
       properties:
         connected: { type: boolean }
         emailConfirmation: { type: [boolean, "null"] }
-        smtp:
+        hook:
           type: object
+          description: Supabase's Send Email Hook. Supabase sends no auth email itself; it calls this server, which sends through Resend.
           properties:
-            viaResend: { type: boolean }
-            host: { type: [string, "null"] }
-            sender: { type: [string, "null"] }
-            emailsPerHour: { type: [integer, "null"] }
-          required: [viaResend, host, sender, emailsPerHour]
-        appTemplates: { type: boolean }
+            url: { type: [string, "null"], description: The address to give Supabase (from the portal address) }
+            secretSet: { type: boolean, description: SUPABASE_EMAIL_HOOK_SECRET is set on the server }
+            sending: { type: boolean, description: A Resend key and sender are saved }
+            enabled: { type: [boolean, "null"], description: The hook is on in Supabase; null without the access token }
+            supabaseUrl: { type: [string, "null"], description: The hook address saved in Supabase; null without the access token }
+          required: [url, secretSet, sending, enabled, supabaseUrl]
         error: { type: string }
-      required: [connected, emailConfirmation]
+      required: [connected, emailConfirmation, hook]
     SignInReport:
       type: object
       properties:

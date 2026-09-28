@@ -4,22 +4,15 @@ import { appName, renderEmail } from "./email";
 // email change, sign-in links, reauthentication codes), worded like the app's
 // other mail under the application name saved in the admin.
 //
-// Two ways to deliver them:
-// - Supabase's Send Email Hook (preferred): Supabase calls POST
-//   /api/auth/email-hook for every auth email and this server renders and sends
-//   it through Resend (routes/authEmailHook.ts, `hookEmails` below).
-// - Supabase's own mailer through Resend's SMTP relay, with these templates
-//   pushed through the Management API from Settings → Email (they must be
-//   pushed again after the name changes). There the values are Supabase's Go
-//   template placeholders ({{ .X }}).
+// Supabase only makes the links and codes. With its Send Email Hook on, it
+// calls POST /api/auth/email-hook for every auth email and this server renders
+// it (`hookEmails` below) and sends it through Resend (routes/authEmailHook.ts).
+// Supabase's own mailer and its SMTP settings are not used.
 
-export const RESEND_SMTP = { host: "smtp.resend.com", port: "465", user: "resend" } as const;
-
-/** What each email is filled in with: real values for the hook, Supabase's placeholders for pushed templates. */
+/** What each email is filled in with. */
 type Values = { link: string; token: string; email: string; newEmail: string };
-const PLACEHOLDERS: Values = { link: "{{ .ConfirmationURL }}", token: "{{ .Token }}", email: "{{ .Email }}", newEmail: "{{ .NewEmail }}" };
 
-function templates(name: string, v: Values = PLACEHOLDERS) {
+function templates(name: string, v: Values) {
   const footer = `You're receiving this because of an account request at ${name}. If it wasn't you, you can ignore this email.`;
   return {
     confirmation: {
@@ -48,19 +41,6 @@ function templates(name: string, v: Values = PLACEHOLDERS) {
     },
   };
 }
-
-/** The Management API fields that set every Supabase Auth email's subject and HTML body, under the current app name. */
-export function authEmailTemplateConfig(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [kind, t] of Object.entries(templates(appName()))) {
-    out[`mailer_subjects_${kind}`] = t.subject;
-    out[`mailer_templates_${kind}_content`] = t.html;
-  }
-  return out;
-}
-
-/** Whether the project's sign-up confirmation email uses these templates under the current app name. */
-export const usesAppTemplates = (config: Record<string, unknown>) => config["mailer_subjects_confirmation"] === templates(appName()).confirmation.subject;
 
 // ---------- Send Email Hook ----------
 

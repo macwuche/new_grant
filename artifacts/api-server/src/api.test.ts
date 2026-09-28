@@ -14,7 +14,7 @@ import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore } from "./lib/fileStore";
 import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
-import { authEmailTemplateConfig } from "./lib/authEmails";
+import { hookEmails } from "./lib/authEmails";
 import { memoryEmailSettingsRepo } from "./lib/emailSettings";
 import { memoryInboxRepo } from "./lib/inbox";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
@@ -1284,7 +1284,7 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect((await json(await put("/email/settings", { supabaseToken: "sb_secret_0123456789abcdefghij" }))).fieldErrors.supabaseToken).toMatch(/project API key/);
     expect((await put("/email/settings", { supabaseToken: "has spaces in it 0123456789" })).status).toBe(400);
     expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
-    expect(await json(await call("/email/auth-settings", "tok-super"))).toMatchObject({ connected: true, emailConfirmation: true, smtp: { viaResend: false }, appTemplates: false });
+    expect(await json(await call("/email/auth-settings", "tok-super"))).toMatchObject({ connected: true, emailConfirmation: true, hook: { enabled: false, supabaseUrl: null } });
     providerReplies[`PATCH /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: true } };
     expect(await json(await put("/email/auth-settings", { emailConfirmation: false }))).toMatchObject({ connected: true, emailConfirmation: false });
     const patchCall = providerCalls.find(c => c.method === "PATCH")!;
@@ -1307,44 +1307,25 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null);
     expect(invite.subject).toBe("You've been added to the Nova Bridge grant team");
     expect(invite.html).toContain(">Nova Bridge</p>");
-    expect(authEmailTemplateConfig()["mailer_subjects_confirmation"]).toBe("Confirm your Nova Bridge email");
+    expect(hookEmails({ user: { email: "a@example.org" }, email_data: { email_action_type: "signup", token_hash: "h" } }, "https://ref.supabase.co")[0]!.subject).toBe("Confirm your Nova Bridge email");
     expect(await json(await put("/branding", { appName: "" }))).toEqual({ appName: "arc.fund", isDefault: true });
     expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).subject).toContain("arc.fund");
   });
 
-  it("points Supabase's sign-in emails at Resend and sets their wording", async () => {
+  it("shows whether sign-in emails go through the Send Email Hook and Resend", async () => {
     process.env["SUPABASE_URL"] ??= "https://tynjqjukramcmtotgfdw.supabase.co";
     const ref = /^https:\/\/([a-z0-9]+)\./.exec(process.env["SUPABASE_URL"]!)![1];
-    const path = `/v1/projects/${ref}/config/auth`;
-    expect((await post("/email/auth-settings/smtp", {})).status).toBe(400);
-    providerReplies[`GET ${path}`] = { status: 200, body: { mailer_autoconfirm: false } };
-    expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
-    expect(await json(await post("/email/auth-settings/smtp", {}))).toMatchObject({ error: expect.stringContaining("Resend API key") });
+    const saved = process.env["SUPABASE_EMAIL_HOOK_SECRET"];
+    delete process.env["SUPABASE_EMAIL_HOOK_SECRET"];
+    // Without a token: the server's side only; Supabase's side is unknown.
+    expect(await json(await call("/email/auth-settings", "tok-super"))).toMatchObject({ connected: false, emailConfirmation: null, hook: { secretSet: false, sending: false, enabled: null, supabaseUrl: null } });
     await configure();
-    // A saved domain that isn't verified yet blocks the switch.
-    providerReplies["POST /domains"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "not_started" } };
-    providerReplies["GET /domains/dom_1"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "pending" } };
-    await post("/email/domain", { name: "novabridgegrant.org" });
-    expect((await post("/email/auth-settings/smtp", {})).status).toBe(400);
-    expect(providerCalls.some(c => c.method === "PATCH")).toBe(false);
-    providerReplies["GET /domains/dom_1"] = { status: 200, body: { id: "dom_1", name: "novabridgegrant.org", status: "verified" } };
-    providerReplies[`PATCH ${path}`] = { status: 200, body: { mailer_autoconfirm: false, smtp_host: "smtp.resend.com", smtp_admin_email: "grants@novabridgegrant.org", smtp_sender_name: "Nova Bridge", rate_limit_email_sent: 30 } };
-    expect(await json(await post("/email/auth-settings/smtp", {}))).toMatchObject({ smtp: { viaResend: true, sender: "Nova Bridge <grants@novabridgegrant.org>", emailsPerHour: 30 } });
-    const smtpCall = providerCalls.filter(c => c.method === "PATCH").at(-1)!;
-    expect(smtpCall.body).toEqual({ smtp_host: "smtp.resend.com", smtp_port: "465", smtp_user: "resend", smtp_pass: KEY, smtp_admin_email: "grants@novabridgegrant.org", smtp_sender_name: "Nova Bridge" });
-    const [entry] = (await json(await call("/audit", "tok-super"))).events;
-    expect(entry).toMatchObject({ action: "Send sign-in emails through Resend" });
-    expect(JSON.stringify(entry)).not.toContain(KEY);
-
-    providerReplies[`PATCH ${path}`] = { status: 200, body: { mailer_subjects_confirmation: "Confirm your arc.fund email" } };
-    expect(await json(await post("/email/auth-settings/templates", {}))).toMatchObject({ appTemplates: true });
-    const templates = providerCalls.filter(c => c.method === "PATCH").at(-1)!.body as Record<string, string>;
-    for (const kind of ["confirmation", "recovery", "invite", "magic_link", "email_change", "reauthentication"]) {
-      expect(templates[`mailer_subjects_${kind}`]).toBeTruthy();
-      expect(templates[`mailer_templates_${kind}_content`]).toContain(kind === "reauthentication" ? "{{ .Token }}" : "{{ .ConfirmationURL }}");
-    }
-    expect((await post("/email/auth-settings/templates", {}, "tok-finance")).status).toBe(403);
-    expect((await post("/email/auth-settings/smtp", {}, "tok-finance")).status).toBe(403);
+    process.env["SUPABASE_EMAIL_HOOK_SECRET"] = "v1,whsec_c2VjcmV0";
+    providerReplies[`GET /v1/projects/${ref}/config/auth`] = { status: 200, body: { mailer_autoconfirm: false, hook_send_email_enabled: true, hook_send_email_uri: "https://app.example.org/api/auth/email-hook" } };
+    expect((await put("/email/settings", { supabaseToken: TOKEN })).status).toBe(200);
+    expect((await json(await call("/email/auth-settings", "tok-super"))).hook).toEqual({ url: "https://app.example.org/api/auth/email-hook", secretSet: true, sending: true, enabled: true, supabaseUrl: "https://app.example.org/api/auth/email-hook" });
+    expect((await call("/email/auth-settings", "tok-finance")).status).toBe(403);
+    if (saved === undefined) delete process.env["SUPABASE_EMAIL_HOOK_SECRET"]; else process.env["SUPABASE_EMAIL_HOOK_SECRET"] = saved;
   });
 
   it("adds the sending and receiving domain in Resend and shows its DNS records", async () => {
@@ -1471,12 +1452,5 @@ describe("Supabase's Send Email Hook", () => {
     providerCalls = [];
     expect((await send({ user: { email: "maya@example.com" }, email_data: { email_action_type: "something_new" } })).status).toBe(200);
     expect(sentEmails()).toHaveLength(0);
-  });
-
-  it("keeps the templates pushed to Supabase as Go placeholders", () => {
-    const config = authEmailTemplateConfig();
-    expect(config["mailer_templates_confirmation_content"]).toContain("{{ .ConfirmationURL }}");
-    expect(config["mailer_templates_email_change_content"]).toContain("from {{ .Email }} to {{ .NewEmail }}");
-    expect(config["mailer_templates_reauthentication_content"]).toContain("{{ .Token }}");
   });
 });

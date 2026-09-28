@@ -4,7 +4,6 @@ import { appName, DEFAULT_APP_NAME, mailerFor, setAppName, setAppUrlOverride, ty
 import { effectiveConfig, type EmailSettingsPatch, type EmailSettingsRepo } from "../lib/emailSettings";
 import type { InboxFolder, InboxRepo } from "../lib/inbox";
 import { logger } from "../lib/logger";
-import { authEmailTemplateConfig, RESEND_SMTP, usesAppTemplates } from "../lib/authEmails";
 import { projectRef, resendApi, supabaseManagement, verifyWebhook, type Fetch, type SupabaseAuthConfig } from "../lib/providers";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 
@@ -178,10 +177,11 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
 
   // ---------- Sign-up email confirmation (Supabase) ----------
 
-  // Sign-up confirmation, password reset, and two-step emails come from
-  // Supabase Auth, not the outbox. These routes switch confirmation on or off,
-  // point Supabase's mailer at Resend's SMTP relay (with the saved Resend key
-  // and sender), and install the app's wording for those emails.
+  // Sign-up confirmation, password reset, and two-step emails: Supabase Auth
+  // makes the links and codes, and hands every email to the Send Email Hook
+  // (routes/authEmailHook.ts), which sends it through Resend. Supabase itself
+  // sends nothing. These routes report whether that chain is ready and switch
+  // sign-up confirmation on or off (the switch needs the Supabase access token).
 
   const management = async (res: Response) => {
     const c = await config();
@@ -189,19 +189,23 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     if (!c.supabaseToken || !ref) { res.status(400).json({ error: "Save a Supabase access token first." }); return null; }
     return { c, api: supabaseManagement(c.supabaseToken, ref, fetchImpl) };
   };
-  const authState = (a: SupabaseAuthConfig) => ({
-    connected: true, emailConfirmation: !a.mailer_autoconfirm,
-    smtp: { viaResend: a.smtp_host === RESEND_SMTP.host, host: a.smtp_host || null, sender: a.smtp_admin_email ? `${a.smtp_sender_name ? `${a.smtp_sender_name} ` : ""}<${a.smtp_admin_email}>` : null, emailsPerHour: a.rate_limit_email_sent ?? null },
-    appTemplates: usesAppTemplates(a),
+  /** The server's side of the hook, plus Supabase's side when the token can read it (null when it can't). */
+  const hookState = (c: Awaited<ReturnType<typeof config>>, a: SupabaseAuthConfig | null) => ({
+    url: c.appUrl ? `${c.appUrl}/api/auth/email-hook` : null,
+    secretSet: !!env["SUPABASE_EMAIL_HOOK_SECRET"]?.trim(),
+    sending: !!c.resendKey && !!c.from,
+    enabled: a ? !!a.hook_send_email_enabled : null,
+    supabaseUrl: a ? a.hook_send_email_uri || null : null,
   });
+  const authState = (c: Awaited<ReturnType<typeof config>>, a: SupabaseAuthConfig) => ({ connected: true, emailConfirmation: !a.mailer_autoconfirm, hook: hookState(c, a) });
 
   router.get("/email/auth-settings", admin, async (_req, res) => {
     const c = await config();
     const ref = projectRef(env["SUPABASE_URL"]);
-    if (!c.supabaseToken || !ref) { res.json({ connected: false, emailConfirmation: null }); return; }
+    if (!c.supabaseToken || !ref) { res.json({ connected: false, emailConfirmation: null, hook: hookState(c, null) }); return; }
     const got = await supabaseManagement(c.supabaseToken, ref, fetchImpl).getAuthConfig();
-    if (!got.ok) { res.json({ connected: false, emailConfirmation: null, error: got.error }); return; }
-    res.json(authState(got.data));
+    if (!got.ok) { res.json({ connected: false, emailConfirmation: null, hook: hookState(c, null), error: got.error }); return; }
+    res.json(authState(c, got.data));
   });
 
   router.put("/email/auth-settings", admin, async (req, res) => {
@@ -211,34 +215,7 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     const done = await m.api.setEmailConfirmation(required);
     if (!done.ok) { res.status(502).json({ error: done.error }); return; }
     await settings.record(audit(req, res, "Change sign-up email confirmation", required ? "New accounts must confirm their email." : "New accounts no longer confirm their email.", [{ field: "email confirmation", before: String(!required), after: String(required) }]));
-    res.json(authState(done.data));
-  });
-
-  router.post("/email/auth-settings/smtp", admin, async (req, res) => {
-    const m = await management(res); if (!m) return;
-    const { c } = m;
-    if (!c.resendKey || !c.from) { res.status(400).json({ error: "Save a Resend API key and a sender first." }); return; }
-    // Resend refuses mail from an unverified domain, and Supabase would then fail every sign-up email.
-    const s = await settings.get();
-    if (s.domainId) {
-      const domain = await resendApi(c.resendKey, fetchImpl).getDomain(s.domainId);
-      if (domain.ok && domain.data.status !== "verified") { res.status(400).json({ error: `Verify ${domain.data.name} in Resend first (it's ${domain.data.status}).` }); return; }
-    }
-    const sender = addressOf(c.from);
-    const name = nameOf(c.from) ?? appName();
-    const done = await m.api.updateAuthConfig({ smtp_host: RESEND_SMTP.host, smtp_port: RESEND_SMTP.port, smtp_user: RESEND_SMTP.user, smtp_pass: c.resendKey, smtp_admin_email: sender, smtp_sender_name: name });
-    if (!done.ok) { res.status(502).json({ error: done.error }); return; }
-    await settings.record(audit(req, res, "Send sign-in emails through Resend", `Supabase's sign-up, reset, and two-step emails now go through Resend from ${sender}.`, [{ field: "Supabase SMTP", before: "—", after: `${RESEND_SMTP.host} as ${name} <${sender}>, Resend key …${c.resendKey.slice(-4)}` }]));
-    logger.info({ actor: authLocals(res).staff!.id }, "supabase smtp set to resend");
-    res.json(authState(done.data));
-  });
-
-  router.post("/email/auth-settings/templates", admin, async (req, res) => {
-    const m = await management(res); if (!m) return;
-    const done = await m.api.updateAuthConfig(authEmailTemplateConfig());
-    if (!done.ok) { res.status(502).json({ error: done.error }); return; }
-    await settings.record(audit(req, res, "Set sign-in email wording", `Supabase's sign-up, reset, invite, email-change, sign-in link, and verification-code emails now use the app's wording as ${appName()}.`, [{ field: "Supabase email templates", before: "—", after: `${appName()} wording` }]));
-    res.json(authState(done.data));
+    res.json(authState(m.c, done.data));
   });
 
   // ---------- Team inbox ----------

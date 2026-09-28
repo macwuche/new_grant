@@ -5,13 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { SignupEmailSettingSmtp } from './signupEmailSettingSmtp';
+import type { SignupEmailSettingHook } from './signupEmailSettingHook';
 
 export interface SignupEmailSetting {
   connected: boolean;
   /** @nullable */
   emailConfirmation: boolean | null;
-  smtp?: SignupEmailSettingSmtp;
-  appTemplates?: boolean;
+  /** Supabase's Send Email Hook. Supabase sends no auth email itself; it calls this server, which sends through Resend. */
+  hook: SignupEmailSettingHook;
   error?: string;
 }

@@ -5488,19 +5488,19 @@ export const VerifyEmailDomainResponse = zod.object({
 
 
 /**
- * Read from Supabase with the saved access token; connected is false without one.
- * @summary Whether new accounts must confirm their email (super admin)
+ * The hook's server side (secret, Resend) always; Supabase's side (confirmation, hook enabled and its URL) only with the saved access token, else connected is false.
+ * @summary Sign-up email confirmation and the Send Email Hook status (super admin)
  */
 export const GetSignupEmailSettingResponse = zod.object({
   "connected": zod.boolean(),
   "emailConfirmation": zod.boolean().nullable(),
-  "smtp": zod.object({
-  "viaResend": zod.boolean(),
-  "host": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "emailsPerHour": zod.number().int().nullable()
-}).optional(),
-  "appTemplates": zod.boolean().optional(),
+  "hook": zod.object({
+  "url": zod.string().nullable().describe('The address to give Supabase (from the portal address)'),
+  "secretSet": zod.boolean().describe('SUPABASE_EMAIL_HOOK_SECRET is set on the server'),
+  "sending": zod.boolean().describe('A Resend key and sender are saved'),
+  "enabled": zod.boolean().nullable().describe('The hook is on in Supabase; null without the access token'),
+  "supabaseUrl": zod.string().nullable().describe('The hook address saved in Supabase; null without the access token')
+}).describe('Supabase\'s Send Email Hook. Supabase sends no auth email itself; it calls this server, which sends through Resend.'),
   "error": zod.string().optional()
 })
 
@@ -5516,49 +5516,13 @@ export const SetSignupEmailSettingBody = zod.object({
 export const SetSignupEmailSettingResponse = zod.object({
   "connected": zod.boolean(),
   "emailConfirmation": zod.boolean().nullable(),
-  "smtp": zod.object({
-  "viaResend": zod.boolean(),
-  "host": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "emailsPerHour": zod.number().int().nullable()
-}).optional(),
-  "appTemplates": zod.boolean().optional(),
-  "error": zod.string().optional()
-})
-
-
-/**
- * Sets the Supabase project's custom SMTP to Resend's relay with the saved Resend key and sender. Refused while the saved domain isn't verified. Audited.
- * @summary Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
- */
-export const SendAuthEmailsThroughResendResponse = zod.object({
-  "connected": zod.boolean(),
-  "emailConfirmation": zod.boolean().nullable(),
-  "smtp": zod.object({
-  "viaResend": zod.boolean(),
-  "host": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "emailsPerHour": zod.number().int().nullable()
-}).optional(),
-  "appTemplates": zod.boolean().optional(),
-  "error": zod.string().optional()
-})
-
-
-/**
- * Sets the subject and body of the confirmation, reset, invite, email-change, sign-in link, and verification-code emails. Audited.
- * @summary Use the app's wording for Supabase's sign-in emails (super admin)
- */
-export const SetAuthEmailTemplatesResponse = zod.object({
-  "connected": zod.boolean(),
-  "emailConfirmation": zod.boolean().nullable(),
-  "smtp": zod.object({
-  "viaResend": zod.boolean(),
-  "host": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "emailsPerHour": zod.number().int().nullable()
-}).optional(),
-  "appTemplates": zod.boolean().optional(),
+  "hook": zod.object({
+  "url": zod.string().nullable().describe('The address to give Supabase (from the portal address)'),
+  "secretSet": zod.boolean().describe('SUPABASE_EMAIL_HOOK_SECRET is set on the server'),
+  "sending": zod.boolean().describe('A Resend key and sender are saved'),
+  "enabled": zod.boolean().nullable().describe('The hook is on in Supabase; null without the access token'),
+  "supabaseUrl": zod.string().nullable().describe('The hook address saved in Supabase; null without the access token')
+}).describe('Supabase\'s Send Email Hook. Supabase sends no auth email itself; it calls this server, which sends through Resend.'),
   "error": zod.string().optional()
 })
 

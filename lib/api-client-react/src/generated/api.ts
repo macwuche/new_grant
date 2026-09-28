@@ -7851,8 +7851,8 @@ export const getGetSignupEmailSettingUrl = () => {
 }
 
 /**
- * Read from Supabase with the saved access token; connected is false without one.
- * @summary Whether new accounts must confirm their email (super admin)
+ * The hook's server side (secret, Resend) always; Supabase's side (confirmation, hook enabled and its URL) only with the saved access token, else connected is false.
+ * @summary Sign-up email confirmation and the Send Email Hook status (super admin)
  */
 export const getSignupEmailSetting = async ( options?: Parameters<typeof customFetch>[1]): Promise<SignupEmailSetting> => {
 
@@ -7899,7 +7899,7 @@ export type GetSignupEmailSettingQueryError = ErrorType<InvalidResponse | Unauth
 
 
 /**
- * @summary Whether new accounts must confirm their email (super admin)
+ * @summary Sign-up email confirmation and the Send Email Hook status (super admin)
  */
 
 export function useGetSignupEmailSetting<TData = Awaited<ReturnType<typeof getSignupEmailSetting>>, TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>>(
@@ -8007,156 +8007,6 @@ export const useSetSignupEmailSetting = <TError = ErrorType<InvalidResponse | Un
         TContext
       > => {
       return useMutation(getSetSignupEmailSettingMutationOptions(options));
-    }
-
-export const getSendAuthEmailsThroughResendUrl = () => {
-
-
-
-
-  return `/api/email/auth-settings/smtp`
-}
-
-/**
- * Sets the Supabase project's custom SMTP to Resend's relay with the saved Resend key and sender. Refused while the saved domain isn't verified. Audited.
- * @summary Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
- */
-export const sendAuthEmailsThroughResend = async ( options?: Parameters<typeof customFetch>[1]): Promise<SignupEmailSetting> => {
-
-  return customFetch<SignupEmailSetting>(getSendAuthEmailsThroughResendUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getSendAuthEmailsThroughResendMutationKey = () => ['sendAuthEmailsThroughResend'] as const;
-
-export const getSendAuthEmailsThroughResendMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>, TError,void, TContext> => {
-
-const mutationKey = getSendAuthEmailsThroughResendMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>, void> = () => {
-
-
-          return  sendAuthEmailsThroughResend(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SendAuthEmailsThroughResendMutationResult = NonNullable<Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>>
-
-    export type SendAuthEmailsThroughResendMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
-
-
-    /**
- * @summary Send Supabase's sign-up, reset, and two-step emails through Resend (super admin)
- */
-export const useSendAuthEmailsThroughResend = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof sendAuthEmailsThroughResend>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getSendAuthEmailsThroughResendMutationOptions(options));
-    }
-
-export const getSetAuthEmailTemplatesUrl = () => {
-
-
-
-
-  return `/api/email/auth-settings/templates`
-}
-
-/**
- * Sets the subject and body of the confirmation, reset, invite, email-change, sign-in link, and verification-code emails. Audited.
- * @summary Use the app's wording for Supabase's sign-in emails (super admin)
- */
-export const setAuthEmailTemplates = async ( options?: Parameters<typeof customFetch>[1]): Promise<SignupEmailSetting> => {
-
-  return customFetch<SignupEmailSetting>(getSetAuthEmailTemplatesUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getSetAuthEmailTemplatesMutationKey = () => ['setAuthEmailTemplates'] as const;
-
-export const getSetAuthEmailTemplatesMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAuthEmailTemplates>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setAuthEmailTemplates>>, TError,void, TContext> => {
-
-const mutationKey = getSetAuthEmailTemplatesMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setAuthEmailTemplates>>, void> = () => {
-
-
-          return  setAuthEmailTemplates(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SetAuthEmailTemplatesMutationResult = NonNullable<Awaited<ReturnType<typeof setAuthEmailTemplates>>>
-
-    export type SetAuthEmailTemplatesMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
-
-
-    /**
- * @summary Use the app's wording for Supabase's sign-in emails (super admin)
- */
-export const useSetAuthEmailTemplates = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setAuthEmailTemplates>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof setAuthEmailTemplates>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getSetAuthEmailTemplatesMutationOptions(options));
     }
 
 export const getGetBrandingUrl = () => {

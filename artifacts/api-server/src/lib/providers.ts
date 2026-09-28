@@ -73,8 +73,7 @@ export function verifyWebhook(secret: string, headers: { id?: string; timestamp?
 
 /** The parts of a Supabase project's auth config this app reads (the Management API returns many more). */
 export type SupabaseAuthConfig = {
-  mailer_autoconfirm?: boolean; smtp_host?: string | null; smtp_admin_email?: string | null; smtp_sender_name?: string | null;
-  rate_limit_email_sent?: number | null; mailer_subjects_confirmation?: string | null;
+  mailer_autoconfirm?: boolean; hook_send_email_enabled?: boolean | null; hook_send_email_uri?: string | null;
 };
 
 /** The project ref from SUPABASE_URL (https://<ref>.supabase.co). */
@@ -88,7 +87,5 @@ export function supabaseManagement(token: string, ref: string, fetchImpl: Fetch 
     getAuthConfig: () => call<SupabaseAuthConfig>(fetchImpl, url, { headers }, "Supabase"),
     /** Email confirmation at sign-up on (true) or off (false: new accounts are confirmed automatically). */
     setEmailConfirmation: (required: boolean) => update({ mailer_autoconfirm: !required }),
-    /** Any other auth settings: custom SMTP, email subjects and templates. */
-    updateAuthConfig: update,
   };
 }
