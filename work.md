@@ -45,9 +45,34 @@ The app uses Supabase project `tynjqjukramcmtotgfdw` (EU) for sign-in and for it
 - **Settings layout:** admin settings are grouped into sections shown as cards with a one-line status and who can change them; each opens its own page with a way back. New settings features get their own section.
 - **Hierarchy:** Clear page title and context; compact metric cards and status badges; section cards for forms, queues, and supporting information. Plain-language microcopy explains eligibility, progress, and the consequence of actions.
 - **Interaction:** Filters and search update immediately. Actions validate inline; irreversible decisions (approve, decline, close, lockdown, paid/failed) need a second confirming click. Signed in, buttons are disabled while a request is in flight, and a record changed by someone else shows a "changed since you opened it" notice with **Load latest**.
-- **Trust signals:** Wording follows the mode. Signed in, pages say records are saved to the account or the server, and still say plainly that no money moves and cards are fictional; email is described as sent only where Resend is configured. In demo mode, "saved in this browser only" labels remain. Never label a control as performing an operation it doesn't perform.
+- **Trust signals:** Wording follows the mode. Signed in, pages say records are saved to the account or the server; payout pages say the finance team processes requests, and cards are still described as fictional. The demo notices on the applicant Deposits and Payouts pages and the phone "DEMO ONLY" banner were removed on 28 Sep 2026 (the deposit page still shows placeholder payment details until real ones are supplied); email is described as sent only where Resend is configured. In demo mode, "saved in this browser only" labels remain. Never label a control as performing an operation it doesn't perform.
 - **Responsive behavior:** The applicant sidebar adapts to viewport height; on smaller screens the admin uses a bottom navigation bar and compact record cards. Test down to 320px and short desktop viewports.
 - **Accessibility baseline:** Semantic headings, labeled inputs, keyboard-reachable navigation, visible focus, readable status text (not color alone), reduced motion. Verify focus trapping and restoration in dialogs.
+
+#### Saved design: the lime note banner
+
+A slim lime strip with bold, small charcoal text, used until 28 Sep 2026 as the phone-only "DEMO ONLY · Saved in this browser only. Nothing is sent, charged, or paid out." note under the applicant top bar. The note was removed (it was out of date for signed-in users), but the owner likes the look: reuse it for short, important one-line messages. It sat between the `<header className="topbar">` and `<div className="page-wrap">` in `ShellLayout` (`src/App.tsx`) and was shown only under the phone breakpoint.
+
+```tsx
+<div className="note-banner" role="note">Short message · One line of context.</div>
+```
+
+```css
+/* Pale lime fill, deeper lime border, charcoal bold text. Tokens from :root in src/index.css. */
+.note-banner {
+  margin: 4px 16px 0;
+  border: 1px solid hsl(74 55% 78%);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: hsl(74 75% 92%);
+  color: hsl(var(--charcoal));
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+```
+
+Original class `mobile-demo-note`: hidden by default (`display: none`) and switched to `display: block` with the rules above inside the phone media query. For a banner on every screen size, use the rules as they are. Lead with a short upper-case label and a middle dot (`LABEL · message`).
 
 Styling lives in `src/index.css` and focused page styles under `artifacts/grant-user-portal/src/pages/`. Page titles and metadata update per route in `src/App.tsx`.
 

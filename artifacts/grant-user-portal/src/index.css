@@ -267,7 +267,6 @@ button { cursor: pointer; }
 .toast strong { display: block; color: hsl(var(--lime)); font-size: 11px; }
 .toast span { display: block; margin-top: 3px; color: #d2d4d5; line-height: 1.4; }
 .mobile-nav { display: none; }
-.mobile-demo-note { display: none; }
 .muted { color: hsl(var(--muted)); }
 .mono { font-family: var(--app-font-mono); }
 .mt { margin-top: 18px; }
@@ -301,7 +300,6 @@ button { cursor: pointer; }
   .mobile-brand .brand-name { font-size: 15px; }
   .topbar-left > div:not(.mobile-brand) { display: none; }
   .page-wrap { width: 100%; min-width: 0; padding: 8px 16px 88px; }
-  .mobile-demo-note { display: block; margin: 4px 16px 0; border: 1px solid hsl(74 55% 78%); border-radius: 12px; padding: 10px 12px; background: hsl(74 75% 92%); color: hsl(var(--charcoal)); font-size: 10px; font-weight: 700; line-height: 1.45; }
   .top-actions .icon-btn { width: 35px; height: 35px; }
   .top-avatar { width: 35px; height: 35px; }
   .stack, .grid-2, .grid-3, .grid-4, .detail-layout { min-width: 0; }
