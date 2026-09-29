@@ -7,8 +7,11 @@
  */
 import type { ProgramChange } from './programChange';
 import type { TreasuryInput } from './treasuryInput';
+import type { WithdrawalMethod } from './withdrawalMethod';
 
 export type Treasury = TreasuryInput & {
+  /** Withdrawal methods; applicants get only the available ones */
+  channels: WithdrawalMethod[];
   updatedAt: string;
   /** Staff only; empty for applicants */
   changeLog: ProgramChange[];

@@ -91,6 +91,8 @@ export const LIMITS = {
   user: { name: "user", max: 300, windowMs: 60_000 },
   /** Any change (POST, PUT, PATCH, DELETE), per user. */
   writes: { name: "writes", max: 60, windowMs: 60_000 },
-  /** Document uploads, per user. */
+  /** Document and profile photo uploads, per user. */
   uploads: { name: "uploads", max: 30, windowMs: 10 * 60_000 },
+  /** Current-password checks (before a password or email change), per user. */
+  passwordChecks: { name: "passwordChecks", max: 10, windowMs: 15 * 60_000 },
 } satisfies Record<string, Limit>;

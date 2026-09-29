@@ -430,6 +430,28 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Profile center (29 Sep 2026) — before deploying it
+
+- **Schema:** new `applicant_profiles` columns and the `security_events` table. Run the schema push above (Step 7) before restarting the API, or `/api/profile` fails.
+- **Photos** are kept under `DOCUMENTS_DIR` with the documents, so they're in the same backup.
+- **Optional location:** to fill the Location column in the applicant's security activity, turn on Cloudflare → Rules → Managed Transforms → "Add visitor location headers", then add `GEO_HEADERS=cloudflare` to `/etc/novabridgegrant/api.env` and restart. Leave it unset if the API can be reached without going through Cloudflare, since clients could send those headers themselves.
+- **Email change:** the email-change email now shows the verification code as well as the link; nothing to change in Supabase. With "Secure email change" on in Supabase, both addresses must confirm.
+- **Smoke test after deploying:** sign in as a test applicant → My profile → upload a photo, change the password (with the current one), change the email with the code, and log out other devices from a second browser.
+
+### Withdrawal methods (29 Sep 2026) — before deploying it
+
+- **Schema push required** (Step 7) before restarting the API: `ledger_entries` gains `source` and `payout_details`. Without it, withdrawals fail. The methods themselves live in `system_settings.treasury` (JSON); existing settings are filled in when read, so the four old channels appear as methods with their forms.
+- **Payout details are now stored in full** (on each withdrawal and as each applicant's last answers per method) so finance can pay from them. Old masked destinations in `applicant_profiles.payout_destinations` are ignored; applicants fill the method's form on their next request.
+- **Method photos** are stored under `DOCUMENTS_DIR` (owner folder `5a1e5000-0000-4000-8000-00000000f070`), so they're in the same backup, and served publicly at `/api/withdrawal-methods/<id>/photo`.
+- **Smoke test:** as finance, Settings → Withdrawal methods → add a method with a photo upload and a two-field form → it appears on a test applicant's Withdrawals page → request with the form → Payments → Payouts shows the answers → make the method unavailable → it disappears for the applicant.
+
+### Add funds page and dashboard buttons (29 Sep 2026) — deploy notes
+
+- Portal-only changes: no schema push and no new environment variables. They ship with the same `git pull` + `deploy/build.sh` + restart.
+- `pnpm-lock.yaml` changed (the API server gained `@workspace/api-client-react` as a dev dependency for its tests); `deploy/build.sh` installs it with the rest.
+- **Smoke test:** as a test applicant, dashboard → **+ Deposit** opens Add funds; announce a small deposit, copy the reference, cancel it from the history. Dashboard → **Withdraw** opens Withdrawals.
+- The Add funds page still shows the placeholder receiving details; replace them in `lib/domain/src/deposits.ts` (`DEPOSIT_METHODS`) once the owner supplies the real ones.
+
 ## Server inventory (new VPS)
 
 _Fill in from step 1's output on the new server._

@@ -21,10 +21,10 @@ import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
 import { authEmailHookRouter } from "./authEmailHook";
 import { brandingRouter, emailRouter, emailWebhookRouter } from "./email";
-import { moneyRouter } from "./money";
+import { moneyRouter, withdrawalMethodPhotoRouter } from "./money";
 import healthRouter from "./health";
 import meRouter from "./me";
-import { profileRouter } from "./profile";
+import { profileRouter, supabasePasswordChecker } from "./profile";
 import { programsRouter } from "./programs";
 import { signInsRouter } from "./signIns";
 import { staffRouter } from "./staff";
@@ -35,9 +35,11 @@ export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; pr
   /** Overrides for the rate limits (tests). */
   limits?: Partial<Record<keyof typeof LIMITS, Limit>>;
   /** Staff access needs a two-step (aal2) session (STAFF_MFA_REQUIRED, on unless "false"). */
-  staffMfa?: boolean };
+  staffMfa?: boolean;
+  /** Supabase Auth, for checking an applicant's current password before they change it or their email. */
+  supabaseAuth?: { url: string; anonKey: string } | null };
 
-export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, emailSettings, inbox, signIns, fetchImpl, limits = {}, staffMfa = true }: ApiDeps): IRouter {
+export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, emailSettings, inbox, signIns, fetchImpl, limits = {}, staffMfa = true, supabaseAuth = null }: ApiDeps): IRouter {
   const router: IRouter = Router();
   const limit = { ...LIMITS, ...limits };
   const email = { outbox: emailOutbox, settings: emailSettings, inbox, ...(fetchImpl ? { fetchImpl } : {}) };
@@ -48,22 +50,28 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(authEmailHookRouter(email));
   // The application name, for pages shown before sign-in.
   router.use(brandingRouter(emailSettings));
+  // Withdrawal method photos, for image tags (public; the bytes are checked against their recorded hash).
+  router.use(withdrawalMethodPhotoRouter(moneyRepo, fileStore));
   // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
   const writes = rateLimiter(limit.writes, byUser);
   const uploads = rateLimiter(limit.uploads, byUser);
   router.use(failureLimiter(limit.anonymous), authenticate(verifier), rateLimiter(limit.user, byUser));
   router.use((req, res, next) => req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS" ? next() : writes(req, res, next));
   router.post("/documents", uploads);
+  router.put("/profile/avatar", uploads);
+  router.put("/money/methods/:methodId/photo", uploads);
+  router.post("/profile/check-password", rateLimiter(limit.passwordChecks, byUser));
   router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
   router.use(meRouter(staffMfa));
   router.use(signInsRouter(signIns, profileRepo));
+  const passwordChecker = supabaseAuth ? supabasePasswordChecker(supabaseAuth.url, supabaseAuth.anonKey, fetchImpl) : null;
   router.use(staffRouter(staffRepo));
   router.use(programsRouter(programRepo, applicationRepo));
-  router.use(profileRouter(profileRepo, documentRepo));
+  router.use(profileRouter({ repo: profileRepo, documents: documentRepo, activity: activityRepo, files: fileStore, passwordChecker }));
   router.use(applicantsRouter(profileRepo));
   router.use(applicationsRouter(applicationRepo, profileRepo, moneyRepo, documentRepo, fileStore));
   router.use(documentsRouter({ documents: documentRepo, files: fileStore, profiles: profileRepo, applications: applicationRepo, programs: programRepo }));
-  router.use(moneyRouter(moneyRepo, profileRepo));
+  router.use(moneyRouter(moneyRepo, profileRepo, fileStore));
   router.use(activityRouter(activityRepo));
   router.use(emailRouter(email));
   return router;

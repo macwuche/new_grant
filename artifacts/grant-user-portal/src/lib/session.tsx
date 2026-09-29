@@ -39,6 +39,14 @@ type Session = {
   /** Checks a 6-digit code (for a new factor, or the account's first verified one) and upgrades the session. */
   verifyTwoStep: (code: string, factorId?: string) => Promise<string | null>;
   removeTwoStep: (factorId: string) => Promise<string | null>;
+  /** Profile center: a new password for the signed-in account (the current one is checked by the API first). */
+  changePassword: (password: string) => Promise<string | null>;
+  /** Asks Supabase to change the sign-in email; a code and link go to the new address (and the current one, if secure change is on). */
+  requestEmailChange: (newEmail: string) => Promise<string | null>;
+  /** Confirms an email change with a code from the email. */
+  verifyEmailChange: (newEmail: string, code: string) => Promise<string | null>;
+  /** Signs out every other session of this account; this one stays signed in. */
+  signOutOthers: () => Promise<string | null>;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -185,6 +193,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (error) return /invalid|expired/i.test(error.message) ? 'That code didn\'t work. Check your authenticator app and try the current code.' : authErrorMessage(error.message);
       // The verified session arrives through onAuthStateChange (MFA_CHALLENGE_VERIFIED).
       return null;
+    },
+    changePassword: async password => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) return /different from the old/i.test(error.message) ? 'Choose a password different from your current one.' : authErrorMessage(error.message);
+      return null;
+    },
+    requestEmailChange: async newEmail => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() }, { emailRedirectTo: `${window.location.origin}${basePath()}/profile` });
+      if (error) return /already (been )?registered|already exists/i.test(error.message) ? 'That email is already used by another account.' : authErrorMessage(error.message);
+      return null;
+    },
+    verifyEmailChange: async (newEmail, code) => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const { data, error } = await supabase.auth.verifyOtp({ email: newEmail.trim(), token: code.replace(/\s/g, ''), type: 'email_change' });
+      if (error) return /invalid|expired/i.test(error.message) ? 'That code didn\'t work or has expired. Check the latest email, or ask for a new code.' : authErrorMessage(error.message);
+      // With secure email change on, the first code only confirms one address; the email changes once both are confirmed.
+      if (data.session) await loadMe(data.session);
+      return null;
+    },
+    signOutOthers: async () => {
+      if (!supabase) return 'Sign-in isn\'t set up yet.';
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      return error ? authErrorMessage(error.message) : null;
     },
     removeTwoStep: async factorId => {
       if (!supabase) return 'Sign-in isn\'t set up yet.';

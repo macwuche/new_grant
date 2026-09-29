@@ -79,7 +79,7 @@ describe('permission switches', () => {
     expect(M.payoutBlocker(s)).toBeNull();
     turn('payoutKyc', true);
     expect(s.notifications[0]!.body).toMatch(/Payouts now need a verified identity/);
-    refuse(M.requestWithdrawal(s, 20, 'bank', now), /Verify your identity .* payout/);
+    refuse(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: s.savedPayoutDetails['bank'] }, now), /Verify your identity .* payout/);
     accept(D.requestDeposit(s, 50, 'bank', now));
     turn('depositKyc', true);
     refuse(D.requestDeposit(s, 50, 'bank', now), /Verify your identity .* adding funds/);

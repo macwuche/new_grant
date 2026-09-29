@@ -10,6 +10,8 @@ import type { LedgerEntryCounterpart } from './ledgerEntryCounterpart';
 import type { LedgerEntryReleaseApproval } from './ledgerEntryReleaseApproval';
 import type { LedgerEntryStatus } from './ledgerEntryStatus';
 import type { LedgerEntryType } from './ledgerEntryType';
+import type { PayoutBalance } from './payoutBalance';
+import type { PayoutDetail } from './payoutDetail';
 
 export interface LedgerEntry {
   id: string;
@@ -34,4 +36,7 @@ export interface LedgerEntry {
   /** Staff card moves and balance adjustments - the reason shown to the applicant */
   note?: string;
   category?: AdjustmentCategory;
+  source?: PayoutBalance;
+  /** Withdrawals - the method's form as the applicant filled it in */
+  payoutDetails?: PayoutDetail[];
 }

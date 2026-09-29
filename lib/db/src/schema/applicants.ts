@@ -66,11 +66,26 @@ export const applicantProfilesTable = pgTable("applicant_profiles", {
   permissions: jsonb("permissions").$type<AccountPermissionsJson | null>(),
   /** Virtual and physical card settings (fictional: no card provider is connected). */
   cards: jsonb("cards").$type<CardsJson | null>(),
-  /** Masked payout destination labels per channel; full numbers are never stored. */
-  payoutDestinations: jsonb("payout_destinations").$type<Partial<Record<"bank" | "wire" | "mobile" | "crypto", string>>>().notNull().default({}),
+  /**
+   * The applicant's last payout form answers per withdrawal method (method id → field id → value), used to
+   * pre-fill the next request. Full values: finance needs them to pay. Rows from before 29 Sep 2026 hold masked
+   * labels (method id → string) instead; the API ignores those.
+   */
+  payoutDestinations: jsonb("payout_destinations").$type<Record<string, Record<string, string> | string>>().notNull().default({}),
   destinationChangedAt: timestamp("destination_changed_at", { withTimezone: true }),
   /** Whether in-app notifications are also sent by email. */
   emailNotifications: boolean("email_notifications").notNull().default(true),
+  /** Profile center (the applicant's own edits): the @handle, and a Telegram username without the "@". */
+  displayName: text("display_name").notNull().default(""),
+  telegram: text("telegram").notNull().default(""),
+  /** Privacy switches: keep device, IP, and location with security events; email an alert for a new device. */
+  activityLoggingEnabled: boolean("activity_logging_enabled").notNull().default(true),
+  unusualActivityEmailEnabled: boolean("unusual_activity_email_enabled").notNull().default(true),
+  /** Profile photo: a file on the API server's disk (FileStore key), its detected type, and SHA-256 (checked on every read). */
+  avatarKey: text("avatar_key"),
+  avatarType: text("avatar_type"),
+  avatarSha256: text("avatar_sha256"),
+  avatarUpdatedAt: timestamp("avatar_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

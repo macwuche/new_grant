@@ -328,7 +328,7 @@ paths:
     patch:
       operationId: updateProfile
       tags: [profile]
-      summary: Edit your name, phone, and address
+      summary: Edit your personal details
       description: The email is the sign-in account's; tier and identity status are set by staff.
       requestBody:
         required: true
@@ -374,6 +374,155 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Stale"
+  /profile/avatar:
+    get:
+      operationId: getAvatar
+      tags: [profile]
+      summary: Your profile photo
+      description: Owner only. The content is checked against the SHA-256 recorded at upload.
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: uploadAvatar
+      tags: [profile]
+      summary: Upload a new profile photo
+      description: The raw image is the request body (JPEG, PNG, or WEBP, detected from the content; at most 5 MB). Replaces the previous photo. Stored on the API server's disk, never in Supabase Storage.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/BadRequest"
+        "415":
+          $ref: "#/components/responses/BadRequest"
+  /profile/avatar/delete:
+    post:
+      operationId: removeAvatar
+      tags: [profile]
+      summary: Remove your profile photo
+      description: Deletes the file; the profile shows your initials again.
+      responses:
+        "200":
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /profile/privacy:
+    put:
+      operationId: setPrivacy
+      tags: [profile]
+      summary: Save your privacy and security switches
+      description: Activity logging keeps the device, IP address, and location with each security event; unusual-activity email sends an alert when a new device signs in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivacyPreferences"
+      responses:
+        "200":
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /profile/security-events:
+    get:
+      operationId: listSecurityEvents
+      tags: [profile]
+      summary: Your recent security activity
+      description: Newest first, at most 50.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SecurityEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: reportSecurityEvent
+      tags: [profile]
+      summary: Record a security change made in the browser
+      description: The portal reports changes Supabase made directly (two-step on or off, signing out other devices, an email change requested). Two-step changes are recorded only if the session's verified factors agree.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecurityEventReport"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityEventResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /profile/check-password:
+    post:
+      operationId: checkPassword
+      tags: [profile]
+      summary: Confirm your current password
+      description: Checked with Supabase from the server (the throwaway session is signed out straight away), before changing your password or email. A wrong password is recorded as a failed attempt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordCheck"
+      responses:
+        "200":
+          description: The password is right
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/BadRequest"
   /sign-ins:
     post:
       operationId: reportSignIn
@@ -1230,7 +1379,10 @@ paths:
       operationId: requestWithdrawal
       tags: [money]
       summary: Request a payout
-      description: From your grant balance to a saved destination on an enabled channel.
+      description: >-
+        With an available withdrawal method: the amount, the balance it comes from (required when the method
+        allows both; the deposit balance keeps the reserve), and the method's form answers (field id → value).
+        Field errors are keyed `details.<fieldId>`. The answers are kept with the request and remembered for next time.
       requestBody:
         required: true
         content:
@@ -1696,48 +1848,190 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-  /money/destinations:
+  /money/methods:
     post:
-      operationId: savePayoutDestination
+      operationId: createWithdrawalMethod
       tags: [money]
-      summary: Save a payout destination
-      description: Only a masked label is stored.
+      summary: Add a withdrawal method
+      description: Requires treasury.manage. 409 if the money settings changed since `version`. The new method's id is returned as `id`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DestinationInput"
+              $ref: "#/components/schemas/WithdrawalMethodSave"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MoneyResult"
+                $ref: "#/components/schemas/MoneySettingsResult"
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /money/destinations/{channel}/remove:
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /money/methods/{methodId}:
     parameters:
-      - $ref: "#/components/parameters/ChannelParam"
-    post:
-      operationId: removePayoutDestination
+      - $ref: "#/components/parameters/MethodIdParam"
+    put:
+      operationId: updateWithdrawalMethod
       tags: [money]
-      summary: Remove a payout destination
-      description: Pending payouts still go where they were sent.
+      summary: Edit a withdrawal method
+      description: Requires treasury.manage. Applies to new requests; pending ones keep what they were quoted. 409 if stale.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalMethodSave"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MoneyResult"
+                $ref: "#/components/schemas/MoneySettingsResult"
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /money/methods/{methodId}/availability:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: setWithdrawalMethodAvailability
+      tags: [money]
+      summary: Show or hide a withdrawal method for users
+      description: Requires treasury.manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MethodAvailability"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/methods/{methodId}/delete:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: deleteWithdrawalMethod
+      tags: [money]
+      summary: Delete a withdrawal method
+      description: Requires treasury.manage. Pending requests keep the method's name, charges, and answers, so they can still be processed. An uploaded photo is deleted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/methods/{methodId}/photo:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    put:
+      operationId: uploadWithdrawalMethodPhoto
+      tags: [money]
+      summary: Upload a withdrawal method's photo
+      description: Requires treasury.manage. The raw image is the body (JPEG, PNG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces a previous upload or link.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /money/methods/{methodId}/photo/delete:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: removeWithdrawalMethodPhoto
+      tags: [money]
+      summary: Remove a withdrawal method's photo
+      description: Requires treasury.manage. Users see the method's first letter instead.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /withdrawal-methods/{methodId}/photo:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    get:
+      operationId: getWithdrawalMethodPhoto
+      tags: [money]
+      summary: A withdrawal method's uploaded photo
+      description: Public (method logos aren't private), so pages can use it in an image tag. Checked against the SHA-256 recorded at upload.
+      security: []
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
   /money/ledger:
     get:
       operationId: getLedger
@@ -2480,8 +2774,8 @@ components:
       schema:
         type: string
         pattern: "^TX-[0-9]{1,15}$"
-    ChannelParam:
-      name: channel
+    MethodIdParam:
+      name: methodId
       in: path
       required: true
       schema:
@@ -2830,7 +3124,21 @@ components:
       required: [id, purpose, applicationId, requirement, fileName, contentType, sizeBytes, uploadedAt]
     ChannelId:
       type: string
-      enum: [bank, wire, mobile, crypto]
+      description: A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+      pattern: "^[a-z0-9-]{1,40}$"
+    PayoutBalance:
+      type: string
+      enum: [grant, deposit]
+    PayoutDetail:
+      type: object
+      properties:
+        fieldId:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+      required: [fieldId, label, value]
     LedgerEntry:
       type: object
       properties:
@@ -2886,36 +3194,128 @@ components:
           description: Staff card moves and balance adjustments - the reason shown to the applicant
         category:
           $ref: "#/components/schemas/AdjustmentCategory"
+        source:
+          $ref: "#/components/schemas/PayoutBalance"
+        payoutDetails:
+          type: array
+          description: Withdrawals - the method's form as the applicant filled it in
+          items:
+            $ref: "#/components/schemas/PayoutDetail"
       required: [id, applicantId, type, description, amount, status, createdAt]
-    PayoutChannel:
+    MethodFieldType:
+      type: string
+      enum: [text, textarea, email, number, select]
+    MethodField:
       type: object
       properties:
         id:
-          $ref: "#/components/schemas/ChannelId"
+          type: string
+          maxLength: 40
+          description: Omitted for a new field; kept on edits so remembered answers still match
+        label:
+          type: string
+          maxLength: 100
+        type:
+          $ref: "#/components/schemas/MethodFieldType"
+        required:
+          type: boolean
+        placeholder:
+          type: string
+          maxLength: 200
+        help:
+          type: string
+          maxLength: 300
+        options:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 100
+      required: [label, type, required, placeholder, help, options]
+      additionalProperties: false
+    WithdrawalMethodInput:
+      type: object
+      properties:
         name:
           type: string
+          maxLength: 80
         enabled:
           type: boolean
+          description: Shown to users on the withdrawal page
         min:
           type: number
         max:
           type: number
         feeRate:
           type: number
+          description: 0-0.1 (a fraction of the amount)
         feeFixed:
           type: number
         feeCap:
           type: number
-      required: [id, name, enabled, min, max, feeRate, feeFixed, feeCap]
+          description: The most a request is charged; 0 for no maximum
+        processingTime:
+          type: string
+          maxLength: 100
+        instructions:
+          type: string
+          maxLength: 2000
+        photoUrl:
+          type: string
+          maxLength: 1000
+          description: An https link, the method's current uploaded-photo path unchanged, or empty for the first-letter badge
+        source:
+          type: string
+          enum: [grant, deposit, both]
+        formTitle:
+          type: string
+          maxLength: 100
+        fields:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/MethodField"
+      required: [name, enabled, min, max, feeRate, feeFixed, feeCap, processingTime, instructions, photoUrl, source, formTitle, fields]
+      additionalProperties: false
+    WithdrawalMethod:
+      allOf:
+        - $ref: "#/components/schemas/WithdrawalMethodInput"
+        - type: object
+          properties:
+            id:
+              $ref: "#/components/schemas/ChannelId"
+            fields:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/MethodField"
+                  - type: object
+                    properties:
+                      id:
+                        type: string
+                    required: [id]
+          required: [id]
+    WithdrawalMethodSave:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        method:
+          $ref: "#/components/schemas/WithdrawalMethodInput"
+      required: [version, method]
+      additionalProperties: false
+    MethodAvailability:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required: [enabled]
       additionalProperties: false
     TreasuryInput:
       type: object
+      description: Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
       properties:
-        channels:
-          type: array
-          maxItems: 10
-          items:
-            $ref: "#/components/schemas/PayoutChannel"
         physicalCardFee:
           type: number
         cardDeliveryFee:
@@ -2932,13 +3332,18 @@ components:
           type: number
         applicationFee:
           type: number
-      required: [channels, physicalCardFee, cardDeliveryFee, minDeposit, maxDeposit, depositThreshold, highValueDeposit, dualControlThreshold, applicationFee]
+      required: [physicalCardFee, cardDeliveryFee, minDeposit, maxDeposit, depositThreshold, highValueDeposit, dualControlThreshold, applicationFee]
       additionalProperties: false
     Treasury:
       allOf:
         - $ref: "#/components/schemas/TreasuryInput"
         - type: object
           properties:
+            channels:
+              type: array
+              description: Withdrawal methods; applicants get only the available ones
+              items:
+                $ref: "#/components/schemas/WithdrawalMethod"
             updatedAt:
               type: string
             changeLog:
@@ -2946,7 +3351,7 @@ components:
               description: Staff only; empty for applicants
               items:
                 $ref: "#/components/schemas/ProgramChange"
-          required: [updatedAt, changeLog]
+          required: [channels, updatedAt, changeLog]
     Lockdown:
       type: object
       properties:
@@ -2974,6 +3379,9 @@ components:
           $ref: "#/components/schemas/MoneySettings"
         message:
           type: string
+        id:
+          type: string
+          description: The withdrawal method the action created or changed, if any
       required: [settings, message]
     MoneySettingsUpdate:
       type: object
@@ -3339,10 +3747,13 @@ components:
             $ref: "#/components/schemas/LedgerEntry"
         cards:
           $ref: "#/components/schemas/Cards"
-        payoutDestinations:
+        savedPayoutDetails:
           type: object
+          description: The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request
           additionalProperties:
-            type: string
+            type: object
+            additionalProperties:
+              type: string
         destinationChangedAt:
           type: string
         treasury:
@@ -3351,7 +3762,7 @@ components:
           allOf:
             - $ref: "#/components/schemas/Lockdown"
           nullable: true
-      required: [transactions, cards, payoutDestinations, treasury, lockdown]
+      required: [transactions, cards, savedPayoutDetails, treasury, lockdown]
     MoneyResult:
       type: object
       properties:
@@ -3388,6 +3799,14 @@ components:
           type: number
         channel:
           $ref: "#/components/schemas/ChannelId"
+        source:
+          $ref: "#/components/schemas/PayoutBalance"
+        details:
+          type: object
+          maxProperties: 30
+          additionalProperties:
+            type: string
+            maxLength: 2000
       required: [amount, channel]
       additionalProperties: false
     CardLimit:
@@ -3399,19 +3818,6 @@ components:
         limit:
           type: number
       required: [card, limit]
-      additionalProperties: false
-    DestinationInput:
-      type: object
-      properties:
-        channel:
-          $ref: "#/components/schemas/ChannelId"
-        primary:
-          type: string
-          maxLength: 80
-        secondary:
-          type: string
-          maxLength: 80
-      required: [channel, primary]
       additionalProperties: false
     NotificationItem:
       type: object
@@ -3872,7 +4278,18 @@ components:
           description: ISO date of birth given at sign-up, if any
         account:
           $ref: "#/components/schemas/Account"
-      required: [name, email, phone, address, sector, country, tier, identityVerified, joined, account]
+        displayName:
+          type: string
+          description: Shown as the profile's @handle; empty when not added
+        telegram:
+          type: string
+          description: Telegram username without the "@"; empty when not added
+        privacy:
+          $ref: "#/components/schemas/PrivacyPreferences"
+        avatarUpdatedAt:
+          type: [string, "null"]
+          description: When the profile photo was last changed; null when there is none (show initials)
+      required: [name, email, phone, address, sector, country, tier, identityVerified, joined, account, displayName, telegram, privacy, avatarUpdatedAt]
     Kyc:
       type: object
       properties:
@@ -3989,7 +4406,72 @@ components:
         address:
           type: string
           maxLength: 300
+        displayName:
+          type: string
+          maxLength: 40
+          description: Left unchanged when omitted
+        telegram:
+          type: string
+          maxLength: 64
+          description: Left unchanged when omitted
+        birthDate:
+          type: string
+          maxLength: 10
+          description: yyyy-mm-dd, or empty to remove; left unchanged when omitted
       required: [name, phone, address]
+      additionalProperties: false
+    PrivacyPreferences:
+      type: object
+      properties:
+        activityLogging:
+          type: boolean
+        unusualActivityEmail:
+          type: boolean
+      required: [activityLogging, unusualActivityEmail]
+      additionalProperties: false
+    SecurityEventKind:
+      type: string
+      enum: [sign_in, new_device_sign_in, password_changed, failed_password_check, email_change_requested, email_changed, two_step_on, two_step_off, signed_out_others]
+    SecurityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/SecurityEventKind"
+        device:
+          type: [string, "null"]
+          description: Browser and system, e.g. "Chrome on Windows"; null when activity logging was off
+        ip:
+          type: [string, "null"]
+        location:
+          type: [string, "null"]
+          description: City and country from the proxy's location headers, when available
+        at:
+          type: string
+      required: [id, kind, device, ip, location, at]
+    SecurityEventReport:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [email_change_requested, two_step_on, two_step_off, signed_out_others]
+      required: [kind]
+      additionalProperties: false
+    SecurityEventResult:
+      type: object
+      properties:
+        recorded:
+          type: boolean
+      required: [recorded]
+    PasswordCheck:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required: [password]
       additionalProperties: false
     Error:
       type: object

@@ -1,10 +1,10 @@
-import type { CardSettings, CardsState, Lockdown, PayoutDestinations, Transaction, Treasury } from "@workspace/domain/model";
+import type { CardSettings, CardsState, Lockdown, SavedPayoutDetails, Transaction, Treasury } from "@workspace/domain/model";
 import { DEFAULT_CARD_SETTINGS } from "@workspace/domain/cards";
 import type { Effects } from "./activity";
 import type { ProfileRecord, ProfileRepo } from "./profileRepo";
 
-// Storage for money: the ledger, each applicant's cards and payout
-// destinations, and the system money settings and lockdown. Balances are never
+// Storage for money: the ledger, each applicant's cards and remembered payout
+// answers, and the system money settings (with the withdrawal methods) and lockdown. Balances are never
 // stored; the rules derive them from the ledger.
 //
 // Locking (the Drizzle version uses Postgres advisory locks):
@@ -16,7 +16,7 @@ import type { ProfileRecord, ProfileRepo } from "./profileRepo";
 // `ProgramScope.money` (program lock first, then the applicant's).
 
 /** An applicant's money profile: what the money rules read and change besides the ledger. */
-export type MoneyProfile = { cards: CardsState; payoutDestinations: PayoutDestinations; destinationChangedAt?: string };
+export type MoneyProfile = { cards: CardsState; savedPayoutDetails: SavedPayoutDetails; destinationChangedAt?: string };
 
 export type SystemSettings = { treasury: Treasury; lockdown: Lockdown | null };
 
@@ -85,7 +85,7 @@ export function memoryMoneyRepo(profiles: ProfileRepo, seed: SystemSettings, act
     withApplicant: (applicantId, fn) => lock("system", () => lock(`applicant:${applicantId}`, async () => {
       const profile = await profiles.get(applicantId);
       if (!profile) throw new Error("no such applicant");
-      if (!moneyRows.has(applicantId)) moneyRows.set(applicantId, { cards: newCards(), payoutDestinations: {} });
+      if (!moneyRows.has(applicantId)) moneyRows.set(applicantId, { cards: newCards(), savedPayoutDetails: {} });
       return fn({
         ...structuredClone(settings), applicant: profile, money: structuredClone(moneyRows.get(applicantId)!), transactions: own(applicantId),
         saveTransaction: async tx => { ledgerRows.set(tx.id, structuredClone(tx)); },

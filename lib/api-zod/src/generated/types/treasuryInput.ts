@@ -5,11 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { PayoutChannel } from './payoutChannel';
 
+/**
+ * Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
+ */
 export interface TreasuryInput {
-  /** @maxItems 10 */
-  channels: PayoutChannel[];
   physicalCardFee: number;
   cardDeliveryFee: number;
   minDeposit: number;

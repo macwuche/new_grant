@@ -134,7 +134,7 @@ describe('saved-data migration', () => {
     const { grants: _g, notifications: _n, treasury: _t, staffFeed: _f, ...rest } = createSeedState();
     const v2 = { ...rest, version: 2, applications: rest.applications.slice(0, 1) };
     const migrated = migrateState(JSON.parse(JSON.stringify(v2)))!;
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(6);
     expect(migrated.staff.length).toBeGreaterThan(0);
     expect(migrated.audit).toEqual([]);
     expect(migrated.treasury.channels.length).toBeGreaterThan(0);

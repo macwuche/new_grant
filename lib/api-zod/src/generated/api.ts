@@ -572,13 +572,20 @@ export const GetProfileResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 
 
 /**
  * The email is the sign-in account's; tier and identity status are set by staff.
- * @summary Edit your name, phone, and address
+ * @summary Edit your personal details
  */
 export const updateProfileBodyNameMax = 120;
 
@@ -586,12 +593,21 @@ export const updateProfileBodyPhoneMax = 40;
 
 export const updateProfileBodyAddressMax = 300;
 
+export const updateProfileBodyDisplayNameMax = 40;
+
+export const updateProfileBodyTelegramMax = 64;
+
+export const updateProfileBodyBirthDateMax = 10;
+
 
 
 export const UpdateProfileBody = zod.object({
   "name": zod.string().max(updateProfileBodyNameMax),
   "phone": zod.string().max(updateProfileBodyPhoneMax),
-  "address": zod.string().max(updateProfileBodyAddressMax)
+  "address": zod.string().max(updateProfileBodyAddressMax),
+  "displayName": zod.string().max(updateProfileBodyDisplayNameMax).optional().describe('Left unchanged when omitted'),
+  "telegram": zod.string().max(updateProfileBodyTelegramMax).optional().describe('Left unchanged when omitted'),
+  "birthDate": zod.string().max(updateProfileBodyBirthDateMax).optional().describe('yyyy-mm-dd, or empty to remove; left unchanged when omitted')
 })
 
 export const UpdateProfileResponse = zod.object({
@@ -633,7 +649,14 @@ export const UpdateProfileResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 
 
@@ -692,7 +715,233 @@ export const SubmitIdentityCheckResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
+})
+
+
+/**
+ * Owner only. The content is checked against the SHA-256 recorded at upload.
+ * @summary Your profile photo
+ */
+export const GetAvatarResponse = zod.unknown()
+
+
+/**
+ * The raw image is the request body (JPEG, PNG, or WEBP, detected from the content; at most 5 MB). Replaces the previous photo. Stored on the API server's disk, never in Supabase Storage.
+ * @summary Upload a new profile photo
+ */
+export const UploadAvatarResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
+}).optional()
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
+})
+
+
+/**
+ * Deletes the file; the profile shows your initials again.
+ * @summary Remove your profile photo
+ */
+export const RemoveAvatarResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
+}).optional()
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
+})
+
+
+/**
+ * Activity logging keeps the device, IP address, and location with each security event; unusual-activity email sends an alert when a new device signs in.
+ * @summary Save your privacy and security switches
+ */
+export const SetPrivacyBody = zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+})
+
+export const SetPrivacyResponse = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
+}).optional()
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
+})
+
+
+/**
+ * Newest first, at most 50.
+ * @summary Your recent security activity
+ */
+export const ListSecurityEventsResponseItem = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['sign_in', 'new_device_sign_in', 'password_changed', 'failed_password_check', 'email_change_requested', 'email_changed', 'two_step_on', 'two_step_off', 'signed_out_others']),
+  "device": zod.string().nullable().describe('Browser and system, e.g. "Chrome on Windows"; null when activity logging was off'),
+  "ip": zod.string().nullable(),
+  "location": zod.string().nullable().describe('City and country from the proxy\'s location headers, when available'),
+  "at": zod.string()
+})
+export const ListSecurityEventsResponse = zod.array(ListSecurityEventsResponseItem)
+
+
+/**
+ * The portal reports changes Supabase made directly (two-step on or off, signing out other devices, an email change requested). Two-step changes are recorded only if the session's verified factors agree.
+ * @summary Record a security change made in the browser
+ */
+export const ReportSecurityEventBody = zod.object({
+  "kind": zod.enum(['email_change_requested', 'two_step_on', 'two_step_off', 'signed_out_others'])
+})
+
+export const ReportSecurityEventResponse = zod.object({
+  "recorded": zod.boolean()
+})
+
+
+/**
+ * Checked with Supabase from the server (the throwaway session is signed out straight away), before changing your password or email. A wrong password is recorded as a failed attempt.
+ * @summary Confirm your current password
+ */
+export const checkPasswordBodyPasswordMax = 200;
+
+
+
+export const CheckPasswordBody = zod.object({
+  "password": zod.string().min(1).max(checkPasswordBodyPasswordMax)
+})
+
+export const CheckPasswordResponse = zod.object({
+  "message": zod.string()
 })
 
 
@@ -753,7 +1002,14 @@ export const ReportPasswordChangedResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 
 
@@ -804,7 +1060,14 @@ export const CompleteCredentialResetResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 
 
@@ -853,7 +1116,14 @@ export const ListApplicantsResponseItem = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 })
 export const ListApplicantsResponse = zod.array(ListApplicantsResponseItem)
@@ -918,7 +1188,14 @@ export const SetApplicantTierResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -980,7 +1257,14 @@ export const SetCardSettingsResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1042,7 +1326,14 @@ export const SetAccountPermissionResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1107,7 +1398,14 @@ export const LockApplicantResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1164,7 +1462,14 @@ export const UnlockApplicantResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1225,7 +1530,14 @@ export const RequireCredentialResetResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1282,7 +1594,14 @@ export const ApproveIdentityCheckResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1347,7 +1666,14 @@ export const RejectIdentityCheckResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -1412,7 +1738,14 @@ export const RequestReverificationResponse = zod.object({
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean()
 }).optional()
-}).describe('Staff-managed controls on an applicant account')
+}).describe('Staff-managed controls on an applicant account'),
+  "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
+  "telegram": zod.string().describe('Telegram username without the "@"; empty when not added'),
+  "privacy": zod.object({
+  "activityLogging": zod.boolean(),
+  "unusualActivityEmail": zod.boolean()
+}),
+  "avatarUpdatedAt": zod.string().nullable().describe('When the profile photo was last changed; null when there is none (show initials)')
 })
 }),
   "message": zod.string()
@@ -2242,7 +2575,42 @@ export const getMyMoneyResponseCardsPhysicalShippingAddressPostalCodeMax = 20;
 
 export const getMyMoneyResponseCardsPhysicalShippingAddressCountryMax = 60;
 
-export const getMyMoneyResponseTreasuryOneChannelsMax = 10;
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2270,7 +2638,13 @@ export const GetMyMoneyResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2315,19 +2689,9 @@ export const GetMyMoneyResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(getMyMoneyResponseTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -2336,7 +2700,43 @@ export const GetMyMoneyResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(getMyMoneyResponseTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(getMyMoneyResponseTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(getMyMoneyResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -2375,7 +2775,42 @@ export const requestDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMa
 
 export const requestDepositResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const requestDepositResponseMoneyTreasuryOneChannelsMax = 10;
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2404,7 +2839,13 @@ export const RequestDepositResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2449,19 +2890,9 @@ export const RequestDepositResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(requestDepositResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -2470,7 +2901,43 @@ export const RequestDepositResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(requestDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -2514,7 +2981,42 @@ export const cancelDepositResponseMoneyCardsPhysicalShippingAddressPostalCodeMax
 
 export const cancelDepositResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const cancelDepositResponseMoneyTreasuryOneChannelsMax = 10;
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2543,7 +3045,13 @@ export const CancelDepositResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2588,19 +3096,9 @@ export const CancelDepositResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(cancelDepositResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -2609,7 +3107,43 @@ export const CancelDepositResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(cancelDepositResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -2629,12 +3163,19 @@ export const CancelDepositResponse = zod.object({
 
 
 /**
- * From your grant balance to a saved destination on an enabled channel.
+ * With an available withdrawal method: the amount, the balance it comes from (required when the method allows both; the deposit balance keeps the reserve), and the method's form answers (field id → value). Field errors are keyed `details.<fieldId>`. The answers are kept with the request and remembered for next time.
  * @summary Request a payout
  */
+export const requestWithdrawalBodyChannelRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const requestWithdrawalBodyDetailsMaxOne = 2000;
+
+
+
 export const RequestWithdrawalBody = zod.object({
   "amount": zod.number(),
-  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
+  "channel": zod.string().regex(requestWithdrawalBodyChannelRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "details": zod.record(zod.string(), zod.string().max(requestWithdrawalBodyDetailsMaxOne)).optional()
 })
 
 export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
@@ -2651,7 +3192,42 @@ export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCod
 
 export const requestWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const requestWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2680,7 +3256,13 @@ export const RequestWithdrawalResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2725,19 +3307,9 @@ export const RequestWithdrawalResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(requestWithdrawalResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -2746,7 +3318,43 @@ export const RequestWithdrawalResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -2790,7 +3398,42 @@ export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressPostalCode
 
 export const cancelWithdrawalResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const cancelWithdrawalResponseMoneyTreasuryOneChannelsMax = 10;
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2819,7 +3462,13 @@ export const CancelWithdrawalResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2864,19 +3513,9 @@ export const CancelWithdrawalResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(cancelWithdrawalResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -2885,7 +3524,43 @@ export const CancelWithdrawalResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -2926,7 +3601,42 @@ export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressPostalCode
 
 export const toggleCardFreezeResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const toggleCardFreezeResponseMoneyTreasuryOneChannelsMax = 10;
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -2955,7 +3665,13 @@ export const ToggleCardFreezeResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3000,19 +3716,9 @@ export const ToggleCardFreezeResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(toggleCardFreezeResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3021,7 +3727,43 @@ export const ToggleCardFreezeResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -3063,7 +3805,42 @@ export const setCardLimitResponseMoneyCardsPhysicalShippingAddressPostalCodeMax 
 
 export const setCardLimitResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const setCardLimitResponseMoneyTreasuryOneChannelsMax = 10;
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -3092,7 +3869,13 @@ export const SetCardLimitResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3137,19 +3920,9 @@ export const SetCardLimitResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(setCardLimitResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3158,7 +3931,43 @@ export const SetCardLimitResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(setCardLimitResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -3195,7 +4004,42 @@ export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressPostalCod
 
 export const createVirtualCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const createVirtualCardResponseMoneyTreasuryOneChannelsMax = 10;
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -3224,7 +4068,13 @@ export const CreateVirtualCardResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3269,19 +4119,9 @@ export const CreateVirtualCardResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(createVirtualCardResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3290,7 +4130,43 @@ export const CreateVirtualCardResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -3332,7 +4208,42 @@ export const fundCardResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20
 
 export const fundCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const fundCardResponseMoneyTreasuryOneChannelsMax = 10;
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -3361,7 +4272,13 @@ export const FundCardResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3406,19 +4323,9 @@ export const FundCardResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(fundCardResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3427,7 +4334,43 @@ export const FundCardResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(fundCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(fundCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(fundCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -3490,7 +4433,42 @@ export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressPostalC
 
 export const requestPhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const requestPhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -3519,7 +4497,13 @@ export const RequestPhysicalCardResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3564,19 +4548,9 @@ export const RequestPhysicalCardResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(requestPhysicalCardResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3585,7 +4559,43 @@ export const RequestPhysicalCardResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -3630,7 +4640,42 @@ export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressPostal
 
 export const activatePhysicalCardResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
 
-export const activatePhysicalCardResponseMoneyTreasuryOneChannelsMax = 10;
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
@@ -3659,7 +4704,13 @@ export const ActivatePhysicalCardResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3704,19 +4755,9 @@ export const ActivatePhysicalCardResponse = zod.object({
   "cancelReason": zod.string().optional()
 })
 }),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
+  "savedPayoutDetails": zod.record(zod.string(), zod.record(zod.string(), zod.string())).describe('The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request'),
   "destinationChangedAt": zod.string().optional(),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(activatePhysicalCardResponseMoneyTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -3725,7 +4766,43 @@ export const ActivatePhysicalCardResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -4733,122 +5810,106 @@ export const DeductFromCardResponse = zod.object({
 
 
 /**
- * Only a masked label is stored.
- * @summary Save a payout destination
+ * Requires treasury.manage. 409 if the money settings changed since `version`. The new method's id is returned as `id`.
+ * @summary Add a withdrawal method
  */
-export const savePayoutDestinationBodyPrimaryMax = 80;
+export const createWithdrawalMethodBodyVersionMax = 40;
 
-export const savePayoutDestinationBodySecondaryMax = 80;
+export const createWithdrawalMethodBodyMethodNameMax = 80;
 
+export const createWithdrawalMethodBodyMethodProcessingTimeMax = 100;
 
+export const createWithdrawalMethodBodyMethodInstructionsMax = 2000;
 
-export const SavePayoutDestinationBody = zod.object({
-  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "primary": zod.string().max(savePayoutDestinationBodyPrimaryMax),
-  "secondary": zod.string().max(savePayoutDestinationBodySecondaryMax).optional()
-})
+export const createWithdrawalMethodBodyMethodPhotoUrlMax = 1000;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+export const createWithdrawalMethodBodyMethodFormTitleMax = 100;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+export const createWithdrawalMethodBodyMethodFieldsItemIdMax = 40;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+export const createWithdrawalMethodBodyMethodFieldsItemLabelMax = 100;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+export const createWithdrawalMethodBodyMethodFieldsItemPlaceholderMax = 200;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+export const createWithdrawalMethodBodyMethodFieldsItemHelpMax = 300;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+export const createWithdrawalMethodBodyMethodFieldsItemOptionsItemMax = 100;
 
-export const savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+export const createWithdrawalMethodBodyMethodFieldsItemOptionsMax = 30;
 
-export const savePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+export const createWithdrawalMethodBodyMethodFieldsMax = 20;
 
 
 
-export const SavePayoutDestinationResponse = zod.object({
-  "money": zod.object({
-  "transactions": zod.array(zod.object({
-  "id": zod.string(),
-  "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
-  "description": zod.string(),
-  "amount": zod.number().describe('Signed; credits positive, debits negative'),
-  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
-  "createdAt": zod.string(),
-  "method": zod.string().optional(),
-  "fee": zod.number().optional(),
-  "destination": zod.string().optional(),
-  "reference": zod.string().optional(),
-  "processedAt": zod.string().optional(),
-  "processedBy": zod.string().optional(),
-  "failureReason": zod.string().optional(),
-  "dualControl": zod.boolean().optional(),
-  "releaseApproval": zod.object({
-  "by": zod.string(),
-  "at": zod.string(),
-  "byId": zod.string().optional()
-}).optional(),
-  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
-})),
-  "cards": zod.object({
-  "virtual": zod.object({
-  "lastFour": zod.string(),
-  "dailyLimit": zod.number(),
-  "frozen": zod.boolean(),
-  "createdAt": zod.string().optional(),
-  "createdBy": zod.string().optional(),
-  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
-  "frozenReason": zod.string().optional(),
-  "pin": zod.string().describe('Fictional; no card provider is connected')
-}).nullable(),
-  "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
-  "dailyLimit": zod.number(),
-  "lastFour": zod.string().optional(),
-  "frozen": zod.boolean().optional(),
-  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
-  "frozenReason": zod.string().optional(),
-  "shippingAddress": zod.object({
-  "name": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax),
-  "line1": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max),
-  "line2": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
-  "city": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax),
-  "region": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
-  "postalCode": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
-  "country": zod.string().max(savePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax)
-}).optional(),
-  "requestedAt": zod.string().optional(),
-  "feeTxId": zod.string().optional(),
-  "issuedBy": zod.string().optional(),
-  "shippedAt": zod.string().optional(),
-  "shippedBy": zod.string().optional(),
-  "trackingRef": zod.string().optional(),
-  "shippingMessage": zod.string().optional(),
-  "activatedAt": zod.string().optional(),
-  "declinedAt": zod.string().optional(),
-  "declinedBy": zod.string().optional(),
-  "declineReason": zod.string().optional(),
-  "cancelledAt": zod.string().optional(),
-  "cancelledBy": zod.string().optional(),
-  "cancelReason": zod.string().optional()
-})
-}),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
-  "destinationChangedAt": zod.string().optional(),
-  "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
+export const CreateWithdrawalMethodBody = zod.object({
+  "version": zod.string().max(createWithdrawalMethodBodyVersionMax),
+  "method": zod.object({
+  "name": zod.string().max(createWithdrawalMethodBodyMethodNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
   "min": zod.number(),
   "max": zod.number(),
-  "feeRate": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
   "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(savePayoutDestinationResponseMoneyTreasuryOneChannelsMax),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(createWithdrawalMethodBodyMethodProcessingTimeMax),
+  "instructions": zod.string().max(createWithdrawalMethodBodyMethodInstructionsMax),
+  "photoUrl": zod.string().max(createWithdrawalMethodBodyMethodPhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(createWithdrawalMethodBodyMethodFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(createWithdrawalMethodBodyMethodFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(createWithdrawalMethodBodyMethodFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(createWithdrawalMethodBodyMethodFieldsItemPlaceholderMax),
+  "help": zod.string().max(createWithdrawalMethodBodyMethodFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(createWithdrawalMethodBodyMethodFieldsItemOptionsItemMax)).max(createWithdrawalMethodBodyMethodFieldsItemOptionsMax)
+})).max(createWithdrawalMethodBodyMethodFieldsMax)
+})
+})
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const CreateWithdrawalMethodResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -4857,7 +5918,43 @@ export const SavePayoutDestinationResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -4872,119 +5969,118 @@ export const SavePayoutDestinationResponse = zod.object({
 }).nullable()
 }),
   "message": zod.string(),
-  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
 })
 
 
 /**
- * Pending payouts still go where they were sent.
- * @summary Remove a payout destination
+ * Requires treasury.manage. Applies to new requests; pending ones keep what they were quoted. 409 if stale.
+ * @summary Edit a withdrawal method
  */
-export const RemovePayoutDestinationParams = zod.object({
-  "channel": zod.enum(['bank', 'wire', 'mobile', 'crypto'])
+export const updateWithdrawalMethodPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const UpdateWithdrawalMethodParams = zod.object({
+  "methodId": zod.coerce.string().regex(updateWithdrawalMethodPathMethodIdRegExp)
 })
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax = 80;
+export const updateWithdrawalMethodBodyVersionMax = 40;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max = 120;
+export const updateWithdrawalMethodBodyMethodNameMax = 80;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max = 120;
+export const updateWithdrawalMethodBodyMethodProcessingTimeMax = 100;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax = 60;
+export const updateWithdrawalMethodBodyMethodInstructionsMax = 2000;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax = 60;
+export const updateWithdrawalMethodBodyMethodPhotoUrlMax = 1000;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax = 20;
+export const updateWithdrawalMethodBodyMethodFormTitleMax = 100;
 
-export const removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax = 60;
+export const updateWithdrawalMethodBodyMethodFieldsItemIdMax = 40;
 
-export const removePayoutDestinationResponseMoneyTreasuryOneChannelsMax = 10;
+export const updateWithdrawalMethodBodyMethodFieldsItemLabelMax = 100;
+
+export const updateWithdrawalMethodBodyMethodFieldsItemPlaceholderMax = 200;
+
+export const updateWithdrawalMethodBodyMethodFieldsItemHelpMax = 300;
+
+export const updateWithdrawalMethodBodyMethodFieldsItemOptionsItemMax = 100;
+
+export const updateWithdrawalMethodBodyMethodFieldsItemOptionsMax = 30;
+
+export const updateWithdrawalMethodBodyMethodFieldsMax = 20;
 
 
 
-export const RemovePayoutDestinationResponse = zod.object({
-  "money": zod.object({
-  "transactions": zod.array(zod.object({
-  "id": zod.string(),
-  "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
-  "description": zod.string(),
-  "amount": zod.number().describe('Signed; credits positive, debits negative'),
-  "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
-  "createdAt": zod.string(),
-  "method": zod.string().optional(),
-  "fee": zod.number().optional(),
-  "destination": zod.string().optional(),
-  "reference": zod.string().optional(),
-  "processedAt": zod.string().optional(),
-  "processedBy": zod.string().optional(),
-  "failureReason": zod.string().optional(),
-  "dualControl": zod.boolean().optional(),
-  "releaseApproval": zod.object({
-  "by": zod.string(),
-  "at": zod.string(),
-  "byId": zod.string().optional()
-}).optional(),
-  "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
-})),
-  "cards": zod.object({
-  "virtual": zod.object({
-  "lastFour": zod.string(),
-  "dailyLimit": zod.number(),
-  "frozen": zod.boolean(),
-  "createdAt": zod.string().optional(),
-  "createdBy": zod.string().optional(),
-  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
-  "frozenReason": zod.string().optional(),
-  "pin": zod.string().describe('Fictional; no card provider is connected')
-}).nullable(),
-  "physical": zod.object({
-  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
-  "dailyLimit": zod.number(),
-  "lastFour": zod.string().optional(),
-  "frozen": zod.boolean().optional(),
-  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
-  "frozenReason": zod.string().optional(),
-  "shippingAddress": zod.object({
-  "name": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressNameMax),
-  "line1": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine1Max),
-  "line2": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressLine2Max).optional(),
-  "city": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCityMax),
-  "region": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressRegionMax).optional(),
-  "postalCode": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressPostalCodeMax),
-  "country": zod.string().max(removePayoutDestinationResponseMoneyCardsPhysicalShippingAddressCountryMax)
-}).optional(),
-  "requestedAt": zod.string().optional(),
-  "feeTxId": zod.string().optional(),
-  "issuedBy": zod.string().optional(),
-  "shippedAt": zod.string().optional(),
-  "shippedBy": zod.string().optional(),
-  "trackingRef": zod.string().optional(),
-  "shippingMessage": zod.string().optional(),
-  "activatedAt": zod.string().optional(),
-  "declinedAt": zod.string().optional(),
-  "declinedBy": zod.string().optional(),
-  "declineReason": zod.string().optional(),
-  "cancelledAt": zod.string().optional(),
-  "cancelledBy": zod.string().optional(),
-  "cancelReason": zod.string().optional()
-})
-}),
-  "payoutDestinations": zod.record(zod.string(), zod.string()),
-  "destinationChangedAt": zod.string().optional(),
-  "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
+export const UpdateWithdrawalMethodBody = zod.object({
+  "version": zod.string().max(updateWithdrawalMethodBodyVersionMax),
+  "method": zod.object({
+  "name": zod.string().max(updateWithdrawalMethodBodyMethodNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
   "min": zod.number(),
   "max": zod.number(),
-  "feeRate": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
   "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(removePayoutDestinationResponseMoneyTreasuryOneChannelsMax),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(updateWithdrawalMethodBodyMethodProcessingTimeMax),
+  "instructions": zod.string().max(updateWithdrawalMethodBodyMethodInstructionsMax),
+  "photoUrl": zod.string().max(updateWithdrawalMethodBodyMethodPhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(updateWithdrawalMethodBodyMethodFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(updateWithdrawalMethodBodyMethodFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(updateWithdrawalMethodBodyMethodFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(updateWithdrawalMethodBodyMethodFieldsItemPlaceholderMax),
+  "help": zod.string().max(updateWithdrawalMethodBodyMethodFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(updateWithdrawalMethodBodyMethodFieldsItemOptionsItemMax)).max(updateWithdrawalMethodBodyMethodFieldsItemOptionsMax)
+})).max(updateWithdrawalMethodBodyMethodFieldsMax)
+})
+})
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const UpdateWithdrawalMethodResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -4993,7 +6089,43 @@ export const RemovePayoutDestinationResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -5008,8 +6140,490 @@ export const RemovePayoutDestinationResponse = zod.object({
 }).nullable()
 }),
   "message": zod.string(),
-  "id": zod.string().optional().describe('The ledger entry the action created or changed, if any')
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
 })
+
+
+/**
+ * Requires treasury.manage.
+ * @summary Show or hide a withdrawal method for users
+ */
+export const setWithdrawalMethodAvailabilityPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const SetWithdrawalMethodAvailabilityParams = zod.object({
+  "methodId": zod.coerce.string().regex(setWithdrawalMethodAvailabilityPathMethodIdRegExp)
+})
+
+export const SetWithdrawalMethodAvailabilityBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const SetWithdrawalMethodAvailabilityResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
+}).and(zod.object({
+  "id": zod.string().regex(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
+})
+
+
+/**
+ * Requires treasury.manage. Pending requests keep the method's name, charges, and answers, so they can still be processed. An uploaded photo is deleted.
+ * @summary Delete a withdrawal method
+ */
+export const deleteWithdrawalMethodPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const DeleteWithdrawalMethodParams = zod.object({
+  "methodId": zod.coerce.string().regex(deleteWithdrawalMethodPathMethodIdRegExp)
+})
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const DeleteWithdrawalMethodResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
+}).and(zod.object({
+  "id": zod.string().regex(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
+})
+
+
+/**
+ * Requires treasury.manage. The raw image is the body (JPEG, PNG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces a previous upload or link.
+ * @summary Upload a withdrawal method's photo
+ */
+export const uploadWithdrawalMethodPhotoPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const UploadWithdrawalMethodPhotoParams = zod.object({
+  "methodId": zod.coerce.string().regex(uploadWithdrawalMethodPhotoPathMethodIdRegExp)
+})
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const UploadWithdrawalMethodPhotoResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
+}).and(zod.object({
+  "id": zod.string().regex(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
+})
+
+
+/**
+ * Requires treasury.manage. Users see the method's first letter instead.
+ * @summary Remove a withdrawal method's photo
+ */
+export const removeWithdrawalMethodPhotoPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const RemoveWithdrawalMethodPhotoParams = zod.object({
+  "methodId": zod.coerce.string().regex(removeWithdrawalMethodPhotoPathMethodIdRegExp)
+})
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
+
+
+
+export const RemoveWithdrawalMethodPhotoResponse = zod.object({
+  "settings": zod.object({
+  "treasury": zod.object({
+  "physicalCardFee": zod.number(),
+  "cardDeliveryFee": zod.number(),
+  "minDeposit": zod.number(),
+  "maxDeposit": zod.number(),
+  "depositThreshold": zod.number(),
+  "highValueDeposit": zod.number(),
+  "dualControlThreshold": zod.number(),
+  "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
+}).and(zod.object({
+  "id": zod.string().regex(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
+  "updatedAt": zod.string(),
+  "changeLog": zod.array(zod.object({
+  "at": zod.string(),
+  "by": zod.string(),
+  "summary": zod.string()
+})).describe('Staff only; empty for applicants')
+})),
+  "lockdown": zod.object({
+  "since": zod.string(),
+  "by": zod.string(),
+  "reason": zod.string()
+}).nullable()
+}),
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
+})
+
+
+/**
+ * Public (method logos aren't private), so pages can use it in an image tag. Checked against the SHA-256 recorded at upload.
+ * @summary A withdrawal method's uploaded photo
+ */
+export const getWithdrawalMethodPhotoPathMethodIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+
+
+export const GetWithdrawalMethodPhotoParams = zod.object({
+  "methodId": zod.coerce.string().regex(getWithdrawalMethodPhotoPathMethodIdRegExp)
+})
+
+export const GetWithdrawalMethodPhotoResponse = zod.unknown()
 
 
 /**
@@ -5039,7 +6653,13 @@ export const GetLedgerResponseItem = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 })
 export const GetLedgerResponse = zod.array(GetLedgerResponseItem)
 
@@ -5048,22 +6668,47 @@ export const GetLedgerResponse = zod.array(GetLedgerResponseItem)
  * Any active staff member.
  * @summary Money settings and lockdown
  */
-export const getMoneySettingsResponseTreasuryOneChannelsMax = 10;
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
 export const GetMoneySettingsResponse = zod.object({
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(getMoneySettingsResponseTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -5072,7 +6717,43 @@ export const GetMoneySettingsResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(getMoneySettingsResponseTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(getMoneySettingsResponseTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(getMoneySettingsResponseTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -5094,23 +6775,11 @@ export const GetMoneySettingsResponse = zod.object({
  */
 export const updateMoneySettingsBodyVersionMax = 40;
 
-export const updateMoneySettingsBodyTreasuryChannelsMax = 10;
-
 
 
 export const UpdateMoneySettingsBody = zod.object({
   "version": zod.string().max(updateMoneySettingsBodyVersionMax),
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(updateMoneySettingsBodyTreasuryChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -5119,26 +6788,51 @@ export const UpdateMoneySettingsBody = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
-})
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints')
 })
 
-export const updateMoneySettingsResponseSettingsTreasuryOneChannelsMax = 10;
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
 export const UpdateMoneySettingsResponse = zod.object({
   "settings": zod.object({
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(updateMoneySettingsResponseSettingsTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -5147,7 +6841,43 @@ export const UpdateMoneySettingsResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -5161,7 +6891,8 @@ export const UpdateMoneySettingsResponse = zod.object({
   "reason": zod.string()
 }).nullable()
 }),
-  "message": zod.string()
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
 })
 
 
@@ -5177,23 +6908,48 @@ export const StartLockdownBody = zod.object({
   "reason": zod.string().max(startLockdownBodyReasonMax)
 })
 
-export const startLockdownResponseSettingsTreasuryOneChannelsMax = 10;
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
 export const StartLockdownResponse = zod.object({
   "settings": zod.object({
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(startLockdownResponseSettingsTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -5202,7 +6958,43 @@ export const StartLockdownResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(startLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -5216,7 +7008,8 @@ export const StartLockdownResponse = zod.object({
   "reason": zod.string()
 }).nullable()
 }),
-  "message": zod.string()
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
 })
 
 
@@ -5224,23 +7017,48 @@ export const StartLockdownResponse = zod.object({
  * Requires security.lockdown.
  * @summary End the lockdown
  */
-export const endLockdownResponseSettingsTreasuryOneChannelsMax = 10;
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax = 80;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax = 2000;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax = 1000;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax = 40;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax = 200;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax = 300;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax = 30;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsMax = 20;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp = new RegExp('^[a-z0-9-]{1,40}$');
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax = 40;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax = 200;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax = 300;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax = 100;
+
+export const endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax = 30;
 
 
 
 export const EndLockdownResponse = zod.object({
   "settings": zod.object({
   "treasury": zod.object({
-  "channels": zod.array(zod.object({
-  "id": zod.enum(['bank', 'wire', 'mobile', 'crypto']),
-  "name": zod.string(),
-  "enabled": zod.boolean(),
-  "min": zod.number(),
-  "max": zod.number(),
-  "feeRate": zod.number(),
-  "feeFixed": zod.number(),
-  "feeCap": zod.number()
-})).max(endLockdownResponseSettingsTreasuryOneChannelsMax),
   "physicalCardFee": zod.number(),
   "cardDeliveryFee": zod.number(),
   "minDeposit": zod.number(),
@@ -5249,7 +7067,43 @@ export const EndLockdownResponse = zod.object({
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
   "applicationFee": zod.number()
+}).describe('Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints').and(zod.object({
+  "channels": zod.array(zod.object({
+  "name": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax),
+  "enabled": zod.boolean().describe('Shown to users on the withdrawal page'),
+  "min": zod.number(),
+  "max": zod.number(),
+  "feeRate": zod.number().describe('0-0.1 (a fraction of the amount)'),
+  "feeFixed": zod.number(),
+  "feeCap": zod.number().describe('The most a request is charged; 0 for no maximum'),
+  "processingTime": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneProcessingTimeMax),
+  "instructions": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneInstructionsMax),
+  "photoUrl": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOnePhotoUrlMax).describe('An https link, the method\'s current uploaded-photo path unchanged, or empty for the first-letter badge'),
+  "source": zod.enum(['grant', 'deposit', 'both']),
+  "formTitle": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFormTitleMax),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemIdMax).optional().describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemPlaceholderMax),
+  "help": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemHelpMax),
+  "options": zod.array(zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsItemMax)).max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsItemOptionsMax)
+})).max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneFieldsMax)
 }).and(zod.object({
+  "id": zod.string().regex(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoIdRegExp).describe('A withdrawal method\'s id (the built-in methods are bank, wire, mobile, crypto)'),
+  "fields": zod.array(zod.object({
+  "id": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneIdMax).describe('Omitted for a new field; kept on edits so remembered answers still match'),
+  "label": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneLabelMax),
+  "type": zod.enum(['text', 'textarea', 'email', 'number', 'select']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOnePlaceholderMax),
+  "help": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneHelpMax),
+  "options": zod.array(zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsItemMax)).max(endLockdownResponseSettingsTreasuryTwoChannelsItemTwoFieldsItemOneOptionsMax)
+}).and(zod.object({
+  "id": zod.string()
+})))
+}))).describe('Withdrawal methods; applicants get only the available ones'),
   "updatedAt": zod.string(),
   "changeLog": zod.array(zod.object({
   "at": zod.string(),
@@ -5263,7 +7117,8 @@ export const EndLockdownResponse = zod.object({
   "reason": zod.string()
 }).nullable()
 }),
-  "message": zod.string()
+  "message": zod.string(),
+  "id": zod.string().optional().describe('The withdrawal method the action created or changed, if any')
 })
 
 
@@ -5302,7 +7157,13 @@ export const ConfirmDepositResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 }),
   "message": zod.string()
 })
@@ -5351,7 +7212,13 @@ export const RejectDepositResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 }),
   "message": zod.string()
 })
@@ -5392,7 +7259,13 @@ export const ApprovePayoutReleaseResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 }),
   "message": zod.string()
 })
@@ -5433,7 +7306,13 @@ export const MarkPayoutPaidResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 }),
   "message": zod.string()
 })
@@ -5482,7 +7361,13 @@ export const MarkPayoutFailedResponse = zod.object({
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
   "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
-  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional(),
+  "source": zod.enum(['grant', 'deposit']).optional(),
+  "payoutDetails": zod.array(zod.object({
+  "fieldId": zod.string(),
+  "label": zod.string(),
+  "value": zod.string()
+})).optional().describe('Withdrawals - the method\'s form as the applicant filled it in')
 }),
   "message": zod.string()
 })

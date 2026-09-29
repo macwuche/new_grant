@@ -17,8 +17,11 @@ export type NewAudit = {
   at: string; staffId: string; staffName: string; role: string; action: string; target: string;
   applicantId: string | null; summary: string; changes: AuditChange[]; riskScore: number | null; ip: string | null;
 };
-/** `emails`: messages besides notification copies (which are derived from `notifications` when stored). */
-export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffEvent[]; audit: NewAudit[]; emails?: NewEmail[] };
+/** One entry in an account's security activity (see ./securityEvents.ts); device, IP, and location are null while activity logging is off. */
+export type NewSecurityEvent = { userId: string; kind: SecurityEventKind; device: string | null; ip: string | null; location: string | null; at: string };
+export type SecurityEventKind = "sign_in" | "new_device_sign_in" | "password_changed" | "failed_password_check" | "email_change_requested" | "email_changed" | "two_step_on" | "two_step_off" | "signed_out_others";
+/** `emails`: messages besides notification copies (which are derived from `notifications` when stored). `security`: security activity entries. */
+export type Effects = { notifications: NewNotification[]; staffEvents: NewStaffEvent[]; audit: NewAudit[]; emails?: NewEmail[]; security?: NewSecurityEvent[] };
 
 /** Who a notification's email copy goes to; null or opted out means no email. */
 export type EmailRecipient = { email: string; name: string; emailNotifications: boolean };
@@ -79,6 +82,9 @@ export function auditHash(prevHash: string, e: NewAudit): string {
 // ---------- Reading ----------
 
 export type NotificationRecord = { id: string; at: string; title: string; body: string; href: string; read: boolean };
+export type SecurityEventRecord = Omit<NewSecurityEvent, "userId"> & { id: string };
+/** How many security events the profile shows. */
+export const SECURITY_EVENT_LIMIT = 50;
 export type StaffEventRecord = NewStaffEvent & { id: string; read: boolean };
 export type AuditRecord = NewAudit & { id: string };
 export type ChainCheck = { intact: boolean; checked: number; brokenAt?: string };
@@ -94,6 +100,10 @@ export interface ActivityRepo {
   /** Newest first. */
   audit(): Promise<AuditRecord[]>;
   verifyAudit(): Promise<ChainCheck>;
+  /** The account's security activity, newest first (at most SECURITY_EVENT_LIMIT). */
+  securityEvents(userId: string): Promise<SecurityEventRecord[]>;
+  /** Stores security events that don't accompany another change. */
+  recordSecurity(events: NewSecurityEvent[]): Promise<void>;
 }
 
 /** Walks entries oldest first and checks each link of the hash chain. */
@@ -114,9 +124,14 @@ export function memoryActivity(email?: { outbox: { enqueue(emails: NewEmail[]): 
   const events: (NewStaffEvent & { seq: number })[] = [];
   const reads = new Set<string>();
   const audit: { seq: number; entry: NewAudit; prevHash: string; hash: string }[] = [];
+  const security: (NewSecurityEvent & { seq: number })[] = [];
   let seq = 0;
+  const write = (effects: Effects) => {
+    for (const e of effects.security ?? []) security.push({ ...e, seq: ++seq });
+  };
   return {
     write: effects => {
+      write(effects);
       if (email) email.outbox.enqueue(emailsFor(effects, email.recipient, "https://app.example.org"));
       for (const { email: _email, ...n } of effects.notifications) notifications.push({ ...n, seq: ++seq, read: false });
       for (const e of effects.staffEvents) events.push({ ...e, seq: ++seq });
@@ -136,5 +151,8 @@ export function memoryActivity(email?: { outbox: { enqueue(emails: NewEmail[]): 
     markAllStaffEventsRead: async staffId => { let count = 0; for (const e of events) { const k = `${staffId}:${e.seq}`; if (!reads.has(k)) { reads.add(k); count++; } } return count; },
     audit: async () => [...audit].reverse().map(a => ({ ...a.entry, id: `AU-${a.seq}` })),
     verifyAudit: async () => checkChain(audit.map(a => ({ id: `AU-${a.seq}`, entry: a.entry, prevHash: a.prevHash, hash: a.hash }))),
+    securityEvents: async userId => security.filter(e => e.userId === userId).sort((a, b) => b.at.localeCompare(a.at) || b.seq - a.seq).slice(0, SECURITY_EVENT_LIMIT)
+      .map(({ seq: s, userId: _u, ...e }) => ({ ...e, id: `SE-${s}` })),
+    recordSecurity: async events => { write({ ...NO_EFFECTS, security: events }); },
   };
 }

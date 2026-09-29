@@ -1,6 +1,7 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, ledgerEntriesTable, ledgerNumberSeq, systemSettingsTable, type LedgerRow, type TreasuryJson } from "@workspace/db";
-import type { Lockdown, Transaction, Treasury } from "@workspace/domain/model";
+import type { Lockdown, SavedPayoutDetails, Transaction, Treasury } from "@workspace/domain/model";
+import { normalizeMethod } from "@workspace/domain/withdrawalMethods";
 import { seedTreasury } from "@workspace/domain/seed";
 import { writeEffects } from "./activity.db";
 import { newCards, type MoneyProfile, type MoneyRepo, type SystemSettings } from "./moneyRepo";
@@ -10,13 +11,18 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const SETTINGS_ID = 1;
 
-// jsonb doesn't keep key order; rebuild settings in the domain's order.
+// jsonb doesn't keep key order; rebuild settings in the domain's order. Methods saved before
+// 29 Sep 2026 (fixed channels) get the method fields they lack (normalizeMethod).
 const toTreasury = (t: TreasuryJson): Treasury => ({
-  channels: t.channels.map(c => ({ id: c.id, name: c.name, enabled: c.enabled, min: c.min, max: c.max, feeRate: c.feeRate, feeFixed: c.feeFixed, feeCap: c.feeCap })),
+  channels: t.channels.map(c => normalizeMethod(c as Parameters<typeof normalizeMethod>[0])),
   physicalCardFee: t.physicalCardFee, cardDeliveryFee: t.cardDeliveryFee, minDeposit: t.minDeposit, maxDeposit: t.maxDeposit,
   depositThreshold: t.depositThreshold, highValueDeposit: t.highValueDeposit, dualControlThreshold: t.dualControlThreshold,
   applicationFee: t.applicationFee, updatedAt: t.updatedAt, changeLog: t.changeLog.map(c => ({ at: c.at, by: c.by, summary: c.summary })),
 });
+/** Remembered payout answers; older rows hold masked labels (strings), which can't pre-fill a form and are dropped. */
+const toSavedDetails = (raw: Record<string, Record<string, string> | string>): SavedPayoutDetails =>
+  Object.fromEntries(Object.entries(raw ?? {}).filter((e): e is [string, Record<string, string>] => !!e[1] && typeof e[1] === "object")
+    .map(([method, answers]) => [method, Object.fromEntries(Object.entries(answers).filter(([, v]) => typeof v === "string"))]));
 const toLockdown = (l: Lockdown | null): Lockdown | null => l ? { since: l.since, by: l.by, reason: l.reason } : null;
 
 /** A ledger row as the domain's Transaction: optional fields are omitted, not null. */
@@ -35,6 +41,8 @@ export const toTransaction = (r: LedgerRow): Transaction => ({
   ...(r.counterpart !== null ? { counterpart: r.counterpart } : {}),
   ...(r.note !== null ? { note: r.note } : {}),
   ...(r.category !== null ? { category: r.category } : {}),
+  ...(r.source !== null ? { source: r.source } : {}),
+  ...(r.payoutDetails ? { payoutDetails: r.payoutDetails.map(d => ({ fieldId: d.fieldId, label: d.label, value: d.value })) } : {}),
 });
 
 const toRow = (t: Transaction) => ({
@@ -43,6 +51,7 @@ const toRow = (t: Transaction) => ({
   reference: t.reference ?? null, processedAt: t.processedAt ? new Date(t.processedAt) : null, processedBy: t.processedBy ?? null,
   failureReason: t.failureReason ?? null, dualControl: t.dualControl ?? null, releaseApproval: t.releaseApproval ?? null,
   counterpart: t.counterpart ?? null, note: t.note ?? null, category: t.category ?? null,
+  source: t.source ?? null, payoutDetails: t.payoutDetails ?? null,
 });
 
 export async function saveTransaction(tx: Tx, t: Transaction) {
@@ -86,13 +95,13 @@ export const dbMoneyRepo: MoneyRepo = {
       cards = newCards();
       await tx.update(applicantProfilesTable).set({ cards }).where(eq(applicantProfilesTable.authUserId, applicantId));
     }
-    const money: MoneyProfile = { cards, payoutDestinations: row.payoutDestinations, ...(row.destinationChangedAt ? { destinationChangedAt: row.destinationChangedAt.toISOString() } : {}) };
+    const money: MoneyProfile = { cards, savedPayoutDetails: toSavedDetails(row.payoutDestinations), ...(row.destinationChangedAt ? { destinationChangedAt: row.destinationChangedAt.toISOString() } : {}) };
     return fn({
       ...(await readSettings(tx)), applicant: toProfileRecord(row), money, transactions: await ledgerIn(tx, applicantId),
       saveTransaction: t => saveTransaction(tx, t),
       saveMoney: async m => {
         await tx.update(applicantProfilesTable).set({
-          cards: m.cards, payoutDestinations: m.payoutDestinations, destinationChangedAt: m.destinationChangedAt ? new Date(m.destinationChangedAt) : null,
+          cards: m.cards, payoutDestinations: m.savedPayoutDetails, destinationChangedAt: m.destinationChangedAt ? new Date(m.destinationChangedAt) : null,
         }).where(eq(applicantProfilesTable.authUserId, applicantId));
       },
       record: effects => writeEffects(tx, effects),
@@ -115,7 +124,7 @@ export const dbMoneyRepo: MoneyRepo = {
     const [row] = await db.select({ cards: applicantProfilesTable.cards, payoutDestinations: applicantProfilesTable.payoutDestinations, destinationChangedAt: applicantProfilesTable.destinationChangedAt })
       .from(applicantProfilesTable).where(eq(applicantProfilesTable.authUserId, applicantId));
     if (!row?.cards) return null;
-    return { cards: row.cards, payoutDestinations: row.payoutDestinations, ...(row.destinationChangedAt ? { destinationChangedAt: row.destinationChangedAt.toISOString() } : {}) };
+    return { cards: row.cards, savedPayoutDetails: toSavedDetails(row.payoutDestinations), ...(row.destinationChangedAt ? { destinationChangedAt: row.destinationChangedAt.toISOString() } : {}) };
   },
   findTransaction: async id => { const [row] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, id)); return row ? toTransaction(row) : null; },
   cardHolders: async () => {

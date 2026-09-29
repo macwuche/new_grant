@@ -9,6 +9,7 @@ import { applicantProfilesTable } from "./applicants";
 // stored. Row-level security is on with no policies (see ./staff.ts).
 
 export type ReleaseApprovalJson = { by: string; byId?: string; at: string };
+export type PayoutDetailJson = { fieldId: string; label: string; value: string };
 
 export const ledgerEntriesTable = pgTable("ledger_entries", {
   id: text("id").primaryKey(),
@@ -34,6 +35,10 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   note: text("note"),
   /** Staff balance adjustments: why (Grant adjustment, Deposit manual override, Card fee refund, Correction, Fraud freeze). */
   category: text("category").$type<"Grant adjustment" | "Deposit manual override" | "Card fee refund" | "Correction" | "Fraud freeze">(),
+  /** Withdrawals: the balance the money comes from (null on older rows: the grant balance). */
+  source: text("source").$type<"grant" | "deposit">(),
+  /** Withdrawals: the method's form as the applicant filled it in (full values; finance pays from them). */
+  payoutDetails: jsonb("payout_details").$type<PayoutDetailJson[]>(),
 }, t => [index("ledger_applicant_idx").on(t.applicantId), index("ledger_type_status_idx").on(t.type, t.status)]).enableRLS();
 
 /**
@@ -42,8 +47,16 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
  */
 export const ledgerNumberSeq = pgSequence("ledger_number_seq", { startWith: 100000, increment: 10 });
 
+/** A withdrawal method as stored. Rows saved before 29 Sep 2026 have only the first eight keys; the API fills in the rest. */
+export type WithdrawalMethodJson = {
+  id: string; name: string; enabled: boolean; min: number; max: number; feeRate: number; feeFixed: number; feeCap: number;
+  processingTime?: string; instructions?: string; photoUrl?: string; photoFile?: { key: string; contentType: string; sha256: string };
+  source?: "grant" | "deposit" | "both"; formTitle?: string;
+  fields?: { id: string; label: string; type: "text" | "textarea" | "email" | "number" | "select"; required: boolean; placeholder: string; help: string; options: string[] }[];
+};
+
 export type TreasuryJson = {
-  channels: { id: "bank" | "wire" | "mobile" | "crypto"; name: string; enabled: boolean; min: number; max: number; feeRate: number; feeFixed: number; feeCap: number }[];
+  channels: WithdrawalMethodJson[];
   physicalCardFee: number; cardDeliveryFee: number; minDeposit: number; maxDeposit: number; depositThreshold: number;
   highValueDeposit: number; dualControlThreshold: number; applicationFee: number;
   updatedAt: string; changeLog: { at: string; by: string; summary: string }[];

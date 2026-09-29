@@ -1,11 +1,12 @@
 import type { ComponentType } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, ArrowRight, Banknote, ClipboardList, FileText, Info, Mail, Palette, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Banknote, ClipboardList, FileText, Info, Mail, Palette, ShieldCheck, Users, WalletCards, type LucideIcon } from 'lucide-react';
 import { useAppName } from '@/lib/appName';
 import { useSession } from '@/lib/session';
 import { useDemoStore } from '@/lib/store';
 import { AdminEmailSettings } from './AdminEmailSettings';
 import { AdminTreasurySettings } from './AdminTreasurySettings';
+import { AdminWithdrawalMethods } from './AdminWithdrawalMethods';
 import { AdminTeamServer, AdminTeamSettings } from './AdminStaff';
 import { AppNameSettings } from './AppNameSettings';
 import { BrandColorSettings } from './BrandColorSettings';
@@ -35,8 +36,12 @@ function TeamPage() { return useSignedIn() ? <AdminTeamServer /> : <AdminTeamSet
 function BrandingPage() { return <><AppNameSettings /><BrandColorSettings /></>; }
 
 function MoneyStatus() {
+  const { depositThreshold } = useDemoStore().state.treasury;
+  return <>Reserve ${depositThreshold.toLocaleString('en-US')} · card and application fees</>;
+}
+function MethodsStatus() {
   const { channels } = useDemoStore().state.treasury;
-  return <>{channels.filter(c => c.enabled).length} of {channels.length} payout channels on</>;
+  return <>{channels.filter(c => c.enabled).length} of {channels.length} available to users</>;
 }
 function BrandingStatus() { return <>Name: {useAppName().name}</>; }
 function AppInfoStatus() { return <>{useSignedIn() ? 'Signed in · server records' : 'Preview · this browser only'}</>; }
@@ -68,7 +73,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'email', title: 'Email', icon: Mail, access: 'Super admin', Status: EmailStatus, Page: EmailPage,
     description: 'Resend connection, sender and team mailbox, sending domain and DNS, webhook, sign-up verification, and delivery status.' },
   { id: 'money', title: 'Money', icon: Banknote, access: 'Finance', Status: MoneyStatus, Page: AdminTreasurySettings,
-    description: 'Payout channels with their limits and fees, card fees, deposit limits and reserve, the two-person threshold, and the application fee.' },
+    description: 'Card fees, deposit limits and reserve, the two-person threshold, and the application fee.' },
+  { id: 'withdrawal-methods', title: 'Withdrawal methods', icon: WalletCards, access: 'Finance', Status: MethodsStatus, Page: AdminWithdrawalMethods,
+    description: 'How users are paid out: each method\'s photo, limits, charges, processing time, instructions, balance, and the form users fill in.' },
   { id: 'team', title: 'Team & roles', icon: Users, access: 'Super admin', Page: TeamPage,
     description: 'Who is on the grant team, their roles, and what each role can do.' },
   { id: 'branding', title: 'App branding', icon: Palette, access: 'Super admin', Status: BrandingStatus, Page: BrandingPage,

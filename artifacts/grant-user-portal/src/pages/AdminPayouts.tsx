@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Info, Search } from 'lucide-react';
+import { ArrowRight, Check, Copy, Info, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { applicantName } from '@workspace/domain/review';
 import { approvePayoutRelease, markPayoutFailed, markPayoutPaid, MIN_FAILURE_REASON_LENGTH, needsSecondSignOff, payoutAmounts, payoutQueue, pendingPayoutTotal } from '@workspace/domain/payouts';
@@ -7,7 +7,8 @@ import { actingStaff } from '@workspace/domain/staff';
 import * as api from '@workspace/api-client-react';
 import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
-import type { Result, Transaction } from '@workspace/domain/model';
+import type { PayoutDetail, Result, Transaction } from '@workspace/domain/model';
+import { BALANCE_LABELS } from '@workspace/domain/withdrawalMethods';
 import { ReviewFrame } from './AdminReviewPanel';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
 
@@ -16,6 +17,23 @@ const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
 const day = (iso: string) => format(new Date(iso), 'dd MMM yyyy');
 /** Finance wording for ledger statuses. */
 const label = (tx: Transaction) => tx.status === 'Completed' ? 'Paid' : tx.status;
+const balanceOf = (tx: Transaction) => BALANCE_LABELS[tx.source ?? 'grant'];
+
+/** The applicant's answers to the method's form, as finance needs them to send the money. */
+function PayoutDetails({ details }: { details: PayoutDetail[] }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async (d: PayoutDetail) => {
+    try { await navigator.clipboard.writeText(d.value); setCopied(d.fieldId); setTimeout(() => setCopied(c => c === d.fieldId ? null : c), 1500); } catch { setCopied(null); }
+  };
+  return <section className="admin-review-section" aria-label="Payout details" data-testid="panel-admin-payout-details">
+    <h3>Payout details</h3>
+    <p className="admin-review-hint">As the applicant entered them for this request.</p>
+    <dl className="admin-detail-fields">{details.map(d => <div key={d.fieldId} data-testid={`row-admin-payout-detail-${d.fieldId}`}><dt>{d.label}</dt>
+      <dd style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between', overflowWrap: 'anywhere' }}><span>{d.value}</span>
+        <button type="button" className="admin-btn" style={{ minHeight: 28, padding: '0 10px', flex: '0 0 auto' }} onClick={() => void copy(d)} aria-label={`Copy ${d.label}`} data-testid={`button-admin-copy-detail-${d.fieldId}`}>{copied === d.fieldId ? <Check size={13} /> : <Copy size={13} />}</button></dd></div>)}</dl>
+  </section>;
+}
+
 const badgeClass = (tx: Transaction) => `admin-badge ${tx.status === 'Completed' ? 'approved' : tx.status === 'Failed' ? 'declined' : tx.status === 'Cancelled' ? 'draft' : 'submitted'}`;
 
 export function AdminPayouts() {
@@ -32,7 +50,7 @@ export function AdminPayouts() {
   return <>
     <div className="admin-overview-metrics">
       <div className="admin-metric featured" data-testid="metric-admin-payouts-pending"><span className="admin-metric-label">Waiting to be paid</span><strong className="admin-metric-value">{String(pending.length).padStart(2, '0')}</strong><span className="admin-metric-foot">Oldest request first</span></div>
-      <div className="admin-metric" data-testid="metric-admin-payouts-held"><span className="admin-metric-label">Held for pending payouts</span><strong className="admin-metric-value">{usd(pendingPayoutTotal(state))}</strong><span className="admin-metric-foot">Deducted from grant balances</span></div>
+      <div className="admin-metric" data-testid="metric-admin-payouts-held"><span className="admin-metric-label">Held for pending payouts</span><strong className="admin-metric-value">{usd(pendingPayoutTotal(state))}</strong><span className="admin-metric-foot">Held from the balance each came from</span></div>
       <div className="admin-metric" data-testid="metric-admin-payouts-paid"><span className="admin-metric-label">Marked paid</span><strong className="admin-metric-value">{usd(paidTotal)}</strong><span className="admin-metric-foot">Net of fees</span></div>
       <div className="admin-metric" data-testid="metric-admin-payouts-failed"><span className="admin-metric-label">Failed</span><strong className="admin-metric-value">{String(queue.filter(t => t.status === 'Failed').length).padStart(2, '0')}</strong><span className="admin-metric-foot">Funds returned to applicants</span></div>
     </div>
@@ -98,8 +116,9 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
     <p className="admin-detail-lead">{applicantName(state, tx.applicantId)} · requested {when(tx.createdAt)}</p>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-payout-flash">{flash.text}</div>}
     <dl className="admin-detail-fields">
-      {[['Destination', tx.destination ?? tx.description], ['Requested amount', usd(amounts.gross)], ['Processing fee', usd(amounts.fee)], ['Applicant receives', usd(amounts.net)], ...(tx.processedAt ? [[tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', `${when(tx.processedAt)} by ${tx.status === 'Cancelled' ? 'the applicant' : tx.processedBy ?? 'finance'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      {[['Destination', tx.destination ?? tx.description], ['Paid from', balanceOf(tx)], ['Requested amount', usd(amounts.gross)], ['Processing fee', usd(amounts.fee)], ['Applicant receives', usd(amounts.net)], ...(tx.processedAt ? [[tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', `${when(tx.processedAt)} by ${tx.status === 'Cancelled' ? 'the applicant' : tx.processedBy ?? 'finance'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
     </dl>
+    {tx.payoutDetails?.length ? <PayoutDetails details={tx.payoutDetails} /> : null}
     <section className="admin-review-section admin-review-actions" aria-label="Process payout">
       <h3>Process</h3>
       {tx.status === 'Pending' ? <>
@@ -119,7 +138,7 @@ function PayoutPanel({ txId, onClose }: { txId: string; onClose: () => void }) {
           <button type="button" className={`admin-btn ${mode === 'failed' ? 'danger' : 'primary'}`} disabled={!can('payments.process') || (mode === 'paid' && (!!state.lockdown || (dual && (!tx.releaseApproval || me?.name === tx.releaseApproval.by))))} onClick={submit} data-testid="button-admin-submit-payout">{confirming ? (mode === 'paid' ? `Confirm: paid ${usd(amounts.net)}` : 'Confirm failure') : mode === 'paid' ? 'Mark as paid' : 'Mark as failed'}</button>
         </div>
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
-      </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Recorded as paid. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this request before it was processed. Do not send it.' : `Recorded as failed: ${tx.failureReason}. The amount was returned to the applicant's grant balance.`}</p>}
+      </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Recorded as paid. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this request before it was processed. Do not send it.' : `Recorded as failed: ${tx.failureReason}. The amount was returned to the applicant's ${balanceOf(tx).toLowerCase()}.`}</p>}
     </section>
     <div className="admin-detail-note"><Info size={17} /><span>{staffMoney.connected
       ? 'No payment provider is connected: send the money outside the app, then record it here. Results are saved on the server, role-checked, and audited; large payouts need two different people.'

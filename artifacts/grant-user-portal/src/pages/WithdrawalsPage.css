@@ -1,0 +1,32 @@
+/* Withdrawals (/withdrawals). Builds on the Add funds page's styles (DepositsPage.css). */
+.wd-method { align-items: flex-start; }
+.wd-method .dp-method-copy small.wd-method-facts { display: block; color: #475569; line-height: 1.45; }
+.wd-method .dp-radio { margin-top: 10px; }
+.wd-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
+.wd-sources legend { padding: 0; }
+.wd-source { display: flex; gap: 10px; align-items: flex-start; min-width: 0; padding: 12px 14px; border: 1.5px solid var(--dp-line); border-radius: 14px; cursor: pointer; }
+.wd-source.active { border-color: var(--dp-ink); background: #fbfdf4; }
+.wd-source:focus-within { outline: 3px solid rgba(198,244,50,.75); outline-offset: 2px; }
+.wd-source input { margin-top: 3px; accent-color: #111111; }
+.wd-source span { display: grid; gap: 2px; min-width: 0; }
+.wd-source strong { font-size: 13px; }
+.wd-source small { color: var(--dp-muted); font-size: 11.5px; }
+.wd-max { flex: 0 0 auto; }
+.wd-fees { margin-top: 16px; }
+.wd-form { display: grid; gap: 14px; min-width: 0; }
+.wd-instructions { margin-top: 0; }
+.wd-field { min-width: 0; }
+.wd-optional { color: var(--dp-muted); font-weight: 500; }
+.wd-input { width: 100%; min-height: 44px; padding: 10px 14px; border: 1.5px solid var(--dp-line); border-radius: 14px; background: #fafafa; color: var(--dp-ink); font: inherit; font-size: 13.5px; outline: none; transition: border-color .16s ease, box-shadow .16s ease; }
+textarea.wd-input { resize: vertical; }
+.wd-input:focus { border-color: #9dc41f; box-shadow: 0 0 0 3px rgba(198,244,50,.3); background: #fff; }
+.wd-input[aria-invalid="true"] { border-color: #ef4444; }
+.wd-answer { overflow-wrap: anywhere; text-align: right; }
+.wd-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.wd-empty { padding: 24px 12px; border: 1px dashed var(--dp-line); border-radius: 14px; }
+.wd-page .dp-review dd .method-badge { font-size: 10px; }
+@media (max-width: 760px) {
+  .wd-sources { grid-template-columns: minmax(0, 1fr); }
+  .wd-answer { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { .wd-input { transition: none; } }

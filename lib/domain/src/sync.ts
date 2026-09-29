@@ -1,4 +1,4 @@
-import type { AccountControls, Application, AuditEvent, CardsState, DemoState, Grant, Lockdown, Notification, PayoutDestinations, Profile, Result, StaffEvent, Transaction, Treasury } from './model';
+import type { AccountControls, Application, AuditEvent, CardsState, DemoState, Grant, Lockdown, Notification, Profile, Result, SavedPayoutDetails, StaffEvent, Transaction, Treasury } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 // Merging server records into the browser store. While only some data lives on
@@ -26,7 +26,9 @@ export function dropServerProgram(state: DemoState, id: string): Result {
 }
 
 /** The applicant profile as the API returns it. */
-export type ServerProfile = Pick<Profile, 'name' | 'email' | 'phone' | 'address' | 'sector' | 'country' | 'joined' | 'tier' | 'identityVerified'> & { birthDate?: string | null };
+export type ServerProfile = Pick<Profile, 'name' | 'email' | 'phone' | 'address' | 'sector' | 'country' | 'joined' | 'tier' | 'identityVerified'> & {
+  birthDate?: string | null; displayName?: string; telegram?: string; privacy?: Profile['privacy'];
+};
 /** Account controls as the API returns them (risk signals aren't collected yet). */
 export type ServerAccount = Omit<AccountControls, 'signals' | 'destinationChangedAt'>;
 export type ServerApplicant = { id: string; profile: ServerProfile; account: ServerAccount };
@@ -40,8 +42,13 @@ const withSignals = (account: ServerAccount, local?: AccountControls): AccountCo
  * preference is still only a browser setting.
  */
 export function adoptServerProfile(state: DemoState, server: ServerProfile, account?: ServerAccount): Result {
-  const { name, email, phone, address, sector, country, joined, tier, identityVerified } = server;
-  const profile = { ...state.profile, name, email, phone, address, sector, country, joined, tier, identityVerified };
+  const { name, email, phone, address, sector, country, joined, tier, identityVerified, birthDate, displayName, telegram, privacy } = server;
+  const profile: Profile = { ...state.profile, name, email, phone, address, sector, country, joined, tier, identityVerified };
+  // Profile-center fields, when the server sends them (older responses don't).
+  if (birthDate !== undefined) { if (birthDate) profile.birthDate = birthDate; else delete profile.birthDate; }
+  if (displayName !== undefined) profile.displayName = displayName;
+  if (telegram !== undefined) profile.telegram = telegram;
+  if (privacy) profile.privacy = { ...privacy };
   const accounts = account ? { ...state.accounts, [CURRENT_APPLICANT_ID]: withSignals(account, state.accounts[CURRENT_APPLICANT_ID]) } : state.accounts;
   if (same(profile, state.profile) && same(accounts, state.accounts)) return unchanged(state);
   return { ok: true, message: '', state: { ...state, profile, accounts } };
@@ -134,14 +141,14 @@ export function leaveServerActivity(state: DemoState): Result {
 }
 
 /** Money as the API returns it to an applicant (their own ledger, with their real account id). */
-export type ServerMoney = { transactions: Transaction[]; cards: CardsState; payoutDestinations: PayoutDestinations; destinationChangedAt?: string; treasury: Treasury; lockdown: Lockdown | null };
+export type ServerMoney = { transactions: Transaction[]; cards: CardsState; savedPayoutDetails: SavedPayoutDetails; destinationChangedAt?: string; treasury: Treasury; lockdown: Lockdown | null };
 
 /** Loads an applicant's own money from the API into the portal's current-applicant slot. */
 export function adoptServerMoney(state: DemoState, money: ServerMoney, ownId?: string): Result {
   const transactions = money.transactions.map(t => t.applicantId === ownId ? { ...t, applicantId: CURRENT_APPLICANT_ID } : t);
   const account = state.accounts[CURRENT_APPLICANT_ID];
   const accounts = account ? { ...state.accounts, [CURRENT_APPLICANT_ID]: { ...account, destinationChangedAt: money.destinationChangedAt } } : state.accounts;
-  const next = { ...state, transactions, cards: money.cards, payoutDestinations: money.payoutDestinations, accounts, treasury: money.treasury, lockdown: money.lockdown, serverMoney: true };
+  const next = { ...state, transactions, cards: money.cards, savedPayoutDetails: money.savedPayoutDetails ?? {}, accounts, treasury: money.treasury, lockdown: money.lockdown, serverMoney: true };
   if (state.serverMoney && same(next, state)) return unchanged(state);
   return { ok: true, message: '', state: next };
 }
@@ -167,7 +174,7 @@ export function adoptServerSettings(state: DemoState, settings: { treasury: Trea
 export function leaveServerMoney(state: DemoState): Result {
   if (!state.serverMoney) return unchanged(state);
   const seed = createSeedState();
-  return { ok: true, message: '', state: { ...state, transactions: seed.transactions, cards: seed.cards, payoutDestinations: seed.payoutDestinations, treasury: seed.treasury, lockdown: seed.lockdown, serverMoney: false } };
+  return { ok: true, message: '', state: { ...state, transactions: seed.transactions, cards: seed.cards, savedPayoutDetails: seed.savedPayoutDetails, treasury: seed.treasury, lockdown: seed.lockdown, serverMoney: false } };
 }
 
 /**
@@ -180,6 +187,6 @@ export function forStorage(state: DemoState): DemoState {
   if (stored.serverApplicants) stored = { ...stored, otherApplicants: [], accounts: { [CURRENT_APPLICANT_ID]: stored.accounts[CURRENT_APPLICANT_ID]! } };
   if (stored.serverApplications) stored = { ...stored, applications: [] };
   if (stored.serverActivity) stored = { ...stored, notifications: [], staffFeed: [], audit: [] };
-  if (stored.serverMoney) { const seed = createSeedState(); stored = { ...stored, transactions: [], cards: seed.cards, payoutDestinations: {} }; }
+  if (stored.serverMoney) { const seed = createSeedState(); stored = { ...stored, transactions: [], cards: seed.cards, savedPayoutDetails: {} }; }
   return stored;
 }

@@ -90,7 +90,7 @@ async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits
   inbox = memoryInboxRepo();
   providerCalls = []; providerReplies = {};
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, limits }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, limits, supabaseAuth: { url: "https://proj.supabase.co", anonKey: "anon-key" } }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -357,8 +357,9 @@ describe("applicant profile", () => {
   });
 
   it("saves valid edits, never the email, and reports invalid fields", async () => {
-    const bad = await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "M", phone: "12", address: "" }) });
+    const bad = await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "M", phone: "12", address: "x" }) });
     expect(bad.status).toBe(400);
+    // The address is optional since the profile center (29 Sep 2026), but a given one must be complete.
     expect(Object.keys((await json(bad)).fieldErrors).sort()).toEqual(["address", "name", "phone"]);
     const ok = await call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify({ name: "Maya O.", phone: "+44 20 7946 0001", address: "1 High Street, Leeds", email: "evil@example.com" }) });
     expect(ok.status).toBe(200);
@@ -721,7 +722,7 @@ describe("money", () => {
   const mine = async () => json(await call("/money/mine", "tok-maya"));
   const entry = async (id: string) => (await mine()).transactions.find((t: { id: string }) => t.id === id);
   const deposit = (amount: number) => post("/money/deposits", { amount, method: "bank" }, "tok-maya");
-  /** Maya verified, awarded `award` on Creative Practice, with a confirmed deposit and a saved bank account. */
+  /** Maya verified, awarded `award` on Creative Practice, with a confirmed deposit. */
   const fund = async (award: number, deposited = 100) => {
     await call("/profile", "tok-maya");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
@@ -731,9 +732,9 @@ describe("money", () => {
     await post(`/applications/${application.id}/approve`, { version: v, award });
     const d = (await json(await deposit(deposited))).money.transactions.find((t: { type: string; status: string }) => t.type === "Deposit" && t.status === "Pending");
     await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
-    await post("/money/destinations", { channel: "bank", primary: "Meridian Bank", secondary: "123456789" }, "tok-maya");
   };
-  const withdraw = (amount: number) => post("/money/withdrawals", { amount, channel: "bank" }, "tok-maya");
+  const BANK = { "bank-name": "Meridian Bank", "account-name": "Maya Okafor", "account-number": "123456789" };
+  const withdraw = (amount: number) => post("/money/withdrawals", { amount, channel: "bank", details: BANK }, "tok-maya");
 
   it("starts with no cards and no entries, and hides who changed the settings", async () => {
     const m = await mine();
@@ -767,7 +768,11 @@ describe("money", () => {
     expect((await json(await withdraw(3500))).error).toMatch(/up to \$3,000/);
     const res = await json(await withdraw(1000));
     const w = res.money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
-    expect(w).toMatchObject({ amount: -1000, status: "Pending", destination: "Bank transfer · Meridian Bank · •••• 6789" });
+    expect(w).toMatchObject({ amount: -1000, status: "Pending", destination: "Bank transfer · Meridian Bank", source: "grant" });
+    expect(w.payoutDetails).toEqual([
+      { fieldId: "bank-name", label: "Bank name", value: "Meridian Bank" }, { fieldId: "account-name", label: "Account holder name", value: "Maya Okafor" },
+      { fieldId: "account-number", label: "Account number", value: "123456789" },
+    ]);
     expect(w.fee).toBeGreaterThan(0);
     expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
     expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("Payout sent");
@@ -962,6 +967,134 @@ describe("money", () => {
     await call("/profile", "tok-super");
     const own = (await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-super"))).money.transactions[0];
     expect((await post(`/money/deposits/${own.id}/confirm`, {})).status).toBe(403);
+  });
+});
+
+describe("withdrawal methods", () => {
+  const MAYA = USERS["tok-maya"]!.id;
+  const settings = async (token = "tok-finance") => json(await call("/money/settings", token));
+  const version = async () => (await settings()).treasury.updatedAt as string;
+  const paypal = (patch: Record<string, unknown> = {}) => ({
+    name: "PayPal", enabled: true, min: 20, max: 1500, feeRate: 0.02, feeFixed: 1, feeCap: 0, processingTime: "Within 24 hours",
+    instructions: "Use the email of a verified PayPal account.", photoUrl: "", source: "both", formTitle: "PayPal account",
+    fields: [
+      { label: "PayPal email", type: "email", required: true, placeholder: "you@example.com", help: "", options: [] },
+      { label: "Account type", type: "select", required: true, placeholder: "", help: "", options: ["Personal", "Business"] },
+    ],
+    ...patch,
+  });
+  const create = async (patch: Record<string, unknown> = {}, token = "tok-finance") => post("/money/methods", { version: await version(), method: paypal(patch) }, token);
+  const edit = async (id: string, patch: Record<string, unknown>, token = "tok-finance") => put(`/money/methods/${id}`, { version: await version(), method: paypal(patch) }, token);
+  const upload = (id: string, bytes: Buffer, token = "tok-finance") => fetch(`${base}/money/methods/${id}/photo`, { method: "PUT", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
+  const photoOf = async (id: string) => (await settings()).treasury.channels.find((c: { id: string }) => c.id === id).photoUrl as string;
+  const ANSWERS = { "paypal-email": "maya@example.com", "account-type": "Personal" };
+  const withdraw = (body: Record<string, unknown>) => post("/money/withdrawals", body, "tok-maya");
+  /** Maya verified, awarded `award`, with `deposited` confirmed in her deposit balance. */
+  const fund = async (award: number, deposited: number) => {
+    await call("/profile", "tok-maya");
+    await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const app = { businessName: "Okafor Studio", requestedAmount: award, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+    const { application } = await json(await submitApp({ grantId: "creative", application: app }, "tok-maya"));
+    const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
+    await post(`/applications/${application.id}/approve`, { version: v, award });
+    const d = (await json(await post("/money/deposits", { amount: deposited, method: "bank" }, "tok-maya"))).money.transactions.find((t: { type: string }) => t.type === "Deposit");
+    await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
+  };
+
+  it("lets finance and super admins add methods; others get 403, a stale version 409, and bad input field errors", async () => {
+    const res = await create();
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body).toMatchObject({ id: "paypal", message: expect.stringMatching(/PayPal added/) });
+    const added = body.settings.treasury.channels.find((c: { id: string }) => c.id === "paypal");
+    expect(added.fields.map((f: { id: string }) => f.id)).toEqual(["paypal-email", "account-type"]);
+    expect(body.settings.treasury.changeLog.at(-1)).toMatchObject({ by: "Jordan Lee", summary: "Added withdrawal method PayPal." });
+    expect((await create({ name: "Skrill" }, "tok-super")).status).toBe(200);
+    await call("/profile", "tok-maya");
+    expect((await create({ name: "Payoneer" }, "tok-maya")).status).toBe(403);
+    expect((await create({ name: "Payoneer" }, "tok-riley")).status).toBe(403);
+    expect((await post("/money/methods", { version: "2020-01-01T00:00:00.000Z", method: paypal({ name: "Payoneer" }) }, "tok-finance")).status).toBe(409);
+    const bad = await json(await create({ name: "Payoneer", min: 50, max: 10, photoUrl: "http://cdn.example.com/p.png" }));
+    expect(bad.fieldErrors).toMatchObject({ max: "Must be at least the minimum.", photoUrl: "Use a secure link (https://)." });
+    const dataUrl = await create({ name: "Payoneer", photoUrl: "data:image/png;base64,iVBORw0KGgo=" });
+    expect([dataUrl.status, (await json(dataUrl)).fieldErrors?.photoUrl]).toEqual([400, expect.stringMatching(/photo button/)]);
+    expect((await post("/money/methods", { version: await version(), method: { name: "Half a method" } }, "tok-finance")).status).toBe(400);
+  });
+
+  it("edits, hides, and deletes methods; applicants only see available ones, without the change log", async () => {
+    await create();
+    expect((await edit("paypal", { max: 2000 })).status).toBe(200);
+    expect((await settings()).treasury.changeLog.at(-1).summary).toBe("Withdrawal method PayPal: limits.");
+    expect((await edit("nope", { name: "Nope" })).status).toBe(404);
+    await call("/profile", "tok-maya");
+    const ids = async () => (await json(await call("/money/mine", "tok-maya"))).treasury.channels.map((c: { id: string }) => c.id);
+    expect(await ids()).toContain("paypal");
+    expect((await post("/money/methods/paypal/availability", { enabled: false }, "tok-finance")).status).toBe(200);
+    expect(await ids()).not.toContain("paypal");
+    expect((await settings()).treasury.channels.find((c: { id: string }) => c.id === "paypal").enabled).toBe(false);
+    expect((await json(await call("/money/mine", "tok-maya"))).treasury.changeLog).toEqual([]);
+    expect((await post("/money/methods/paypal/availability", { enabled: false }, "tok-finance")).status).toBe(400);
+    expect((await post("/money/methods/paypal/availability", { enabled: true }, "tok-maya")).status).toBe(403);
+    expect((await post("/money/methods/paypal/delete", {}, "tok-finance")).status).toBe(200);
+    expect((await settings()).treasury.channels.map((c: { id: string }) => c.id)).not.toContain("paypal");
+    expect((await post("/money/methods/paypal/delete", {}, "tok-finance")).status).toBe(404);
+  });
+
+  it("stores uploaded photos on the server, serves them publicly by method, and removes them when replaced or deleted", async () => {
+    await create();
+    expect((await upload("paypal", Buffer.from("not an image"))).status).toBe(415);
+    expect((await upload("paypal", Buffer.alloc(0))).status).toBe(400);
+    expect((await upload("paypal", Buffer.concat([PNG, Buffer.alloc(2 * 1024 * 1024)]))).status).toBe(413);
+    await call("/profile", "tok-maya");
+    expect((await upload("paypal", PNG, "tok-maya")).status).toBe(403);
+    expect((await upload("paypal", PNG)).status).toBe(200);
+    const url = await photoOf("paypal");
+    expect(url).toMatch(/^\/api\/withdrawal-methods\/paypal\/photo\?v=[0-9a-f]{12}$/);
+    expect(JSON.stringify(await settings())).not.toContain("photoFile");
+    // Public: no token needed.
+    const served = await fetch(`${base}${url.replace(/^\/api/, "")}`);
+    expect([served.status, served.headers.get("content-type"), Buffer.from(await served.arrayBuffer()).equals(PNG)]).toEqual([200, "image/png", true]);
+    const [first] = [...files.files.keys()];
+    const other = Buffer.concat([PNG, Buffer.alloc(8, 2)]);
+    expect((await upload("paypal", other)).status).toBe(200);
+    expect(files.files.has(first!)).toBe(false); // the replaced photo is gone
+    const [second] = [...files.files.keys()];
+    files.files.set(second!, Buffer.from("changed on disk"));
+    expect((await fetch(`${base}/withdrawal-methods/paypal/photo`)).status).toBe(404);
+    expect((await post("/money/methods/paypal/photo/delete", {}, "tok-finance")).status).toBe(200);
+    expect(await photoOf("paypal")).toBe("");
+    expect(files.files.size).toBe(0);
+    expect((await upload("paypal", PNG)).status).toBe(200);
+    expect((await post("/money/methods/paypal/delete", {}, "tok-finance")).status).toBe(200);
+    expect(files.files.size).toBe(0);
+    expect((await fetch(`${base}/withdrawal-methods/paypal/photo`)).status).toBe(404);
+    expect((await upload("paypal", PNG)).status).toBe(404);
+  });
+
+  it("takes requests with the method's form and the chosen balance, remembers the answers, and shows finance every answer", async () => {
+    await fund(3000, 200);
+    await create();
+    const missing = await json(await withdraw({ amount: 100, channel: "paypal", source: "grant", details: {} }));
+    expect(missing.fieldErrors).toEqual({ "details.paypal-email": "PayPal email is required.", "details.account-type": "Account type is required." });
+    expect((await json(await withdraw({ amount: 100, channel: "paypal", details: ANSWERS }))).error).toMatch(/Choose the balance/);
+    expect((await json(await withdraw({ amount: 180, channel: "paypal", source: "deposit", details: ANSWERS }))).error).toMatch(/up to \$175\.00 from your deposit balance/);
+    expect((await json(await withdraw({ amount: 100, channel: "bank", source: "deposit", details: {} }))).error).toMatch(/grant balance only/);
+    const ok = await json(await withdraw({ amount: 100, channel: "paypal", source: "deposit", details: { ...ANSWERS, stray: "ignored" } }));
+    const w = ok.money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
+    expect(w).toMatchObject({ source: "deposit", fee: 3, destination: "PayPal · maya@example.com", payoutDetails: [{ fieldId: "paypal-email", label: "PayPal email", value: "maya@example.com" }, { fieldId: "account-type", label: "Account type", value: "Personal" }] });
+    expect(ok.money.savedPayoutDetails).toEqual({ paypal: ANSWERS });
+    const ledger = await json(await call("/money/ledger", "tok-finance"));
+    expect(ledger.find((t: { id: string }) => t.id === w.id).payoutDetails).toEqual(w.payoutDetails);
+    // Remembered after a reload, and the method can be deleted while the request is still payable.
+    expect((await json(await call("/money/mine", "tok-maya"))).savedPayoutDetails.paypal).toEqual(ANSWERS);
+    expect((await post("/money/methods/paypal/delete", {}, "tok-finance")).status).toBe(200);
+    expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
+  });
+
+  it("has no payout-destination endpoints any more", async () => {
+    await call("/profile", "tok-maya");
+    expect((await post("/money/destinations", { channel: "bank", primary: "Meridian Bank", secondary: "123456789" }, "tok-maya")).status).toBe(404);
   });
 });
 
@@ -1494,5 +1627,194 @@ describe("Supabase's Send Email Hook", () => {
     providerCalls = [];
     expect((await send({ user: { email: "maya@example.com" }, email_data: { email_action_type: "something_new" } })).status).toBe(200);
     expect(sentEmails()).toHaveLength(0);
+  });
+});
+
+// ---------- Profile center (user_profile_ui_design_operation.md) ----------
+
+const MAYA_ID = "66666666-6666-4666-8666-666666666666";
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
+const WEBP = Buffer.concat([Buffer.from("RIFF"), Buffer.from([0x40, 0, 0, 0]), Buffer.from("WEBPVP8 "), Buffer.alloc(64, 3)]);
+const putAvatar = (bytes: Buffer, token = "tok-maya") => fetch(`${base}/profile/avatar`, { method: "PUT", body: bytes, headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
+const WINDOWS_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+const signInFrom = (token: string, deviceId: string) => call("/sign-ins", token, { method: "POST", body: JSON.stringify({ deviceId }), headers: { "user-agent": WINDOWS_CHROME } });
+
+describe("profile center: avatar", () => {
+  it("stores JPEG, PNG, and WEBP photos on the file store, replaces the old file, and serves them to the owner only", async () => {
+    expect((await json(await call("/profile", "tok-maya"))).avatarUpdatedAt).toBeNull();
+    expect((await call("/profile/avatar", "tok-maya")).status).toBe(404);
+    const first = await putAvatar(PNG);
+    expect(first.status).toBe(200);
+    expect((await json(first)).avatarUpdatedAt).toEqual(expect.any(String));
+    expect(files.files.size).toBe(1);
+    const photo = await call("/profile/avatar", "tok-maya");
+    expect(photo.status).toBe(200);
+    expect(photo.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await photo.arrayBuffer()).equals(PNG)).toBe(true);
+    // Another person's token only ever reaches their own (missing) photo.
+    expect((await call("/profile/avatar", "tok-applicant")).status).toBe(404);
+    for (const bytes of [JPEG, WEBP]) expect((await putAvatar(bytes)).status).toBe(200);
+    expect(files.files.size).toBe(1); // the old files were removed
+    expect((await call("/profile/avatar", "tok-maya")).headers.get("content-type")).toBe("image/webp");
+  });
+
+  it("refuses empty, oversized, and non-image files", async () => {
+    expect((await putAvatar(Buffer.alloc(0))).status).toBe(400);
+    const pdf = await putAvatar(Buffer.from("%PDF-1.7 not a photo"));
+    expect(pdf.status).toBe(415);
+    expect((await json(pdf)).error).toMatch(/JPG, PNG, or WEBP/);
+    const big = await putAvatar(Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024)]));
+    expect(big.status).toBe(413);
+    expect((await json(big)).error).toMatch(/5 MB/);
+    expect(files.files.size).toBe(0);
+  });
+
+  it("checks the stored photo against its SHA-256, and removing it deletes the file", async () => {
+    await putAvatar(PNG);
+    const [key] = [...files.files.keys()];
+    files.files.set(key!, Buffer.from("changed on disk"));
+    expect((await call("/profile/avatar", "tok-maya")).status).toBe(404);
+    await putAvatar(JPEG);
+    const removed = await post("/profile/avatar/delete", {}, "tok-maya");
+    expect((await json(removed)).avatarUpdatedAt).toBeNull();
+    expect(files.files.size).toBe(0);
+    expect((await call("/profile/avatar", "tok-maya")).status).toBe(404);
+  });
+});
+
+describe("profile center: personal details", () => {
+  const details = { name: "Maya Okafor", phone: "+44 20 7946 0000", address: "", displayName: "Maya O", telegram: "@maya_ok", birthDate: "1990-04-02" };
+  const save = (body: unknown) => call("/profile", "tok-maya", { method: "PATCH", body: JSON.stringify(body) });
+
+  it("saves the display name, Telegram handle, date of birth, and phone, and keeps the sign-in email", async () => {
+    // An email in the body is ignored: it's always the sign-in account's.
+    const saved = await json(await save({ ...details, email: "nope@example.com" }));
+    expect(saved).toMatchObject({ displayName: "Maya O", telegram: "maya_ok", birthDate: "1990-04-02", phone: "+44 20 7946 0000", email: "maya@example.com" });
+    expect(await json(await call("/profile", "tok-maya"))).toMatchObject({ displayName: "Maya O", telegram: "maya_ok" });
+    // Empty values clear the optional fields.
+    expect(await json(await save({ ...details, telegram: "", birthDate: "", displayName: "" }))).toMatchObject({ telegram: "", displayName: "", birthDate: null });
+  });
+
+  it("refuses a bad handle, a phone without a country code, and a future or under-age date of birth, with field errors", async () => {
+    const res = await save({ ...details, phone: "020 7946 0000", telegram: "@ab", birthDate: "2099-01-01", displayName: "!" });
+    expect(res.status).toBe(400);
+    expect(Object.keys((await json(res)).fieldErrors).sort()).toEqual(["birthDate", "displayName", "phone", "telegram"]);
+    const young = await save({ ...details, birthDate: `${new Date().getUTCFullYear() - 10}-01-01` });
+    expect((await json(young)).fieldErrors.birthDate).toMatch(/at least 16/);
+  });
+
+  it("keeps saved profile-center fields when an older portal sends only name, phone, and address", async () => {
+    await save(details);
+    const saved = await json(await save({ name: "Maya Okafor", phone: "+44 20 7946 0001", address: "" }));
+    expect(saved).toMatchObject({ phone: "+44 20 7946 0001", telegram: "maya_ok", displayName: "Maya O", birthDate: "1990-04-02" });
+  });
+});
+
+describe("profile center: privacy", () => {
+  it("defaults both switches on and saves them", async () => {
+    expect((await json(await call("/profile", "tok-maya"))).privacy).toEqual({ activityLogging: true, unusualActivityEmail: true });
+    expect((await put("/profile/privacy", { activityLogging: "no", unusualActivityEmail: true }, "tok-maya")).status).toBe(400);
+    const saved = await json(await put("/profile/privacy", { activityLogging: false, unusualActivityEmail: false }, "tok-maya"));
+    expect(saved.privacy).toEqual({ activityLogging: false, unusualActivityEmail: false });
+  });
+
+  it("with activity logging off, keeps security events and sign-in notices without device, IP, or location", async () => {
+    await put("/profile/privacy", { activityLogging: false, unusualActivityEmail: true }, "tok-maya");
+    await signInFrom("tok-maya", "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    const [event] = await json(await call("/profile/security-events", "tok-maya"));
+    expect(event).toMatchObject({ kind: "new_device_sign_in", device: null, ip: null, location: null });
+    const [note] = await json(await call("/notifications", "tok-maya"));
+    expect(note.body).not.toContain("Chrome on Windows");
+    // Turned back on, the next event keeps where it came from.
+    await put("/profile/privacy", { activityLogging: true, unusualActivityEmail: true }, "tok-maya");
+    await signInFrom("tok-maya", "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    const [latest] = await json(await call("/profile/security-events", "tok-maya"));
+    expect(latest).toMatchObject({ kind: "sign_in", device: "Chrome on Windows", ip: expect.any(String) });
+  });
+
+  it("with unusual-activity email off, a new device makes an in-app notice but no email", async () => {
+    await put("/profile/privacy", { activityLogging: true, unusualActivityEmail: false }, "tok-maya");
+    await signInFrom("tok-maya", "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    expect(outbox.rows.filter(r => r.to === "maya@example.com" && r.subject === "New device signed in")).toHaveLength(0);
+    expect((await json(await call("/notifications", "tok-maya")))[0].title).toBe("New device signed in");
+    // Switched back on: the next new device is emailed.
+    await put("/profile/privacy", { activityLogging: true, unusualActivityEmail: true }, "tok-maya");
+    await signInFrom("tok-maya", "9a9a9a9a-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    expect(outbox.rows.filter(r => r.to === "maya@example.com" && r.subject === "New device signed in")).toHaveLength(1);
+  });
+
+  it("reads the location from Cloudflare's headers only when GEO_HEADERS=cloudflare", async () => {
+    const { requestLocation } = await import("./lib/securityEvents");
+    const req = { get: (h: string) => ({ "cf-ipcity": "Port Harcourt", "cf-ipcountry": "ng" } as Record<string, string>)[h] };
+    expect(requestLocation(req, {})).toBeNull();
+    expect(requestLocation(req, { GEO_HEADERS: "cloudflare" })).toBe("Port Harcourt, NG");
+    expect(requestLocation({ get: (h: string) => h === "cf-ipcountry" ? "XX" : undefined }, { GEO_HEADERS: "cloudflare" })).toBeNull();
+  });
+});
+
+describe("profile center: security activity", () => {
+  it("lists sign-ins and password changes, newest first, only to their owner", async () => {
+    await signInFrom("tok-maya", "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    await signInFrom("tok-maya", "0f5c2b8e-1d4a-4c7e-9b3a-6e2f8d1c4a55");
+    await post("/profile/password-changed", {}, "tok-maya");
+    const kinds = (await json(await call("/profile/security-events", "tok-maya"))).map((e: { kind: string }) => e.kind);
+    expect(kinds).toEqual(["password_changed", "sign_in", "new_device_sign_in"]);
+    expect(await json(await call("/profile/security-events", "tok-applicant"))).toEqual([]);
+  });
+
+  it("checks the current password with Supabase from the server, signs that session out, and records a wrong one as a failed attempt", async () => {
+    providerReplies["POST /auth/v1/token"] = { status: 200, body: { access_token: "throwaway", refresh_token: "r" } };
+    providerReplies["POST /auth/v1/logout"] = { status: 200, body: {} };
+    const ok = await post("/profile/check-password", { password: "right-password" }, "tok-maya");
+    expect(ok.status).toBe(200);
+    const token = providerCalls.find(c => c.url.includes("/auth/v1/token"))!;
+    expect(token.url).toBe("https://proj.supabase.co/auth/v1/token?grant_type=password");
+    expect(token.body).toEqual({ email: "maya@example.com", password: "right-password" });
+    const logout = providerCalls.find(c => c.url.includes("/auth/v1/logout"))!;
+    expect(logout.url).toContain("scope=local");
+    expect(logout.headers["authorization"]).toBe("Bearer throwaway");
+
+    providerReplies["POST /auth/v1/token"] = { status: 400, body: { error_code: "invalid_credentials" } };
+    const wrong = await post("/profile/check-password", { password: "wrong" }, "tok-maya");
+    expect(wrong.status).toBe(400);
+    expect((await json(wrong)).fieldErrors.currentPassword).toMatch(/isn't your current password/);
+    expect((await json(await call("/profile/security-events", "tok-maya")))[0]).toMatchObject({ kind: "failed_password_check" });
+    providerReplies["POST /auth/v1/token"] = { status: 429, body: {} };
+    expect((await post("/profile/check-password", { password: "x" }, "tok-maya")).status).toBe(429);
+    expect((await post("/profile/check-password", {}, "tok-maya")).status).toBe(400);
+  });
+
+  it("limits current-password checks per user", async () => {
+    await new Promise(r => server.close(r));
+    await start(verifier, { passwordChecks: { name: "passwordChecks", max: 2, windowMs: 60_000 } });
+    providerReplies["POST /auth/v1/token"] = { status: 400, body: {} };
+    for (let i = 0; i < 2; i++) expect((await post("/profile/check-password", { password: "guess" }, "tok-maya")).status).toBe(400);
+    expect((await post("/profile/check-password", { password: "guess" }, "tok-maya")).status).toBe(429);
+  });
+
+  it("records email changes, two-step changes the account agrees with, and signing out other devices", async () => {
+    expect((await json(await post("/profile/security-events", { kind: "signed_out_others" }, "tok-maya"))).recorded).toBe(true);
+    expect((await json(await post("/profile/security-events", { kind: "email_change_requested" }, "tok-maya"))).recorded).toBe(true);
+    // Maya's plain token has no authenticator, so "two-step on" isn't believed; her two-step session's is.
+    expect((await json(await post("/profile/security-events", { kind: "two_step_on" }, "tok-maya"))).recorded).toBe(false);
+    expect((await json(await post("/profile/security-events", { kind: "two_step_on" }, "tok-maya-new-factor"))).recorded).toBe(true);
+    expect((await json(await post("/profile/security-events", { kind: "two_step_off" }, "tok-maya-new-factor"))).recorded).toBe(false);
+    expect((await post("/profile/security-events", { kind: "sign_in" }, "tok-maya")).status).toBe(400);
+    // The sign-in email changing at Supabase is noticed on the next request.
+    USERS["tok-maya-renamed"] = { ...USERS["tok-maya"]!, email: "maya.new@example.com" };
+    try {
+      expect((await json(await call("/profile", "tok-maya-renamed"))).email).toBe("maya.new@example.com");
+    } finally { delete USERS["tok-maya-renamed"]; }
+    const kinds = (await json(await call("/profile/security-events", "tok-maya"))).map((e: { kind: string }) => e.kind);
+    expect(kinds).toEqual(["email_changed", "two_step_on", "email_change_requested", "signed_out_others"]);
+    expect((await json(await call("/notifications", "tok-maya")))[0]).toMatchObject({ title: "Email address changed", href: "/profile" });
+  });
+
+  it("puts the verification code in the email-change email", async () => {
+    const { hookEmails } = await import("./lib/authEmails");
+    const [toOld, toNew] = hookEmails({ user: { email: "old@example.com", new_email: "new@example.com" }, email_data: { token: "111111", token_hash: "h1", token_new: "222222", token_hash_new: "h2", email_action_type: "email_change" } }, "https://proj.supabase.co");
+    expect(toOld!.text).toContain("111111");
+    expect(toNew!.text).toContain("222222");
   });
 });

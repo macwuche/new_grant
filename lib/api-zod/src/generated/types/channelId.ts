@@ -6,12 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ChannelId = typeof ChannelId[keyof typeof ChannelId];
-
-
-export const ChannelId = {
-  bank: 'bank',
-  wire: 'wire',
-  mobile: 'mobile',
-  crypto: 'crypto',
-} as const;
+/**
+ * A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+ * @pattern ^[a-z0-9-]{1,40}$
+ */
+export type ChannelId = string;

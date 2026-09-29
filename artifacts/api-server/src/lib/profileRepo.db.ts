@@ -2,7 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, type ApplicantProfileRow } from "@workspace/db";
 import { NO_EFFECTS } from "./activity";
 import { writeEffects } from "./activity.db";
-import { permissionsFrom, type AccountPatch, type ProfileRecord, type ProfileRepo } from "./profileRepo";
+import { permissionsFrom, type AccountPatch, type ContactPatch, type ProfileRecord, type ProfileRepo } from "./profileRepo";
 
 export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
   authUserId: row.authUserId, name: row.name, email: row.email, phone: row.phone, address: row.address,
@@ -18,6 +18,10 @@ export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
     permissions: permissionsFrom(row.permissions, row.emailNotifications),
   },
   emailNotifications: row.emailNotifications,
+  displayName: row.displayName, telegram: row.telegram,
+  privacy: { activityLogging: row.activityLoggingEnabled, unusualActivityEmail: row.unusualActivityEmailEnabled },
+  avatar: row.avatarKey && row.avatarType && row.avatarSha256 && row.avatarUpdatedAt
+    ? { key: row.avatarKey, contentType: row.avatarType, sha256: row.avatarSha256, updatedAt: row.avatarUpdatedAt.toISOString() } : null,
   resetsRequiredAt: { password: row.passwordResetRequiredAt?.toISOString() ?? null, twoFactor: row.twoFactorResetRequiredAt?.toISOString() ?? null },
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
 });
@@ -41,6 +45,12 @@ const accountColumns = (patch: AccountPatch) => ({
   } : {}),
 });
 
+const contactColumns = ({ privacy, avatar, ...rest }: ContactPatch, now: Date) => ({
+  ...rest,
+  ...(privacy ? { activityLoggingEnabled: privacy.activityLogging, unusualActivityEmailEnabled: privacy.unusualActivityEmail } : {}),
+  ...(avatar !== undefined ? { avatarKey: avatar?.key ?? null, avatarType: avatar?.contentType ?? null, avatarSha256: avatar?.sha256 ?? null, avatarUpdatedAt: avatar ? now : null } : {}),
+});
+
 const byId = (id: string) => eq(applicantProfilesTable.authUserId, id);
 // Versions are read back as JavaScript dates (milliseconds); Postgres keeps microseconds,
 // so compare at millisecond precision or a row stamped by the database never matches.
@@ -56,10 +66,12 @@ export const dbProfileRepo: ProfileRepo = {
     const [existing] = await db.select().from(applicantProfilesTable).where(byId(profile.authUserId));
     return toRecord(existing!);
   },
-  updateContact: async (id, patch) => {
-    const [row] = await db.update(applicantProfilesTable).set({ ...patch, updatedAt: new Date() }).where(byId(id)).returning();
+  updateContact: async (id, patch, effects = NO_EFFECTS) => db.transaction(async tx => {
+    const now = new Date();
+    const [row] = await tx.update(applicantProfilesTable).set({ ...contactColumns(patch, now), updatedAt: now }).where(byId(id)).returning();
+    await writeEffects(tx, effects);
     return toRecord(row!);
-  },
+  }),
   saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => db.transaction(async tx => {
     const [row] = await tx.update(applicantProfilesTable).set({ ...accountColumns(patch), updatedAt: new Date() })
       .where(and(byId(id), atVersion(expectedVersion))).returning();

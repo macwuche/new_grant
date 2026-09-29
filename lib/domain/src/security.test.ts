@@ -21,15 +21,15 @@ beforeEach(() => { s = createSeedState(); });
 
 describe('dual-control payouts', () => {
   it('flags payouts at or above the threshold when requested', () => {
-    const small = accept(M.requestWithdrawal(s, 100, 'bank', now)).id!;
-    const large = accept(M.requestWithdrawal(s, 2500, 'bank', now)).id!;
+    const small = accept(M.requestWithdrawal(s, { amount: 100, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
+    const large = accept(M.requestWithdrawal(s, { amount: 2500, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
     expect(tx(small).dualControl).toBeUndefined();
     expect(tx(large).dualControl).toBe(true);
     expect(s.staffFeed[0]).toMatchObject({ highlight: true, title: expect.stringMatching(/two sign-offs/) });
   });
 
   it('needs a release approval from a different person before it can be paid', () => {
-    const id = accept(M.requestWithdrawal(s, 3000, 'bank', now)).id!;
+    const id = accept(M.requestWithdrawal(s, { amount: 3000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
     expect(P.markPayoutPaid(s, id, 'Jordan Lee', now).ok).toBe(false);
     accept(P.approvePayoutRelease(s, id, 'Riley Chen', now));
     expect(P.approvePayoutRelease(s, id, 'Sam Rivera', now).ok).toBe(false);
@@ -41,7 +41,7 @@ describe('dual-control payouts', () => {
   });
 
   it("keeps the requirement if finance raises the threshold afterwards, and doesn't ask for small ones", () => {
-    const id = accept(M.requestWithdrawal(s, 3000, 'bank', now)).id!;
+    const id = accept(M.requestWithdrawal(s, { amount: 3000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
     s = { ...s, treasury: { ...s.treasury, dualControlThreshold: 10000 } };
     expect(P.markPayoutPaid(s, id, 'Jordan Lee', now).ok).toBe(false);
     expect(P.approvePayoutRelease(s, 'TX-84077', 'Riley Chen', now).ok).toBe(false);
@@ -56,7 +56,7 @@ describe('system lockdown', () => {
     expect(result.message).toMatch(/1 pending payout/);
     expect(s.notifications[0]).toMatchObject({ applicantId: CURRENT_APPLICANT_ID, title: 'Payouts paused' });
     expect(M.payoutBlocker(s)).toMatch(/paused/);
-    expect(M.requestWithdrawal(s, 50, 'bank', now).ok).toBe(false);
+    expect(M.requestWithdrawal(s, { amount: 50, method: 'bank', details: s.savedPayoutDetails['bank'] }, now).ok).toBe(false);
     expect(P.markPayoutPaid(s, 'TX-84077', 'Jordan Lee', now).ok).toBe(false);
     accept(P.markPayoutFailed(s, 'TX-84077', 'Returned during the security check.', 'Jordan Lee', now));
     expect(Sec.startLockdown(s, 'Again, for another reason.', 'Sam Rivera', now).ok).toBe(false);

@@ -6,4 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MyMoneyPayoutDestinations = {[key: string]: string};
+export interface SecurityEventResult {
+  recorded: boolean;
+}

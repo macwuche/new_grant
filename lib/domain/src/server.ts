@@ -1,4 +1,4 @@
-import type { AccountControls, Application, CardsState, DemoState, Notification, PayoutDestinations, Profile, Transaction } from './model';
+import type { AccountControls, Application, CardsState, DemoState, Notification, Profile, SavedPayoutDetails, Transaction } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
 
 /**
@@ -14,7 +14,7 @@ export function serverState(loaded: Loaded): DemoState {
   return {
     ...base,
     grants: [], applications: [], notifications: [], transactions: [], staffFeed: [], otherApplicants: [],
-    accounts: {}, staff: [], actingStaffId: '', audit: [], payoutDestinations: {}, lockdown: null,
+    accounts: {}, staff: [], actingStaffId: '', audit: [], savedPayoutDetails: {}, lockdown: null,
     // Callers pass the stored money settings; without them no application fee can be charged.
     treasury: { ...base.treasury, applicationFee: 0 },
     ...loaded,
@@ -29,9 +29,9 @@ export type SlotApplicant = {
   id: string;
   profile: Omit<Profile, 'twoFactor'>;
   account: AccountControls;
-  /** Money routes only: the applicant's cards and saved payout destinations. */
+  /** Money routes only: the applicant's cards and remembered payout answers. */
   cards?: CardsState;
-  payoutDestinations?: PayoutDestinations;
+  savedPayoutDetails?: SavedPayoutDetails;
 };
 
 /**
@@ -52,14 +52,14 @@ export function applicantState(loaded: Loaded, applicant: SlotApplicant): DemoSt
     notifications: state.notifications.map(toSlot),
     transactions: state.transactions.map(toSlot),
     ...(applicant.cards ? { cards: applicant.cards } : {}),
-    payoutDestinations: applicant.payoutDestinations ?? {},
+    savedPayoutDetails: applicant.savedPayoutDetails ?? {},
   };
 }
 
 /** What a rule left in the slot, with the real applicant id put back on their records. */
 export function readApplicantSlot(state: DemoState, applicantId: string): {
   profile: Omit<Profile, 'twoFactor'>; account: AccountControls; applications: Application[]; notifications: Notification[];
-  transactions: Transaction[]; cards: CardsState; payoutDestinations: PayoutDestinations;
+  transactions: Transaction[]; cards: CardsState; savedPayoutDetails: SavedPayoutDetails;
 } {
   const fromSlot = <T extends { applicantId: string }>(r: T): T => r.applicantId === CURRENT_APPLICANT_ID ? { ...r, applicantId } : r;
   const { twoFactor: _twoFactor, ...profile } = state.profile;
@@ -70,6 +70,6 @@ export function readApplicantSlot(state: DemoState, applicantId: string): {
     notifications: state.notifications.map(fromSlot),
     transactions: state.transactions.map(fromSlot),
     cards: state.cards,
-    payoutDestinations: state.payoutDestinations,
+    savedPayoutDetails: state.savedPayoutDetails,
   };
 }

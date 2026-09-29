@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { applicantProfilesTable, auditEventsTable, db, emailOutboxTable, notificationsTable, staffEventReadsTable, staffEventsTable, type AuditEventRow } from "@workspace/db";
-import { auditHash, checkChain, emailsFor, GENESIS_HASH, LIST_LIMIT, type ActivityRepo, type Effects, type NewAudit } from "./activity";
+import { applicantProfilesTable, auditEventsTable, db, emailOutboxTable, notificationsTable, securityEventsTable, staffEventReadsTable, staffEventsTable, type AuditEventRow } from "@workspace/db";
+import { auditHash, checkChain, emailsFor, GENESIS_HASH, LIST_LIMIT, NO_EFFECTS, SECURITY_EVENT_LIMIT, type ActivityRepo, type Effects, type NewAudit, type SecurityEventKind } from "./activity";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -19,6 +19,9 @@ export async function writeEffects(tx: Tx, effects: Effects): Promise<void> {
   const emails = emailsFor(effects, id => people.find(p => p.id === id));
   if (emails.length) {
     await tx.insert(emailOutboxTable).values(emails.map(e => ({ kind: e.kind, toAddress: e.to, subject: e.subject, textBody: e.text, htmlBody: e.html })));
+  }
+  if (effects.security?.length) {
+    await tx.insert(securityEventsTable).values(effects.security.map(e => ({ ...e, at: new Date(e.at) })));
   }
   if (effects.staffEvents.length) {
     await tx.insert(staffEventsTable).values(effects.staffEvents.map(e => ({ ...e, at: new Date(e.at) })));
@@ -72,4 +75,8 @@ export const dbActivityRepo: ActivityRepo = {
     .map(r => ({ ...toEntry(r), id: `AU-${r.seq}` })),
   verifyAudit: async () => checkChain((await db.select().from(auditEventsTable).orderBy(auditEventsTable.seq))
     .map(r => ({ id: `AU-${r.seq}`, entry: toEntry(r), prevHash: r.prevHash, hash: r.hash }))),
+  securityEvents: async userId => (await db.select().from(securityEventsTable).where(eq(securityEventsTable.userId, userId))
+    .orderBy(desc(securityEventsTable.at)).limit(SECURITY_EVENT_LIMIT))
+    .map(r => ({ id: r.id, kind: r.kind as SecurityEventKind, device: r.device, ip: r.ip, location: r.location, at: r.at.toISOString() })),
+  recordSecurity: async events => { if (events.length) await withEffects({ ...NO_EFFECTS, security: events }, async () => undefined); },
 };

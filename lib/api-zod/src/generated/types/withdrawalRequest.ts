@@ -6,8 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChannelId } from './channelId';
+import type { PayoutBalance } from './payoutBalance';
+import type { WithdrawalRequestDetails } from './withdrawalRequestDetails';
 
 export interface WithdrawalRequest {
   amount: number;
   channel: ChannelId;
+  source?: PayoutBalance;
+  details?: WithdrawalRequestDetails;
 }

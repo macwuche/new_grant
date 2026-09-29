@@ -1,9 +1,10 @@
-import { randomInt } from "node:crypto";
-import { Router, type IRouter, type Request, type Response } from "express";
+import { createHash, randomInt, randomUUID } from "node:crypto";
+import express, { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
 import {
   ActivatePhysicalCardBody, AdjustBalanceBody, ApprovePhysicalCardBody, ConfirmDepositParams as LedgerIdParams, DeductFromCardBody, FundCardAsStaffBody, FundCardBody,
-  GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RemovePayoutDestinationParams, RequestDepositBody,
-  RequestPhysicalCardBody, RequestWithdrawalBody, SavePayoutDestinationBody, SetCardFreezeAsStaffBody, SetCardLimitBody, ToggleCardFreezeBody, UpdateMoneySettingsBody,
+  CreateWithdrawalMethodBody, GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RequestDepositBody,
+  RequestPhysicalCardBody, RequestWithdrawalBody, SetCardFreezeAsStaffBody, SetCardLimitBody, SetWithdrawalMethodAvailabilityBody, ToggleCardFreezeBody,
+  UpdateMoneySettingsBody, UpdateWithdrawalMethodParams as MethodIdParams,
 } from "@workspace/api-zod";
 import {
   activatePhysicalCard, approvePhysicalCard, cancelPhysicalCard, cardQueue, createVirtualCard, declinePhysicalCard, DEFAULT_CARD_SETTINGS, fundCard,
@@ -13,25 +14,25 @@ import { staffAdjustBalance } from "@workspace/domain/adjustments";
 import { computeBalances } from "@workspace/domain/rules";
 import type { Permission } from "@workspace/authz";
 import { cancelDeposit, confirmDeposit, rejectDeposit, requestDeposit } from "@workspace/domain/deposits";
-import {
-  cancelWithdrawal, removePayoutDestination, requestPhysicalCard, requestWithdrawal, savePayoutDestination, setCardLimit, toggleCardFreeze,
-} from "@workspace/domain/money";
-import type { ChannelId, DemoState, Result, Transaction, Treasury, TreasuryInput } from "@workspace/domain/model";
+import { cancelWithdrawal, requestPhysicalCard, requestWithdrawal, setCardLimit, toggleCardFreeze } from "@workspace/domain/money";
+import type { DemoState, MethodPhotoFile, Result, Transaction, Treasury, TreasuryInput } from "@workspace/domain/model";
 import { approvePayoutRelease, markPayoutFailed, markPayoutPaid } from "@workspace/domain/payouts";
 import { endLockdown, startLockdown } from "@workspace/domain/security";
 import { applicantState, readApplicantSlot, serverState } from "@workspace/domain/server";
 import { CURRENT_APPLICANT_ID as SLOT } from "@workspace/domain/seed";
 import { updateTreasury } from "@workspace/domain/treasury";
+import { createMethod, deleteMethod, MAX_METHOD_PHOTO_BYTES, setMethodAvailability, setMethodPhoto, updateMethod, type MethodInput } from "@workspace/domain/withdrawalMethods";
 import { effectsOf } from "../lib/activity";
+import type { FileStore } from "../lib/fileStore";
 import { slotApplicant } from "../lib/applicantRules";
 import { storeLedgerChanges } from "../lib/ledger";
 import { logger } from "../lib/logger";
 import { newCards, type MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
-import { ownProfile } from "./profile";
+import { detectImage, ownProfile } from "./profile";
 
-// Money: the ledger, deposits, payouts, cards, payout destinations, the money
+// Money: the ledger, deposits, payouts, cards, withdrawal methods, the money
 // settings, and the lockdown. Every change runs the shared rules
 // (@workspace/domain/{money,deposits,payouts,treasury,security}) under the
 // locks described in ../lib/moneyRepo.ts, and stores the ledger entries, money
@@ -45,10 +46,16 @@ const send = (res: Response, f: Failure) => res.status(f.status).json(f.body);
 /** No card issuer is connected, so card endings and PINs are random. */
 const fourDigits = () => String(randomInt(10_000)).padStart(4, "0");
 
-/** What applicants see of the settings: the rules that apply to them, not who changed what. */
-const forApplicants = (t: Treasury): Treasury => ({ ...t, changeLog: [] });
+/** Settings as they leave the server: where an uploaded method photo is stored stays on the server. */
+const outward = (t: Treasury): Treasury => ({ ...t, channels: t.channels.map(({ photoFile: _file, ...m }) => m) });
+/** What applicants see of the settings: the available methods and the rules that apply to them, not who changed what. */
+const forApplicants = (t: Treasury): Treasury => { const o = outward(t); return { ...o, channels: o.channels.filter(c => c.enabled), changeLog: [] }; };
+const outwardSettings = (s: { treasury: Treasury; lockdown: DemoState["lockdown"] }) => ({ ...s, treasury: outward(s.treasury) });
 
-export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
+/** Method photos are stored under this owner id (storage keys are `<uuid>/<uuid>`). */
+export const METHOD_PHOTO_OWNER = "5a1e5000-0000-4000-8000-00000000f070";
+
+export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: FileStore): IRouter {
   const router: IRouter = Router();
 
   // ---------- Applicant ----------
@@ -73,13 +80,13 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
       const base = slotApplicant(scope.applicant);
       const before = applicantState(
         { transactions: scope.transactions, treasury: scope.treasury, lockdown: scope.lockdown, nextId },
-        { ...base, account: { ...base.account, ...(scope.money.destinationChangedAt ? { destinationChangedAt: scope.money.destinationChangedAt } : {}) }, cards: scope.money.cards, payoutDestinations: scope.money.payoutDestinations },
+        { ...base, account: { ...base.account, ...(scope.money.destinationChangedAt ? { destinationChangedAt: scope.money.destinationChangedAt } : {}) }, cards: scope.money.cards, savedPayoutDetails: scope.money.savedPayoutDetails },
       );
       const result = command(before);
       if (!result.ok) return { failure: refused(result) };
       const slot = readApplicantSlot(result.state, record.authUserId);
       await storeLedgerChanges(scope.transactions, slot.transactions, scope.saveTransaction);
-      const after = { cards: slot.cards, payoutDestinations: slot.payoutDestinations, ...(slot.account.destinationChangedAt ? { destinationChangedAt: slot.account.destinationChangedAt } : {}) };
+      const after = { cards: slot.cards, savedPayoutDetails: slot.savedPayoutDetails, ...(slot.account.destinationChangedAt ? { destinationChangedAt: slot.account.destinationChangedAt } : {}) };
       if (JSON.stringify(after) !== JSON.stringify(scope.money)) await scope.saveMoney(after);
       await scope.record(effectsOf(before, result.state, new Date(), { slotId: record.authUserId }));
       return { message: result.message, ...(result.id ? { id: result.id } : {}) };
@@ -102,8 +109,9 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
   });
   router.post("/money/withdrawals", async (req, res) => {
     const b = RequestWithdrawalBody.safeParse(req.body);
-    if (!b.success) { res.status(400).json({ error: "Send an amount and a payout channel." }); return; }
-    await asApplicant(res, s => requestWithdrawal(s, b.data.amount, b.data.channel, new Date()));
+    if (!b.success) { res.status(400).json({ error: "Send an amount, a withdrawal method, and the method's details." }); return; }
+    const { amount, channel, source, details } = b.data;
+    await asApplicant(res, s => requestWithdrawal(s, { amount, method: channel, ...(source ? { source } : {}), details: details ?? {} }, new Date()));
   });
   router.post("/money/withdrawals/:id/cancel", async (req, res) => {
     const id = idOf(req);
@@ -136,21 +144,10 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
     if (!b.success) { res.status(400).json({ error: "Enter the shipping address: name, address, city, postal code, and country." }); return; }
     await asApplicant(res, s => requestPhysicalCard(s, b.data, new Date()));
   });
-  router.post("/money/destinations", async (req, res) => {
-    const b = SavePayoutDestinationBody.safeParse(req.body);
-    if (!b.success) { res.status(400).json({ error: "Send the channel and the destination details." }); return; }
-    await asApplicant(res, s => savePayoutDestination(s, b.data.channel, { primary: b.data.primary, secondary: b.data.secondary }, new Date()));
-  });
-  router.post("/money/destinations/:channel/remove", async (req, res) => {
-    const p = RemovePayoutDestinationParams.safeParse(req.params);
-    if (!p.success) { res.status(400).json({ error: "Choose a payout channel." }); return; }
-    await asApplicant(res, s => removePayoutDestination(s, p.data.channel as ChannelId));
-  });
-
   // ---------- Staff: ledger entries ----------
 
   router.get("/money/ledger", requireStaff, async (_req, res) => { res.json(await money.ledger()); });
-  router.get("/money/settings", requireStaff, async (_req, res) => { res.json(await money.settings()); });
+  router.get("/money/settings", requireStaff, async (_req, res) => { res.json(outwardSettings(await money.settings())); });
 
   type TxCommand = (state: DemoState, actor: { id: string; name: string }, tx: Transaction) => Result;
 
@@ -231,7 +228,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
       const outcome = await money.withApplicant(record.authUserId, async (scope): Promise<{ message: string } | { failure: Failure }> => {
         const base = slotApplicant(scope.applicant);
         const before = applicantState({ transactions: scope.transactions, treasury: scope.treasury, lockdown: scope.lockdown, nextId },
-          { ...base, cards: scope.money.cards, payoutDestinations: scope.money.payoutDestinations });
+          { ...base, cards: scope.money.cards, savedPayoutDetails: scope.money.savedPayoutDetails });
         const result = parsed.command(before, actor);
         if (!result.ok) return { failure: refused(result) };
         const slot = readApplicantSlot(result.state, record.authUserId);
@@ -265,19 +262,21 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
 
   // ---------- Staff: settings and lockdown ----------
 
-  async function asSystem(req: Request, res: Response, label: string, target: "treasury" | "lockdown", command: (state: DemoState, by: string) => Result) {
+  /** Runs a settings, method, or lockdown rule under the system lock; returns the outcome (the response is sent). */
+  async function asSystem(req: Request, res: Response, label: string, target: string, command: (state: DemoState, by: string) => Result): Promise<{ ok: true; before: Treasury; after: Treasury } | { ok: false }> {
     const actor = authLocals(res).staff!;
-    const outcome = await money.withSystem(async (scope): Promise<{ message: string } | { failure: Failure }> => {
+    const outcome = await money.withSystem(async (scope): Promise<{ message: string; id?: string; before: Treasury; after: Treasury } | { failure: Failure }> => {
       const before = serverState({ treasury: scope.treasury, lockdown: scope.lockdown, transactions: scope.pendingWithdrawals });
       const result = command(before, actor.name);
       if (!result.ok) return { failure: refused(result) };
       if (JSON.stringify(result.state.treasury) !== JSON.stringify(scope.treasury)) await scope.saveTreasury(result.state.treasury);
       if (JSON.stringify(result.state.lockdown) !== JSON.stringify(scope.lockdown)) await scope.saveLockdown(result.state.lockdown);
       await scope.record(effectsOf(before, result.state, new Date(), { audit: auditContext(req, res, label, target), summary: result.message }));
-      return { message: result.message };
+      return { message: result.message, ...(result.id ? { id: result.id } : {}), before: scope.treasury, after: result.state.treasury };
     });
-    if ("failure" in outcome) { send(res, outcome.failure); return; }
-    res.json({ settings: await money.settings(), message: outcome.message });
+    if ("failure" in outcome) { send(res, outcome.failure); return { ok: false }; }
+    res.json({ settings: outwardSettings(await money.settings()), message: outcome.message, ...(outcome.id ? { id: outcome.id } : {}) });
+    return { ok: true, before: outcome.before, after: outcome.after };
   }
 
   router.put("/money/settings", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
@@ -287,6 +286,81 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
     if (current.treasury.updatedAt !== b.data.version) { res.status(409).json({ error: "Money settings changed since you opened them. Review the latest values and try again." }); return; }
     await asSystem(req, res, "Update money settings", "treasury", (s, by) => updateTreasury(s, b.data.version, b.data.treasury as TreasuryInput, by, new Date()));
   });
+  // ---------- Staff: withdrawal methods ----------
+
+  /** Removes stored method photos no method uses any more (after a delete, a new upload, or switching to a link). */
+  async function dropUnusedPhotos(before: Treasury, after: Treasury) {
+    const kept = new Set(after.channels.map(c => c.photoFile?.key).filter(Boolean));
+    for (const c of before.channels) {
+      if (c.photoFile && !kept.has(c.photoFile.key)) await files.remove(c.photoFile.key).catch(err => logger.warn({ err, method: c.id }, "couldn't remove an unused method photo"));
+    }
+  }
+  const methodIdOf = (req: Request) => { const p = MethodIdParams.safeParse(req.params); return p.success ? p.data.methodId : null; };
+  const staleVersion = async (version: string) => (await money.settings()).treasury.updatedAt !== version;
+  const STALE = "Withdrawal methods changed since you opened them. Review the latest version and try again.";
+  /** Uploaded photos are set with their own endpoint; preview-mode data: URLs never reach the server. */
+  const photoLinkError = (input: MethodInput) => input.photoUrl.trim().startsWith("data:") ? { error: "Upload the photo with the photo button, or use an https link.", fieldErrors: { photoUrl: "Upload the photo with the photo button, or use an https link." } } : null;
+
+  router.post("/money/methods", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const b = CreateWithdrawalMethodBody.safeParse(req.body);
+    if (!b.success) { res.status(400).json({ error: "Send the settings' version and every method field." }); return; }
+    const input = b.data.method as MethodInput;
+    const photo = photoLinkError(input);
+    if (photo) { res.status(400).json(photo); return; }
+    if (await staleVersion(b.data.version)) { res.status(409).json({ error: STALE }); return; }
+    await asSystem(req, res, "Add withdrawal method", "treasury", (s, by) => createMethod(s, b.data.version, input, by, new Date()));
+  });
+  router.put("/money/methods/:methodId", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = methodIdOf(req);
+    const b = CreateWithdrawalMethodBody.safeParse(req.body);
+    if (!id) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    if (!b.success) { res.status(400).json({ error: "Send the settings' version and every method field." }); return; }
+    const input = b.data.method as MethodInput;
+    const photo = photoLinkError(input);
+    if (photo) { res.status(400).json(photo); return; }
+    const current = (await money.settings()).treasury;
+    if (!current.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    if (current.updatedAt !== b.data.version) { res.status(409).json({ error: STALE }); return; }
+    const done = await asSystem(req, res, "Edit withdrawal method", id, (s, by) => updateMethod(s, b.data.version, id, input, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+  router.post("/money/methods/:methodId/availability", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = methodIdOf(req);
+    const b = SetWithdrawalMethodAvailabilityBody.safeParse(req.body);
+    if (!id || !(await money.settings()).treasury.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    if (!b.success) { res.status(400).json({ error: "Say whether users can choose the method." }); return; }
+    await asSystem(req, res, b.data.enabled ? "Make withdrawal method available" : "Make withdrawal method unavailable", id, (s, by) => setMethodAvailability(s, id, b.data.enabled, by, new Date()));
+  });
+  router.post("/money/methods/:methodId/delete", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = methodIdOf(req);
+    if (!id || !(await money.settings()).treasury.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    const done = await asSystem(req, res, "Delete withdrawal method", id, (s, by) => deleteMethod(s, id, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+  router.put("/money/methods/:methodId/photo", requireStaff, requirePermission("treasury.manage"), express.raw({ type: () => true, limit: MAX_METHOD_PHOTO_BYTES }), async (req: Request, res: Response) => {
+    const id = methodIdOf(req);
+    if (!id || !(await money.settings()).treasury.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
+    const contentType = detectImage(bytes);
+    if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
+    const file: MethodPhotoFile = { key: `${METHOD_PHOTO_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex") };
+    await files.put(file.key, bytes);
+    const done = await asSystem(req, res, "Change withdrawal method photo", id, (s, by) => setMethodPhoto(s, id, "", file, by, new Date()));
+    if (!done.ok) { await files.remove(file.key).catch(() => {}); return; }
+    await dropUnusedPhotos(done.before, done.after);
+  });
+  router.use("/money/methods/:methodId/photo", (err: { type?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large") { res.status(413).json({ error: `Photos can be at most ${MAX_METHOD_PHOTO_BYTES / 1024 / 1024} MB.` }); return; }
+    next(err);
+  });
+  router.post("/money/methods/:methodId/photo/delete", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = methodIdOf(req);
+    if (!id || !(await money.settings()).treasury.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
+    const done = await asSystem(req, res, "Remove withdrawal method photo", id, (s, by) => setMethodPhoto(s, id, "", null, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+
   router.post("/money/lockdown", requireStaff, requirePermission("security.lockdown"), async (req, res) => {
     const b = ReasonBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Explain why the system is being locked down." }); return; }
@@ -296,5 +370,27 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
     await asSystem(req, res, "End system lockdown", "lockdown", (s, by) => endLockdown(s, by, new Date()));
   });
 
+  return router;
+}
+
+/**
+ * Public: a withdrawal method's uploaded photo, so pages can show it in an
+ * image tag (method logos aren't private). The address carries the photo's
+ * hash, so it can be cached; the bytes are checked against that hash.
+ */
+export function withdrawalMethodPhotoRouter(money: MoneyRepo, files: FileStore): IRouter {
+  const router: IRouter = Router();
+  router.get("/withdrawal-methods/:methodId/photo", async (req, res) => {
+    const p = MethodIdParams.safeParse(req.params);
+    const method = p.success ? (await money.settings()).treasury.channels.find(c => c.id === p.data.methodId) : undefined;
+    const file = method?.photoFile;
+    const bytes = file ? await files.get(file.key) : null;
+    if (!file || !bytes || createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
+      if (file) logger.error({ method: method?.id, missing: !bytes }, "withdrawal method photo is missing or doesn't match its record");
+      res.status(404).json({ error: "No photo." }); return;
+    }
+    res.set({ "Content-Type": file.contentType, "Content-Length": String(bytes.length), "Cache-Control": "public, max-age=86400", "Content-Security-Policy": "default-src 'none'; sandbox", "Cross-Origin-Resource-Policy": "same-site" });
+    res.end(bytes);
+  });
   return router;
 }

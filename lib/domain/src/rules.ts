@@ -211,7 +211,8 @@ export function computeBalances(transactions: Transaction[]): Balances {
   for (const tx of transactions) {
     if (tx.status === 'Failed' || tx.status === 'Cancelled') continue;
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
-    if (tx.type === 'Withdrawal') { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; }
+    // Withdrawals come from the grant balance unless the method paid out from the deposit balance.
+    if (tx.type === 'Withdrawal') { if (tx.source === 'deposit') deposit += tx.amount; else { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; } }
     if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
     if (tx.type === 'Card fee' || tx.type === 'Application fee' || tx.type === 'Deposit adjustment') deposit += tx.amount;
     if (tx.type === 'Grant adjustment') grant += tx.amount;

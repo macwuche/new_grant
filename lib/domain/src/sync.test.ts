@@ -131,13 +131,13 @@ describe('activity from the server', () => {
 describe('money from the server', () => {
   const seed = createSeedState();
   const credit = { id: 'TX-180000', applicantId: 'me-uuid', type: 'Grant' as const, description: 'Award (APP-5001)', amount: 3000, status: 'Completed' as const, createdAt: '2026-09-26T10:00:00.000Z' };
-  const money = { transactions: [credit], cards: seed.cards, payoutDestinations: { bank: 'Meridian · •••• 6789' }, destinationChangedAt: '2026-09-25T10:00:00.000Z', treasury: seed.treasury, lockdown: null };
+  const money = { transactions: [credit], cards: seed.cards, savedPayoutDetails: { bank: { 'account-number': '12346789' } }, destinationChangedAt: '2026-09-25T10:00:00.000Z', treasury: seed.treasury, lockdown: null };
 
-  it("gives the applicant their own ledger and destinations in the portal slot", () => {
+  it("gives the applicant their own ledger and remembered payout details in the portal slot", () => {
     const result = adoptServerMoney(seed, money, 'me-uuid');
     if (!result.ok) throw new Error(result.error);
     expect(result.state.transactions).toEqual([{ ...credit, applicantId: CURRENT_APPLICANT_ID }]);
-    expect(result.state.payoutDestinations).toEqual({ bank: 'Meridian · •••• 6789' });
+    expect(result.state.savedPayoutDetails).toEqual({ bank: { 'account-number': '12346789' } });
     expect(result.state.accounts[CURRENT_APPLICANT_ID]!.destinationChangedAt).toBe('2026-09-25T10:00:00.000Z');
   });
 
@@ -148,11 +148,11 @@ describe('money from the server', () => {
     expect(result.state.lockdown?.by).toBe('Sam');
   });
 
-  it('never stores the ledger or destinations in the browser, and restores the demo money after signing out', () => {
+  it('never stores the ledger or payout details in the browser, and restores the demo money after signing out', () => {
     const loaded = adoptServerMoney(seed, money, 'me-uuid');
     if (!loaded.ok) throw new Error(loaded.error);
     const stored = forStorage(loaded.state);
-    expect([stored.transactions, stored.payoutDestinations]).toEqual([[], {}]);
+    expect([stored.transactions, stored.savedPayoutDetails]).toEqual([[], {}]);
     const left = leaveServerMoney(stored);
     if (!left.ok) throw new Error(left.error);
     expect(left.state.transactions).toEqual(seed.transactions);

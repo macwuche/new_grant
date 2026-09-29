@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Effects } from "./activity";
+import { DEFAULT_PRIVACY, type PrivacyPreferences } from "@workspace/domain/profile";
+import type { Effects, NewNotification } from "./activity";
 import { appName, appUrl, renderEmail, type NewEmail } from "./email";
 
 // Sign-in alerts. After a completed sign-in (two-step included) the portal
@@ -29,12 +30,19 @@ export function deviceLabel(userAgent: string | undefined): string {
 const when = (now: Date) => `${now.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 const from = (label: string, ip: string | null) => `${label}${ip ? `, IP address ${ip}` : ""}`;
 
-/** The applicant's notification: every sign-in in the app; emailed (always, as a security notice) only for a new device. */
-export function applicantSignInNotice(applicantId: string, isNew: boolean, label: string, ip: string | null, now: Date) {
+/**
+ * The applicant's notification: every sign-in in the app; for a new device also
+ * emailed (as a security notice, even with email copies off) unless they turned
+ * unusual-activity email off. With activity logging off, the device and IP
+ * address aren't kept in the notice either.
+ */
+export function applicantSignInNotice(applicantId: string, isNew: boolean, label: string, ip: string | null, now: Date, privacy: PrivacyPreferences = DEFAULT_PRIVACY): NewNotification {
+  const where = privacy.activityLogging ? from(label, ip) : null;
   return isNew
-    ? { applicantId, at: now.toISOString(), href: "/settings", title: "New device signed in",
-        body: `Your account was signed in from a new device: ${from(label, ip)}, at ${when(now)}. If this wasn't you, reset your password now and contact the grant team.` }
-    : { applicantId, at: now.toISOString(), href: "/settings", title: "Signed in", body: `Signed in from ${from(label, ip)}.`, email: false as const };
+    ? { applicantId, at: now.toISOString(), href: "/profile", title: "New device signed in",
+        body: `Your account was signed in from a new device${where ? `: ${where},` : ""} at ${when(now)}. If this wasn't you, reset your password now and contact the grant team.`,
+        ...(privacy.unusualActivityEmail ? {} : { email: false as const }) }
+    : { applicantId, at: now.toISOString(), href: "/profile", title: "Signed in", body: where ? `Signed in from ${where}.` : "Signed in.", email: false as const };
 }
 
 /** A staff member's new-device email. */

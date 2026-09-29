@@ -13,4 +13,19 @@ export interface ProfileUpdate {
   phone: string;
   /** @maxLength 300 */
   address: string;
+  /**
+     * Left unchanged when omitted
+     * @maxLength 40
+     */
+  displayName?: string;
+  /**
+     * Left unchanged when omitted
+     * @maxLength 64
+     */
+  telegram?: string;
+  /**
+     * yyyy-mm-dd, or empty to remove; left unchanged when omitted
+     * @maxLength 10
+     */
+  birthDate?: string;
 }

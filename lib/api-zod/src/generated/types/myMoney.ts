@@ -8,13 +8,14 @@
 import type { Cards } from './cards';
 import type { LedgerEntry } from './ledgerEntry';
 import type { Lockdown } from './lockdown';
-import type { MyMoneyPayoutDestinations } from './myMoneyPayoutDestinations';
+import type { MyMoneySavedPayoutDetails } from './myMoneySavedPayoutDetails';
 import type { Treasury } from './treasury';
 
 export interface MyMoney {
   transactions: LedgerEntry[];
   cards: Cards;
-  payoutDestinations: MyMoneyPayoutDestinations;
+  /** The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request */
+  savedPayoutDetails: MyMoneySavedPayoutDetails;
   destinationChangedAt?: string;
   treasury: Treasury;
   lockdown: Lockdown | null;

@@ -67,28 +67,22 @@ describe('application fee', () => {
   });
 });
 
-describe('payout destinations', () => {
-  it('validates each channel and stores only a masked label', () => {
-    expect(M.destinationLabel('bank', { primary: 'Meridian', secondary: '12345678901' })).toEqual({ label: 'Meridian · •••• 8901' });
-    expect(M.destinationLabel('bank', { primary: '', secondary: '12' })).toEqual({ errors: { primary: 'Enter the bank name.', secondary: 'Enter 6–17 digits.' } });
-    expect(M.destinationLabel('wire', { primary: 'mrdnus33', secondary: 'GB29NWBK60161331926819' })).toEqual({ label: 'SWIFT MRDNUS33 · •••• 6819' });
-    expect('errors' in M.destinationLabel('wire', { primary: 'BAD', secondary: '123456' })).toBe(true);
-    expect(M.destinationLabel('mobile', { primary: '+44 7700 900123' })).toEqual({ label: '+44 7700 900123' });
-    expect('errors' in M.destinationLabel('mobile', { primary: 'call me' })).toBe(true);
-    expect(M.destinationLabel('crypto', { primary: 'TXr9ab3kLmN2pQ4sT6vW8yZ1cD5fG7h9jK' })).toEqual({ label: 'USDT (TRC-20) · TXr9…h9jK' });
-    expect('errors' in M.destinationLabel('crypto', { primary: '0xabc' })).toBe(true);
-  });
-
-  it('requires a destination before requesting a payout on that channel', () => {
+describe('remembered payout details', () => {
+  it('keeps the answers with the request, remembers them for next time, and tells staff when they change', () => {
     s = { ...s, treasury: { ...s.treasury, channels: s.treasury.channels.map(c => ({ ...c, enabled: true })) } };
-    expect(M.validateWithdrawal(s, 100, 'crypto')).toMatch(/Payout destinations/);
-    accept(M.savePayoutDestination(s, 'crypto', { primary: 'TXr9ab3kLmN2pQ4sT6vW8yZ1cD5fG7h9jK' }, now));
-    expect(s.staffFeed[0]).toMatchObject({ kind: 'account', title: 'Payout destination added' });
-    const id = accept(M.requestWithdrawal(s, 100, 'crypto', now)).id!;
-    expect(s.transactions.find(t => t.id === id)!.destination).toBe('USDT wallet · USDT (TRC-20) · TXr9…h9jK');
-    accept(M.removePayoutDestination(s, 'crypto'));
-    expect(s.transactions.find(t => t.id === id)!.destination).toContain('TXr9…h9jK');
-    expect(M.savePayoutDestination(s, 'bank', { primary: 'Meridian checking', secondary: '0000000842' }, now).ok).toBe(false); // unchanged
+    const refused = M.requestWithdrawal(s, { amount: 100, method: 'crypto', details: {} }, now);
+    expect(refused.ok === false && refused.fieldErrors).toEqual({ 'details.wallet': 'USDT (TRC-20) wallet address is required.' });
+    const wallet = 'TXr9ab3kLmN2pQ4sT6vW8yZ1cD5fG7h9jK';
+    const id = accept(M.requestWithdrawal(s, { amount: 100, method: 'crypto', details: { wallet } }, now)).id!;
+    const tx = s.transactions.find(t => t.id === id)!;
+    expect(tx.payoutDetails).toEqual([{ fieldId: 'wallet', label: 'USDT (TRC-20) wallet address', value: wallet }]);
+    expect(tx.destination).toBe(`USDT wallet · ${wallet.slice(0, 14)}…${wallet.slice(-8)}`);
+    expect(s.savedPayoutDetails['crypto']).toEqual({ wallet });
+    expect(s.staffFeed.find(e => e.kind === 'account')).toMatchObject({ title: 'Payout details added' });
+    const feed = s.staffFeed.length;
+    accept(M.requestWithdrawal(s, { amount: 60, method: 'crypto', details: { wallet } }, now)); // same answers: no new account alert
+    expect(s.staffFeed.filter(e => e.kind === 'account')).toHaveLength(1);
+    expect(s.staffFeed.length).toBe(feed + 1);
   });
 });
 
@@ -103,10 +97,10 @@ describe('card limits', () => {
   });
 });
 
-describe('saved-data migration v4 → v5', () => {
+describe('saved-data migration v4 → v6', () => {
   it('adds the new records without changing existing programs or applications', () => {
     const seed = createSeedState();
-    const { payoutDestinations: _p, accounts: _a, staff: _s, actingStaffId: _x, audit: _au, lockdown: _l, ...rest } = seed;
+    const { savedPayoutDetails: _p, accounts: _a, staff: _s, actingStaffId: _x, audit: _au, lockdown: _l, ...rest } = seed;
     const v4 = JSON.parse(JSON.stringify({
       ...rest, version: 4,
       grants: rest.grants.map(({ questions: _q, ...g }) => g),
@@ -114,7 +108,8 @@ describe('saved-data migration v4 → v5', () => {
       profile: { ...rest.profile, identityVerified: false },
     }));
     const migrated = migrateState(v4)!;
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(6);
+    expect(migrated.treasury.channels.every(c => c.processingTime && c.source === 'grant' && Array.isArray(c.fields))).toBe(true);
     expect(migrated.grants.every(g => g.questions.length === 0)).toBe(true);
     expect(migrated.applications.every(a => a.escalation === null && typeof a.answers === 'object')).toBe(true);
     expect(migrated.accounts['APL-1001']!.kyc.status).toBe('Not submitted');

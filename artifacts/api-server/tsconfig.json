@@ -24,6 +24,9 @@
     },
     {
       "path": "../../lib/domain"
+    },
+    {
+      "path": "../../lib/api-client-react"
     }
   ]
 }

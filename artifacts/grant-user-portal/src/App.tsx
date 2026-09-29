@@ -12,33 +12,34 @@ import {
 Mail, } from 'lucide-react';
 import { ForgotPasswordPage, LoginPage, NotFoundPage, ResetPasswordPage, SignUpPage } from './pages/AuthPages';
 import { AdminPage } from './pages/AdminPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { DepositsPage } from './pages/DepositsPage';
+import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { AdminLoginPage, AdminResetPasswordPage } from './pages/AdminLogin';
 import {
-  completeCredentialReset as completeServerReset, deleteApplicationDraft, getProfile, saveApplicationDraft, submitApplication as submitServerApplication,
-  submitIdentityCheck, updateProfile as saveServerProfile, type ApplicationResult as ApiApplicationResult, type Message as ApiMessage, type Profile as ApiProfile,
+  deleteApplicationDraft, getProfile, saveApplicationDraft, submitApplication as submitServerApplication,
+  submitIdentityCheck, type ApplicationResult as ApiApplicationResult, type Message as ApiMessage, type Profile as ApiProfile,
 } from '@workspace/api-client-react';
 import { adoptServerApplication, adoptServerProfile, dropServerApplication, type ServerAccount } from '@workspace/domain/sync';
 import * as api from '@workspace/api-client-react';
 import { ServerDataProvider, apiError, useMoneyAction, useServerData, type Outcome as MoneyOutcome } from './lib/serverData';
 import { SessionProvider, useSession } from './lib/session';
 import { DocumentFiles, UploadButton, useMyDocuments } from './lib/documents';
-import { TwoStepCodeForm, TwoStepSetupForm } from './components/TwoStep';
-import type { Application, ApplicationInput, ChannelId, DemoState, DepositMethodId, Grant, KycDocumentType, PayoutChannel, PhysicalCardStatus, ShippingAddress, Tier, Transaction } from '@workspace/domain/model';
+import { TwoStepCodeForm } from './components/TwoStep';
+import type { Application, ApplicationInput, DemoState, Grant, KycDocumentType, PhysicalCardStatus, ShippingAddress, Tier, Transaction } from '@workspace/domain/model';
 import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
-import { completeCredentialReset, KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
+import { KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
 import { lockdownMessage } from '@workspace/domain/security';
 import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
-  saveDraft, setTwoFactor, submitApplication, updateProfile, validateApplication, type ApplicationStep, type ProfileInput,
+  saveDraft, submitApplication, validateApplication, type ApplicationStep,
 } from '@workspace/domain/rules';
 import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
-  activatePhysicalCard, canRequestPhysical, cancelWithdrawal, cardKycBlocker, cardSettingsOf, channelFee, checkAddress, createVirtualCard, DEFAULT_CARD_LIMIT, DESTINATION_FIELDS, formatAddress, fundableFrom, fundCard, fundingSources, physicalInUse, enabledChannels, MIN_CARD_LIMIT, payoutBlocker, physicalCardTotal, removePayoutDestination, requestPhysicalCard,
-  requestWithdrawal, savePayoutDestination, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateCardLimit, validateWithdrawal, type DestinationInput,
+  activatePhysicalCard, canRequestPhysical, cardKycBlocker, cardSettingsOf, checkAddress, createVirtualCard, DEFAULT_CARD_LIMIT, formatAddress, fundableFrom, fundCard, fundingSources, physicalInUse, MIN_CARD_LIMIT, physicalCardTotal, requestPhysicalCard, setCardLimit, TIER_CARD_LIMITS, toggleCardFreeze, validateCardLimit,
 } from '@workspace/domain/money';
-import { cancelDeposit, DEPOSIT_METHODS, requestDeposit, validateDeposit } from '@workspace/domain/deposits';
 import { NotificationsMenu } from './components/NotificationsMenu';
 
 type Toast = (message: string) => void;
@@ -118,14 +119,14 @@ function ShellLayout({ children }: { children: ReactNode }) {
         <div className="demo-note"><strong>{session.status === 'signedIn' ? 'Early access' : 'Illustrative workspace'}</strong><span>{session.status === 'signedIn'
           ? 'Your profile, applications, and balances are saved to your account and handled by the grant team.'
           : 'Your changes are saved in this browser only. Nothing is sent for review, charged, or paid out.'}</span></div>
-        <div className="user-mini"><div className="avatar">{initials}</div><div className="user-mini-text"><div className="user-mini-name">{profile.name}</div><div className="user-mini-email">{profile.email}</div></div><MoreHorizontal size={16} color="#858990" /></div>
+        <Link href="/profile" className="user-mini" aria-label="My profile" data-testid="link-sidebar-profile"><div className="avatar">{initials}</div><div className="user-mini-text"><div className="user-mini-name">{profile.name}</div><div className="user-mini-email">{profile.email}</div></div><MoreHorizontal size={16} color="#858990" /></Link>
       </div>
     </aside>
     <main className="main">
       <header className="topbar">
         <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark"><BrandLetter /></div><div className="brand-name"><Wordmark /></div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
         <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu />{session.status === 'signedIn'
-          ? <><span className="top-avatar" aria-hidden="true">{initials}</span><button className="icon-btn" onClick={() => void session.signOut()} aria-label="Sign out" title="Sign out" data-testid="button-signout"><LogOut size={16} /></button></>
+          ? <><Link href="/profile" className="top-avatar" aria-label="My profile" title="My profile" data-testid="link-top-profile">{initials}</Link><button className="icon-btn" onClick={() => void session.signOut()} aria-label="Sign out" title="Sign out" data-testid="button-signout"><LogOut size={16} /></button></>
           : <Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link>}</div>
       </header>
       <div className="page-wrap"><AccountBanner />{children}</div>
@@ -143,7 +144,7 @@ function AccountBanner() {
   return <div className="stack" style={{ gap: 8, marginBottom: 16 }}>
     {locked && <div className="notice notice-danger" role="alert" data-testid="notice-account-locked"><ShieldAlert size={16} /><div>{locked}</div></div>}
     {state.lockdown && <div className="notice" role="status" data-testid="notice-lockdown"><ShieldAlert size={16} /><div>{lockdownMessage(state)} Pending requests are safe.</div></div>}
-    {resets.length > 0 && <div className="notice" role="status" data-testid="notice-credential-reset"><LockKeyhole size={16} /><div>The grant team asked you to {resets.join(' and ')}. <Link href="/settings" className="link-text">Go to Settings</Link></div></div>}
+    {resets.length > 0 && <div className="notice" role="status" data-testid="notice-credential-reset"><LockKeyhole size={16} /><div>The grant team asked you to {resets.join(' and ')}. <Link href="/profile" className="link-text">Go to My profile</Link></div></div>}
   </div>;
 }
 function pageTitle(location: string, name: string) {
@@ -159,13 +160,16 @@ function pageTitle(location: string, name: string) {
   if (location.startsWith('/transactions')) return 'Transactions';
   if (location.startsWith('/withdrawals')) return 'Withdrawals';
   if (location.startsWith('/deposits')) return 'Add funds';
+  if (location.startsWith('/profile')) return 'My profile';
   return 'Settings';
 }
 function DemoToast({ message, onClose }: { message: string; onClose: () => void }) {
   return <div className="toast" role="status" data-testid="status-demo-toast"><Info size={17} color="hsl(74 88% 58%)" /><div><span>{message}</span></div><button onClick={onClose} aria-label="Close message" data-testid="button-close-toast"><X size={15} /></button></div>;
 }
-function Metric({ label, value, helper, className = '' }: { label: string; value: string; helper: string; className?: string }) {
-  return <div className={`card metric-card ${className}`} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}><div className="metric-label"><span>{label}</span><Info size={14} /></div><div className="metric-value">{value}</div><div className="metric-helper">{helper}</div>{className && <span className="metric-orb" />}</div>;
+/** A dashboard figure; `action` (a small button or link) sits at the end of the helper line. */
+function Metric({ label, value, helper, className = '', action }: { label: string; value: string; helper: string; className?: string; action?: ReactNode }) {
+  const helperLine = <div className="metric-helper">{helper}</div>;
+  return <div className={`card metric-card ${className}`} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}><div className="metric-label"><span>{label}</span><Info size={14} /></div><div className="metric-value">{value}</div>{action ? <div className="metric-foot">{helperLine}{action}</div> : helperLine}{className && <span className="metric-orb" />}</div>;
 }
 function StatusBadge({ status, tone }: { status: string; tone?: string }) { return <span className={statusClass(tone ?? status)} data-testid={`status-${status.toLowerCase().replaceAll(' ', '-')}`}>{status}</span>; }
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -185,8 +189,10 @@ function Dashboard({ onToast }: { onToast: Toast }) {
     <section className="hero-card card"><div className="hero-copy"><div className="kicker">A clearer way forward</div><h2>Keep your next move well funded.</h2><p>Track grant decisions, understand your available funds, and keep every account detail in one calm workspace.</p><Link className="btn btn-primary" href="/grants" style={{ marginTop: 22 }} data-testid="link-explore-grants">Explore grants <ArrowRight size={15} /></Link></div><div className="hero-visual"><div className="hero-stamp">YOUR<br />MOMENTUM<br />MATTERS</div></div></section>
     <section className="grid-4">
       <Metric label="Eligible amount" value={money(maxEligibleAward(state.grants, state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
-      <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" />
-      <Metric label="Deposit balance" value={money(balances.deposit)} helper={balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees'} />
+      <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" 
+        action={<Link href="/withdrawals" className="metric-action" data-testid="link-dashboard-withdraw"><ArrowUpRight size={13} aria-hidden="true" />Withdraw</Link>} />
+      <Metric label="Successful deposit" value={money(balances.deposit)} helper={balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees'}
+        action={<Link href="/deposits" className="metric-action" data-testid="link-dashboard-deposit"><Plus size={13} aria-hidden="true" />Deposit</Link>} />
       <Metric label="Account tier" value={`Tier ${state.profile.tier}`} helper={state.profile.identityVerified ? 'Verified applicant' : 'Verification needed'} />
     </section>
     <section className="grid-2">
@@ -695,78 +701,6 @@ function CancelButton({ tx, onCancel, label }: { tx: Transaction; onCancel: (id:
     ? <span style={{ display: 'inline-flex', gap: 6 }}><button className="btn btn-ghost" onClick={() => onCancel(tx.id)} data-testid={`button-confirm-cancel-${tx.id}`}>Confirm</button><button className="btn btn-ghost" onClick={() => setConfirming(false)} aria-label="Keep request" data-testid={`button-keep-${tx.id}`}><X size={14} /></button></span>
     : <button className="btn btn-ghost" onClick={() => setConfirming(true)} data-testid={`button-cancel-${tx.id}`}>{label}</button>;
 }
-function WithdrawalsPage({ onToast }: { onToast: Toast }) {
-  const { state, run } = useDemoStore();
-  const channels = enabledChannels(state);
-  const [channelId, setChannelId] = useState<ChannelId | ''>(channels[0]?.id ?? '');
-  const [amount, setAmount] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const balances = computeBalances(ownTransactions(state));
-  const channel = channels.find(c => c.id === channelId) ?? channels[0];
-  const value = amount.trim() === '' ? NaN : Number(amount);
-  const fee = channel ? channelFee(channel, value) : 0;
-  const blocker = payoutBlocker(state);
-  const history = ownTransactions(state).filter(t => t.type === 'Withdrawal').sort(byNewest(t => t.createdAt));
-  const preview = () => { if (!channel) return; const problem = validateWithdrawal(state, value, channel.id); setError(problem); if (!problem) setShowModal(true); };
-  const moneyAction = useMoneyAction();
-  const confirm = async () => {
-    if (!channel) return;
-    const result = await moneyAction(s => requestWithdrawal(s, value, channel.id, new Date()), () => api.requestWithdrawal({ amount: value, channel: channel.id }));
-    setShowModal(false);
-    if (!result.ok) { setError(result.error); return; }
-    setAmount('');
-    onToast(`${result.message} The finance team will process it.`);
-  };
-  const cancel = async (id: string) => { const result = await moneyAction(s => cancelWithdrawal(s, id, new Date()), () => api.cancelWithdrawal(id)); onToast(result.ok ? result.message : result.error); };
-  const feeText = (c: PayoutChannel) => [c.feeRate ? `${+(c.feeRate * 100).toFixed(2)}%` : '', c.feeFixed ? `${money(c.feeFixed)} fixed` : ''].filter(Boolean).join(' + ') + (c.feeCap && c.feeRate ? `, max ${money(c.feeCap)}` : '') || 'No fee';
-  return <div className="stack"><div className="detail-layout"><div className="stack"><div className="withdraw-summary"><div className="metric-label"><span>Available to request</span><WalletCards size={15} /></div><div className="metric-value">{money(balances.grant)}</div><div className="metric-helper">Grant balance{balances.pendingWithdrawals > 0 ? ` · ${money(balances.pendingWithdrawals)} held for pending payouts` : ''}</div></div><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Request a payout</h2><p className="section-subtitle">Choose a channel and check the fee breakdown.</p></div></div>
-    {blocker && <div className="notice mb" role="alert" data-testid="notice-payout-blocked"><Info size={16} /><div>{blocker}{blocker.includes('deposit balance') && <> <Link href="/deposits" className="link-text">Add funds</Link></>}</div></div>}
-    {channel && <><div className="field mb"><label className="field-label" htmlFor="withdrawal-amount">Amount (USD)</label><input id="withdrawal-amount" type="number" inputMode="decimal" min={channel.min} max={channel.max} step="0.01" className="input" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-withdrawal-amount" aria-invalid={!!error} aria-describedby={error ? 'withdrawal-error' : undefined} />{error ? <FieldError id="withdrawal-error" message={error} /> : <span className="field-hint">{channel.name}: {money(channel.min)} – {money(Math.min(channel.max, Math.max(balances.grant, 0)))}</span>}</div>
-    <div className="field"><span className="field-label">Payout channel</span><div className="stack" style={{ gap: 8 }}>{channels.map(c => <label key={c.id} className={`payout-method ${channel.id === c.id ? 'active' : ''}`}><input type="radio" name="payout" checked={channel.id === c.id} onChange={() => { setChannelId(c.id); setError(null); }} data-testid={`radio-payout-${c.id}`} /><div className="payout-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{c.name}</strong><span>{state.payoutDestinations[c.id] ?? 'No destination saved'} · fee {feeText(c)}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div></>}
-    {channel && !state.payoutDestinations[channel.id] && <div className="notice mt" role="note" data-testid="notice-missing-destination"><Info size={16} /><div>Add your {channel.name} details before requesting a payout. <Link href="/settings#payouts" className="link-text">Payout destinations</Link></div></div>}
-    {channel && channel.max >= state.treasury.dualControlThreshold && <p className="field-hint mt">Requests of {money(state.treasury.dualControlThreshold)} or more need two members of the finance and compliance team to sign off, so they can take longer.</p>}
-    <div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>The finance team reviews every request.</span><button className="btn btn-primary" onClick={preview} disabled={!channel || !!blocker || balances.grant <= 0} data-testid="button-preview-withdrawal">Review request <ArrowRight size={15} /></button></div></div></div>
-    <aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Fee breakdown</h2><p className="section-subtitle">{channel ? `${channel.name}: ${feeText(channel)}` : 'No channel available'}</p></div></div><div className="fee-row"><span>Requested amount</span><strong>{money(value || 0)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(Math.max(0, (value || 0) - fee))}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The fee is deducted from the payout. Rates are set by the finance team and apply to new requests.</p></aside></div>
-    <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Payout requests</h2><p className="section-subtitle">Pending requests are held from your grant balance until the finance team marks them paid or failed. You can cancel a request while it's pending.</p></div></div><TransactionTable rows={history} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
-    {showModal && channel && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="withdrawal-modal-title"><div className="modal"><div className="modal-head"><div><h2 id="withdrawal-modal-title">Confirm payout request</h2><p>The request stays pending until the finance team processes it.</p></div><button className="icon-btn" onClick={() => setShowModal(false)} aria-label="Close" data-testid="button-close-withdrawal-modal"><X size={16} /></button></div><div className="fee-row"><span>Destination</span><strong>{channel.name} · {state.payoutDestinations[channel.id]}</strong></div><div className="fee-row"><span>Amount</span><strong>{money(value)}</strong></div><div className="fee-row"><span>Processing fee</span><strong>{money(fee)}</strong></div><div className="fee-row"><span>You receive</span><strong>{money(value - fee)}</strong></div><div style={{ display: 'flex', gap: 8, marginTop: 18 }}><button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)} data-testid="button-cancel-withdrawal">Cancel</button><button className="btn btn-dark" style={{ flex: 1 }} onClick={confirm} data-testid="button-confirm-withdrawal">Submit request</button></div></div></div>}
-  </div>;
-}
-function DepositsPage({ onToast }: { onToast: Toast }) {
-  const { state, run } = useDemoStore();
-  const [methodId, setMethodId] = useState<DepositMethodId>('bank');
-  const [amount, setAmount] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [latest, setLatest] = useState<string | null>(null);
-  const balances = computeBalances(ownTransactions(state));
-  const { treasury } = state;
-  const method = DEPOSIT_METHODS.find(m => m.id === methodId)!;
-  const deposits = ownTransactions(state).filter(t => t.type === 'Deposit').sort(byNewest(t => t.createdAt));
-  const justCreated = latest ? deposits.find(t => t.id === latest && t.status === 'Pending') : undefined;
-  const moneyAction = useMoneyAction();
-  const submit = async () => {
-    const value = amount.trim() === '' ? NaN : Number(amount);
-    const problem = validateDeposit(state, value);
-    if (problem) { setError(problem); return; }
-    const result = await moneyAction(s => requestDeposit(s, value, methodId, new Date()), () => api.requestDeposit({ amount: value, method: methodId }));
-    if (!result.ok) { setError(result.error); return; }
-    setError(null); setAmount(''); setLatest(result.id ?? null);
-    onToast(result.message);
-  };
-  const cancel = async (id: string) => { const result = await moneyAction(s => cancelDeposit(s, id, new Date()), () => api.cancelDeposit(id)); onToast(result.ok ? result.message : result.error); };
-  return <div className="stack"><div className="page-intro"><h2>Add funds to your deposit balance.</h2><p>Your deposit balance pays card fees and must hold a small reserve before payouts. Announce a transfer here, send it with the reference, and it's credited once the finance team confirms it arrived.</p></div>
-    <div className="detail-layout"><div className="card card-pad">
-      <div className="section-head"><div><h2 className="section-title">New deposit</h2><p className="section-subtitle">{money(treasury.minDeposit)} – {money(treasury.maxDeposit)} per deposit.</p></div></div>
-      
-      <div className="field mb"><label className="field-label" htmlFor="deposit-amount">Amount (USD)</label><input id="deposit-amount" className="input" type="number" inputMode="decimal" min={treasury.minDeposit} max={treasury.maxDeposit} step="0.01" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="0.00" data-testid="input-deposit-amount" aria-invalid={!!error} aria-describedby={error ? 'deposit-error' : undefined} /><FieldError id="deposit-error" message={error ?? undefined} /></div>
-      <div className="field"><span className="field-label">Method</span><div className="stack" style={{ gap: 8 }}>{DEPOSIT_METHODS.map(m => <label key={m.id} className={`payout-method ${methodId === m.id ? 'active' : ''}`}><input type="radio" name="deposit-method" checked={methodId === m.id} onChange={() => setMethodId(m.id)} data-testid={`radio-deposit-${m.id}`} /><div className="payout-icon">{m.id === 'bank' ? <Landmark size={15} /> : <Banknote size={15} />}</div><div className="payout-copy"><strong>{m.name}</strong><span>{m.timing}</span></div><ChevronDown size={14} color="hsl(var(--muted))" /></label>)}</div></div>
-      <div className="form-actions"><span className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>You'll get a reference to include with your transfer.</span><button className="btn btn-primary" onClick={submit} data-testid="button-submit-deposit">Get payment reference <ArrowRight size={15} /></button></div>
-      {justCreated && <div className="card mt" style={{ padding: 16, background: 'hsl(var(--background))' }} data-testid="panel-deposit-instructions"><strong style={{ fontSize: 13 }}>Send {money(justCreated.amount)} to:</strong><div className="fee-row"><span>Pay to</span><strong>{method.payTo}</strong></div><div className="fee-row"><span>Reference</span><strong className="mono" data-testid="text-deposit-reference">{justCreated.reference}</strong></div><p className="field-hint">Include the reference exactly, or finance can't match your transfer. {method.timing}.</p></div>}
-    </div>
-    <aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Deposit balance</h2><p className="section-subtitle">Confirmed funds only.</p></div></div><div className="fee-row"><span>Available</span><strong data-testid="text-deposit-balance">{money(balances.deposit)}</strong></div><div className="fee-row"><span>Awaiting confirmation</span><strong>{money(balances.pendingDeposits)}</strong></div><div className="fee-row"><span>Required reserve</span><strong>{money(treasury.depositThreshold)}</strong></div><p className="field-hint" style={{ marginTop: 15 }}>The reserve must stay in your deposit balance to request payouts or a physical card.</p></aside></div>
-    <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your deposits</h2><p className="section-subtitle">Cancel a deposit if you decide not to send it.</p></div></div><TransactionTable rows={deposits} action={tx => <CancelButton tx={tx} onCancel={cancel} label="Cancel" />} /></section>
-  </div>;
-}
 function IdentityCheck({ onToast }: { onToast: Toast }) {
   const { state, run } = useDemoStore();
   const { connected } = useServerData();
@@ -810,25 +744,6 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
     </div>}
   </div><StatusBadge status={kyc.status} tone={tone} /></div>;
 }
-/** Signed in only: the account's authenticator apps, and completing a two-step reset the grant team required. */
-function TwoStepSettings({ pendingReset, onReset, onToast }: { pendingReset: boolean; onReset: () => Promise<void>; onToast: Toast }) {
-  const session = useSession();
-  const [adding, setAdding] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const enrolled = session.factors.length > 0;
-  const remove = async (id: string) => { const failure = await session.removeTwoStep(id); setConfirmRemove(null); onToast(failure ?? 'Authenticator app removed.'); };
-  return <div className="verification-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }} data-testid="section-two-step"><div className="verification-icon"><LockKeyhole size={15} /></div>
-    <div className="verification-copy" style={{ flex: '1 1 240px' }}><strong>Two-step sign-in</strong>
-      <span>{pendingReset ? 'The grant team reset this. Remove your old authenticator app, add a new one, then confirm.' : enrolled ? 'On. You enter a code from your authenticator app each time you sign in.' : 'Off. Add an authenticator app so a stolen password isn\'t enough to get in.'}</span>
-      {session.factors.map(f => <div key={f.id} className="doc-row" style={{ marginTop: 8 }}><span className="doc-name">{f.name}</span><span className="doc-meta">Added {fmtDate(f.createdAt)}</span><span className="doc-actions">{confirmRemove === f.id
-        ? <button className="btn btn-ghost danger-text" onClick={() => void remove(f.id)} data-testid={`button-confirm-remove-factor-${f.id}`}>Confirm remove</button>
-        : <button className="btn btn-ghost" onClick={() => setConfirmRemove(f.id)} data-testid={`button-remove-factor-${f.id}`}>Remove</button>}</span></div>)}
-      {adding ? <div style={{ marginTop: 12 }}><TwoStepSetupForm ui="app" onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onToast('Two-step sign-in is on.'); if (pendingReset) void onReset(); }} /></div>
-        : (!enrolled || pendingReset) && <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setAdding(true)} data-testid="button-add-two-step">{pendingReset ? 'Add new authenticator app' : 'Turn on two-step sign-in'}</button>}
-    </div>
-    <StatusBadge status={enrolled ? 'On' : 'Off'} tone={enrolled ? 'Completed' : 'Draft'} /></div>;
-}
-
 /** Signed in only: whether notifications are also emailed to the account's address. */
 function EmailPreferenceCard({ onToast }: { onToast: Toast }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -844,82 +759,22 @@ function EmailPreferenceCard({ onToast }: { onToast: Toast }) {
   return <div className="card card-pad" id="email" data-testid="section-email-preference"><div className="verification-item" style={{ border: 0, padding: 0 }}><div className="verification-icon"><Mail size={15} /></div><div className="verification-copy"><strong>Email copies of notifications</strong><span>{enabled === null ? 'Loading…' : enabled ? 'Review outcomes, identity checks, deposits, payouts, and account changes are also sent to your email.' : 'Off. You\'ll only see notifications in the bell.'}</span></div>
     <button className={`switch ${enabled ? 'on' : ''}`} role="switch" aria-checked={!!enabled} disabled={enabled === null || saving} onClick={() => void toggle()} aria-label="Email copies of notifications" data-testid="button-toggle-email-notifications" /></div></div>;
 }
-function PayoutDestinationsCard({ onToast }: { onToast: Toast }) {
-  const { state, run } = useDemoStore();
-  const [editing, setEditing] = useState<ChannelId | null>(null);
-  const [input, setInput] = useState<DestinationInput>({ primary: '', secondary: '' });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const open = (id: ChannelId) => { setEditing(id); setInput({ primary: '', secondary: '' }); setErrors({}); };
-  const moneyAction = useMoneyAction();
-  const save = async () => {
-    if (!editing) return;
-    const result = await moneyAction(s => savePayoutDestination(s, editing, input, new Date()), () => api.savePayoutDestination({ channel: editing, primary: input.primary, ...(input.secondary ? { secondary: input.secondary } : {}) }));
-    if (!result.ok) { setErrors(result.fieldErrors ?? {}); if (!result.fieldErrors) onToast(result.error); return; }
-    setEditing(null); onToast(result.message);
-  };
-  const remove = async (id: ChannelId) => { const result = await moneyAction(s => removePayoutDestination(s, id), () => api.removePayoutDestination(id)); onToast(result.ok ? result.message : result.error); };
-  return <div className="card card-pad" id="payouts" data-testid="section-payout-destinations"><div className="section-head"><div><h2 className="section-title">Payout destinations</h2><p className="section-subtitle">Where payouts go for each channel. Only a masked label is kept. Changing a destination is reviewed by the team for your security.</p></div><Landmark size={19} color="hsl(var(--muted))" /></div>
-    {state.treasury.channels.map(c => { const saved = state.payoutDestinations[c.id]; return <div key={c.id} className="verification-item" style={{ flexWrap: 'wrap' }} data-testid={`row-destination-${c.id}`}>
-      <div className="verification-icon">{c.id === 'bank' || c.id === 'wire' ? <Landmark size={15} /> : <Banknote size={15} />}</div>
-      <div className="verification-copy" style={{ flex: '1 1 200px' }}><strong>{c.name}{!c.enabled && <span className="muted" style={{ fontWeight: 500 }}> · not offered right now</span>}</strong><span>{saved ?? 'Not set'}</span></div>
-      <div style={{ display: 'flex', gap: 6 }}><button className="btn btn-ghost" onClick={() => editing === c.id ? setEditing(null) : open(c.id)} data-testid={`button-edit-destination-${c.id}`}>{editing === c.id ? 'Cancel' : saved ? 'Change' : 'Add'}</button>{saved && editing !== c.id && <button className="icon-btn" onClick={() => remove(c.id)} aria-label={`Remove ${c.name} destination`} data-testid={`button-remove-destination-${c.id}`}><Trash2 size={14} /></button>}</div>
-      {editing === c.id && <div className="field-grid" style={{ flexBasis: '100%', marginTop: 10 }}>
-        {DESTINATION_FIELDS[c.id].map(f => { const id = `dest-${c.id}-${f.key}`; return <div className="field" key={f.key}><label className="field-label" htmlFor={id}>{f.label}</label><input id={id} className="input" autoComplete="off" placeholder={f.placeholder} value={input[f.key] ?? ''} onChange={e => { setInput({ ...input, [f.key]: e.target.value }); setErrors(({ [f.key]: _, ...rest }) => rest); }} data-testid={`input-destination-${c.id}-${f.key}`} aria-invalid={!!errors[f.key]} aria-describedby={errors[f.key] ? `${id}-error` : undefined} /><FieldError id={`${id}-error`} message={errors[f.key]} /></div>; })}
-        <div className="field-full" style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" onClick={() => void save()} data-testid={`button-save-destination-${c.id}`}>Save destination</button></div>
-      </div>}
-    </div>; })}
-  </div>;
-}
 function SettingsPage({ onToast }: { onToast: Toast }) {
-  const { state, run, reset } = useDemoStore();
+  const { state, reset } = useDemoStore();
   const { connected } = useServerData();
-  const [saving, setSaving] = useState(false);
   const { profile } = state;
-  const account = accountOf(state, CURRENT_APPLICANT_ID);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<ProfileInput>(profile);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmReset, setConfirmReset] = useState(false);
-  useEffect(() => { if (window.location.hash === '#payouts') document.getElementById('payouts')?.scrollIntoView(); }, []);
-  const startEdit = () => { setDraft({ name: profile.name, email: profile.email, phone: profile.phone, address: profile.address }); setErrors({}); setEditing(true); };
-  const save = async () => {
-    if (!connected) {
-      const result = run(s => updateProfile(s, draft));
-      if (!result.ok) { setErrors(result.fieldErrors ?? {}); return; }
-      setEditing(false); onToast(result.message);
-      return;
-    }
-    setSaving(true);
-    try {
-      const saved = await saveServerProfile({ name: draft.name, phone: draft.phone, address: draft.address });
-      run(s => adoptServerProfile(s, saved));
-      setEditing(false); onToast('Profile saved.');
-    } catch (err) {
-      const failure = apiError(err, "Couldn't save your profile. Try again.");
-      setErrors(failure.fieldErrors ?? {});
-      if (!failure.fieldErrors) onToast(failure.error);
-    } finally { setSaving(false); }
-  };
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const complete = async (kind: 'password' | 'twoFactor') => {
-    if (!connected) { const r = run(s => completeCredentialReset(s, kind)); onToast(r.ok ? r.message : r.error); return; }
-    try { run(adoptProfile(await completeServerReset({ kind }))); onToast(kind === 'password' ? 'Password reset recorded.' : 'Two-step sign-in reset recorded.'); }
-    catch (err) { onToast(apiError(err, "Couldn't record that. Try again.").error); }
-  };
-  const shown = editing ? draft : profile;
-  // Signed in, the email is the sign-in account's and can't be edited here.
-  const field = (key: keyof ProfileInput, label: string) => <div className="field"><label className="field-label" htmlFor={`profile-${key}`}>{label}</label><input id={`profile-${key}`} className="input" disabled={!editing || (connected && key === 'email')} value={shown[key]} onChange={e => { setDraft({ ...draft, [key]: e.target.value }); setErrors(({ [key]: _, ...rest }) => rest); }} data-testid={`input-profile-${key}`} aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `profile-${key}-error` : undefined} /><FieldError id={`profile-${key}-error`} message={errors[key]} /></div>;
-  return <div className="detail-layout settings-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Your profile and security controls.</p></div></div><div className="settings-nav"><button onClick={() => jump('profile')} data-testid="tab-settings-profile">Profile details</button><button onClick={() => jump('verification')} data-testid="tab-settings-verification">Verification & security</button><button onClick={() => jump('payouts')} data-testid="tab-settings-payouts">Payout destinations</button>{!connected && <button onClick={() => jump('demo-data')} data-testid="tab-settings-demo">Sample data</button>}</div></aside><div className="stack">
-    <div className="card card-pad" id="profile"><div className="section-head"><div><h2 className="section-title">Profile details</h2><p className="section-subtitle">Keep your contact details current.</p></div><button className="btn btn-ghost" onClick={() => editing ? setEditing(false) : startEdit()} data-testid="button-edit-profile">{editing ? 'Cancel' : 'Edit profile'}</button></div><div className="field-grid">{field('name', 'Full name')}{field('email', 'Email')}{field('phone', 'Phone')}{field('address', 'Address')}</div>{editing && <div className="form-actions"><span className="muted" style={{ fontSize: 11 }}>{connected ? 'Saved to your account. Your email is your sign-in address.' : 'Saved in this browser only.'}</span><button className="btn btn-primary" onClick={() => void save()} disabled={saving} data-testid="button-save-profile">{saving ? 'Saving…' : 'Save changes'}</button></div>}</div>
-    <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Verification & security</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
+  // Personal details, photo, password, email, two-step sign-in, and security activity live on /profile.
+  return <div className="detail-layout settings-layout"><aside className="card card-pad"><div className="section-head"><div><h2 className="section-title">Account settings</h2><p className="section-subtitle">Verification and notifications.</p></div></div><div className="settings-nav"><Link href="/profile" className="settings-nav-link" data-testid="link-settings-profile">Profile &amp; security</Link><button onClick={() => jump('verification')} data-testid="tab-settings-verification">Identity verification</button>{!connected && <button onClick={() => jump('demo-data')} data-testid="tab-settings-demo">Sample data</button>}</div></aside><div className="stack">
+    <div className="card card-pad" id="profile" data-testid="section-settings-profile-link"><div className="verification-item" style={{ border: 0, padding: 0, flexWrap: 'wrap' }}><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy" style={{ flex: '1 1 220px' }}><strong>Profile &amp; security</strong><span>Your photo, personal details, password, email, two-step sign-in, privacy switches, and recent security activity.</span></div><Link href="/profile" className="btn btn-dark" data-testid="link-open-profile">Open My profile <ArrowRight size={14} /></Link></div></div>
+    <div className="card card-pad" id="verification"><div className="section-head"><div><h2 className="section-title">Identity verification</h2><p className="section-subtitle">The signals behind your Tier {profile.tier} account.</p></div><BadgeCheck size={21} color="hsl(var(--success))" /></div>
       <IdentityCheck onToast={onToast} />
       <div className="verification-item"><div className="verification-icon"><ShieldCheck size={15} /></div><div className="verification-copy"><strong>Account tier</strong><span>Tier {profile.tier} · sets which grants you can apply for. The grant team changes tiers after review.</span></div><span style={{ font: '700 12px var(--app-font-display)' }}>Tier {profile.tier}</span></div>
-      {connected ? <TwoStepSettings pendingReset={account.twoFactorResetRequired} onReset={() => complete('twoFactor')} onToast={onToast} /> : <div className="verification-item"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>Two-step sign-in</strong><span>{account.twoFactorResetRequired ? 'The team reset this. Set it up again.' : 'Preference only until sign-in is connected'}</span></div>{account.twoFactorResetRequired ? <button className="btn btn-ghost" onClick={() => void complete('twoFactor')} data-testid="button-complete-2fa-reset">Set up again</button> : <button className={`switch ${profile.twoFactor ? 'on' : ''}`} role="switch" aria-checked={profile.twoFactor} onClick={() => { const r = run(s => setTwoFactor(s, !profile.twoFactor)); if (r.ok) onToast(r.message); }} aria-label="Toggle two-step sign-in" data-testid="button-toggle-two-factor" />}</div>}
-      {account.passwordResetRequired && <div className="verification-item" data-testid="row-password-reset"><div className="verification-icon"><LockKeyhole size={15} /></div><div className="verification-copy"><strong>New password required</strong><span>{connected ? 'Requested by the grant team. Sign out, use “Forgot password?” on the sign-in page, and choose a new password from the emailed link; that completes it.' : "Requested by the grant team. Sign-in isn't connected, so nothing is stored."}</span></div><button className="btn btn-ghost" onClick={() => void complete('password')} data-testid="button-complete-password-reset">I've reset it</button></div>}
     </div>
     {connected && <EmailPreferenceCard onToast={onToast} />}
-    <PayoutDestinationsCard onToast={onToast} />
-    {!connected && <div className="card card-pad" id="demo-data"><div className="section-head"><div><h2 className="section-title">Sample data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser. Resetting also clears the staff audit log and settings.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); setEditing(false); onToast('Sample data reset to the original records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset sample data</button>}</div></div>}
+    <div className="card card-pad" id="payouts" data-testid="section-settings-payout-details"><div className="verification-item" style={{ border: 0, padding: 0, flexWrap: 'wrap' }}><div className="verification-icon"><WalletCards size={15} /></div><div className="verification-copy" style={{ flex: '1 1 220px' }}><strong>Payout details</strong><span>You enter them with each withdrawal, on the method's form. Your last answers for each method are filled in for you next time.</span></div><Link href="/withdrawals" className="btn btn-dark" data-testid="link-open-withdrawals">Go to Withdrawals <ArrowRight size={14} /></Link></div></div>
+    {!connected && <div className="card card-pad" id="demo-data"><div className="section-head"><div><h2 className="section-title">Sample data</h2><p className="section-subtitle">Applications, payouts, card changes, and profile edits are stored in this browser. Resetting also clears the staff audit log and settings.</p></div><RotateCcw size={19} color="hsl(var(--muted))" /></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{confirmReset ? <><button className="btn btn-dark" onClick={() => { reset(); setConfirmReset(false); onToast('Sample data reset to the original records.'); }} data-testid="button-confirm-reset-demo">Yes, reset everything</button><button className="btn btn-ghost" onClick={() => setConfirmReset(false)} data-testid="button-cancel-reset-demo">Keep my changes</button></> : <button className="btn btn-ghost" onClick={() => setConfirmReset(true)} data-testid="button-reset-demo">Reset sample data</button>}</div></div>}
   </div></div>;
 }
 
@@ -930,14 +785,14 @@ function RouterView({ onToast }: { onToast: Toast }) {
     const titles: Record<string, string> = {
       '/': 'Dashboard', '/dashboard': 'Dashboard', '/grants': 'Grant categories',
       '/applications': 'Applications', '/cards': 'Cards', '/transactions': 'Transactions',
-      '/withdrawals': 'Withdrawals', '/deposits': 'Add funds', '/settings': 'Settings',
+      '/withdrawals': 'Withdrawals', '/deposits': 'Add funds', '/settings': 'Settings', '/profile': 'My profile',
       '/login': 'Sign in', '/signup': 'Create an account', '/forgot-password': 'Reset password', '/reset-password': 'Choose a new password',
-      '/admin': 'Admin overview', '/admin/login': 'Staff sign-in', '/admin/reset-password': 'Reset staff password', '/admin/applicants': 'Admin applicants',
+      '/admin': 'Admin overview', '/admin/login': 'Staff sign-in', '/admin/reset-password': 'Reset staff password', '/admin/applicants': 'Admin users',
       '/admin/inbox': 'Admin email inbox',
       '/admin/applications': 'Admin applications', '/admin/payouts': 'Admin payouts', '/admin/deposits': 'Admin deposits', '/admin/cards': 'Admin cards', '/admin/grants': 'Admin grants', '/admin/security': 'Admin security', '/admin/audit': 'Admin audit log',
       '/admin/settings': 'Admin settings',
     };
-    const title = titles[location] ?? (location.startsWith('/admin/settings/') ? 'Admin settings' : location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
+    const title = titles[location] ?? (location.startsWith('/admin/settings/') ? 'Admin settings' : location.startsWith('/admin/applicants/') ? 'Admin user profile' : location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
     const description = location.startsWith('/admin')
       ? `Explore the ${appName} admin UI preview. Sample records only; admin access and changes are not active.`
       : `Explore the ${appName} grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.`;
@@ -981,6 +836,7 @@ function RouterView({ onToast }: { onToast: Toast }) {
     <Route path="/withdrawals"><Shell><WithdrawalsPage onToast={onToast} /></Shell></Route>
     <Route path="/deposits"><Shell><DepositsPage onToast={onToast} /></Shell></Route>
     <Route path="/settings"><Shell><SettingsPage onToast={onToast} /></Shell></Route>
+    <Route path="/profile"><Shell><ProfilePage onToast={onToast} /></Shell></Route>
     <Route><NotFoundPage /></Route>
   </Switch>;
 }

@@ -1,4 +1,5 @@
-import type { AccountControls, Application, ApplicationEvent, DemoState, Grant, Notification, PayoutDestinations, ProgramQuestion, StaffEvent, StaffMember, Treasury } from './model';
+import { BUILTIN_METHOD_DETAILS } from './withdrawalMethods';
+import type { AccountControls, Application, ApplicationEvent, DemoState, Grant, Notification, ProgramQuestion, SavedPayoutDetails, StaffEvent, StaffMember, Treasury } from './model';
 
 /** The demo applicant who uses the applicant portal. */
 export const CURRENT_APPLICANT_ID = 'APL-1001';
@@ -49,9 +50,12 @@ export function seedGrants(): Grant[] {
   }));
 }
 
-/** The demo applicant's saved payout destinations (fictional). USDT starts unset. */
-export function seedPayoutDestinations(): PayoutDestinations {
-  return { bank: 'Meridian checking · •••• 0842', wire: 'SWIFT MRDNUS33 · •••• 0842', mobile: '+1 (415) 555-0148' };
+/** The demo applicant's remembered payout answers per method (fictional). USDT starts empty. */
+export function seedSavedPayoutDetails(): SavedPayoutDetails {
+  return {
+    bank: { 'bank-name': 'Meridian Bank', 'account-name': 'Alex Morgan', 'account-number': '4403990842' },
+    mobile: { phone: '+1 (415) 555-0148', network: 'Other' },
+  };
 }
 
 const account = (fields: Partial<AccountControls> & Pick<AccountControls, 'kyc' | 'signals'>): AccountControls => ({ status: 'Active', passwordResetRequired: false, twoFactorResetRequired: false, ...fields });
@@ -75,10 +79,10 @@ const TREASURY_CREATED = '2026-06-01T09:00:00.000Z';
 export function seedTreasury(): Treasury {
   return {
     channels: [
-      { id: 'bank', name: 'Bank transfer', enabled: true, min: 10, max: 10000, feeRate: 0.0125, feeFixed: 0, feeCap: 14 },
-      { id: 'mobile', name: 'Mobile money', enabled: true, min: 10, max: 2000, feeRate: 0.015, feeFixed: 0, feeCap: 10 },
-      { id: 'wire', name: 'Wire transfer', enabled: false, min: 500, max: 50000, feeRate: 0, feeFixed: 25, feeCap: 25 },
-      { id: 'crypto', name: 'USDT wallet', enabled: false, min: 50, max: 20000, feeRate: 0.01, feeFixed: 1, feeCap: 20 },
+      { id: 'bank', name: 'Bank transfer', enabled: true, min: 10, max: 10000, feeRate: 0.0125, feeFixed: 0, feeCap: 14, photoUrl: '', source: 'grant', ...BUILTIN_METHOD_DETAILS['bank']! },
+      { id: 'mobile', name: 'Mobile money', enabled: true, min: 10, max: 2000, feeRate: 0.015, feeFixed: 0, feeCap: 10, photoUrl: '', source: 'grant', ...BUILTIN_METHOD_DETAILS['mobile']! },
+      { id: 'wire', name: 'Wire transfer', enabled: false, min: 500, max: 50000, feeRate: 0, feeFixed: 25, feeCap: 25, photoUrl: '', source: 'grant', ...BUILTIN_METHOD_DETAILS['wire']! },
+      { id: 'crypto', name: 'USDT wallet', enabled: false, min: 50, max: 20000, feeRate: 0.01, feeFixed: 1, feeCap: 20, photoUrl: '', source: 'grant', ...BUILTIN_METHOD_DETAILS['crypto']! },
     ],
     physicalCardFee: 8.5,
     cardDeliveryFee: 3.5,
@@ -109,7 +113,7 @@ function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' 
 export function createSeedState(): DemoState {
   const me = CURRENT_APPLICANT_ID;
   return {
-    version: 5,
+    version: 6,
     grants: seedGrants(),
     notifications: seedNotifications(me),
     treasury: seedTreasury(),
@@ -172,13 +176,14 @@ export function createSeedState(): DemoState {
       { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Deposit via Bank transfer', amount: 450, status: 'Completed', createdAt: '2026-08-05T10:00:00.000Z', method: 'bank', reference: 'ARC-1990', processedAt: '2026-08-06T13:00:00.000Z', processedBy: DEMO_FINANCE },
       { id: 'TX-82090', applicantId: 'APL-1042', type: 'Deposit', description: 'Deposit via Bank transfer', amount: 1500, status: 'Pending', createdAt: '2026-09-24T10:00:00.000Z', method: 'bank', reference: 'ARC-2090' },
       { id: 'TX-83984', applicantId: me, type: 'Card fee', description: 'Virtual card issuance', amount: -8.5, status: 'Completed', createdAt: '2026-07-30T09:00:00.000Z' },
-      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', method: 'bank', fee: 1.56, destination: 'Bank transfer · Meridian checking · •••• 0842' },
+      { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', method: 'bank', fee: 1.56, destination: 'Bank transfer · Meridian Bank', source: 'grant',
+        payoutDetails: [{ fieldId: 'bank-name', label: 'Bank name', value: 'Meridian Bank' }, { fieldId: 'account-name', label: 'Account holder name', value: 'Alex Morgan' }, { fieldId: 'account-number', label: 'Account number', value: '4403990842' }] },
     ],
     cards: {
       virtual: { lastFour: '4826', dailyLimit: 1500, frozen: false, pin: '3071' },
       physical: { status: 'Not requested', dailyLimit: 2500 },
     },
-    payoutDestinations: seedPayoutDestinations(),
+    savedPayoutDetails: seedSavedPayoutDetails(),
     accounts: seedAccounts(),
     staff: seedStaff(),
     actingStaffId: 'STF-1',

@@ -1,5 +1,6 @@
 import { DEFAULT_PERMISSIONS } from "@workspace/domain/applicants";
 import type { AccountControls, AccountPermissions } from "@workspace/domain/model";
+import { DEFAULT_PRIVACY, type PrivacyPreferences } from "@workspace/domain/profile";
 import { NO_EFFECTS, type Effects } from "./activity";
 
 // Storage for applicant profiles and their staff-managed account controls, one
@@ -23,6 +24,12 @@ export type ProfileRecord = {
   account: StoredAccount;
   /** Whether notifications are also emailed. */
   emailNotifications: boolean;
+  /** Profile center: the @handle and Telegram username (empty when not added). */
+  displayName: string;
+  telegram: string;
+  privacy: PrivacyPreferences;
+  /** The profile photo on the FileStore, or null (initials are shown). */
+  avatar: StoredAvatar | null;
   /** When staff required each pending reset (server-only; null when none is pending). */
   resetsRequiredAt: { password: string | null; twoFactor: string | null };
   /** ISO timestamp the profile was created. */
@@ -31,8 +38,12 @@ export type ProfileRecord = {
   updatedAt: string;
 };
 
+export type StoredAvatar = { key: string; contentType: string; sha256: string; updatedAt: string };
 export type NewProfile = Pick<ProfileRecord, "authUserId" | "name" | "email" | "phone" | "sector" | "country" | "birthDate">;
-export type ContactPatch = Partial<Pick<ProfileRecord, "name" | "email" | "phone" | "address" | "emailNotifications">>;
+/** The person's own edits; `avatar.updatedAt` is set by the repo. */
+export type ContactPatch = Partial<Pick<ProfileRecord, "name" | "email" | "phone" | "address" | "emailNotifications" | "displayName" | "telegram" | "birthDate" | "privacy">> & {
+  avatar?: Omit<StoredAvatar, "updatedAt"> | null;
+};
 /** What the account rules may change. */
 export type AccountPatch = Partial<Pick<ProfileRecord, "tier" | "identityVerified" | "account">>;
 
@@ -42,8 +53,8 @@ export interface ProfileRepo {
   list(): Promise<ProfileRecord[]>;
   /** Creates the profile, or returns the existing one if two first requests race. */
   create(profile: NewProfile): Promise<ProfileRecord>;
-  /** Contact details: the person's own edits, applied directly. */
-  updateContact(authUserId: string, patch: ContactPatch): Promise<ProfileRecord>;
+  /** Contact details: the person's own edits, applied directly, with any effects in the same transaction. */
+  updateContact(authUserId: string, patch: ContactPatch, effects?: Effects): Promise<ProfileRecord>;
   /** Tier, identity, and account controls: stored only if the record is still at `expectedVersion`. */
   saveAccount(authUserId: string, patch: AccountPatch, expectedVersion: string, effects?: Effects): Promise<ProfileRecord | "stale">;
 }
@@ -73,14 +84,18 @@ export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write
       const existing = rows.get(profile.authUserId);
       if (existing) return structuredClone(existing);
       const at = stamp();
-      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, resetsRequiredAt: { password: null, twoFactor: null }, createdAt: at, updatedAt: at, ...profile };
+      const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, displayName: "", telegram: "", privacy: { ...DEFAULT_PRIVACY }, avatar: null, resetsRequiredAt: { password: null, twoFactor: null }, createdAt: at, updatedAt: at, ...profile };
       rows.set(row.authUserId, row);
       return out(row);
     },
-    updateContact: async (id, patch) => {
+    updateContact: async (id, patch, effects = NO_EFFECTS) => {
       const row = rows.get(id);
       if (!row) throw new Error("not found");
-      Object.assign(row, patch, { updatedAt: stamp() });
+      const at = stamp();
+      const { avatar, ...rest } = structuredClone(patch);
+      Object.assign(row, rest, { updatedAt: at });
+      if (avatar !== undefined) row.avatar = avatar ? { ...avatar, updatedAt: at } : null;
+      activity?.write(effects);
       return out(row);
     },
     saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => {

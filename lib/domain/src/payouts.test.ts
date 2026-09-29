@@ -21,15 +21,15 @@ beforeEach(() => { s = createSeedState(); });
 
 describe('queue', () => {
   it('lists only withdrawals, pending oldest first then processed', () => {
-    const newer = accept(M.requestWithdrawal(s, 200, 'mobile', now)).id!;
+    const newer = accept(M.requestWithdrawal(s, { amount: 200, method: 'mobile', details: s.savedPayoutDetails['mobile'] }, now)).id!;
     accept(P.markPayoutPaid(s, 'TX-84077', FINANCE, now));
-    const later = accept(M.requestWithdrawal(s, 50, 'bank', new Date('2026-09-26T09:00:00Z'))).id!;
+    const later = accept(M.requestWithdrawal(s, { amount: 50, method: 'bank', details: s.savedPayoutDetails['bank'] }, new Date('2026-09-26T09:00:00Z'))).id!;
     expect(P.payoutQueue(s).map(t => t.id)).toEqual([newer, later, 'TX-84077']);
     expect(P.payoutQueue(s).every(t => t.type === 'Withdrawal')).toBe(true);
   });
 
   it('totals pending payouts', () => {
-    accept(M.requestWithdrawal(s, 200, 'bank', now));
+    accept(M.requestWithdrawal(s, { amount: 200, method: 'bank', details: s.savedPayoutDetails['bank'] }, now));
     expect(P.pendingPayoutTotal(s)).toBe(325);
   });
 

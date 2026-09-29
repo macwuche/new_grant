@@ -119,7 +119,7 @@ export function AdminApplicants({ openApplicant }: { openApplicant: (id: string)
 
   return <section className="aup-card aup-directory" data-testid="panel-admin-applicants">
     <div className="aup-directory-top">
-      <div className="aup-tabs" role="tablist" aria-label="Applicant groups">
+      <div className="aup-tabs" role="tablist" aria-label="User groups">
         {TABS.map(t => { const count = rows.filter(t.match).length; return <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => reset(() => setTab(t.id))} data-testid={`tab-admin-applicants-${t.id}`}>{t.label}<span>{count}</span></button>; })}
       </div>
       <button type="button" className="aup-btn primary" onClick={exportCsv} disabled={!exportRows.length} data-testid="button-admin-applicants-export">
@@ -166,7 +166,7 @@ export function AdminApplicants({ openApplicant }: { openApplicant: (id: string)
         </tr>)}</tbody>
       </table></div>
 
-      <div className="aup-mobile-list" role="list" aria-label="Applicants">{shown.map(r => <article key={r.id} role="listitem" className="aup-mobile-row" data-testid={`card-admin-applicant-${r.id}`}>
+      <div className="aup-mobile-list" role="list" aria-label="Users">{shown.map(r => <article key={r.id} role="listitem" className="aup-mobile-row" data-testid={`card-admin-applicant-${r.id}`}>
         <div className="aup-mobile-row-top">
           <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.name}`} />
           <button type="button" className="aup-user" onClick={() => openApplicant(r.id)}><span className="aup-avatar" aria-hidden="true">{initials(r.name)}</span><span><strong>{r.name}</strong><small>{r.email}</small></span></button>
@@ -186,7 +186,7 @@ export function AdminApplicants({ openApplicant }: { openApplicant: (id: string)
         <span className="aup-count" data-testid="text-admin-applicants-count">{filtered.length ? `${(current - 1) * size + 1}–${Math.min(current * size, filtered.length)} of ${filtered.length}` : '0'} · {rows.length} total</span>
         <label className="aup-select-pill small"><span className="sr-only">Rows per page</span><select value={size} onChange={e => reset(() => setSize(Number(e.target.value)))} aria-label="Rows per page" data-testid="select-admin-applicants-page-size">{PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}</select><ChevronDown size={14} /></label>
       </div>
-    </> : <div className="aup-empty" data-testid="empty-admin-applicants"><Users size={26} /><h3>{rows.length ? 'Nobody matches' : 'No applicants yet'}</h3><p>{rows.length ? 'Try another tab, a shorter search, or clear the filter.' : 'People appear here once they sign up and open the applicant portal.'}</p>
+    </> : <div className="aup-empty" data-testid="empty-admin-applicants"><Users size={26} /><h3>{rows.length ? 'Nobody matches' : 'No users yet'}</h3><p>{rows.length ? 'Try another tab, a shorter search, or clear the filter.' : 'People appear here once they sign up and open the applicant portal.'}</p>
       {rows.length > 0 && <button type="button" className="aup-btn" onClick={() => { setTab('all'); setQuery(''); setNarrow('any'); setPage(1); }} data-testid="button-admin-applicants-reset">Clear filters</button>}</div>}
 
     {dialog && <ReasonDialog applicantId={dialog.id} name={dialog.name} action={dialog.action} tier={dialog.tier ?? null} onClose={() => setDialog(null)} onDone={outcome => { setDialog(null); report(outcome); }} />}

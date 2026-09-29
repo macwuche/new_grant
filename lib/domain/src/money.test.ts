@@ -37,7 +37,7 @@ describe('channel fees', () => {
 describe('withdrawal validation', () => {
   it('offers only enabled channels', () => {
     expect(M.enabledChannels(s).map(c => c.id)).toEqual(['bank', 'mobile']);
-    expect(M.validateWithdrawal(s, 600, 'wire')).toMatch(/available payout channel/);
+    expect(M.validateWithdrawal(s, 600, 'wire')).toMatch(/available withdrawal method/);
   });
 
   it('enforces per-channel limits and the balance', () => {
@@ -63,20 +63,20 @@ describe('withdrawal validation', () => {
 
 describe('withdrawal requests', () => {
   it('records channel, fee, and destination, holds funds, and alerts staff', () => {
-    const { id } = accept(M.requestWithdrawal(s, 1000, 'mobile', now));
+    const { id } = accept(M.requestWithdrawal(s, { amount: 1000, method: 'mobile', details: s.savedPayoutDetails['mobile'] }, now));
     expect(tx(id!)).toMatchObject({ status: 'Pending', amount: -1000, method: 'mobile', fee: 10, destination: 'Mobile money · +1 (415) 555-0148' });
     expect(mine().grant).toBe(3075);
     expect(s.staffFeed[0]).toMatchObject({ kind: 'withdrawal', title: `Payout request ${id}`, read: false });
   });
 
   it('keeps the quoted fee even if settings change later', () => {
-    const { id } = accept(M.requestWithdrawal(s, 1000, 'bank', now));
+    const { id } = accept(M.requestWithdrawal(s, { amount: 1000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now));
     setChannel('bank', { feeRate: 0.05, feeCap: 100 });
     expect(tx(id!).fee).toBe(12.5);
   });
 
   it('lets the applicant cancel a pending request, returning the funds', () => {
-    const { id } = accept(M.requestWithdrawal(s, 1000, 'bank', now));
+    const { id } = accept(M.requestWithdrawal(s, { amount: 1000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now));
     accept(M.cancelWithdrawal(s, id!, now));
     expect(tx(id!)).toMatchObject({ status: 'Cancelled', processedBy: 'Applicant' });
     expect(mine()).toMatchObject({ grant: 4075, pendingWithdrawals: 125 });

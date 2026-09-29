@@ -58,7 +58,7 @@ export function AdminApplicantProfile({ applicantId }: { applicantId: string }) 
   const [ledgerGroup, setLedgerGroup] = useState<Group>('all');
   const [adjusting, setAdjusting] = useState<AdjustmentTarget | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
-  const back = <Link href="/admin/applicants" className="aup-back" data-testid="link-admin-back-to-applicants"><ArrowLeft size={15} /> All applicants</Link>;
+  const back = <Link href="/admin/applicants" className="aup-back" data-testid="link-admin-back-to-applicants"><ArrowLeft size={15} /> All users</Link>;
 
   if (!person) return <>{back}<section className="aup-card"><div className="aup-empty" data-testid="empty-admin-applicant-profile"><Search size={25} /><h3>{connected && !applicantsError ? 'Loading applicant…' : 'Applicant not found'}</h3><p>{applicantsError ?? 'They may have been removed, or the link is wrong.'}</p></div></section></>;
 

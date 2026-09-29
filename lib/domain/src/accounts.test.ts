@@ -43,7 +43,7 @@ describe('tier changes', () => {
 });
 
 describe('account lock', () => {
-  it('blocks applying, deposits, payouts, card changes, and destinations until unlocked', () => {
+  it('blocks applying, deposits, payouts, and card changes until unlocked', () => {
     accept(Ac.lockAccount(s, ME, 'Suspected account takeover.', 'Riley Chen', now));
     expect(accountOf(s, ME)).toMatchObject({ status: 'Locked', lockedBy: 'Riley Chen' });
     expect(R.saveDraft(s, 'green', draft(), now, 'APP-2101').ok).toBe(false);
@@ -51,7 +51,7 @@ describe('account lock', () => {
     expect(M.payoutBlocker(s)).toMatch(/locked/);
     expect(M.requestPhysicalCard(s, { name: 'Alex Morgan', line1: '1 Main St', city: 'Austin', postalCode: '73301', country: 'United States' }, now).ok).toBe(false);
     expect(M.setCardLimit(s, 'virtual', 1000).ok).toBe(false);
-    expect(M.savePayoutDestination(s, 'mobile', { primary: '+44 7700 900123' }, now).ok).toBe(false);
+    expect(M.requestWithdrawal(s, { amount: 50, method: 'mobile', details: s.savedPayoutDetails['mobile'] }, now).ok).toBe(false);
     accept(M.toggleCardFreeze(s)); // freezing is still allowed
     expect(M.toggleCardFreeze(s).ok).toBe(false); // unfreezing is not
     expect(D.cancelDeposit(s, 'TX-99999', now).ok).toBe(false);
@@ -115,14 +115,15 @@ describe('risk scoring', () => {
     expect(Risk.assessRisk(s, 'APL-1043', now).score).toBeLessThanOrEqual(100);
   });
 
-  it('reacts to velocity and new payout destinations, and alerts staff when an applicant turns high risk', () => {
+  it('reacts to velocity and changed payout details, and alerts staff when an applicant turns high risk', () => {
     s = { ...s, accounts: { ...s.accounts, [ME]: { ...s.accounts[ME]!, signals: { ipCountry: 'Brazil', sharedDeviceWith: [] } } } };
-    accept(M.savePayoutDestination(s, 'crypto', { primary: 'TXr9ab3kLmN2pQ4sT6vW8yZ1cD5fG7h9jK' }, now));
-    expect(Risk.assessRisk(s, ME, now)).toMatchObject({ score: 35, level: 'Medium' });
-    expect(Risk.assessRisk(s, ME, now).factors.map(f => f.label)).toContain('Payout destination changed in the last 7 days');
+    accept(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: { ...s.savedPayoutDetails['bank'], 'account-number': '7700112233' } }, now));
+    // Changing details takes a request, and with the seeded one that's 2 payout requests in 7 days.
+    expect(Risk.assessRisk(s, ME, now)).toMatchObject({ score: 50, level: 'Medium' });
+    expect(Risk.assessRisk(s, ME, now).factors.map(f => f.label)).toEqual(expect.arrayContaining(['Payout details changed in the last 7 days', '2 payout requests in 7 days']));
     for (let i = 0; i < 3; i++) accept(D.requestDeposit(s, 1200, 'bank', now));
-    expect(Risk.assessRisk(s, ME, now)).toMatchObject({ score: 60, level: 'High' });
-    accept(M.requestWithdrawal(s, 20, 'bank', now)); // stays high: no second alert
+    expect(Risk.assessRisk(s, ME, now)).toMatchObject({ score: 75, level: 'High' });
+    accept(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)); // stays high: no second alert
     const alerts = s.staffFeed.filter(e => e.kind === 'security' && e.title.startsWith('Risk alert'));
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({ highlight: true, href: '/admin/security' });

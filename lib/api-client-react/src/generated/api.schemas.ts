@@ -336,15 +336,25 @@ export interface Document {
   uploadedAt: string;
 }
 
-export type ChannelId = typeof ChannelId[keyof typeof ChannelId];
+/**
+ * A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+ * @pattern ^[a-z0-9-]{1,40}$
+ */
+export type ChannelId = string;
+
+export type PayoutBalance = typeof PayoutBalance[keyof typeof PayoutBalance];
 
 
-export const ChannelId = {
-  bank: 'bank',
-  wire: 'wire',
-  mobile: 'mobile',
-  crypto: 'crypto',
+export const PayoutBalance = {
+  grant: 'grant',
+  deposit: 'deposit',
 } as const;
+
+export interface PayoutDetail {
+  fieldId: string;
+  label: string;
+  value: string;
+}
 
 export type LedgerEntryType = typeof LedgerEntryType[keyof typeof LedgerEntryType];
 
@@ -423,22 +433,103 @@ export interface LedgerEntry {
   /** Staff card moves and balance adjustments - the reason shown to the applicant */
   note?: string;
   category?: AdjustmentCategory;
+  source?: PayoutBalance;
+  /** Withdrawals - the method's form as the applicant filled it in */
+  payoutDetails?: PayoutDetail[];
 }
 
-export interface PayoutChannel {
-  id: ChannelId;
+export type MethodFieldType = typeof MethodFieldType[keyof typeof MethodFieldType];
+
+
+export const MethodFieldType = {
+  text: 'text',
+  textarea: 'textarea',
+  email: 'email',
+  number: 'number',
+  select: 'select',
+} as const;
+
+export interface MethodField {
+  /**
+     * Omitted for a new field; kept on edits so remembered answers still match
+     * @maxLength 40
+     */
+  id?: string;
+  /** @maxLength 100 */
+  label: string;
+  type: MethodFieldType;
+  required: boolean;
+  /** @maxLength 200 */
+  placeholder: string;
+  /** @maxLength 300 */
+  help: string;
+  /**
+     * @maxItems 30
+     * @items.maxLength 100
+     */
+  options: string[];
+}
+
+export type WithdrawalMethodInputSource = typeof WithdrawalMethodInputSource[keyof typeof WithdrawalMethodInputSource];
+
+
+export const WithdrawalMethodInputSource = {
+  grant: 'grant',
+  deposit: 'deposit',
+  both: 'both',
+} as const;
+
+export interface WithdrawalMethodInput {
+  /** @maxLength 80 */
   name: string;
+  /** Shown to users on the withdrawal page */
   enabled: boolean;
   min: number;
   max: number;
+  /** 0-0.1 (a fraction of the amount) */
   feeRate: number;
   feeFixed: number;
+  /** The most a request is charged; 0 for no maximum */
   feeCap: number;
+  /** @maxLength 100 */
+  processingTime: string;
+  /** @maxLength 2000 */
+  instructions: string;
+  /**
+     * An https link, the method's current uploaded-photo path unchanged, or empty for the first-letter badge
+     * @maxLength 1000
+     */
+  photoUrl: string;
+  source: WithdrawalMethodInputSource;
+  /** @maxLength 100 */
+  formTitle: string;
+  /** @maxItems 20 */
+  fields: MethodField[];
 }
 
+export type WithdrawalMethodFieldsItem = MethodField & {
+  id: string;
+};
+
+export type WithdrawalMethod = WithdrawalMethodInput & {
+  id: ChannelId;
+  fields?: WithdrawalMethodFieldsItem[];
+};
+
+export interface WithdrawalMethodSave {
+  /** @maxLength 40 */
+  version: string;
+  method: WithdrawalMethodInput;
+}
+
+export interface MethodAvailability {
+  enabled: boolean;
+}
+
+/**
+ * Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
+ */
 export interface TreasuryInput {
-  /** @maxItems 10 */
-  channels: PayoutChannel[];
   physicalCardFee: number;
   cardDeliveryFee: number;
   minDeposit: number;
@@ -456,6 +547,8 @@ export interface ProgramChange {
 }
 
 export type Treasury = TreasuryInput & {
+  /** Withdrawal methods; applicants get only the available ones */
+  channels: WithdrawalMethod[];
   updatedAt: string;
   /** Staff only; empty for applicants */
   changeLog: ProgramChange[];
@@ -475,6 +568,8 @@ export interface MoneySettings {
 export interface MoneySettingsResult {
   settings: MoneySettings;
   message: string;
+  /** The withdrawal method the action created or changed, if any */
+  id?: string;
 }
 
 export interface MoneySettingsUpdate {
@@ -817,12 +912,16 @@ export interface StaffCardFreeze {
   reason?: string;
 }
 
-export type MyMoneyPayoutDestinations = {[key: string]: string};
+/**
+ * The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request
+ */
+export type MyMoneySavedPayoutDetails = {[key: string]: {[key: string]: string}};
 
 export interface MyMoney {
   transactions: LedgerEntry[];
   cards: Cards;
-  payoutDestinations: MyMoneyPayoutDestinations;
+  /** The last form answers per withdrawal method (method id → field id → value), to pre-fill the next request */
+  savedPayoutDetails: MyMoneySavedPayoutDetails;
   destinationChangedAt?: string;
   treasury: Treasury;
   lockdown: Lockdown | null;
@@ -853,9 +952,13 @@ export interface DepositRequest {
   method: DepositRequestMethod;
 }
 
+export type WithdrawalRequestDetails = {[key: string]: string};
+
 export interface WithdrawalRequest {
   amount: number;
   channel: ChannelId;
+  source?: PayoutBalance;
+  details?: WithdrawalRequestDetails;
 }
 
 export type CardLimitCard = typeof CardLimitCard[keyof typeof CardLimitCard];
@@ -869,14 +972,6 @@ export const CardLimitCard = {
 export interface CardLimit {
   card: CardLimitCard;
   limit: number;
-}
-
-export interface DestinationInput {
-  channel: ChannelId;
-  /** @maxLength 80 */
-  primary: string;
-  /** @maxLength 80 */
-  secondary?: string;
 }
 
 export interface NotificationItem {
@@ -1253,6 +1348,11 @@ export interface Account {
   permissions?: AccountPermissions;
 }
 
+export interface PrivacyPreferences {
+  activityLogging: boolean;
+  unusualActivityEmail: boolean;
+}
+
 export interface Profile {
   name: string;
   email: string;
@@ -1270,6 +1370,16 @@ export interface Profile {
      */
   birthDate?: string | null;
   account: Account;
+  /** Shown as the profile's @handle; empty when not added */
+  displayName: string;
+  /** Telegram username without the "@"; empty when not added */
+  telegram: string;
+  privacy: PrivacyPreferences;
+  /**
+     * When the profile photo was last changed; null when there is none (show initials)
+     * @nullable
+     */
+  avatarUpdatedAt: string | null;
 }
 
 export interface ApplicantEntry {
@@ -1338,6 +1448,80 @@ export interface ProfileUpdate {
   phone: string;
   /** @maxLength 300 */
   address: string;
+  /**
+     * Left unchanged when omitted
+     * @maxLength 40
+     */
+  displayName?: string;
+  /**
+     * Left unchanged when omitted
+     * @maxLength 64
+     */
+  telegram?: string;
+  /**
+     * yyyy-mm-dd, or empty to remove; left unchanged when omitted
+     * @maxLength 10
+     */
+  birthDate?: string;
+}
+
+export type SecurityEventKind = typeof SecurityEventKind[keyof typeof SecurityEventKind];
+
+
+export const SecurityEventKind = {
+  sign_in: 'sign_in',
+  new_device_sign_in: 'new_device_sign_in',
+  password_changed: 'password_changed',
+  failed_password_check: 'failed_password_check',
+  email_change_requested: 'email_change_requested',
+  email_changed: 'email_changed',
+  two_step_on: 'two_step_on',
+  two_step_off: 'two_step_off',
+  signed_out_others: 'signed_out_others',
+} as const;
+
+export interface SecurityEvent {
+  id: string;
+  kind: SecurityEventKind;
+  /**
+     * Browser and system, e.g. "Chrome on Windows"; null when activity logging was off
+     * @nullable
+     */
+  device: string | null;
+  /** @nullable */
+  ip: string | null;
+  /**
+     * City and country from the proxy's location headers, when available
+     * @nullable
+     */
+  location: string | null;
+  at: string;
+}
+
+export type SecurityEventReportKind = typeof SecurityEventReportKind[keyof typeof SecurityEventReportKind];
+
+
+export const SecurityEventReportKind = {
+  email_change_requested: 'email_change_requested',
+  two_step_on: 'two_step_on',
+  two_step_off: 'two_step_off',
+  signed_out_others: 'signed_out_others',
+} as const;
+
+export interface SecurityEventReport {
+  kind: SecurityEventReportKind;
+}
+
+export interface SecurityEventResult {
+  recorded: boolean;
+}
+
+export interface PasswordCheck {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  password: string;
 }
 
 export interface Error {

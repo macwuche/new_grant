@@ -89,9 +89,10 @@ describe('audit log', () => {
 
   it('flattens nested settings into readable field paths', () => {
     const { updatedAt: _u, changeLog: _c, ...input } = s.treasury;
-    const next = { ...input, channels: input.channels.map(c => c.id === 'wire' ? { ...c, enabled: true } : c) };
+    const { channels: _ch, ...rest } = input;
+    const next = { ...rest, applicationFee: 5 };
     accept(S.asStaff(s, 'treasury.manage', { action: 'Update money settings', target: 'treasury' }, now, (st, actor) => T.updateTreasury(st, st.treasury.updatedAt, next, actor.name, now)));
-    expect(s.audit.at(-1)!.changes).toEqual([{ field: 'channels.wire.enabled', before: 'false', after: 'true' }]);
+    expect(s.audit.at(-1)!.changes).toEqual([{ field: 'applicationFee', before: '0', after: '5' }]);
     expect(s.audit.at(-1)!.applicantId).toBeNull();
   });
 

@@ -38,7 +38,7 @@ export function assessRisk(state: DemoState, applicantId: string, now: Date): Ri
   add(deposits >= 3, `${deposits} deposits announced in 7 days`, 15);
   add(payouts >= 2, `${payouts} payout requests in 7 days`, 15);
   add(recent('Deposit', 30).some(t => t.status !== 'Failed' && t.status !== 'Cancelled' && t.amount >= state.treasury.highValueDeposit), 'High-value deposit in the last 30 days', 10);
-  add(!!destinationChangedAt && new Date(destinationChangedAt).getTime() >= since(7), 'Payout destination changed in the last 7 days', 15);
+  add(!!destinationChangedAt && new Date(destinationChangedAt).getTime() >= since(7), 'Payout details changed in the last 7 days', 15);
   add(state.applications.some(a => a.applicantId === applicantId && a.escalation?.status === 'Open'), 'Application escalated to security', 10);
 
   const score = Math.min(100, factors.reduce((sum, f) => sum + f.points, 0));

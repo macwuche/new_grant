@@ -113,6 +113,10 @@ export type Transaction = {
   /** Withdrawals only: processing fee taken from the amount, and where it goes. */
   fee?: number;
   destination?: string;
+  /** Withdrawals only: the balance the money comes from (older requests: the grant balance). */
+  source?: PayoutBalance;
+  /** Withdrawals only: the method's form as the applicant filled it in, kept with the request. */
+  payoutDetails?: PayoutDetail[];
   /** Deposits only: reference the applicant quotes when sending money. */
   reference?: string;
   /** Deposits and withdrawals: set when finance confirms/rejects, or the applicant cancels. */
@@ -132,12 +136,39 @@ export type Transaction = {
   category?: AdjustmentCategory;
 };
 
-export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
+/** A withdrawal method's id (the four built-in methods keep 'bank', 'wire', 'mobile', 'crypto'). */
+export type ChannelId = string;
 
-/** A withdrawal channel finance can enable, limit, and price. */
+/** A balance a payout can come from. ("Eligible amount" is what an applicant could apply for, not money.) */
+export type PayoutBalance = 'grant' | 'deposit';
+/** Which balance a withdrawal method pays out from; with 'both' the applicant chooses. */
+export type WithdrawalSource = PayoutBalance | 'both';
+export type MethodFieldType = 'text' | 'textarea' | 'email' | 'number' | 'select';
+
+/** One field of a withdrawal method's form. */
+export type MethodField = {
+  /** Stable within the method (answers are remembered by it). */
+  id: string;
+  label: string;
+  type: MethodFieldType;
+  required: boolean;
+  placeholder: string;
+  help: string;
+  /** Dropdown choices ('select' only). */
+  options: string[];
+};
+
+/** A photo uploaded to the API server for a method (the file is on the server's disk, like documents). */
+export type MethodPhotoFile = { key: string; contentType: string; sha256: string };
+
+/** One answer kept with a payout request: the field's label at the time, and the value. */
+export type PayoutDetail = { fieldId: string; label: string; value: string };
+
+/** A withdrawal method finance manages (was a fixed "payout channel"): limits, charges, balance, and a form. */
 export type PayoutChannel = {
   id: ChannelId;
   name: string;
+  /** Shown to applicants on /withdrawals. */
   enabled: boolean;
   /** Per-transaction limits (USD). */
   min: number;
@@ -146,7 +177,20 @@ export type PayoutChannel = {
   feeRate: number;
   feeFixed: number;
   feeCap: number;
+  /** e.g. "1–2 business days". */
+  processingTime: string;
+  /** Shown to the applicant before they request. */
+  instructions: string;
+  /** An https link, an uploaded photo's API path, a data: URL (preview mode only), or '' for the first-letter badge. */
+  photoUrl: string;
+  /** Set when the photo was uploaded to the API server. */
+  photoFile?: MethodPhotoFile;
+  source: WithdrawalSource;
+  /** The form's name, e.g. "Wallet details". */
+  formTitle: string;
+  fields: MethodField[];
 };
+export type WithdrawalMethod = PayoutChannel;
 
 export type DepositMethodId = 'bank' | 'mobile';
 
@@ -169,7 +213,8 @@ export type Treasury = {
   changeLog: ProgramChange[];
 };
 
-export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog'>;
+/** Money settings as finance edits them on Settings → Money; methods are managed on their own (./withdrawalMethods). */
+export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog' | 'channels'>;
 
 /** Staff activity feed entry (shared by the demo staff team). */
 export type StaffEvent = {
@@ -184,8 +229,8 @@ export type StaffEvent = {
   read: boolean;
 };
 
-/** The applicant's saved payout destination per channel (display label, masked). */
-export type PayoutDestinations = Partial<Record<ChannelId, string>>;
+/** The applicant's last answers per withdrawal method (field id → value), used to pre-fill the next request. */
+export type SavedPayoutDetails = Record<ChannelId, Record<string, string>>;
 
 export type Profile = {
   name: string;
@@ -199,8 +244,14 @@ export type Profile = {
   country: string;
   /** ISO date the account was created. */
   joined: string;
-  /** ISO date of birth, when given at sign-up. */
+  /** ISO date of birth, when given at sign-up or added on the profile. */
   birthDate?: string;
+  /** Shown as the profile's @handle. */
+  displayName?: string;
+  /** Telegram username, without the "@". */
+  telegram?: string;
+  /** Privacy switches (./profile.ts); missing means the defaults. */
+  privacy?: { activityLogging: boolean; unusualActivityEmail: boolean };
 };
 
 /** Other (fictional) applicants visible in the admin directory. */
@@ -327,7 +378,7 @@ export type CardsState = {
 };
 
 export type DemoState = {
-  version: 5;
+  version: 6;
   grants: Grant[];
   notifications: Notification[];
   treasury: Treasury;
@@ -338,7 +389,7 @@ export type DemoState = {
   applications: Application[];
   transactions: Transaction[];
   cards: CardsState;
-  payoutDestinations: PayoutDestinations;
+  savedPayoutDetails: SavedPayoutDetails;
   /** Keyed by applicant id, for every applicant including the demo user. */
   accounts: Record<string, AccountControls>;
   staff: StaffMember[];
@@ -366,7 +417,7 @@ export type DemoState = {
    */
   serverActivity?: boolean;
   /**
-   * Set once the ledger, cards, payout destinations, money settings, and
+   * Set once the ledger, cards, saved payout details, money settings, and
    * lockdown come from the API. The ledger, cards, and destinations are
    * reloaded on each visit, so they're never saved to browser storage.
    */

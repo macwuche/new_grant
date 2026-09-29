@@ -65,6 +65,7 @@ const app = createApp({
   staffRepo: dbStaffRepo, programRepo: dbProgramRepo, profileRepo: dbProfileRepo, applicationRepo: dbApplicationRepo, activityRepo: dbActivityRepo, moneyRepo: dbMoneyRepo,
   documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, emailSettings, inbox: dbInboxRepo, signIns: dbSignInRepo,
   staffMfa: process.env["STAFF_MFA_REQUIRED"] !== "false",
+  supabaseAuth: supabaseUrl && supabaseAnonKey ? { url: supabaseUrl, anonKey: supabaseAnonKey } : null,
 });
 
 app.listen(port, (err) => {

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Account } from './account';
+import type { PrivacyPreferences } from './privacyPreferences';
 import type { ProfileTier } from './profileTier';
 
 export interface Profile {
@@ -25,4 +26,14 @@ export interface Profile {
      */
   birthDate?: string | null;
   account: Account;
+  /** Shown as the profile's @handle; empty when not added */
+  displayName: string;
+  /** Telegram username without the "@"; empty when not added */
+  telegram: string;
+  privacy: PrivacyPreferences;
+  /**
+     * When the profile photo was last changed; null when there is none (show initials)
+     * @nullable
+     */
+  avatarUpdatedAt: string | null;
 }

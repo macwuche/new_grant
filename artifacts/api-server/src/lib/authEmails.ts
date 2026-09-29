@@ -33,7 +33,10 @@ function templates(name: string, v: Values) {
     },
     email_change: {
       subject: `Confirm your new ${name} email`,
-      ...renderEmail({ greeting: "Hello,", paragraphs: [`Confirm that you want to change your ${name} email from ${v.email} to ${v.newEmail}.`], action: { label: "Confirm the change", href: v.link }, footer }),
+      ...renderEmail({ greeting: "Hello,", paragraphs: [
+        `Confirm that you want to change your ${name} email from ${v.email} to ${v.newEmail}.`,
+        ...(v.token ? [`Or enter this code where you asked for the change: ${v.token}`, `Never share it with anyone, including ${name} staff.`] : []),
+      ], action: { label: "Confirm the change", href: v.link }, footer }),
     },
     reauthentication: {
       subject: `Your ${name} verification code`,

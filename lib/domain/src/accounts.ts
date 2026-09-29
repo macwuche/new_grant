@@ -172,6 +172,6 @@ export function requestReverification(state: DemoState, applicantId: string, rea
 /** The applicant changed their password (reported by the portal after Supabase accepted it), so they're told by email too. */
 export function recordPasswordChange(state: DemoState, now: Date): Result {
   const next = notify(state, CURRENT_APPLICANT_ID, 'Password changed',
-    "Your password was just changed. If this wasn't you, reset your password now and contact the grant team.", '/settings', now);
+    "Your password was just changed. If this wasn't you, reset your password now and contact the grant team.", '/profile', now);
   return { ok: true, message: 'Password change recorded.', state: next };
 }

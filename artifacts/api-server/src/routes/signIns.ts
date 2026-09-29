@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import type { ProfileRepo } from "../lib/profileRepo";
 import { applicantSignInNotice, deviceHash, deviceLabel, staffSignInEmail, type SignInRepo } from "../lib/signIns";
+import { requestLocation, securityEvent } from "../lib/securityEvents";
 import { authLocals } from "../middlewares/auth";
 import { ownProfile } from "./profile";
 
@@ -27,7 +28,11 @@ export function signInsRouter(signIns: SignInRepo, profiles: ProfileRepo): IRout
       ? await signIns.record(user.id, hash, label, now, isNew => ({ notifications: [], staffEvents: [], audit: [], emails: isNew ? [staffSignInEmail(staff, label, ip, now)] : [] }))
       : await (async () => {
         const profile = await ownProfile(profiles, user);
-        return signIns.record(user.id, hash, label, now, isNew => ({ notifications: [applicantSignInNotice(profile.authUserId, isNew, label, ip, now)], staffEvents: [], audit: [] }));
+        const origin = { device: label, ip, location: requestLocation(req) };
+        return signIns.record(user.id, hash, label, now, isNew => ({
+          notifications: [applicantSignInNotice(profile.authUserId, isNew, label, ip, now, profile.privacy)], staffEvents: [], audit: [],
+          security: [securityEvent(user.id, isNew ? "new_device_sign_in" : "sign_in", profile.privacy, origin, now)],
+        }));
       })();
     res.json({ recorded: true, newDevice });
   });

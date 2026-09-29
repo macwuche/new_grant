@@ -217,6 +217,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.6
+      '@workspace/api-client-react':
+        specifier: workspace:*
+        version: link:../../lib/api-client-react
       esbuild:
         specifier: 0.28.2
         version: 0.28.2

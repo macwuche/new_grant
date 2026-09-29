@@ -10,4 +10,6 @@ import type { MoneySettings } from './moneySettings';
 export interface MoneySettingsResult {
   settings: MoneySettings;
   message: string;
+  /** The withdrawal method the action created or changed, if any */
+  id?: string;
 }

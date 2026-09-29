@@ -73,7 +73,7 @@ export function markPayoutPaid(state: DemoState, txId: string, operator: string,
   return { ok: true, id: txId, message: `${txId} marked as paid (${net} to the applicant).`, state: next };
 }
 
-/** A failed payout stops holding funds, so the amount returns to the applicant's grant balance. */
+/** A failed payout stops holding funds, so the amount returns to the balance it came from. */
 export function markPayoutFailed(state: DemoState, txId: string, reason: string, operator: string, now: Date): Result {
   const text = reason.trim();
   if (text.length < MIN_FAILURE_REASON_LENGTH) return fail('Explain why the payout failed.', { reason: `Write at least ${MIN_FAILURE_REASON_LENGTH} characters; the applicant sees this reason.` });
@@ -81,6 +81,7 @@ export function markPayoutFailed(state: DemoState, txId: string, reason: string,
   if (!loaded.ok) return loaded.result;
   const tx: Transaction = { ...loaded.tx, status: 'Failed', processedAt: now.toISOString(), processedBy: operator, failureReason: text };
   const gross = payoutAmounts(tx).gross.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  const next = notify(update(state, tx), tx.applicantId, 'Payout failed', `${text} ${gross} is back in your grant balance (${txId}).`, '/withdrawals', now);
-  return { ok: true, id: txId, message: `${txId} marked as failed. ${gross} returned to the applicant's grant balance.`, state: next };
+  const balance = tx.source === 'deposit' ? 'deposit balance' : 'grant balance';
+  const next = notify(update(state, tx), tx.applicantId, 'Payout failed', `${text} ${gross} is back in your ${balance} (${txId}).`, '/withdrawals', now);
+  return { ok: true, id: txId, message: `${txId} marked as failed. ${gross} returned to the applicant's ${balance}.`, state: next };
 }

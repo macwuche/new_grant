@@ -46,7 +46,6 @@ import type {
   CredentialReset,
   DeclineDecision,
   DepositRequest,
-  DestinationInput,
   Document,
   EmailDomain,
   EmailDomainInput,
@@ -71,6 +70,7 @@ import type {
   ListDocumentsParams,
   Me,
   Message,
+  MethodAvailability,
   MoneyResult,
   MoneySettings,
   MoneySettingsResult,
@@ -78,6 +78,8 @@ import type {
   MyMoney,
   NotFoundResponse,
   NotificationItem,
+  PasswordCheck,
+  PrivacyPreferences,
   Profile,
   ProfileUpdate,
   Program,
@@ -86,6 +88,9 @@ import type {
   ProgramUpdate,
   ProgramVersion,
   Reason,
+  SecurityEvent,
+  SecurityEventReport,
+  SecurityEventResult,
   ShippingAddress,
   SignInReport,
   SignInResult,
@@ -103,6 +108,7 @@ import type {
   TierChange,
   UnauthorizedResponse,
   UploadDocumentParams,
+  WithdrawalMethodSave,
   WithdrawalRequest
 } from './api.schemas';
 
@@ -1161,7 +1167,7 @@ export const getUpdateProfileUrl = () => {
 
 /**
  * The email is the sign-in account's; tier and identity status are set by staff.
- * @summary Edit your name, phone, and address
+ * @summary Edit your personal details
  */
 export const updateProfile = async (profileUpdate: ProfileUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
 
@@ -1227,7 +1233,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateProfileMutationVariables = {data: BodyType<ProfileUpdate>}
 
     /**
- * @summary Edit your name, phone, and address
+ * @summary Edit your personal details
  */
 export const useUpdateProfile = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProfile>>, TError,UpdateProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1327,6 +1333,593 @@ export const useSubmitIdentityCheck = <TError = ErrorType<InvalidResponse | Unau
         TContext
       > => {
       return useMutation(getSubmitIdentityCheckMutationOptions(options));
+    }
+
+export const getGetAvatarUrl = () => {
+
+
+
+
+  return `/api/profile/avatar`
+}
+
+/**
+ * Owner only. The content is checked against the SHA-256 recorded at upload.
+ * @summary Your profile photo
+ */
+export const getAvatar = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAvatarUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAvatarQueryKey = () => {
+    return [
+    `/api/profile/avatar`
+    ] as const;
+    }
+
+
+export const getGetAvatarQueryOptions = <TData = Awaited<ReturnType<typeof getAvatar>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvatar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAvatarQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAvatar>>> = ({ signal }) => getAvatar({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvatar>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAvatarQueryResult = NonNullable<Awaited<ReturnType<typeof getAvatar>>>
+export type GetAvatarQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+/**
+ * @summary Your profile photo
+ */
+
+export function useGetAvatar<TData = Awaited<ReturnType<typeof getAvatar>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvatar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAvatarQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadAvatarUrl = () => {
+
+
+
+
+  return `/api/profile/avatar`
+}
+
+/**
+ * The raw image is the request body (JPEG, PNG, or WEBP, detected from the content; at most 5 MB). Replaces the previous photo. Stored on the API server's disk, never in Supabase Storage.
+ * @summary Upload a new profile photo
+ */
+export const uploadAvatar = async (uploadAvatarBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Profile>(getUploadAvatarUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadAvatarBody
+  }
+);}
+
+
+
+
+
+export const getUploadAvatarMutationKey = () => ['uploadAvatar'] as const;
+
+export const getUploadAvatarMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadAvatar>>, TError,UploadAvatarMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadAvatar>>, TError,UploadAvatarMutationVariables, TContext> => {
+
+const mutationKey = getUploadAvatarMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadAvatar>>, UploadAvatarMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadAvatar(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadAvatarMutationResult = NonNullable<Awaited<ReturnType<typeof uploadAvatar>>>
+    export type UploadAvatarMutationBody = BodyType<Blob>
+    export type UploadAvatarMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+    export type UploadAvatarMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a new profile photo
+ */
+export const useUploadAvatar = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadAvatar>>, TError,UploadAvatarMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadAvatar>>,
+        TError,
+        UploadAvatarMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadAvatarMutationOptions(options));
+    }
+
+export const getRemoveAvatarUrl = () => {
+
+
+
+
+  return `/api/profile/avatar/delete`
+}
+
+/**
+ * Deletes the file; the profile shows your initials again.
+ * @summary Remove your profile photo
+ */
+export const removeAvatar = async ( options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+  return customFetch<Profile>(getRemoveAvatarUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveAvatarMutationKey = () => ['removeAvatar'] as const;
+
+export const getRemoveAvatarMutationOptions = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAvatar>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeAvatar>>, TError,void, TContext> => {
+
+const mutationKey = getRemoveAvatarMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeAvatar>>, void> = () => {
+
+
+          return  removeAvatar(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveAvatarMutationResult = NonNullable<Awaited<ReturnType<typeof removeAvatar>>>
+
+    export type RemoveAvatarMutationError = ErrorType<UnauthorizedResponse>
+
+
+    /**
+ * @summary Remove your profile photo
+ */
+export const useRemoveAvatar = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAvatar>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeAvatar>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRemoveAvatarMutationOptions(options));
+    }
+
+export const getSetPrivacyUrl = () => {
+
+
+
+
+  return `/api/profile/privacy`
+}
+
+/**
+ * Activity logging keeps the device, IP address, and location with each security event; unusual-activity email sends an alert when a new device signs in.
+ * @summary Save your privacy and security switches
+ */
+export const setPrivacy = async (privacyPreferences: PrivacyPreferences, options?: Parameters<typeof customFetch>[1]): Promise<Profile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Profile>(getSetPrivacyUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(privacyPreferences)
+  }
+);}
+
+
+
+
+
+export const getSetPrivacyMutationKey = () => ['setPrivacy'] as const;
+
+export const getSetPrivacyMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPrivacy>>, TError,SetPrivacyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setPrivacy>>, TError,SetPrivacyMutationVariables, TContext> => {
+
+const mutationKey = getSetPrivacyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setPrivacy>>, SetPrivacyMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setPrivacy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetPrivacyMutationResult = NonNullable<Awaited<ReturnType<typeof setPrivacy>>>
+    export type SetPrivacyMutationBody = BodyType<PrivacyPreferences>
+    export type SetPrivacyMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+    export type SetPrivacyMutationVariables = {data: BodyType<PrivacyPreferences>}
+
+    /**
+ * @summary Save your privacy and security switches
+ */
+export const useSetPrivacy = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPrivacy>>, TError,SetPrivacyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setPrivacy>>,
+        TError,
+        SetPrivacyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetPrivacyMutationOptions(options));
+    }
+
+export const getListSecurityEventsUrl = () => {
+
+
+
+
+  return `/api/profile/security-events`
+}
+
+/**
+ * Newest first, at most 50.
+ * @summary Your recent security activity
+ */
+export const listSecurityEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<SecurityEvent[]> => {
+
+  return customFetch<SecurityEvent[]>(getListSecurityEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSecurityEventsQueryKey = () => {
+    return [
+    `/api/profile/security-events`
+    ] as const;
+    }
+
+
+export const getListSecurityEventsQueryOptions = <TData = Awaited<ReturnType<typeof listSecurityEvents>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSecurityEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSecurityEvents>>> = ({ signal }) => listSecurityEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSecurityEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSecurityEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listSecurityEvents>>>
+export type ListSecurityEventsQueryError = ErrorType<UnauthorizedResponse>
+
+
+/**
+ * @summary Your recent security activity
+ */
+
+export function useListSecurityEvents<TData = Awaited<ReturnType<typeof listSecurityEvents>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSecurityEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReportSecurityEventUrl = () => {
+
+
+
+
+  return `/api/profile/security-events`
+}
+
+/**
+ * The portal reports changes Supabase made directly (two-step on or off, signing out other devices, an email change requested). Two-step changes are recorded only if the session's verified factors agree.
+ * @summary Record a security change made in the browser
+ */
+export const reportSecurityEvent = async (securityEventReport: SecurityEventReport, options?: Parameters<typeof customFetch>[1]): Promise<SecurityEventResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SecurityEventResult>(getReportSecurityEventUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(securityEventReport)
+  }
+);}
+
+
+
+
+
+export const getReportSecurityEventMutationKey = () => ['reportSecurityEvent'] as const;
+
+export const getReportSecurityEventMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSecurityEvent>>, TError,ReportSecurityEventMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportSecurityEvent>>, TError,ReportSecurityEventMutationVariables, TContext> => {
+
+const mutationKey = getReportSecurityEventMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportSecurityEvent>>, ReportSecurityEventMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  reportSecurityEvent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportSecurityEventMutationResult = NonNullable<Awaited<ReturnType<typeof reportSecurityEvent>>>
+    export type ReportSecurityEventMutationBody = BodyType<SecurityEventReport>
+    export type ReportSecurityEventMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+    export type ReportSecurityEventMutationVariables = {data: BodyType<SecurityEventReport>}
+
+    /**
+ * @summary Record a security change made in the browser
+ */
+export const useReportSecurityEvent = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSecurityEvent>>, TError,ReportSecurityEventMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportSecurityEvent>>,
+        TError,
+        ReportSecurityEventMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReportSecurityEventMutationOptions(options));
+    }
+
+export const getCheckPasswordUrl = () => {
+
+
+
+
+  return `/api/profile/check-password`
+}
+
+/**
+ * Checked with Supabase from the server (the throwaway session is signed out straight away), before changing your password or email. A wrong password is recorded as a failed attempt.
+ * @summary Confirm your current password
+ */
+export const checkPassword = async (passwordCheck: PasswordCheck, options?: Parameters<typeof customFetch>[1]): Promise<Message> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Message>(getCheckPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(passwordCheck)
+  }
+);}
+
+
+
+
+
+export const getCheckPasswordMutationKey = () => ['checkPassword'] as const;
+
+export const getCheckPasswordMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | BadRequestResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkPassword>>, TError,CheckPasswordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkPassword>>, TError,CheckPasswordMutationVariables, TContext> => {
+
+const mutationKey = getCheckPasswordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkPassword>>, CheckPasswordMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof checkPassword>>>
+    export type CheckPasswordMutationBody = BodyType<PasswordCheck>
+    export type CheckPasswordMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | BadRequestResponse>
+    export type CheckPasswordMutationVariables = {data: BodyType<PasswordCheck>}
+
+    /**
+ * @summary Confirm your current password
+ */
+export const useCheckPassword = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | BadRequestResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkPassword>>, TError,CheckPasswordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkPassword>>,
+        TError,
+        CheckPasswordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCheckPasswordMutationOptions(options));
     }
 
 export const getReportSignInUrl = () => {
@@ -4264,7 +4857,7 @@ export const getRequestWithdrawalUrl = () => {
 }
 
 /**
- * From your grant balance to a saved destination on an enabled channel.
+ * With an available withdrawal method: the amount, the balance it comes from (required when the method allows both; the deposit balance keeps the reserve), and the method's form answers (field id → value). Field errors are keyed `details.<fieldId>`. The answers are kept with the request and remembered for next time.
  * @summary Request a payout
  */
 export const requestWithdrawal = async (withdrawalRequest: WithdrawalRequest, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
@@ -5890,19 +6483,19 @@ export const useDeductFromCard = <TError = ErrorType<InvalidResponse | Unauthori
       return useMutation(getDeductFromCardMutationOptions(options));
     }
 
-export const getSavePayoutDestinationUrl = () => {
+export const getCreateWithdrawalMethodUrl = () => {
 
 
 
 
-  return `/api/money/destinations`
+  return `/api/money/methods`
 }
 
 /**
- * Only a masked label is stored.
- * @summary Save a payout destination
+ * Requires treasury.manage. 409 if the money settings changed since `version`. The new method's id is returned as `id`.
+ * @summary Add a withdrawal method
  */
-export const savePayoutDestination = async (destinationInput: DestinationInput, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+export const createWithdrawalMethod = async (withdrawalMethodSave: WithdrawalMethodSave, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -5918,12 +6511,12 @@ export const savePayoutDestination = async (destinationInput: DestinationInput, 
     }
     return headers;
   };
-return customFetch<MoneyResult>(getSavePayoutDestinationUrl(),
+return customFetch<MoneySettingsResult>(getCreateWithdrawalMethodUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(destinationInput)
+    body: JSON.stringify(withdrawalMethodSave)
   }
 );}
 
@@ -5931,13 +6524,13 @@ return customFetch<MoneyResult>(getSavePayoutDestinationUrl(),
 
 
 
-export const getSavePayoutDestinationMutationKey = () => ['savePayoutDestination'] as const;
+export const getCreateWithdrawalMethodMutationKey = () => ['createWithdrawalMethod'] as const;
 
-export const getSavePayoutDestinationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext> => {
+export const getCreateWithdrawalMethodMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWithdrawalMethod>>, TError,CreateWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWithdrawalMethod>>, TError,CreateWithdrawalMethodMutationVariables, TContext> => {
 
-const mutationKey = getSavePayoutDestinationMutationKey();
+const mutationKey = getCreateWithdrawalMethodMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5947,10 +6540,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePayoutDestination>>, SavePayoutDestinationMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWithdrawalMethod>>, CreateWithdrawalMethodMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  savePayoutDestination(data,requestOptions)
+          return  createWithdrawalMethod(data,requestOptions)
         }
 
 
@@ -5960,40 +6553,220 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type SavePayoutDestinationMutationResult = NonNullable<Awaited<ReturnType<typeof savePayoutDestination>>>
-    export type SavePayoutDestinationMutationBody = BodyType<DestinationInput>
-    export type SavePayoutDestinationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
-    export type SavePayoutDestinationMutationVariables = {data: BodyType<DestinationInput>}
+    export type CreateWithdrawalMethodMutationResult = NonNullable<Awaited<ReturnType<typeof createWithdrawalMethod>>>
+    export type CreateWithdrawalMethodMutationBody = BodyType<WithdrawalMethodSave>
+    export type CreateWithdrawalMethodMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>
+    export type CreateWithdrawalMethodMutationVariables = {data: BodyType<WithdrawalMethodSave>}
 
     /**
- * @summary Save a payout destination
+ * @summary Add a withdrawal method
  */
-export const useSavePayoutDestination = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePayoutDestination>>, TError,SavePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useCreateWithdrawalMethod = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWithdrawalMethod>>, TError,CreateWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof savePayoutDestination>>,
+        Awaited<ReturnType<typeof createWithdrawalMethod>>,
         TError,
-        SavePayoutDestinationMutationVariables,
+        CreateWithdrawalMethodMutationVariables,
         TContext
       > => {
-      return useMutation(getSavePayoutDestinationMutationOptions(options));
+      return useMutation(getCreateWithdrawalMethodMutationOptions(options));
     }
 
-export const getRemovePayoutDestinationUrl = (channel: 'bank' | 'wire' | 'mobile' | 'crypto',) => {
+export const getUpdateWithdrawalMethodUrl = (methodId: string,) => {
 
 
 
 
-  return `/api/money/destinations/${channel}/remove`
+  return `/api/money/methods/${methodId}`
 }
 
 /**
- * Pending payouts still go where they were sent.
- * @summary Remove a payout destination
+ * Requires treasury.manage. Applies to new requests; pending ones keep what they were quoted. 409 if stale.
+ * @summary Edit a withdrawal method
  */
-export const removePayoutDestination = async (channel: 'bank' | 'wire' | 'mobile' | 'crypto', options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+export const updateWithdrawalMethod = async (methodId: string,
+    withdrawalMethodSave: WithdrawalMethodSave, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
 
-  return customFetch<MoneyResult>(getRemovePayoutDestinationUrl(channel),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getUpdateWithdrawalMethodUrl(methodId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(withdrawalMethodSave)
+  }
+);}
+
+
+
+
+
+export const getUpdateWithdrawalMethodMutationKey = () => ['updateWithdrawalMethod'] as const;
+
+export const getUpdateWithdrawalMethodMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWithdrawalMethod>>, TError,UpdateWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWithdrawalMethod>>, TError,UpdateWithdrawalMethodMutationVariables, TContext> => {
+
+const mutationKey = getUpdateWithdrawalMethodMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWithdrawalMethod>>, UpdateWithdrawalMethodMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  updateWithdrawalMethod(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWithdrawalMethodMutationResult = NonNullable<Awaited<ReturnType<typeof updateWithdrawalMethod>>>
+    export type UpdateWithdrawalMethodMutationBody = BodyType<WithdrawalMethodSave>
+    export type UpdateWithdrawalMethodMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type UpdateWithdrawalMethodMutationVariables = {methodId: string;data: BodyType<WithdrawalMethodSave>}
+
+    /**
+ * @summary Edit a withdrawal method
+ */
+export const useUpdateWithdrawalMethod = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWithdrawalMethod>>, TError,UpdateWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWithdrawalMethod>>,
+        TError,
+        UpdateWithdrawalMethodMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateWithdrawalMethodMutationOptions(options));
+    }
+
+export const getSetWithdrawalMethodAvailabilityUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/methods/${methodId}/availability`
+}
+
+/**
+ * Requires treasury.manage.
+ * @summary Show or hide a withdrawal method for users
+ */
+export const setWithdrawalMethodAvailability = async (methodId: string,
+    methodAvailability: MethodAvailability, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getSetWithdrawalMethodAvailabilityUrl(methodId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(methodAvailability)
+  }
+);}
+
+
+
+
+
+export const getSetWithdrawalMethodAvailabilityMutationKey = () => ['setWithdrawalMethodAvailability'] as const;
+
+export const getSetWithdrawalMethodAvailabilityMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>, TError,SetWithdrawalMethodAvailabilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>, TError,SetWithdrawalMethodAvailabilityMutationVariables, TContext> => {
+
+const mutationKey = getSetWithdrawalMethodAvailabilityMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>, SetWithdrawalMethodAvailabilityMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  setWithdrawalMethodAvailability(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetWithdrawalMethodAvailabilityMutationResult = NonNullable<Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>>
+    export type SetWithdrawalMethodAvailabilityMutationBody = BodyType<MethodAvailability>
+    export type SetWithdrawalMethodAvailabilityMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type SetWithdrawalMethodAvailabilityMutationVariables = {methodId: string;data: BodyType<MethodAvailability>}
+
+    /**
+ * @summary Show or hide a withdrawal method for users
+ */
+export const useSetWithdrawalMethodAvailability = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>, TError,SetWithdrawalMethodAvailabilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setWithdrawalMethodAvailability>>,
+        TError,
+        SetWithdrawalMethodAvailabilityMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetWithdrawalMethodAvailabilityMutationOptions(options));
+    }
+
+export const getDeleteWithdrawalMethodUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/methods/${methodId}/delete`
+}
+
+/**
+ * Requires treasury.manage. Pending requests keep the method's name, charges, and answers, so they can still be processed. An uploaded photo is deleted.
+ * @summary Delete a withdrawal method
+ */
+export const deleteWithdrawalMethod = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+  return customFetch<MoneySettingsResult>(getDeleteWithdrawalMethodUrl(methodId),
   {
     ...options,
     method: 'POST'
@@ -6006,13 +6779,13 @@ export const removePayoutDestination = async (channel: 'bank' | 'wire' | 'mobile
 
 
 
-export const getRemovePayoutDestinationMutationKey = () => ['removePayoutDestination'] as const;
+export const getDeleteWithdrawalMethodMutationKey = () => ['deleteWithdrawalMethod'] as const;
 
-export const getRemovePayoutDestinationMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext> => {
+export const getDeleteWithdrawalMethodMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWithdrawalMethod>>, TError,DeleteWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWithdrawalMethod>>, TError,DeleteWithdrawalMethodMutationVariables, TContext> => {
 
-const mutationKey = getRemovePayoutDestinationMutationKey();
+const mutationKey = getDeleteWithdrawalMethodMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -6022,10 +6795,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removePayoutDestination>>, RemovePayoutDestinationMutationVariables> = (props) => {
-          const {channel} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWithdrawalMethod>>, DeleteWithdrawalMethodMutationVariables> = (props) => {
+          const {methodId} = props ?? {};
 
-          return  removePayoutDestination(channel,requestOptions)
+          return  deleteWithdrawalMethod(methodId,requestOptions)
         }
 
 
@@ -6035,24 +6808,267 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type RemovePayoutDestinationMutationResult = NonNullable<Awaited<ReturnType<typeof removePayoutDestination>>>
+    export type DeleteWithdrawalMethodMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWithdrawalMethod>>>
 
-    export type RemovePayoutDestinationMutationError = ErrorType<InvalidResponse | UnauthorizedResponse>
-    export type RemovePayoutDestinationMutationVariables = {channel: 'bank' | 'wire' | 'mobile' | 'crypto'}
+    export type DeleteWithdrawalMethodMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeleteWithdrawalMethodMutationVariables = {methodId: string}
 
     /**
- * @summary Remove a payout destination
+ * @summary Delete a withdrawal method
  */
-export const useRemovePayoutDestination = <TError = ErrorType<InvalidResponse | UnauthorizedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePayoutDestination>>, TError,RemovePayoutDestinationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useDeleteWithdrawalMethod = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWithdrawalMethod>>, TError,DeleteWithdrawalMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof removePayoutDestination>>,
+        Awaited<ReturnType<typeof deleteWithdrawalMethod>>,
         TError,
-        RemovePayoutDestinationMutationVariables,
+        DeleteWithdrawalMethodMutationVariables,
         TContext
       > => {
-      return useMutation(getRemovePayoutDestinationMutationOptions(options));
+      return useMutation(getDeleteWithdrawalMethodMutationOptions(options));
     }
+
+export const getUploadWithdrawalMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/methods/${methodId}/photo`
+}
+
+/**
+ * Requires treasury.manage. The raw image is the body (JPEG, PNG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces a previous upload or link.
+ * @summary Upload a withdrawal method's photo
+ */
+export const uploadWithdrawalMethodPhoto = async (methodId: string,
+    uploadWithdrawalMethodPhotoBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getUploadWithdrawalMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadWithdrawalMethodPhotoBody
+  }
+);}
+
+
+
+
+
+export const getUploadWithdrawalMethodPhotoMutationKey = () => ['uploadWithdrawalMethodPhoto'] as const;
+
+export const getUploadWithdrawalMethodPhotoMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>, TError,UploadWithdrawalMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>, TError,UploadWithdrawalMethodPhotoMutationVariables, TContext> => {
+
+const mutationKey = getUploadWithdrawalMethodPhotoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>, UploadWithdrawalMethodPhotoMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  uploadWithdrawalMethodPhoto(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadWithdrawalMethodPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>>
+    export type UploadWithdrawalMethodPhotoMutationBody = BodyType<Blob>
+    export type UploadWithdrawalMethodPhotoMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type UploadWithdrawalMethodPhotoMutationVariables = {methodId: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a withdrawal method's photo
+ */
+export const useUploadWithdrawalMethodPhoto = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>, TError,UploadWithdrawalMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadWithdrawalMethodPhoto>>,
+        TError,
+        UploadWithdrawalMethodPhotoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadWithdrawalMethodPhotoMutationOptions(options));
+    }
+
+export const getRemoveWithdrawalMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/methods/${methodId}/photo/delete`
+}
+
+/**
+ * Requires treasury.manage. Users see the method's first letter instead.
+ * @summary Remove a withdrawal method's photo
+ */
+export const removeWithdrawalMethodPhoto = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+  return customFetch<MoneySettingsResult>(getRemoveWithdrawalMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveWithdrawalMethodPhotoMutationKey = () => ['removeWithdrawalMethodPhoto'] as const;
+
+export const getRemoveWithdrawalMethodPhotoMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>, TError,RemoveWithdrawalMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>, TError,RemoveWithdrawalMethodPhotoMutationVariables, TContext> => {
+
+const mutationKey = getRemoveWithdrawalMethodPhotoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>, RemoveWithdrawalMethodPhotoMutationVariables> = (props) => {
+          const {methodId} = props ?? {};
+
+          return  removeWithdrawalMethodPhoto(methodId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveWithdrawalMethodPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>>
+
+    export type RemoveWithdrawalMethodPhotoMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type RemoveWithdrawalMethodPhotoMutationVariables = {methodId: string}
+
+    /**
+ * @summary Remove a withdrawal method's photo
+ */
+export const useRemoveWithdrawalMethodPhoto = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>, TError,RemoveWithdrawalMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeWithdrawalMethodPhoto>>,
+        TError,
+        RemoveWithdrawalMethodPhotoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemoveWithdrawalMethodPhotoMutationOptions(options));
+    }
+
+export const getGetWithdrawalMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/withdrawal-methods/${methodId}/photo`
+}
+
+/**
+ * Public (method logos aren't private), so pages can use it in an image tag. Checked against the SHA-256 recorded at upload.
+ * @summary A withdrawal method's uploaded photo
+ */
+export const getWithdrawalMethodPhoto = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetWithdrawalMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWithdrawalMethodPhotoQueryKey = (methodId: string,) => {
+    return [
+    `/api/withdrawal-methods/${methodId}/photo`
+    ] as const;
+    }
+
+
+export const getGetWithdrawalMethodPhotoQueryOptions = <TData = Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>, TError = ErrorType<NotFoundResponse>>(methodId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWithdrawalMethodPhotoQueryKey(methodId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>> = ({ signal }) => getWithdrawalMethodPhoto(methodId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: methodId !== null && methodId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWithdrawalMethodPhotoQueryResult = NonNullable<Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>>
+export type GetWithdrawalMethodPhotoQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary A withdrawal method's uploaded photo
+ */
+
+export function useGetWithdrawalMethodPhoto<TData = Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>, TError = ErrorType<NotFoundResponse>>(
+ methodId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWithdrawalMethodPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWithdrawalMethodPhotoQueryOptions(methodId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetLedgerUrl = () => {
 
