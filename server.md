@@ -464,7 +464,7 @@ _Fill in from step 1's output on the new server._
 
 ## Status
 
-**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org. Deployed code: `00c13f0` (28 Sep, demo notices removed from the applicant dashboard, deposits, and payouts); before it `bad06bc` (auth emails only through the hook and Resend; Settings → Email shows the hook checklist); before that `0524e86` (adds the auth email hook); first deploy was `8dfe7be`.
+**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org. Deployed code: `2bbe3c4` (29 Sep, admin applicant directory and profile rebuilt, balance adjustments, permission switches); before it `00c13f0` (28 Sep, demo notices removed from the applicant dashboard, deposits, and payouts); before that `bad06bc` (auth emails only through the hook and Resend; Settings → Email shows the hook checklist); before that `0524e86` (adds the auth email hook); first deploy was `8dfe7be`.
 
 Preparation (27 Sep 2026):
 - [x] Reviewed the app's structure and runtime needs; wrote this runbook.
@@ -583,3 +583,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-28 — Owner's rule: Supabase stores data and sends no email; Resend sends everything. Deployed `bad06bc` (removed the Supabase SMTP and wording controls; Settings → Email shows the hook checklist). Build OK, service restarted, `/api/healthz` 200 and the hook still answers unsigned calls with 401.
 - 2026-09-28 — Traced the "hook: 403" sign-up error in Cloudflare → Security → Analytics → Events: Supabase's calls to `/api/auth/email-hook` (Ireland) got a Managed Challenge from Bot Fight Mode. Resend domain verified, key and sender saved, **Bot Fight Mode turned off**, hook switched back on: test sign-up confirmation came from our address through Resend. Step 11b gains the Cloudflare step, an error table, and the full story of the day.
 - 2026-09-28 — Deployed `00c13f0`: the phone "DEMO ONLY" banner and the demo notices on Deposits and Payouts removed (design of the banner kept in `work.md` §3). Build OK, restarted; checked from outside: `/api/healthz` 200 and the served bundle has the new wording. Open: the Deposits page still shows placeholder payment details until real ones are supplied.
+- 2026-09-29 — Deployed `2bbe3c4`: admin applicant directory and user profile rebuilt, balance adjustments, per-applicant permission switches. Schema pushed to Supabase first (`applicant_profiles.permissions`, `ledger_entries.category`; "Changes applied"), build OK, service restarted, `/api/healthz` ok. The owner ran the push without the surrounding parentheses, so that shell had `api.env` exported; close it (`exit`). Next: sign in to the admin and try Applicants and a profile (adjust, toggle, lock).
