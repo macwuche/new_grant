@@ -384,7 +384,8 @@ describe("account controls and identity checks", () => {
   beforeEach(async () => { await call("/profile", "tok-maya"); });
 
   it("starts every applicant active, unverified, and at Tier 1", async () => {
-    expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } });
+    expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" },
+      permissions: { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true } });
   });
 
   it("keeps only the last four characters of the document number", async () => {
@@ -482,6 +483,23 @@ describe("account controls and identity checks", () => {
   it("answers 404 for unknown applicants", async () => {
     expect((await post("/applicants/00000000-0000-4000-8000-000000000999/unlock", {})).status).toBe(404);
     expect((await post("/applicants/not-a-uuid/unlock", {})).status).toBe(404);
+  });
+
+  it("lets compliance switch account permissions, enforced on the applicant and shown to them", async () => {
+    expect((await act("permissions", { key: "payoutKyc", value: true }, "tok-finance")).status).toBe(403);
+    expect((await act("permissions", { key: "somethingElse", value: true }, "tok-riley")).status).toBe(400);
+    const changed = await json(await act("permissions", { key: "depositKyc", value: true }, "tok-riley"));
+    expect(changed.applicant.profile.account.permissions).toMatchObject({ depositKyc: true, payoutKyc: false });
+    expect((await act("permissions", { key: "depositKyc", value: true }, "tok-riley")).status).toBe(400);
+    expect((await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-maya"))).error).toMatch(/Verify your identity/);
+    expect((await json(await call("/notifications", "tok-maya")))[0]).toMatchObject({ title: "Account settings changed" });
+    // Email copies are the same setting the applicant controls in Settings.
+    await act("permissions", { key: "emailNotifications", value: false }, "tok-riley");
+    expect((await json(await call("/profile/email-preference", "tok-maya"))).enabled).toBe(false);
+    await put("/profile/email-preference", { enabled: true }, "tok-maya");
+    expect((await maya()).account.permissions.emailNotifications).toBe(true);
+    const entry = (await json(await call("/audit", "tok-super"))).events.find((e: { summary: string }) => e.summary.startsWith("Identity check for deposits"));
+    expect(entry.changes).toEqual(expect.arrayContaining([{ field: "permissions.depositKyc", before: "false", after: "true" }]));
   });
 
   it("stores account changes only if the record is unchanged", async () => {
@@ -910,6 +928,30 @@ describe("money", () => {
       expect((await post(`/money/card-holders/${USERS["tok-super"]!.id}/virtual`, {})).status).toBe(403);
       expect((await post("/money/card-holders/99999999-9999-4999-8999-999999999999/virtual", {})).status).toBe(404);
     });
+  });
+
+  it("lets finance credit and debit the grant, deposit, and card balances with a category and reason", async () => {
+    await fund(1000, 100);
+    const adjust = (body: Record<string, unknown>, token = "tok-finance") => post(`/money/card-holders/${MAYA}/adjust`, { target: "grant", direction: "credit", amount: 250, category: "Correction", reason: "Award was entered short", ...body }, token);
+    expect((await adjust({}, "tok-riley")).status).toBe(403);
+    expect((await adjust({ reason: "short" })).status).toBe(400);
+    expect((await adjust({ amount: -5 })).status).toBe(400);
+    expect((await adjust({ category: "Bonus" })).status).toBe(400);
+    expect((await adjust({})).status).toBe(200);
+    expect((await json(await adjust({ target: "deposit", direction: "debit", amount: 5000 }))).error).toMatch(/deposit balance holds/);
+    expect((await adjust({ target: "deposit", direction: "debit", amount: 40, category: "Deposit manual override" })).status).toBe(200);
+    expect((await json(await adjust({ target: "card", amount: 30, category: "Card fee refund" }))).error).toMatch(/virtual card/);
+    await post(`/money/card-holders/${MAYA}/virtual`, {}, "tok-finance");
+    expect((await json(await adjust({ target: "card", amount: 30, category: "Card fee refund" }))).holder.balance).toBe(30);
+    const m = await mine();
+    const adjustments = m.transactions.filter((t: { category?: string }) => t.category);
+    expect(adjustments.map((t: { type: string; amount: number; category: string }) => [t.type, t.amount, t.category])).toEqual(expect.arrayContaining([
+      ["Grant adjustment", 250, "Correction"], ["Deposit adjustment", -40, "Deposit manual override"], ["Card top-up", 30, "Card fee refund"],
+    ]));
+    const notices = await json(await call("/notifications", "tok-maya"));
+    expect(notices.some((n: { title: string; body: string }) => n.title === "Balance adjusted by the grant team" && n.body.includes("taken from your deposit balance: Award was entered short"))).toBe(true);
+    const entry = (await json(await call("/audit", "tok-super"))).events.find((e: { action: string; summary: string }) => e.action === "Adjust balance" && e.summary.includes("added to the grant balance"));
+    expect(entry.changes).toEqual(expect.arrayContaining([{ field: "balances.grant", before: "1000", after: "1250" }]));
   });
 
   it("keeps each applicant to their own money, and staff off their own", async () => {

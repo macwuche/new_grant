@@ -3,7 +3,7 @@ import type {
 } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { logStaff } from './activity';
-import { accountLockReason, accountOf, patchAccount } from './applicants';
+import { accountLockReason, accountOf, patchAccount, permissionBlocker } from './applicants';
 import { computeBalances, ownTransactions } from './rules';
 import { CARD_DECLINED_TITLE, CARD_SHIPPED_TITLE, notify } from './notifications';
 import { lockdownMessage } from './security';
@@ -102,7 +102,7 @@ const newVirtual = (state: DemoState, lastFour: string, pin: string, now: Date, 
 /** The applicant creates their virtual card. `lastFour` and `pin` are random from the caller: no issuer is connected. */
 export function createVirtualCard(state: DemoState, lastFour: string, pin: string, now: Date): Result {
   if (state.cards.virtual) return fail('You already have a virtual card.');
-  const blocked = accountLockReason(state) ?? cardKycBlocker(state);
+  const blocked = accountLockReason(state) ?? permissionBlocker(state, 'card') ?? cardKycBlocker(state);
   if (blocked) return fail(blocked);
   const next = logStaff(withCard(state, 'virtual', newVirtual(state, lastFour, pin, now)), {
     kind: 'card', title: 'Virtual card created', body: `${state.profile.name} · card ending ${lastFour}`, href: '/admin/cards',
@@ -256,7 +256,7 @@ export function requestPhysicalCard(state: DemoState, input: ShippingAddress, no
   if (!state.cards.virtual) return fail('Create your virtual card first: a physical card is linked to it.');
   const { status } = state.cards.physical;
   if (!canRequestPhysical(status)) return fail(status === 'Active' ? 'You already have an active physical card.' : status === 'Shipped' ? 'Your physical card is on its way.' : 'Your physical card application is being reviewed.');
-  const blocked = accountLockReason(state) ?? cardKycBlocker(state);
+  const blocked = accountLockReason(state) ?? permissionBlocker(state, 'card') ?? cardKycBlocker(state);
   if (blocked) return fail(blocked);
   const checked = checkAddress(input);
   if ('errors' in checked) return fail('Check the shipping address.', checked.errors);

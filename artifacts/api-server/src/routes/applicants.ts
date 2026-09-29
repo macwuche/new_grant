@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Response } from "express";
-import { LockApplicantBody, RequireCredentialResetBody, SetApplicantTierBody, SetCardSettingsBody, UnlockApplicantParams as ApplicantIdParams } from "@workspace/api-zod";
+import { LockApplicantBody, RequireCredentialResetBody, SetAccountPermissionBody, SetApplicantTierBody, SetCardSettingsBody, UnlockApplicantParams as ApplicantIdParams } from "@workspace/api-zod";
 import { setCardSettings } from "@workspace/domain/cards";
 import type { Permission } from "@workspace/authz";
-import { approveKyc, lockAccount, rejectKyc, requestReverification, requireCredentialReset, setApplicantTier, unlockAccount } from "@workspace/domain/accounts";
+import { approveKyc, lockAccount, rejectKyc, requestReverification, requireCredentialReset, setAccountPermission, setApplicantTier, unlockAccount } from "@workspace/domain/accounts";
 import type { DemoState, Result, Tier } from "@workspace/domain/model";
 import { CURRENT_APPLICANT_ID as SLOT } from "@workspace/domain/seed";
 import { runAccountRule } from "../lib/applicantRules";
@@ -64,6 +64,10 @@ export function applicantsRouter(repo: ProfileRepo): IRouter {
   action("card-settings", "accounts.manage", "Change card settings", body => {
     const parsed = SetCardSettingsBody.safeParse(body);
     return parsed.success ? { ok: true, command: s => setCardSettings(s, SLOT, parsed.data, new Date()) } : { ok: false, error: "Choose the funding balances and whether cards need an identity check." };
+  });
+  action("permissions", "accounts.manage", "Change account permission", body => {
+    const parsed = SetAccountPermissionBody.safeParse(body);
+    return parsed.success ? { ok: true, command: s => setAccountPermission(s, SLOT, parsed.data.key, parsed.data.value, new Date()) } : { ok: false, error: "Choose a setting and whether it is on or off." };
   });
   action("identity/approve", "kyc.review", "Approve identity check", none((s, by) => approveKyc(s, SLOT, by, new Date())));
   action("identity/reject", "kyc.review", "Reject identity check", reason(text => (s, by) => rejectKyc(s, SLOT, text, by, new Date())));

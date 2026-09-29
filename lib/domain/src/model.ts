@@ -92,7 +92,9 @@ export type Application = {
 
 export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
 
-export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Card top-up' | 'Card deduction';
+export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Card top-up' | 'Card deduction' | 'Grant adjustment' | 'Deposit adjustment';
+/** Why staff adjusted a balance by hand (see ./adjustments.ts). */
+export type AdjustmentCategory = 'Grant adjustment' | 'Deposit manual override' | 'Card fee refund' | 'Correction' | 'Fraud freeze';
 /** Card top-ups and deductions: the balance on the other side of the move, or 'none' when staff add or remove money outright. */
 export type CardCounterpart = 'deposit' | 'grant' | 'none';
 export type TransactionStatus = 'Completed' | 'Pending' | 'Failed' | 'Cancelled';
@@ -124,8 +126,10 @@ export type Transaction = {
   releaseApproval?: { by: string; at: string; /** Server records only: the approver's staff id, compared instead of the name. */ byId?: string };
   /** Card top-ups and deductions only (see CardCounterpart). */
   counterpart?: CardCounterpart;
-  /** Staff card moves: the reason, shown to the applicant. */
+  /** Staff card moves and balance adjustments: the reason, shown to the applicant. */
   note?: string;
+  /** Staff balance adjustments (including card credits and debits made from the adjustment form). */
+  category?: AdjustmentCategory;
 };
 
 export type ChannelId = 'bank' | 'wire' | 'mobile' | 'crypto';
@@ -195,10 +199,12 @@ export type Profile = {
   country: string;
   /** ISO date the account was created. */
   joined: string;
+  /** ISO date of birth, when given at sign-up. */
+  birthDate?: string;
 };
 
 /** Other (fictional) applicants visible in the admin directory. */
-export type ApplicantSummary = { id: string; name: string; email: string; sector: string; country: string; verified: boolean; joined: string; tier: Tier };
+export type ApplicantSummary = { id: string; name: string; email: string; sector: string; country: string; verified: boolean; joined: string; tier: Tier; phone?: string; address?: string; birthDate?: string };
 
 export type KycStatus = 'Not submitted' | 'Pending' | 'Verified' | 'Rejected';
 export type KycDocumentType = 'Passport' | 'National ID' | "Driver's licence";
@@ -231,6 +237,22 @@ export type AccountControls = {
   destinationChangedAt?: string;
   /** Staff-set card rules for this applicant; defaults in cards.ts when absent. */
   cardSettings?: CardSettings;
+  /** Staff switches on what this applicant may do; defaults in accounts.ts when absent. */
+  permissions?: AccountPermissions;
+};
+
+/** Per-applicant switches staff turn on or off (Feature toggles on the admin profile page). */
+export type AccountPermissions = {
+  /** Payout requests need a verified identity. */
+  payoutKyc: boolean;
+  /** Deposits need a verified identity. */
+  depositKyc: boolean;
+  /** Notifications are also emailed (security notices always are). */
+  emailNotifications: boolean;
+  /** The applicant may create a virtual card and apply for a physical one (staff can still issue cards). */
+  cardApplications: boolean;
+  /** The applicant may submit new grant applications (resubmitting after requested changes stays allowed). */
+  grantApplications: boolean;
 };
 
 /** Which balances an applicant may move onto their card themselves (staff can use either). */

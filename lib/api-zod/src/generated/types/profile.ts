@@ -19,5 +19,10 @@ export interface Profile {
   identityVerified: boolean;
   /** ISO date the profile was created */
   joined: string;
+  /**
+     * ISO date of birth given at sign-up, if any
+     * @nullable
+     */
+  birthDate?: string | null;
   account: Account;
 }

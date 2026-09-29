@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AccountPermissions } from './accountPermissions';
 import type { AccountStatus } from './accountStatus';
 import type { CardSettings } from './cardSettings';
 import type { Kyc } from './kyc';
@@ -21,4 +22,5 @@ export interface Account {
   twoFactorResetRequired: boolean;
   kyc: Kyc;
   cardSettings?: CardSettings;
+  permissions?: AccountPermissions;
 }

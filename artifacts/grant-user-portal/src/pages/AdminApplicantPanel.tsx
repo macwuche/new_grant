@@ -24,9 +24,53 @@ const day = (iso: string) => format(new Date(iso.length === 10 ? `${iso}T00:00:0
 const kycTone = { Verified: 'verified', Pending: 'submitted', Rejected: 'declined', 'Not submitted': 'draft' } as const;
 
 type Action = 'tier' | 'lock' | 'kyc-reject' | 'reverify';
-type Outcome = { ok: true; message: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+export type Outcome = { ok: true; message: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 /** One account action: the permission and audit label, the browser rule, and the API call used when signed in. */
-type Act = { permission: Parameters<ReturnType<typeof useStaffCommand>>[0]; action: string; local: (s: DemoState, actor: StaffMember) => Result; remote: () => Promise<api.ApplicantResult> };
+export type Act = { permission: Parameters<ReturnType<typeof useStaffCommand>>[0]; action: string; local: (s: DemoState, actor: StaffMember) => Result; remote: () => Promise<api.ApplicantResult> };
+
+/** The account actions that need no reason, for one applicant. */
+export const simpleActs = (id: string) => ({
+  approve: { permission: 'kyc.review', action: 'Approve identity check', local: (s, actor) => approveKyc(s, id, actor.name, new Date()), remote: () => api.approveIdentityCheck(id) },
+  unlock: { permission: 'accounts.manage', action: 'Unlock account', local: s => unlockAccount(s, id, new Date()), remote: () => api.unlockApplicant(id) },
+  resetPassword: { permission: 'accounts.manage', action: 'Force password reset', local: s => requireCredentialReset(s, id, 'password', new Date()), remote: () => api.requireCredentialReset(id, { kind: 'password' }) },
+  resetTwoFactor: { permission: 'accounts.manage', action: 'Reset two-step sign-in', local: s => requireCredentialReset(s, id, 'twoFactor', new Date()), remote: () => api.requireCredentialReset(id, { kind: 'twoFactor' }) },
+}) satisfies Record<string, Act>;
+
+/** The account actions that need a reason (sent to the applicant), for one applicant. */
+export function reasonAct(id: string, action: Action, reason: string, tier?: Tier | null): Act | null {
+  if (action === 'tier' && tier) return { permission: 'accounts.tier', action: 'Change account tier', local: s => setApplicantTier(s, id, tier, reason, new Date()), remote: () => api.setApplicantTier(id, { tier, reason }) };
+  if (action === 'lock') return { permission: 'accounts.manage', action: 'Lock account', local: (s, actor) => lockAccount(s, id, reason, actor.name, new Date()), remote: () => api.lockApplicant(id, { reason }) };
+  if (action === 'kyc-reject') return { permission: 'kyc.review', action: 'Reject identity check', local: (s, actor) => rejectKyc(s, id, reason, actor.name, new Date()), remote: () => api.rejectIdentityCheck(id, { reason }) };
+  if (action === 'reverify') return { permission: 'kyc.review', action: 'Request re-verification', local: (s, actor) => requestReverification(s, id, reason, actor.name, new Date()), remote: () => api.requestReverification(id, { reason }) };
+  return null;
+}
+export type ReasonAction = Action;
+
+/**
+ * Runs an account action. Without sign-in the rule runs on this browser's store
+ * (role-checked and audited there); signed in, the API runs it and the store
+ * takes the saved applicant.
+ */
+export function useAccountAction() {
+  const { run } = useDemoStore();
+  const { connected, refreshApplicants } = useServerData();
+  const command = useStaffCommand();
+  const [busy, setBusy] = useState(false);
+  const perform = async (act: Act, target: string): Promise<Outcome> => {
+    if (!connected) return command(act.permission, { action: act.action, target }, act.local);
+    setBusy(true);
+    try {
+      const res = await act.remote();
+      run(s => adoptServerApplicant(s, toServerApplicant(res.applicant)));
+      return { ok: true, message: res.message };
+    } catch (err) {
+      const failure = apiError(err, "Couldn't reach the server. Nothing was changed; try again.");
+      if (failure.status === 409 || failure.status === 404) void refreshApplicants();
+      return { ok: false, error: failure.error, fieldErrors: failure.fieldErrors };
+    } finally { setBusy(false); }
+  };
+  return { busy, perform };
+}
 
 /** The applicant side panel (Security page and elsewhere): the same details as the profile page, in a dialog. */
 export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: string; onClose: () => void }) {
@@ -45,10 +89,9 @@ export function AdminApplicantPanel({ applicantId, onClose }: { applicantId: str
 
 /** Staff view of one applicant: profile, money, risk, identity check, and account controls. */
 export function ApplicantDetails({ applicantId, profileLink = false }: { applicantId: string; profileLink?: boolean }) {
-  const { state, run } = useDemoStore();
-  const { connected, refreshApplicants } = useServerData();
-  const [busy, setBusy] = useState(false);
-  const command = useStaffCommand();
+  const { state } = useDemoStore();
+  const { connected } = useServerData();
+  const { busy, perform: runAct } = useAccountAction();
   const can = useCan();
   const [tier, setTier] = useState<Tier | null>(null);
   const [reason, setReason] = useState('');
@@ -78,39 +121,11 @@ export function ApplicantDetails({ applicantId, profileLink = false }: { applica
     setError(`Write at least ${MIN_REASON_LENGTH} characters.`);
     return true;
   };
-  // Without sign-in the rule runs on this browser's store (role-checked and audited there);
-  // signed in, the API runs it and the store takes the saved applicant.
-  const perform = async (act: Act) => {
-    if (!connected) { after(command(act.permission, { action: act.action, target: applicantId }, act.local)); return; }
-    setBusy(true);
-    try {
-      const res = await act.remote();
-      run(s => adoptServerApplicant(s, toServerApplicant(res.applicant)));
-      after({ ok: true, message: res.message });
-    } catch (err) {
-      const failure = apiError(err, "Couldn't reach the server. Nothing was changed; try again.");
-      if (failure.status === 409 || failure.status === 404) void refreshApplicants();
-      after({ ok: false, error: failure.error, fieldErrors: failure.fieldErrors });
-    } finally { setBusy(false); }
-  };
-  const id = applicantId;
-  const acts = {
-    approve: { permission: 'kyc.review', action: 'Approve identity check', local: (s, actor) => approveKyc(s, id, actor.name, new Date()), remote: () => api.approveIdentityCheck(id) },
-    unlock: { permission: 'accounts.manage', action: 'Unlock account', local: s => unlockAccount(s, id, new Date()), remote: () => api.unlockApplicant(id) },
-    resetPassword: { permission: 'accounts.manage', action: 'Force password reset', local: s => requireCredentialReset(s, id, 'password', new Date()), remote: () => api.requireCredentialReset(id, { kind: 'password' }) },
-    resetTwoFactor: { permission: 'accounts.manage', action: 'Reset two-step sign-in', local: s => requireCredentialReset(s, id, 'twoFactor', new Date()), remote: () => api.requireCredentialReset(id, { kind: 'twoFactor' }) },
-  } satisfies Record<string, Act>;
-  const withReason = (action: Action): Act | null => {
-    const text = reason;
-    if (action === 'tier' && tier) return { permission: 'accounts.tier', action: 'Change account tier', local: s => setApplicantTier(s, id, tier, text, new Date()), remote: () => api.setApplicantTier(id, { tier, reason: text }) };
-    if (action === 'lock') return { permission: 'accounts.manage', action: 'Lock account', local: (s, actor) => lockAccount(s, id, text, actor.name, new Date()), remote: () => api.lockApplicant(id, { reason: text }) };
-    if (action === 'kyc-reject') return { permission: 'kyc.review', action: 'Reject identity check', local: (s, actor) => rejectKyc(s, id, text, actor.name, new Date()), remote: () => api.rejectIdentityCheck(id, { reason: text }) };
-    if (action === 'reverify') return { permission: 'kyc.review', action: 'Request re-verification', local: (s, actor) => requestReverification(s, id, text, actor.name, new Date()), remote: () => api.requestReverification(id, { reason: text }) };
-    return null;
-  };
+  const perform = async (act: Act) => after(await runAct(act, applicantId));
+  const acts = simpleActs(applicantId);
   const submit = () => {
     if (!pending || needsReason()) return;
-    const act = withReason(pending);
+    const act = reasonAct(applicantId, pending, reason, tier);
     if (act) void perform(act);
   };
   const pendingLabel: Record<Action, string> = {

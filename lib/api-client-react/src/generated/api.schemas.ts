@@ -357,6 +357,8 @@ export const LedgerEntryType = {
   Application_fee: 'Application fee',
   'Card_top-up': 'Card top-up',
   Card_deduction: 'Card deduction',
+  Grant_adjustment: 'Grant adjustment',
+  Deposit_adjustment: 'Deposit adjustment',
 } as const;
 
 export type LedgerEntryStatus = typeof LedgerEntryStatus[keyof typeof LedgerEntryStatus];
@@ -387,6 +389,17 @@ export const LedgerEntryCounterpart = {
   none: 'none',
 } as const;
 
+export type AdjustmentCategory = typeof AdjustmentCategory[keyof typeof AdjustmentCategory];
+
+
+export const AdjustmentCategory = {
+  Grant_adjustment: 'Grant adjustment',
+  Deposit_manual_override: 'Deposit manual override',
+  Card_fee_refund: 'Card fee refund',
+  Correction: 'Correction',
+  Fraud_freeze: 'Fraud freeze',
+} as const;
+
 export interface LedgerEntry {
   id: string;
   applicantId: string;
@@ -407,8 +420,9 @@ export interface LedgerEntry {
   releaseApproval?: LedgerEntryReleaseApproval;
   /** Card moves only - the other balance moved, or none */
   counterpart?: LedgerEntryCounterpart;
-  /** Staff card moves - the reason shown to the applicant */
+  /** Staff card moves and balance adjustments - the reason shown to the applicant */
   note?: string;
+  category?: AdjustmentCategory;
 }
 
 export interface PayoutChannel {
@@ -682,6 +696,63 @@ export const CardFundingSource = {
 export interface CardFunding {
   amount: number;
   source: CardFundingSource;
+}
+
+export type BalanceAdjustmentTarget = typeof BalanceAdjustmentTarget[keyof typeof BalanceAdjustmentTarget];
+
+
+export const BalanceAdjustmentTarget = {
+  grant: 'grant',
+  deposit: 'deposit',
+  card: 'card',
+} as const;
+
+export type BalanceAdjustmentDirection = typeof BalanceAdjustmentDirection[keyof typeof BalanceAdjustmentDirection];
+
+
+export const BalanceAdjustmentDirection = {
+  credit: 'credit',
+  debit: 'debit',
+} as const;
+
+export interface BalanceAdjustment {
+  target: BalanceAdjustmentTarget;
+  direction: BalanceAdjustmentDirection;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
+  amount: number;
+  category: AdjustmentCategory;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  reason: string;
+}
+
+export interface AccountPermissions {
+  payoutKyc: boolean;
+  depositKyc: boolean;
+  emailNotifications: boolean;
+  cardApplications: boolean;
+  grantApplications: boolean;
+}
+
+export type AccountPermissionChangeKey = typeof AccountPermissionChangeKey[keyof typeof AccountPermissionChangeKey];
+
+
+export const AccountPermissionChangeKey = {
+  payoutKyc: 'payoutKyc',
+  depositKyc: 'depositKyc',
+  emailNotifications: 'emailNotifications',
+  cardApplications: 'cardApplications',
+  grantApplications: 'grantApplications',
+} as const;
+
+export interface AccountPermissionChange {
+  key: AccountPermissionChangeKey;
+  value: boolean;
 }
 
 export type StaffCardFundingSource = typeof StaffCardFundingSource[keyof typeof StaffCardFundingSource];
@@ -1179,6 +1250,7 @@ export interface Account {
   twoFactorResetRequired: boolean;
   kyc: Kyc;
   cardSettings?: CardSettings;
+  permissions?: AccountPermissions;
 }
 
 export interface Profile {
@@ -1192,6 +1264,11 @@ export interface Profile {
   identityVerified: boolean;
   /** ISO date the profile was created */
   joined: string;
+  /**
+     * ISO date of birth given at sign-up, if any
+     * @nullable
+     */
+  birthDate?: string | null;
   account: Account;
 }
 

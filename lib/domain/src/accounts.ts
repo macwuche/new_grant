@@ -1,6 +1,6 @@
-import type { DemoState, KycDocumentType, Result, Tier } from './model';
+import type { AccountPermissions, DemoState, KycDocumentType, Result, Tier } from './model';
 import { fail } from './core';
-import { accountOf, findApplicant, patchAccount, patchApplicant } from './applicants';
+import { accountOf, findApplicant, patchAccount, patchApplicant, permissionsOf } from './applicants';
 import { alertIfHighRisk, logStaff } from './activity';
 import { notify } from './notifications';
 import { CURRENT_APPLICANT_ID } from './seed';
@@ -18,6 +18,28 @@ const needReason = (text: string, what: string) => text.trim().length < MIN_REAS
 
 function load(state: DemoState, applicantId: string) {
   return findApplicant(state, applicantId);
+}
+
+// ---------- Permission switches (staff) ----------
+
+export const PERMISSION_SWITCHES: { key: keyof AccountPermissions; label: string; on: string; off: string }[] = [
+  { key: 'payoutKyc', label: 'Identity check for payouts', on: 'Payouts now need a verified identity.', off: 'Payouts no longer need an identity check.' },
+  { key: 'depositKyc', label: 'Identity check for deposits', on: 'Adding funds now needs a verified identity.', off: 'Adding funds no longer needs an identity check.' },
+  { key: 'emailNotifications', label: 'Email copies of notifications', on: 'Notifications will also be emailed to you.', off: "Notifications will no longer be emailed to you (security notices still are)." },
+  { key: 'cardApplications', label: 'Card applications', on: 'You can create and apply for cards again.', off: 'Card applications are turned off for your account.' },
+  { key: 'grantApplications', label: 'New grant applications', on: 'You can submit new grant applications again.', off: 'New grant applications are turned off for your account.' },
+];
+
+/** Staff turn one of the applicant's permission switches on or off. The applicant is told. */
+export function setAccountPermission(state: DemoState, applicantId: string, key: keyof AccountPermissions, value: boolean, now: Date): Result {
+  const person = load(state, applicantId);
+  if (!person) return fail('That applicant could not be found.');
+  const item = PERMISSION_SWITCHES.find(p => p.key === key);
+  if (!item || typeof value !== 'boolean') return fail('Choose a setting to change.');
+  const current = permissionsOf(state, applicantId);
+  if (current[key] === value) return fail(`${item.label} is already ${value ? 'on' : 'off'}.`);
+  const next = patchAccount(state, applicantId, { permissions: { ...current, [key]: value } });
+  return { ok: true, message: `${item.label} turned ${value ? 'on' : 'off'} for ${person.name}.`, state: notify(next, applicantId, 'Account settings changed', value ? item.on : item.off, '/settings', now) };
 }
 
 // ---------- Tier, lock, credential resets (staff) ----------

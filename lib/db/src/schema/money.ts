@@ -13,7 +13,7 @@ export type ReleaseApprovalJson = { by: string; byId?: string; at: string };
 export const ledgerEntriesTable = pgTable("ledger_entries", {
   id: text("id").primaryKey(),
   applicantId: uuid("applicant_id").notNull().references(() => applicantProfilesTable.authUserId),
-  type: text("type").$type<"Grant" | "Deposit" | "Withdrawal" | "Card fee" | "Application fee" | "Card top-up" | "Card deduction">().notNull(),
+  type: text("type").$type<"Grant" | "Deposit" | "Withdrawal" | "Card fee" | "Application fee" | "Card top-up" | "Card deduction" | "Grant adjustment" | "Deposit adjustment">().notNull(),
   description: text("description").notNull(),
   /** Signed: credits positive, debits negative. */
   amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
@@ -30,8 +30,10 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   releaseApproval: jsonb("release_approval").$type<ReleaseApprovalJson | null>(),
   /** Card top-ups and deductions: the other balance moved (deposit, grant), or none. */
   counterpart: text("counterpart").$type<"deposit" | "grant" | "none">(),
-  /** Staff card moves: the reason shown to the applicant. */
+  /** Staff card moves and balance adjustments: the reason shown to the applicant. */
   note: text("note"),
+  /** Staff balance adjustments: why (Grant adjustment, Deposit manual override, Card fee refund, Correction, Fraud freeze). */
+  category: text("category").$type<"Grant adjustment" | "Deposit manual override" | "Card fee refund" | "Correction" | "Fraud freeze">(),
 }, t => [index("ledger_applicant_idx").on(t.applicantId), index("ledger_type_status_idx").on(t.type, t.status)]).enableRLS();
 
 /**

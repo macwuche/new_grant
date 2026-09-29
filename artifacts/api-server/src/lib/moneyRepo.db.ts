@@ -34,6 +34,7 @@ export const toTransaction = (r: LedgerRow): Transaction => ({
   ...(r.releaseApproval ? { releaseApproval: { by: r.releaseApproval.by, at: r.releaseApproval.at, ...(r.releaseApproval.byId ? { byId: r.releaseApproval.byId } : {}) } } : {}),
   ...(r.counterpart !== null ? { counterpart: r.counterpart } : {}),
   ...(r.note !== null ? { note: r.note } : {}),
+  ...(r.category !== null ? { category: r.category } : {}),
 });
 
 const toRow = (t: Transaction) => ({
@@ -41,7 +42,7 @@ const toRow = (t: Transaction) => ({
   createdAt: new Date(t.createdAt), method: t.method ?? null, fee: t.fee ?? null, destination: t.destination ?? null,
   reference: t.reference ?? null, processedAt: t.processedAt ? new Date(t.processedAt) : null, processedBy: t.processedBy ?? null,
   failureReason: t.failureReason ?? null, dualControl: t.dualControl ?? null, releaseApproval: t.releaseApproval ?? null,
-  counterpart: t.counterpart ?? null, note: t.note ?? null,
+  counterpart: t.counterpart ?? null, note: t.note ?? null, category: t.category ?? null,
 });
 
 export async function saveTransaction(tx: Tx, t: Transaction) {

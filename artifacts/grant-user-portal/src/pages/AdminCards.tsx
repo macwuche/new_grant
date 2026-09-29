@@ -163,6 +163,7 @@ function CardPanel({ holder, applicantId, onHolder, onClose }: { holder: CardHol
   </ReviewFrame>;
 }
 
+export type CardMode = Mode;
 type Mode = 'create-virtual' | 'approve' | 'decline' | 'issue' | 'cancel' | 'freeze-virtual' | 'freeze-physical' | 'fund' | 'deduct';
 const EMPTY_ADDRESS: ShippingAddress = { name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: '' };
 const ADDRESS_FIELDS: { key: keyof ShippingAddress; label: string; optional?: boolean }[] = [
@@ -175,12 +176,22 @@ const MOVE_OPTIONS: Record<'fund' | 'deduct', { value: CardCounterpart; label: s
 };
 
 /** Everything staff can do with one applicant's cards. Used in the Cards side panel and on the applicant's profile page. */
-export function CardManager({ holder, onHolder }: { holder: CardHolder; onHolder: (h: CardHolder) => void }) {
+export function CardManager({ holder, onHolder, mode: shownMode, onMode, hideFacts = false }: {
+  holder: CardHolder; onHolder: (h: CardHolder) => void;
+  /** Optional: the parent chooses the open action (the profile page's card tiles do). */
+  mode?: CardMode | null; onMode?: (mode: CardMode | null) => void;
+  /** The profile page shows the cards as tiles instead of the facts list. */
+  hideFacts?: boolean;
+}) {
   const { state } = useDemoStore();
   const { connected } = useServerData();
   const can = useCan();
   const act = useCardAction(onHolder);
-  const [mode, setMode] = useState<Mode | null>(null);
+  const [ownMode, setOwnMode] = useState<Mode | null>(null);
+  const mode = shownMode !== undefined ? shownMode : ownMode;
+  // The last action this component opened or closed itself, so a parent echoing it back doesn't reset the form.
+  const ownChoice = useRef<Mode | null | undefined>(undefined);
+  const setMode = (next: Mode | null) => { ownChoice.current = next; setOwnMode(next); onMode?.(next); };
   const [text, setText] = useState('');
   const [tracking, setTracking] = useState('');
   const [amount, setAmount] = useState('');
@@ -197,6 +208,9 @@ export function CardManager({ holder, onHolder }: { holder: CardHolder; onHolder
     setMode(next); setText(''); setTracking(''); setAmount(''); setMove('deposit'); setConfirming(false); setErrors({}); setFlash(null);
     setAddress(next === 'issue' ? { ...EMPTY_ADDRESS, name: holder.name, ...(physical.shippingAddress ?? {}) } : EMPTY_ADDRESS);
   };
+  // A parent that opens an action (a card tile's button) starts it with empty fields.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (shownMode !== undefined && shownMode !== ownChoice.current) pick(shownMode); }, [shownMode]);
   const freezeCard: CardKind = mode === 'freeze-physical' ? 'physical' : 'virtual';
   const freezeTarget = holder.cards[freezeCard];
   const freezing = mode?.startsWith('freeze') ? !(freezeTarget?.frozen && freezeTarget.frozenBy === 'staff') : false;
@@ -289,7 +303,7 @@ export function CardManager({ holder, onHolder }: { holder: CardHolder; onHolder
 
   return <>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-card-flash">{flash.text}</div>}
-    <dl className="admin-detail-fields">{facts.map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{v}</dd></div>)}</dl>
+    {!hideFacts && <dl className="admin-detail-fields">{facts.map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{v}</dd></div>)}</dl>}
     <section className="admin-review-section admin-review-actions" aria-label="Manage cards">
       <h3>Manage</h3>
       {actingStaff(state) && !connected && <p className="admin-review-hint">Acting as <strong>{actingStaff(state)!.name}</strong>.</p>}

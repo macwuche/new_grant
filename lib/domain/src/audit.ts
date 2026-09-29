@@ -1,7 +1,8 @@
 import type { AuditChange, AuditEvent, DemoState, StaffMember } from './model';
 import { nextIds } from './core';
-import { findApplicant } from './applicants';
+import { findApplicant, permissionsOf } from './applicants';
 import { assessRisk } from './risk';
+import { computeBalances } from './rules';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // Append-only audit trail of staff actions. Entries are added by `asStaff`
@@ -40,7 +41,13 @@ export function snapshot(state: DemoState, target: string): Flat {
     : target === 'lockdown' ? { lockdown: state.lockdown }
     : target.startsWith('APP-') ? state.applications.find(a => a.id === target)
     : target.startsWith('TX-') ? state.transactions.find(t => t.id === target)
-    : target.startsWith('APL-') ? (() => { const a = findApplicant(state, target); return a && { tier: a.tier, identityVerified: a.identityVerified, ...a.account, ...(target === CURRENT_APPLICANT_ID ? { cards: auditedCards(state) } : {}) }; })()
+    : target.startsWith('APL-') ? (() => {
+      const a = findApplicant(state, target);
+      if (!a) return undefined;
+      // Balances are derived from the ledger; recording them shows staff money moves as before → after.
+      const { grant, deposit, card } = computeBalances(state.transactions.filter(t => t.applicantId === target));
+      return { tier: a.tier, identityVerified: a.identityVerified, ...a.account, permissions: permissionsOf(state, target), balances: { grant, deposit, card }, ...(target === CURRENT_APPLICANT_ID ? { cards: auditedCards(state) } : {}) };
+    })()
     : target.startsWith('STF-') ? state.staff.find(m => m.id === target)
     : state.grants.find(g => g.id === target);
   if (record) flatten(record, '', out);

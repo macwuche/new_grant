@@ -21,6 +21,9 @@ export type CardsJson = {
   } & CardFreezeJson;
 };
 
+/** Mirrors `AccountPermissions` in @workspace/domain, without `emailNotifications` (its own column). */
+export type AccountPermissionsJson = { payoutKyc: boolean; depositKyc: boolean; cardApplications: boolean; grantApplications: boolean };
+
 export const accountStatusEnum = pgEnum("account_status", ["Active", "Locked"]);
 
 /** Identity check; only the last four characters of the document number are kept. Mirrors `Kyc` in @workspace/domain. */
@@ -59,6 +62,8 @@ export const applicantProfilesTable = pgTable("applicant_profiles", {
   /** Staff card rules: which balances the applicant may fund their card from, and whether cards need a verified identity. */
   cardFunding: text("card_funding").$type<"deposit" | "grant" | "both">().notNull().default("deposit"),
   cardKycRequired: boolean("card_kyc_required").notNull().default(false),
+  /** Staff permission switches (identity checks for payouts and deposits, card and grant applications); null means the defaults. Email copies live in `email_notifications`. */
+  permissions: jsonb("permissions").$type<AccountPermissionsJson | null>(),
   /** Virtual and physical card settings (fictional: no card provider is connected). */
   cards: jsonb("cards").$type<CardsJson | null>(),
   /** Masked payout destination labels per channel; full numbers are never stored. */

@@ -659,7 +659,7 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
   </div></div>;
 }
 const TRANSACTION_TABS: { label: string; types: Transaction['type'][] | null }[] = [
-  { label: 'All', types: null }, { label: 'Grants', types: ['Grant'] }, { label: 'Deposits', types: ['Deposit'] },
+  { label: 'All', types: null }, { label: 'Grants', types: ['Grant', 'Grant adjustment'] }, { label: 'Deposits', types: ['Deposit', 'Deposit adjustment'] },
   { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Card', types: ['Card top-up', 'Card deduction'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
 ];
 function TransactionsPage() {

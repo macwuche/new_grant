@@ -26,7 +26,7 @@ export function dropServerProgram(state: DemoState, id: string): Result {
 }
 
 /** The applicant profile as the API returns it. */
-export type ServerProfile = Pick<Profile, 'name' | 'email' | 'phone' | 'address' | 'sector' | 'country' | 'joined' | 'tier' | 'identityVerified'>;
+export type ServerProfile = Pick<Profile, 'name' | 'email' | 'phone' | 'address' | 'sector' | 'country' | 'joined' | 'tier' | 'identityVerified'> & { birthDate?: string | null };
 /** Account controls as the API returns them (risk signals aren't collected yet). */
 export type ServerAccount = Omit<AccountControls, 'signals' | 'destinationChangedAt'>;
 export type ServerApplicant = { id: string; profile: ServerProfile; account: ServerAccount };
@@ -47,7 +47,7 @@ export function adoptServerProfile(state: DemoState, server: ServerProfile, acco
   return { ok: true, message: '', state: { ...state, profile, accounts } };
 }
 
-const toSummary = ({ id, profile: p }: ServerApplicant) => ({ id, name: p.name, email: p.email, sector: p.sector, country: p.country, verified: p.identityVerified, joined: p.joined, tier: p.tier });
+const toSummary = ({ id, profile: p }: ServerApplicant) => ({ id, name: p.name, email: p.email, sector: p.sector, country: p.country, verified: p.identityVerified, joined: p.joined, tier: p.tier, phone: p.phone, address: p.address, ...(p.birthDate ? { birthDate: p.birthDate } : {}) });
 
 /** Staff side: replaces the demo directory with the real applicants from the API. */
 export function adoptServerApplicants(state: DemoState, applicants: ServerApplicant[]): Result {

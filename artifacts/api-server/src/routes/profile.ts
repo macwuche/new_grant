@@ -20,7 +20,7 @@ const detail = (metadata: Record<string, unknown> | undefined, key: string, max:
 
 export const toProfile = (r: ProfileRecord) => GetProfileResponse.parse({
   name: r.name, email: r.email, phone: r.phone, address: r.address, sector: r.sector, country: r.country,
-  tier: r.tier, identityVerified: r.identityVerified, joined: r.createdAt.slice(0, 10), account: r.account,
+  tier: r.tier, identityVerified: r.identityVerified, joined: r.createdAt.slice(0, 10), birthDate: r.birthDate, account: r.account,
 });
 
 /** Loads the profile, creating it from the sign-up details on first use and keeping the email in step with the account. */

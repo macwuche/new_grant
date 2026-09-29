@@ -1,4 +1,4 @@
-import type { AccountControls, DemoState, Tier } from './model';
+import type { AccountControls, AccountPermissions, DemoState, Tier } from './model';
 import { CURRENT_APPLICANT_ID } from './seed';
 
 // One view of every applicant, whether their profile lives in `profile` (the
@@ -10,6 +10,11 @@ export type ApplicantRecord = {
   email: string;
   sector: string;
   country: string;
+  /** Contact details staff see on the profile page (empty when unknown). */
+  phone: string;
+  address: string;
+  /** ISO date, when given at sign-up. */
+  birthDate?: string;
   joined: string;
   tier: Tier;
   identityVerified: boolean;
@@ -27,8 +32,8 @@ export const accountOf = (state: DemoState, applicantId: string): AccountControl
 
 export function applicantRecords(state: DemoState): ApplicantRecord[] {
   const p = state.profile;
-  const me: ApplicantRecord = { id: CURRENT_APPLICANT_ID, name: p.name, email: p.email, sector: p.sector, country: p.country, joined: p.joined, tier: p.tier, identityVerified: p.identityVerified, current: true, account: accountOf(state, CURRENT_APPLICANT_ID) };
-  const others = state.otherApplicants.map(o => ({ id: o.id, name: o.name, email: o.email, sector: o.sector, country: o.country, joined: o.joined, tier: o.tier, identityVerified: o.verified, current: false, account: accountOf(state, o.id) }));
+  const me: ApplicantRecord = { id: CURRENT_APPLICANT_ID, name: p.name, email: p.email, sector: p.sector, country: p.country, phone: p.phone, address: p.address, ...(p.birthDate ? { birthDate: p.birthDate } : {}), joined: p.joined, tier: p.tier, identityVerified: p.identityVerified, current: true, account: accountOf(state, CURRENT_APPLICANT_ID) };
+  const others = state.otherApplicants.map(o => ({ id: o.id, name: o.name, email: o.email, sector: o.sector, country: o.country, phone: o.phone ?? '', address: o.address ?? '', ...(o.birthDate ? { birthDate: o.birthDate } : {}), joined: o.joined, tier: o.tier, identityVerified: o.verified, current: false, account: accountOf(state, o.id) }));
   return state.serverApplicants ? others : [me, ...others];
 }
 
@@ -53,4 +58,19 @@ export function patchAccount(state: DemoState, applicantId: string, patch: Parti
 export function accountLockReason(state: DemoState): string | null {
   const account = accountOf(state, CURRENT_APPLICANT_ID);
   return account.status === 'Locked' ? `Your account is locked by the grant team${account.lockReason ? `: ${account.lockReason}` : ''}. Contact support to restore access.` : null;
+}
+
+// ---------- Permissions staff switch per applicant ----------
+
+export const DEFAULT_PERMISSIONS: AccountPermissions = { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true };
+export const permissionsOf = (state: DemoState, applicantId = CURRENT_APPLICANT_ID): AccountPermissions => ({ ...DEFAULT_PERMISSIONS, ...accountOf(state, applicantId).permissions });
+
+/** Why the demo applicant can't do `what` because of a switch staff set, or null. */
+export function permissionBlocker(state: DemoState, what: 'payout' | 'deposit' | 'card' | 'application'): string | null {
+  const p = permissionsOf(state);
+  if (what === 'payout' && p.payoutKyc && !state.profile.identityVerified) return 'Verify your identity (Settings → Identity check) before requesting a payout.';
+  if (what === 'deposit' && p.depositKyc && !state.profile.identityVerified) return 'Verify your identity (Settings → Identity check) before adding funds.';
+  if (what === 'card' && !p.cardApplications) return 'Card applications are turned off for your account. Contact support if you need a card.';
+  if (what === 'application' && !p.grantApplications) return 'New grant applications are turned off for your account. Contact support to find out why.';
+  return null;
 }

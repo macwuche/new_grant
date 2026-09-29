@@ -2,7 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, type ApplicantProfileRow } from "@workspace/db";
 import { NO_EFFECTS } from "./activity";
 import { writeEffects } from "./activity.db";
-import type { AccountPatch, ProfileRecord, ProfileRepo } from "./profileRepo";
+import { permissionsFrom, type AccountPatch, type ProfileRecord, type ProfileRepo } from "./profileRepo";
 
 export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
   authUserId: row.authUserId, name: row.name, email: row.email, phone: row.phone, address: row.address,
@@ -15,6 +15,7 @@ export const toRecord = (row: ApplicantProfileRow): ProfileRecord => ({
     ...(row.lockedBy ? { lockedBy: row.lockedBy } : {}),
     passwordResetRequired: row.passwordResetRequired, twoFactorResetRequired: row.twoFactorResetRequired, kyc: row.kyc,
     cardSettings: { funding: row.cardFunding, kycRequired: row.cardKycRequired },
+    permissions: permissionsFrom(row.permissions, row.emailNotifications),
   },
   emailNotifications: row.emailNotifications,
   resetsRequiredAt: { password: row.passwordResetRequiredAt?.toISOString() ?? null, twoFactor: row.twoFactorResetRequiredAt?.toISOString() ?? null },
@@ -36,6 +37,7 @@ const accountColumns = (patch: AccountPatch) => ({
     twoFactorResetRequiredAt: patch.account.twoFactorResetRequired ? sql`coalesce(${applicantProfilesTable.twoFactorResetRequiredAt}, now())` : null,
     kyc: patch.account.kyc,
     ...(patch.account.cardSettings ? { cardFunding: patch.account.cardSettings.funding, cardKycRequired: patch.account.cardSettings.kycRequired } : {}),
+    ...(patch.account.permissions ? (({ emailNotifications, ...switches }) => ({ permissions: switches, emailNotifications }))(patch.account.permissions) : {}),
   } : {}),
 });
 

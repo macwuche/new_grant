@@ -520,6 +520,37 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Stale"
+  /applicants/{id}/permissions:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: setAccountPermission
+      tags: [applicants]
+      summary: Turn one of an applicant's permission switches on or off
+      description: Requires accounts.manage. Identity checks for payouts and deposits, email copies of notifications, card applications, and new grant applications. The applicant is notified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountPermissionChange"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
   /applicants/{id}/lock:
     parameters:
       - $ref: "#/components/parameters/ApplicantId"
@@ -1563,6 +1594,35 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StaffCardFreeze"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardHolderResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/card-holders/{id}/adjust:
+    parameters:
+      - $ref: "#/components/parameters/ApplicantId"
+    post:
+      operationId: adjustBalance
+      tags: [money]
+      summary: Credit or debit an applicant's grant, deposit, or card balance
+      description: Requires payments.process. Adds a ledger entry with a category and a reason the applicant sees; audited with the balance before and after.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BalanceAdjustment"
       responses:
         "200":
           description: OK
@@ -2780,7 +2840,7 @@ components:
           type: string
         type:
           type: string
-          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee, Card top-up, Card deduction]
+          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee, Card top-up, Card deduction, Grant adjustment, Deposit adjustment]
         description:
           type: string
         amount:
@@ -2823,7 +2883,9 @@ components:
           description: Card moves only - the other balance moved, or none
         note:
           type: string
-          description: Staff card moves - the reason shown to the applicant
+          description: Staff card moves and balance adjustments - the reason shown to the applicant
+        category:
+          $ref: "#/components/schemas/AdjustmentCategory"
       required: [id, applicantId, type, description, amount, status, createdAt]
     PayoutChannel:
       type: object
@@ -3156,6 +3218,54 @@ components:
           type: string
           enum: [deposit, grant]
       required: [amount, source]
+      additionalProperties: false
+    AdjustmentCategory:
+      type: string
+      enum: [Grant adjustment, Deposit manual override, Card fee refund, Correction, Fraud freeze]
+    BalanceAdjustment:
+      type: object
+      properties:
+        target:
+          type: string
+          enum: [grant, deposit, card]
+        direction:
+          type: string
+          enum: [credit, debit]
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
+        category:
+          $ref: "#/components/schemas/AdjustmentCategory"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required: [target, direction, amount, category, reason]
+      additionalProperties: false
+    AccountPermissions:
+      type: object
+      properties:
+        payoutKyc:
+          type: boolean
+        depositKyc:
+          type: boolean
+        emailNotifications:
+          type: boolean
+        cardApplications:
+          type: boolean
+        grantApplications:
+          type: boolean
+      required: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications]
+    AccountPermissionChange:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications]
+        value:
+          type: boolean
+      required: [key, value]
       additionalProperties: false
     StaffCardFunding:
       type: object
@@ -3757,6 +3867,9 @@ components:
         joined:
           type: string
           description: ISO date the profile was created
+        birthDate:
+          type: [string, "null"]
+          description: ISO date of birth given at sign-up, if any
         account:
           $ref: "#/components/schemas/Account"
       required: [name, email, phone, address, sector, country, tier, identityVerified, joined, account]
@@ -3803,6 +3916,8 @@ components:
           $ref: "#/components/schemas/Kyc"
         cardSettings:
           $ref: "#/components/schemas/CardSettings"
+        permissions:
+          $ref: "#/components/schemas/AccountPermissions"
       required: [status, passwordResetRequired, twoFactorResetRequired, kyc]
     ApplicantEntry:
       type: object

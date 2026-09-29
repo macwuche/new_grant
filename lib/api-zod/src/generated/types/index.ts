@@ -7,7 +7,11 @@
  */
 
 export * from './account';
+export * from './accountPermissionChange';
+export * from './accountPermissionChangeKey';
+export * from './accountPermissions';
 export * from './accountStatus';
+export * from './adjustmentCategory';
 export * from './applicantEntry';
 export * from './applicantResult';
 export * from './application';
@@ -26,6 +30,9 @@ export * from './auditLog';
 export * from './auditLogChain';
 export * from './awardDecision';
 export * from './badRequestResponse';
+export * from './balanceAdjustment';
+export * from './balanceAdjustmentDirection';
+export * from './balanceAdjustmentTarget';
 export * from './branding';
 export * from './brandingInput';
 export * from './cardActivation';

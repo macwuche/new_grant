@@ -1,7 +1,7 @@
 import type { DemoState, DepositMethodId, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { alertIfHighRisk, logStaff } from './activity';
-import { accountLockReason } from './applicants';
+import { accountLockReason, permissionBlocker } from './applicants';
 import { notify } from './notifications';
 import { ownTransactions } from './rules';
 import { CURRENT_APPLICANT_ID } from './seed';
@@ -25,7 +25,7 @@ export const DEPOSIT_METHODS: DepositMethod[] = [
 const isDeposit = (tx: Transaction) => tx.type === 'Deposit';
 
 export function validateDeposit(state: DemoState, amount: number): string | null {
-  const locked = accountLockReason(state);
+  const locked = accountLockReason(state) ?? permissionBlocker(state, 'deposit');
   if (locked) return locked;
   const { minDeposit, maxDeposit } = state.treasury;
   if (!Number.isFinite(amount) || amount <= 0) return 'Enter an amount to deposit.';

@@ -1,7 +1,7 @@
 import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { logStaff } from './activity';
-import { accountLockReason } from './applicants';
+import { accountLockReason, permissionBlocker } from './applicants';
 import { notify } from './notifications';
 import { CURRENT_APPLICANT_ID } from './seed';
 
@@ -153,6 +153,8 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
   // Eligibility is re-checked at submission time, ignoring the draft being submitted.
   const others = ownApplications(state).filter(a => a.id !== draftId);
   const resubmitting = ownApplications(state).find(a => a.id === draftId)?.status === 'Changes requested';
+  const switchedOff = resubmitting ? null : permissionBlocker(state, 'application');
+  if (switchedOff) return fail(switchedOff);
   const eligibility = checkEligibility(grant, state.profile, others, now, { allowClosed: resubmitting });
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
   // A processing fee (if finance set one) is charged once, on first submission, from the deposit balance.
@@ -211,7 +213,8 @@ export function computeBalances(transactions: Transaction[]): Balances {
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
     if (tx.type === 'Withdrawal') { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; }
     if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
-    if (tx.type === 'Card fee' || tx.type === 'Application fee') deposit += tx.amount;
+    if (tx.type === 'Card fee' || tx.type === 'Application fee' || tx.type === 'Deposit adjustment') deposit += tx.amount;
+    if (tx.type === 'Grant adjustment') grant += tx.amount;
     // Card moves: the amount is the change to the card balance; the other side moves the opposite way.
     if (tx.type === 'Card top-up' || tx.type === 'Card deduction') {
       card += tx.amount;

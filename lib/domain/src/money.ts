@@ -1,7 +1,7 @@
 import type { ChannelId, DemoState, PayoutChannel, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { alertIfHighRisk, logStaff } from './activity';
-import { accountLockReason, patchAccount } from './applicants';
+import { accountLockReason, patchAccount, permissionBlocker } from './applicants';
 import { computeBalances, ownTransactions } from './rules';
 import { notify } from './notifications';
 import { lockdownMessage } from './security';
@@ -21,7 +21,7 @@ export const findChannel = (state: DemoState, id: string) => state.treasury.chan
 
 /** Why the applicant can't request a payout right now (independent of amount), or null. */
 export function payoutBlocker(state: DemoState): string | null {
-  const locked = accountLockReason(state) ?? lockdownMessage(state);
+  const locked = accountLockReason(state) ?? lockdownMessage(state) ?? permissionBlocker(state, 'payout');
   if (locked) return locked;
   const { deposit } = computeBalances(ownTransactions(state));
   if (!enabledChannels(state).length) return 'Payouts are temporarily unavailable: no payout channel is enabled.';

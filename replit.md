@@ -60,7 +60,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 ## Gotchas
 
 - New tables must call `.enableRLS()`.
-- `email_settings.app_name`, the `sign_in_devices` table, `ledger_entries.counterpart`/`note`, and `applicant_profiles.card_funding`/`card_kyc_required` were pushed to Supabase on 27 Sep 2026 (from the production server). After any schema change, push to Supabase before restarting the API there.
+- `email_settings.app_name`, the `sign_in_devices` table, `ledger_entries.counterpart`/`note`, and `applicant_profiles.card_funding`/`card_kyc_required` were pushed to Supabase on 27 Sep 2026 (from the production server). After any schema change, push to Supabase before restarting the API there. Not yet pushed (29 Sep 2026): `applicant_profiles.permissions` and `ledger_entries.category`.
 - `jsonb` reorders object keys, and Postgres timestamps have microseconds: storage code rebuilds nested objects in the domain's key order and compares versions at millisecond precision.
 - An empty `description:` in the OpenAPI spec makes orval fail and empty the generated folders.
 - The workspace sees the Supabase URL and keys but not the `SUPABASE_DATABASE_URL` secret; add it under Tools → Secrets in this workspace and restart (see `work.md` §6).

@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
-  ActivatePhysicalCardBody, ApprovePhysicalCardBody, ConfirmDepositParams as LedgerIdParams, DeductFromCardBody, FundCardAsStaffBody, FundCardBody,
+  ActivatePhysicalCardBody, AdjustBalanceBody, ApprovePhysicalCardBody, ConfirmDepositParams as LedgerIdParams, DeductFromCardBody, FundCardAsStaffBody, FundCardBody,
   GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RemovePayoutDestinationParams, RequestDepositBody,
   RequestPhysicalCardBody, RequestWithdrawalBody, SavePayoutDestinationBody, SetCardFreezeAsStaffBody, SetCardLimitBody, ToggleCardFreezeBody, UpdateMoneySettingsBody,
 } from "@workspace/api-zod";
@@ -9,6 +9,7 @@ import {
   activatePhysicalCard, approvePhysicalCard, cancelPhysicalCard, cardQueue, createVirtualCard, declinePhysicalCard, DEFAULT_CARD_SETTINGS, fundCard,
   staffCards, staffCreateVirtualCard, staffDeductCard, staffFundCard, staffIssuePhysicalCard, staffSetCardFreeze,
 } from "@workspace/domain/cards";
+import { staffAdjustBalance } from "@workspace/domain/adjustments";
 import { computeBalances } from "@workspace/domain/rules";
 import type { Permission } from "@workspace/authz";
 import { cancelDeposit, confirmDeposit, rejectDeposit, requestDeposit } from "@workspace/domain/deposits";
@@ -259,6 +260,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo): IRouter {
   cardAction("freeze", "accounts.manage", "Change card freeze", body(SetCardFreezeAsStaffBody, "Say which card, whether to freeze it, and the note for the applicant.",
     d => s => staffSetCardFreeze(s, d.card, d.frozen, d.reason ?? "", new Date())));
   cardAction("fund", "payments.process", "Fund card", body(FundCardAsStaffBody, "Send an amount, where it comes from, and a reason.", d => (s, a) => staffFundCard(s, d.amount, d.source, d.reason, a.name, new Date())));
+  cardAction("adjust", "payments.process", "Adjust balance", body(AdjustBalanceBody, "Send the balance, credit or debit, an amount, a category, and a reason.", d => (s, a) => staffAdjustBalance(s, d, a.name, new Date())));
   cardAction("deduct", "payments.process", "Deduct from card", body(DeductFromCardBody, "Send an amount, where it goes, and a reason.", d => (s, a) => staffDeductCard(s, d.amount, d.destination, d.reason, a.name, new Date())));
 
   // ---------- Staff: settings and lockdown ----------

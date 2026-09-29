@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AdjustmentCategory } from './adjustmentCategory';
 import type { LedgerEntryCounterpart } from './ledgerEntryCounterpart';
 import type { LedgerEntryReleaseApproval } from './ledgerEntryReleaseApproval';
 import type { LedgerEntryStatus } from './ledgerEntryStatus';
@@ -30,6 +31,7 @@ export interface LedgerEntry {
   releaseApproval?: LedgerEntryReleaseApproval;
   /** Card moves only - the other balance moved, or none */
   counterpart?: LedgerEntryCounterpart;
-  /** Staff card moves - the reason shown to the applicant */
+  /** Staff card moves and balance adjustments - the reason shown to the applicant */
   note?: string;
+  category?: AdjustmentCategory;
 }

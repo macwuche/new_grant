@@ -543,6 +543,7 @@ export const GetProfileResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -563,6 +564,13 @@ export const GetProfileResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -596,6 +604,7 @@ export const UpdateProfileResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -616,6 +625,13 @@ export const UpdateProfileResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -647,6 +663,7 @@ export const SubmitIdentityCheckResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -667,6 +684,13 @@ export const SubmitIdentityCheckResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -700,6 +724,7 @@ export const ReportPasswordChangedResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -720,6 +745,13 @@ export const ReportPasswordChangedResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -743,6 +775,7 @@ export const CompleteCredentialResetResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -763,6 +796,13 @@ export const CompleteCredentialResetResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -784,6 +824,7 @@ export const ListApplicantsResponseItem = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -804,6 +845,13 @@ export const ListApplicantsResponseItem = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -841,6 +889,7 @@ export const SetApplicantTierResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -861,6 +910,13 @@ export const SetApplicantTierResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -895,6 +951,7 @@ export const SetCardSettingsResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -915,6 +972,75 @@ export const SetCardSettingsResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
+}).optional()
+}).describe('Staff-managed controls on an applicant account')
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
+ * Requires accounts.manage. Identity checks for payouts and deposits, email copies of notifications, card applications, and new grant applications. The applicant is notified.
+ * @summary Turn one of an applicant's permission switches on or off
+ */
+export const SetAccountPermissionParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const SetAccountPermissionBody = zod.object({
+  "key": zod.enum(['payoutKyc', 'depositKyc', 'emailNotifications', 'cardApplications', 'grantApplications']),
+  "value": zod.boolean()
+})
+
+export const SetAccountPermissionResponse = zod.object({
+  "applicant": zod.object({
+  "id": zod.string().uuid(),
+  "profile": zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string(),
+  "sector": zod.string(),
+  "country": zod.string(),
+  "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
+  "identityVerified": zod.boolean(),
+  "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
+  "account": zod.object({
+  "status": zod.enum(['Active', 'Locked']),
+  "lockReason": zod.string().optional(),
+  "lockedAt": zod.string().optional(),
+  "lockedBy": zod.string().optional(),
+  "passwordResetRequired": zod.boolean(),
+  "twoFactorResetRequired": zod.boolean(),
+  "kyc": zod.object({
+  "status": zod.enum(['Not submitted', 'Pending', 'Verified', 'Rejected']),
+  "documentType": zod.enum(['Passport', 'National ID', 'Driver\'s licence']).optional(),
+  "documentLast4": zod.string().optional(),
+  "nameOnDocument": zod.string().optional(),
+  "submittedAt": zod.string().optional(),
+  "reviewedAt": zod.string().optional(),
+  "reviewedBy": zod.string().optional(),
+  "rejectionReason": zod.string().optional()
+}),
+  "cardSettings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -952,6 +1078,7 @@ export const LockApplicantResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -972,6 +1099,13 @@ export const LockApplicantResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -1001,6 +1135,7 @@ export const UnlockApplicantResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -1021,6 +1156,13 @@ export const UnlockApplicantResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -1054,6 +1196,7 @@ export const RequireCredentialResetResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -1074,6 +1217,13 @@ export const RequireCredentialResetResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -1103,6 +1253,7 @@ export const ApproveIdentityCheckResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -1123,6 +1274,13 @@ export const ApproveIdentityCheckResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -1160,6 +1318,7 @@ export const RejectIdentityCheckResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -1180,6 +1339,13 @@ export const RejectIdentityCheckResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -1217,6 +1383,7 @@ export const RequestReverificationResponse = zod.object({
   "tier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "identityVerified": zod.boolean(),
   "joined": zod.string().describe('ISO date the profile was created'),
+  "birthDate": zod.string().nullish().describe('ISO date of birth given at sign-up, if any'),
   "account": zod.object({
   "status": zod.enum(['Active', 'Locked']),
   "lockReason": zod.string().optional(),
@@ -1237,6 +1404,13 @@ export const RequestReverificationResponse = zod.object({
   "cardSettings": zod.object({
   "funding": zod.enum(['deposit', 'grant', 'both']),
   "kycRequired": zod.boolean()
+}).optional(),
+  "permissions": zod.object({
+  "payoutKyc": zod.boolean(),
+  "depositKyc": zod.boolean(),
+  "emailNotifications": zod.boolean(),
+  "cardApplications": zod.boolean(),
+  "grantApplications": zod.boolean()
 }).optional()
 }).describe('Staff-managed controls on an applicant account')
 })
@@ -2076,7 +2250,7 @@ export const GetMyMoneyResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2095,7 +2269,8 @@ export const GetMyMoneyResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2209,7 +2384,7 @@ export const RequestDepositResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2228,7 +2403,8 @@ export const RequestDepositResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2347,7 +2523,7 @@ export const CancelDepositResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2366,7 +2542,8 @@ export const CancelDepositResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2483,7 +2660,7 @@ export const RequestWithdrawalResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2502,7 +2679,8 @@ export const RequestWithdrawalResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2621,7 +2799,7 @@ export const CancelWithdrawalResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2640,7 +2818,8 @@ export const CancelWithdrawalResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2756,7 +2935,7 @@ export const ToggleCardFreezeResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2775,7 +2954,8 @@ export const ToggleCardFreezeResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -2892,7 +3072,7 @@ export const SetCardLimitResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -2911,7 +3091,8 @@ export const SetCardLimitResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3023,7 +3204,7 @@ export const CreateVirtualCardResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3042,7 +3223,8 @@ export const CreateVirtualCardResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3159,7 +3341,7 @@ export const FundCardResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3178,7 +3360,8 @@ export const FundCardResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3316,7 +3499,7 @@ export const RequestPhysicalCardResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3335,7 +3518,8 @@ export const RequestPhysicalCardResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -3455,7 +3639,7 @@ export const ActivatePhysicalCardResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -3474,7 +3658,8 @@ export const ActivatePhysicalCardResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -4270,6 +4455,102 @@ export const SetCardFreezeAsStaffResponse = zod.object({
 
 
 /**
+ * Requires payments.process. Adds a ledger entry with a category and a reason the applicant sees; audited with the balance before and after.
+ * @summary Credit or debit an applicant's grant, deposit, or card balance
+ */
+export const AdjustBalanceParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const adjustBalanceBodyAmountExclusiveMin = 0;
+export const adjustBalanceBodyAmountMax = 1000000;
+
+export const adjustBalanceBodyReasonMax = 1000;
+
+
+
+export const AdjustBalanceBody = zod.object({
+  "target": zod.enum(['grant', 'deposit', 'card']),
+  "direction": zod.enum(['credit', 'debit']),
+  "amount": zod.number().gt(adjustBalanceBodyAmountExclusiveMin).max(adjustBalanceBodyAmountMax),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']),
+  "reason": zod.string().min(1).max(adjustBalanceBodyReasonMax)
+})
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressNameMax = 80;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressLine1Max = 120;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressLine2Max = 120;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressCityMax = 60;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressRegionMax = 60;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressPostalCodeMax = 20;
+
+export const adjustBalanceResponseHolderCardsPhysicalShippingAddressCountryMax = 60;
+
+
+
+export const AdjustBalanceResponse = zod.object({
+  "holder": zod.object({
+  "applicantId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "cards": zod.object({
+  "virtual": zod.object({
+  "lastFour": zod.string(),
+  "dailyLimit": zod.number(),
+  "frozen": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "createdBy": zod.string().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional()
+}).nullable(),
+  "physical": zod.object({
+  "status": zod.enum(['Not requested', 'Requested', 'Shipped', 'Active', 'Declined', 'Cancelled']),
+  "dailyLimit": zod.number(),
+  "lastFour": zod.string().optional(),
+  "frozen": zod.boolean().optional(),
+  "frozenBy": zod.enum(['applicant', 'staff']).optional(),
+  "frozenReason": zod.string().optional(),
+  "shippingAddress": zod.object({
+  "name": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressNameMax),
+  "line1": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressLine1Max),
+  "line2": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressLine2Max).optional(),
+  "city": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressCityMax),
+  "region": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressRegionMax).optional(),
+  "postalCode": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressPostalCodeMax),
+  "country": zod.string().max(adjustBalanceResponseHolderCardsPhysicalShippingAddressCountryMax)
+}).optional(),
+  "requestedAt": zod.string().optional(),
+  "feeTxId": zod.string().optional(),
+  "issuedBy": zod.string().optional(),
+  "shippedAt": zod.string().optional(),
+  "shippedBy": zod.string().optional(),
+  "trackingRef": zod.string().optional(),
+  "shippingMessage": zod.string().optional(),
+  "activatedAt": zod.string().optional(),
+  "declinedAt": zod.string().optional(),
+  "declinedBy": zod.string().optional(),
+  "declineReason": zod.string().optional(),
+  "cancelledAt": zod.string().optional(),
+  "cancelledBy": zod.string().optional(),
+  "cancelReason": zod.string().optional()
+})
+}).describe('An applicant\'s cards as staff see them (no PIN)'),
+  "balance": zod.number().describe('The card balance, shared by both cards'),
+  "settings": zod.object({
+  "funding": zod.enum(['deposit', 'grant', 'both']),
+  "kycRequired": zod.boolean()
+})
+}),
+  "message": zod.string()
+})
+
+
+/**
  * Requires payments.process. From the deposit or grant balance, or none (added by staff). Reason required and shown.
  * @summary Add money to an applicant's card
  */
@@ -4490,7 +4771,7 @@ export const SavePayoutDestinationResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -4509,7 +4790,8 @@ export const SavePayoutDestinationResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -4625,7 +4907,7 @@ export const RemovePayoutDestinationResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -4644,7 +4926,8 @@ export const RemovePayoutDestinationResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })),
   "cards": zod.object({
   "virtual": zod.object({
@@ -4736,7 +5019,7 @@ export const RemovePayoutDestinationResponse = zod.object({
 export const GetLedgerResponseItem = zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -4755,7 +5038,8 @@ export const GetLedgerResponseItem = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 })
 export const GetLedgerResponse = zod.array(GetLedgerResponseItem)
 
@@ -4998,7 +5282,7 @@ export const ConfirmDepositResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -5017,7 +5301,8 @@ export const ConfirmDepositResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 }),
   "message": zod.string()
 })
@@ -5046,7 +5331,7 @@ export const RejectDepositResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -5065,7 +5350,8 @@ export const RejectDepositResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 }),
   "message": zod.string()
 })
@@ -5086,7 +5372,7 @@ export const ApprovePayoutReleaseResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -5105,7 +5391,8 @@ export const ApprovePayoutReleaseResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 }),
   "message": zod.string()
 })
@@ -5126,7 +5413,7 @@ export const MarkPayoutPaidResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -5145,7 +5432,8 @@ export const MarkPayoutPaidResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 }),
   "message": zod.string()
 })
@@ -5174,7 +5462,7 @@ export const MarkPayoutFailedResponse = zod.object({
   "transaction": zod.object({
   "id": zod.string(),
   "applicantId": zod.string(),
-  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction']),
+  "type": zod.enum(['Grant', 'Deposit', 'Withdrawal', 'Card fee', 'Application fee', 'Card top-up', 'Card deduction', 'Grant adjustment', 'Deposit adjustment']),
   "description": zod.string(),
   "amount": zod.number().describe('Signed; credits positive, debits negative'),
   "status": zod.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),
@@ -5193,7 +5481,8 @@ export const MarkPayoutFailedResponse = zod.object({
   "byId": zod.string().optional()
 }).optional(),
   "counterpart": zod.enum(['deposit', 'grant', 'none']).optional().describe('Card moves only - the other balance moved, or none'),
-  "note": zod.string().optional().describe('Staff card moves - the reason shown to the applicant')
+  "note": zod.string().optional().describe('Staff card moves and balance adjustments - the reason shown to the applicant'),
+  "category": zod.enum(['Grant adjustment', 'Deposit manual override', 'Card fee refund', 'Correction', 'Fraud freeze']).optional()
 }),
   "message": zod.string()
 })

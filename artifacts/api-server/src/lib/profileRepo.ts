@@ -1,4 +1,5 @@
-import type { AccountControls } from "@workspace/domain/model";
+import { DEFAULT_PERMISSIONS } from "@workspace/domain/applicants";
+import type { AccountControls, AccountPermissions } from "@workspace/domain/model";
 import { NO_EFFECTS, type Effects } from "./activity";
 
 // Storage for applicant profiles and their staff-managed account controls, one
@@ -47,6 +48,10 @@ export interface ProfileRepo {
   saveAccount(authUserId: string, patch: AccountPatch, expectedVersion: string, effects?: Effects): Promise<ProfileRecord | "stale">;
 }
 
+/** The account's permission switches as stored: the switches, with email copies from their own field. */
+export const permissionsFrom = (stored: Partial<AccountPermissions> | null | undefined, emailNotifications: boolean): AccountPermissions =>
+  ({ ...DEFAULT_PERMISSIONS, ...stored, emailNotifications });
+
 export const NEW_ACCOUNT: StoredAccount = { status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } };
 
 /** In-memory repo for tests and local experiments. */
@@ -54,23 +59,29 @@ export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write
   const rows = new Map(seed.map(r => [r.authUserId, structuredClone(r)]));
   let tick = Date.parse("2026-01-01T00:00:00.000Z");
   const stamp = () => new Date(tick += 1000).toISOString();
+  // Like the database: email copies are their own field, shown in the account's permissions.
+  const out = (row: ProfileRecord): ProfileRecord => {
+    const copy = structuredClone(row);
+    copy.account.permissions = permissionsFrom(copy.account.permissions, copy.emailNotifications);
+    return copy;
+  };
   return {
     peek: id => rows.get(id),
-    get: async id => { const row = rows.get(id); return row ? structuredClone(row) : null; },
-    list: async () => [...rows.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(r => structuredClone(r)),
+    get: async id => { const row = rows.get(id); return row ? out(row) : null; },
+    list: async () => [...rows.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(out),
     create: async profile => {
       const existing = rows.get(profile.authUserId);
       if (existing) return structuredClone(existing);
       const at = stamp();
       const row: ProfileRecord = { address: "", tier: 1, identityVerified: false, account: structuredClone(NEW_ACCOUNT), emailNotifications: true, resetsRequiredAt: { password: null, twoFactor: null }, createdAt: at, updatedAt: at, ...profile };
       rows.set(row.authUserId, row);
-      return structuredClone(row);
+      return out(row);
     },
     updateContact: async (id, patch) => {
       const row = rows.get(id);
       if (!row) throw new Error("not found");
       Object.assign(row, patch, { updatedAt: stamp() });
-      return structuredClone(row);
+      return out(row);
     },
     saveAccount: async (id, patch, expectedVersion, effects = NO_EFFECTS) => {
       const row = rows.get(id);
@@ -81,8 +92,9 @@ export function memoryProfileRepo(seed: ProfileRecord[] = [], activity?: { write
         twoFactor: patch.account.twoFactorResetRequired ? row.resetsRequiredAt.twoFactor ?? at : null,
       };
       Object.assign(row, structuredClone(patch), { updatedAt: at });
+      if (patch.account?.permissions) row.emailNotifications = patch.account.permissions.emailNotifications;
       activity?.write(effects);
-      return structuredClone(row);
+      return out(row);
     },
   };
 }

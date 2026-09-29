@@ -14,6 +14,7 @@ import { AdminPrograms } from './AdminPrograms';
 import { AdminDeposits } from './AdminDeposits';
 import { AdminCards } from './AdminCards';
 import { AdminApplicantProfile } from './AdminApplicantProfile';
+import { AdminApplicants } from './AdminApplicants';
 import { ActivityItem, AdminActivityMenu, useOpenActivity } from './AdminActivityMenu';
 import { AdminApplicantPanel } from './AdminApplicantPanel';
 import { AdminAudit } from './AdminAudit';
@@ -21,7 +22,6 @@ import { AdminSecurity } from './AdminSecurity';
 import { StaffSwitcher } from './AdminStaff';
 import { AdminGate, AdminSessionMenu } from './AdminLogin';
 import { useSession } from '@/lib/session';
-import { RiskBadge } from './AdminRisk';
 import { staffFeed } from '@workspace/domain/activity';
 import { applicantRecords } from '@workspace/domain/applicants';
 import { useServerData } from '@/lib/serverData';
@@ -151,27 +151,6 @@ function Overview({ openReview }: { openReview: (id: string) => void }) {
   </>;
 }
 
-function Applicants({ openApplicant }: { openApplicant: (id: string) => void }) {
-  const applicants = useApplicants();
-  const { connected, applicantsError } = useServerData();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('All statuses');
-  const matches = (person: Applicant) => filter === 'All statuses' || person.status === filter || (filter === 'Locked' && person.locked) || (filter === 'High risk' && person.risk.level === 'High') || filter === `Tier ${person.tier}`;
-  const rows = applicants.filter(person => matches(person) && `${person.name} ${person.email} ${person.sector} ${person.country}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="admin-panel">
-    <SectionHead title="Applicant directory" subtitle={connected ? 'Everyone who has opened the applicant portal with an account. Open a profile to review identity, tier, and account access.' : 'Invented people; the first is the applicant-portal demo user. Open a profile to review identity, risk, tier, and account access.'} />
-    {applicantsError && <div className="admin-review-flash error" role="alert" data-testid="status-admin-applicants-error">{applicantsError}</div>}
-    <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people, sector, country" aria-label="Search applicants" data-testid="input-admin-search-applicants" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter applicants by status" data-testid="select-admin-filter-applicants"><option>All statuses</option><option>Verified</option><option>Pending</option><option>Locked</option><option>High risk</option><option>Tier 1</option><option>Tier 2</option><option>Tier 3</option></select></div><span className="admin-count" data-testid="text-admin-applicants-count">{rows.length} of {applicants.length} profiles</span></div>
-    {rows.length ? <>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Applicant</th><th>Tier</th><th>Identity</th><th>Wallet</th><th>Active grants</th><th>Risk</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Open</span></th></tr></thead><tbody>{rows.map(person => <tr key={person.id} data-testid={`row-admin-applicant-${person.id}`}><td><div className="admin-person-cell"><span className="admin-initials" aria-hidden="true">{person.name.split(' ').map(part => part[0]).join('')}</span><span><span className="admin-table-primary">{person.name}{person.locked && <span className="admin-flag">Locked</span>}</span><span className="admin-table-secondary">{person.email} · {person.country}</span></span></div></td><td className="admin-table-muted">Tier {person.tier}</td><td><Badge status={person.kyc === 'Not submitted' ? 'Pending' : person.kyc} /></td><td className="admin-table-number">{money(person.wallet)}</td><td className="admin-table-muted">{person.activeGrants} · {person.applications} submitted</td><td><RiskBadge risk={person.risk} /></td><td><button type="button" className="admin-icon-button" onClick={() => openApplicant(person.id)} aria-label={`Open ${person.name} profile`} data-testid={`button-preview-admin-applicant-${person.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
-      <div className="admin-mobile-records" role="list" aria-label="Applicant profiles">{rows.map(person => <article className="admin-mobile-record" role="listitem" key={person.id} data-testid={`card-admin-applicant-${person.id}`}>
-        <div className="admin-mobile-record-top"><div className="admin-person-cell"><span className="admin-initials" aria-hidden="true">{person.name.split(' ').map(part => part[0]).join('')}</span><div className="admin-mobile-record-identity"><strong>{person.name}</strong><span>{person.email}</span></div></div><Badge status={person.status} /></div>
-        <dl className="admin-mobile-record-facts"><div><dt>Tier</dt><dd>{person.tier}</dd></div><div><dt>Wallet</dt><dd>{money(person.wallet)}</dd></div><div><dt>Risk</dt><dd>{person.risk.level} · {person.risk.score}</dd></div></dl>
-        <button type="button" className="admin-mobile-record-action" onClick={() => openApplicant(person.id)} aria-label={`Open ${person.name} profile`} data-testid={`button-preview-admin-applicant-mobile-${person.id}`}>Open profile <ArrowRight size={15} /></button>
-      </article>)}</div>
-    </> : <EmptyResults onReset={() => { setQuery(''); setFilter('All statuses'); }} />}
-  </section>;
-}
 
 function Applications({ openReview }: { openReview: (id: string) => void }) {
   const applications = useQueue();
@@ -195,8 +174,8 @@ function Applications({ openReview }: { openReview: (id: string) => void }) {
 
 const sectionCopy: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: { eyebrow: 'The grant team workspace', title: 'A better view of what matters.', description: 'A thoughtful place to orient around people, programs, and the requests between them.' },
-  applicant: { eyebrow: 'People / Profile', title: 'One applicant, everything in one place.', description: 'Identity, account controls, balances, cards, and card rules for this applicant. Every change is role-checked and audited.' },
-  applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Fictional applicants with their tier, identity status, balances, and fraud risk. Open a profile to change tier, lock the account, force credential resets, or review identity.' },
+  applicant: { eyebrow: 'People / Profile', title: 'One applicant, everything in one place.', description: 'Profile, identity documents, balances and adjustments, cards, feature toggles, the full ledger, and the audit trail. Every change is role-checked and audited.' },
+  applicants: { eyebrow: 'People / Directory', title: 'The people behind the work.', description: 'Everyone with an applicant account: status, tier, identity, location, balances, and fraud risk. Open a profile to manage the account.' },
   inbox: { eyebrow: 'Workspace / Correspondence', title: 'The team inbox.', description: 'Mail to and from the grant team\'s address.' },
   applications: { eyebrow: 'Funding / Review queue', title: 'Every request, in context.', description: 'Review submitted requests, ask applicants for changes, and record approvals or declines. Decisions are saved in this browser only.' },
   cards: { eyebrow: 'Funding / Cards', title: 'Cards, from application to doorstep.', description: 'Approve or decline physical card applications, issue cards, fund or deduct from card balances, and freeze cards. The cards are fictional: no card issuer is connected.' },
@@ -224,7 +203,7 @@ function AdminWorkspace({ section, settingsSection, applicantId: profileId }: { 
   const copy = sectionCopy[section];
   const content: Record<AdminSection, ReactNode> = {
     overview: <Overview openReview={setReviewId} />,
-    applicants: <Applicants openApplicant={id => navigate(`/admin/applicants/${id}`)} />,
+    applicants: <AdminApplicants openApplicant={id => navigate(`/admin/applicants/${id}`)} />,
     applicant: <AdminApplicantProfile applicantId={profileId ?? ''} />,
     inbox: signedIn ? <AdminInboxLive /> : <AdminInbox />,
     applications: <Applications openReview={setReviewId} />,

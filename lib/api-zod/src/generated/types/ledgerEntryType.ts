@@ -17,4 +17,6 @@ export const LedgerEntryType = {
   Application_fee: 'Application fee',
   'Card_top-up': 'Card top-up',
   Card_deduction: 'Card deduction',
+  Grant_adjustment: 'Grant adjustment',
+  Deposit_adjustment: 'Deposit adjustment',
 } as const;
