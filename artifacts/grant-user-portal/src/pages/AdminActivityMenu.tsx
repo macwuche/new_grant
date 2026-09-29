@@ -58,7 +58,7 @@ export function AdminActivityMenu() {
     {open && <div className="admin-activity-panel" id={panelId} role="region" aria-label="Team activity" data-testid="panel-admin-activity">
       <div className="admin-activity-head"><strong><Activity size={14} /> Team activity</strong>{unread > 0 && <button type="button" onClick={() => { run(markAllStaffEventsRead); if (connected) void markAllStaffFeedRead().catch(() => refreshActivity()); }} data-testid="button-admin-activity-read-all">Mark all as read</button>}</div>
       {items.length ? <div className="admin-activity-list">{items.map(e => <ActivityItem key={e.id} event={e} onOpen={ev => { setOpen(false); openItem(ev); }} />)}</div> : <p className="admin-review-hint" style={{ padding: 16 }}>No activity yet.</p>}
-      <div className="admin-activity-foot"><Link href="/admin" onClick={() => setOpen(false)}>Overview</Link><span>{connected ? 'Read status is yours alone' : 'Shared by the demo staff team · browser only'}</span></div>
+      <div className="admin-activity-foot"><Link href="/admin" onClick={() => setOpen(false)}>Overview</Link><span>{connected ? 'Read status is yours alone' : 'Shared by everyone in this browser'}</span></div>
     </div>}
   </div>;
 }

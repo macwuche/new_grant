@@ -25,8 +25,8 @@ export function AdminEmailSettings({ signedIn = false }: { signedIn?: boolean })
   const can = useCan();
   if (signedIn && can('staff.manage')) return <EmailAdmin />;
   return <section className="admin-panel admin-email-settings" aria-labelledby="admin-email-settings-title">
-    <div className="admin-panel-head"><div><p className="admin-email-settings-kicker">DELIVERY / RESEND</p><h2 id="admin-email-settings-title">Email configuration</h2><p>{signedIn ? 'Delivery status is visible to super admins.' : 'The connection checklist for official correspondence. Nothing here is active in this demo.'}</p></div><span className="admin-email-settings-state">{signedIn ? 'SUPER ADMIN ONLY' : 'NOT CONNECTED'}</span></div>
-    {!signedIn && <><div className="admin-email-settings-banner"><Info size={17} /><span>In demo mode nothing is sent. The sample inbox does not send, receive, or sync messages.</span></div>
+    <div className="admin-panel-head"><div><p className="admin-email-settings-kicker">DELIVERY / RESEND</p><h2 id="admin-email-settings-title">Email configuration</h2><p>{signedIn ? 'Delivery status is visible to super admins.' : 'The connection checklist for official correspondence. Nothing here is active in preview mode.'}</p></div><span className="admin-email-settings-state">{signedIn ? 'SUPER ADMIN ONLY' : 'NOT CONNECTED'}</span></div>
+    {!signedIn && <><div className="admin-email-settings-banner"><Info size={17} /><span>In preview mode nothing is sent. The sample inbox does not send, receive, or sync messages.</span></div>
     <div className="admin-email-settings-list">{configuration.map(({ icon: Icon, label, value, detail }) => <div className="admin-email-settings-row" key={label}><span className="admin-email-settings-icon"><Icon size={17} /></span><div><strong>{label}</strong><p>{detail}</p></div><span className="admin-email-settings-value" data-testid={`status-email-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{value}</span></div>)}</div></>}
   </section>;
 }

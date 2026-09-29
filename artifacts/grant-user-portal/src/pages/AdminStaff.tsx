@@ -34,7 +34,7 @@ const initials = (name: string) => name.split(' ').map(p => p[0]).join('').slice
 export function StaffSwitcher() {
   const { state, run } = useDemoStore();
   const me = actingStaff(state);
-  return <label className="admin-staff-switcher" title="Demo only: choose which staff member you act as. There is no staff sign-in yet.">
+  return <label className="admin-staff-switcher" title="Preview only: choose which staff member you act as. There is no staff sign-in yet.">
     <span className="admin-avatar" aria-hidden="true">{me ? initials(me.name) : '?'}</span>
     <span className="admin-staff-switcher-copy"><small>Acting as</small>
       <select value={me?.id ?? ''} onChange={e => run(s => switchStaff(s, e.target.value))} aria-label="Acting as staff member" data-testid="select-admin-acting-staff">
@@ -57,7 +57,7 @@ export function AdminTeamSettings() {
   const report = (result: Result) => setFlash(result.ok ? { tone: 'ok', text: result.message } : { tone: 'error', text: result.error });
 
   return <section className="admin-panel admin-treasury" aria-labelledby="team-title" data-testid="panel-admin-team">
-    <div className="admin-panel-head"><div><h2 id="team-title"><UserCog size={16} style={{ display: 'inline', verticalAlign: '-3px' }} /> Team & roles</h2><p>Who can do what. Every action in this workspace is checked against the acting member's role and written to the audit log. Demo roster; there is no staff sign-in yet, so this shows the rules rather than enforcing them against real people.</p></div></div>
+    <div className="admin-panel-head"><div><h2 id="team-title"><UserCog size={16} style={{ display: 'inline', verticalAlign: '-3px' }} /> Team & roles</h2><p>Who can do what. Every action in this workspace is checked against the acting member's role and written to the audit log. Sample roster; there is no staff sign-in yet, so this shows the rules rather than enforcing them against real people.</p></div></div>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-team-flash">{flash.text}</div>}
     <RoleNotice permission="staff.manage" />
     <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Staff member</th><th>Role</th><th>Access</th></tr></thead><tbody>{state.staff.map(m => <tr key={m.id} data-testid={`row-admin-staff-${m.id}`}>

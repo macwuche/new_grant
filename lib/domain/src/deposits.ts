@@ -18,8 +18,8 @@ export type DepositMethod = { id: DepositMethodId; name: string; payTo: string; 
 
 /** Fictional receiving details for the demo. */
 export const DEPOSIT_METHODS: DepositMethod[] = [
-  { id: 'bank', name: 'Bank transfer', payTo: 'arc.fund Demo Trust · Account 00012345 · Routing 000000000', timing: 'Usually 1–2 business days' },
-  { id: 'mobile', name: 'Mobile money', payTo: 'arc.fund Demo · +1 (415) 555-0100', timing: 'Usually within an hour' },
+  { id: 'bank', name: 'Bank transfer', payTo: 'Placeholder details · Account 00012345 · Routing 000000000', timing: 'Usually 1–2 business days' },
+  { id: 'mobile', name: 'Mobile money', payTo: 'Placeholder details · +1 (415) 555-0100', timing: 'Usually within an hour' },
 ];
 
 const isDeposit = (tx: Transaction) => tx.type === 'Deposit';

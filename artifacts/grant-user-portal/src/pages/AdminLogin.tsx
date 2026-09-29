@@ -84,7 +84,7 @@ export function AdminLoginPage() {
       <div className="auth-eyebrow"><ShieldCheck size={13} aria-hidden="true" style={{ display: 'inline', verticalAlign: '-2px' }} /> Staff sign-in</div>
       <h1>{mode === 'signin' ? 'Sign in to the team workspace.' : 'Reset your password.'}</h1>
       <p className="auth-lede">{mode === 'signin' ? 'Use the work email the grant team added you with. Your role decides what you can see and do.' : "Enter your work email and we'll send a link to choose a new password."}</p>
-      {!configured && <Notice testId="notice-admin-login-unconfigured">Staff sign-in isn't set up on this site yet (the Supabase keys are missing), so this form can't sign you in. <Link href="/admin" className="auth-inline-link" data-testid="link-admin-login-demo">Open the demo workspace</Link> to explore with sample staff instead.</Notice>}
+      {!configured && <Notice testId="notice-admin-login-unconfigured">Staff sign-in isn't set up on this site yet (the Supabase keys are missing), so this form can't sign you in. <Link href="/admin" className="auth-inline-link" data-testid="link-admin-login-demo">Open the preview workspace</Link> to explore with sample staff instead.</Notice>}
       {session.status === 'signedIn' && !session.me?.staff?.active && <NoAccessMessage />}
       <form className="auth-form" noValidate onSubmit={submit} data-testid="form-admin-login">
         <div className="auth-field">

@@ -152,7 +152,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
           : evidence.docs === null ? <p className="admin-review-hint">Loading…</p>
           : grant.requirements.map(req => { const files = evidence.docs!.filter(d => d.requirement === req); return <div key={req}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{req}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
         <p className="admin-review-hint">Opening a file is recorded in the audit log.</p></section>
-      : <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Demo: applicants confirm readiness only; no files are uploaded.</p></section>}
+      : <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Preview: applicants confirm readiness only; no files are uploaded.</p></section>}
     {grant.questions.length > 0 && <section className="admin-review-section"><h3>Program questions</h3><dl className="admin-detail-fields">{grant.questions.map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}</dl></section>}
 
     <section className="admin-review-section admin-review-actions" aria-label="Decision">
@@ -191,8 +191,8 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     </section>
 
     <div className="admin-detail-note"><Info size={17} /><span>{connected
-      ? 'Decisions are saved on the server, role-checked there, and shown to the applicant. Approved awards are credited to the applicant\'s demo balance until payments move to the server. The applicant isn\'t emailed or notified in the app yet.'
-      : 'Demo review workflow. Decisions are saved in this browser only and update the applicant preview here. Actions are checked against the acting staff member\'s role and audited, but there is no real staff sign-in yet, so never use this with real applicant data.'}</span></div>
+      ? 'Decisions are saved on the server, role-checked there, and shown to the applicant. Approved awards are credited to the applicant\'s grant balance. The applicant isn\'t emailed or notified in the app yet.'
+      : 'Preview review workflow. Decisions are saved in this browser only and update the applicant preview here. Actions are checked against the acting staff member\'s role and audited, but there is no real staff sign-in yet, so never use this with real applicant data.'}</span></div>
   </ReviewFrame>;
 }
 

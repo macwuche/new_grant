@@ -136,7 +136,7 @@ export function ApplicantDetails({ applicantId, profileLink = false }: { applica
 
   return <>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{person.name}</h2><span className="admin-review-badges">{account.status === 'Locked' && <span className="admin-badge declined" data-testid="status-admin-account-locked">Locked</span>}<RiskBadge risk={risk} /></span></div>
-    <p className="admin-detail-lead">{person.email} · {person.sector} · {person.country}{person.current ? ' · applicant-portal demo user' : ''}{profileLink && <> · <Link href={`/admin/applicants/${person.id}`} className="link-text" data-testid="link-admin-applicant-profile">Open full profile</Link></>}</p>
+    <p className="admin-detail-lead">{person.email} · {person.sector} · {person.country}{person.current ? ' · applicant-portal preview user' : ''}{profileLink && <> · <Link href={`/admin/applicants/${person.id}`} className="link-text" data-testid="link-admin-applicant-profile">Open full profile</Link></>}</p>
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-applicant-flash">{flash.text}</div>}
 
     <dl className="admin-detail-fields">
@@ -151,7 +151,7 @@ export function ApplicantDetails({ applicantId, profileLink = false }: { applica
 
     <section className="admin-review-section"><h3>Fraud risk</h3>
       {risk.factors.length ? <ul className="admin-risk-list" data-testid="list-admin-risk-factors">{risk.factors.map(f => <li key={f.label}><span>{f.label}</span><strong>+{f.points}</strong></li>)}<li className="total"><span>Score (max 100)</span><strong>{risk.score}</strong></li></ul> : <p className="admin-review-hint">No risk signals.</p>}
-      <p className="admin-review-hint">{connected ? 'Sign-in location and device signals aren\'t collected yet.' : 'Sign-in location and device signals are fictional demo values.'} Medium from {RISK_MEDIUM}, high from {RISK_HIGH}.</p>
+      <p className="admin-review-hint">{connected ? 'Sign-in location and device signals aren\'t collected yet.' : 'Sign-in location and device signals are fictional sample values.'} Medium from {RISK_MEDIUM}, high from {RISK_HIGH}.</p>
     </section>
 
     <section className="admin-review-section admin-review-actions" aria-label="Identity verification"><h3>Identity check</h3>
@@ -168,7 +168,7 @@ export function ApplicantDetails({ applicantId, profileLink = false }: { applica
         {kyc.status === 'Pending' && <><button type="button" className="admin-btn" onClick={() => start('kyc-reject')} data-testid="button-admin-kyc-reject">Reject</button><button type="button" className="admin-btn primary" disabled={busy} onClick={() => void perform(acts.approve)} data-testid="button-admin-kyc-approve">Approve identity</button></>}
         {kyc.status === 'Verified' && <button type="button" className="admin-btn" onClick={() => start('reverify')} data-testid="button-admin-kyc-reverify">Ask to verify again</button>}
       </div>}
-      {!connected ? <p className="admin-review-hint">Demo: no documents are uploaded; staff see only the details the applicant entered.</p>
+      {!connected ? <p className="admin-review-hint">Preview: no documents are uploaded; staff see only the details the applicant entered.</p>
         : !can('kyc.review') ? <p className="admin-review-hint">Only staff who review identity checks can open identity documents.</p>
         : <div data-testid="section-admin-identity-documents"><h4 className="admin-review-subhead">Documents</h4>
           {identityDocs.error ? <p className="admin-field-error">{identityDocs.error}</p> : identityDocs.docs === null ? <p className="admin-review-hint">Loading…</p>

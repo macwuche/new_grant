@@ -85,7 +85,7 @@ export function AdminApplicantProfile({ applicantId }: { applicantId: string }) 
       {card.holder ? <>
         <CardRoster holder={card.holder} onAdjust={() => setAdjusting('card')} onMode={openCard} onTransactions={showCardTransactions} />
         <div id="aup-card-actions" className="aup-subsection"><h3>All card actions</h3><CardManager holder={card.holder} onHolder={card.replace} mode={cardMode} onMode={setCardMode} hideFacts /></div>
-      </> : card.demoOnly ? <p className="aup-hint" data-testid="text-admin-profile-cards-demo">In the demo only the applicant-portal user ({state.profile.name}) has cards.</p>
+      </> : card.demoOnly ? <p className="aup-hint" data-testid="text-admin-profile-cards-demo">In preview mode only the applicant-portal user ({state.profile.name}) has cards.</p>
         : card.loadError ? <p className="aup-error">{card.loadError}</p> : <p className="aup-hint">Loading cards…</p>}
     </section>
 
@@ -208,7 +208,7 @@ function IdentityDocuments({ applicantId, onFlash }: { applicantId: string; onFl
 
     <div className="aup-docs" data-testid="section-admin-identity-documents">
       {!connected ? (kyc.documentType
-        ? <button type="button" className="aup-doc" onClick={() => setInspecting('details')} data-testid="button-admin-inspect-details"><span className="aup-doc-icon"><FileText size={20} /></span><strong>{kyc.documentType}</strong><small>Details entered · demo has no uploads</small></button>
+        ? <button type="button" className="aup-doc" onClick={() => setInspecting('details')} data-testid="button-admin-inspect-details"><span className="aup-doc-icon"><FileText size={20} /></span><strong>{kyc.documentType}</strong><small>Details entered · no uploads in preview mode</small></button>
         : <p className="aup-hint">Nothing submitted yet.</p>)
         : !can('kyc.review') ? <p className="aup-hint">Only staff who review identity checks can open identity documents.</p>
         : docs.error ? <p className="aup-error">{docs.error}</p>
@@ -270,7 +270,7 @@ function DocumentInspector({ doc, applicantId, busy, onApprove, onClose, onRejec
   return <AdminModal wide title={doc ? doc.fileName : `${kyc.documentType ?? 'Identity'} details`} subtitle={`${person.name} · identity check ${KYC_TEXT[kyc.status].toLowerCase()}`} onClose={onClose} testId="dialog-admin-document-inspector">
     <div className="aup-inspector">
       <div className="aup-viewer">
-        {!doc ? <div className="aup-viewer-empty"><FileText size={30} /><p>No file in the demo: only the details the applicant entered.</p></div>
+        {!doc ? <div className="aup-viewer-empty"><FileText size={30} /><p>No file in preview mode: only the details the applicant entered.</p></div>
           : error ? <div className="aup-viewer-empty"><p className="aup-error">{error}</p></div>
           : !url ? <div className="aup-viewer-empty"><p>Loading…</p></div>
           : image ? <div className="aup-viewer-stage"><img src={url} alt={`${doc.fileName}, uploaded by ${person.name}`} style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} /></div>
@@ -323,7 +323,7 @@ function Balances({ ledger, applicantId, onAdjust }: { ledger: Transaction[]; ap
   const demoBlocked = !connected && applicantId !== CURRENT_APPLICANT_ID;
   return <section className="aup-card" id="aup-balances" aria-labelledby="aup-balances-title">
     <SectionTitle id="aup-balances-title" icon={<Wallet size={17} />} title="Balances" text="Always worked out from the ledger below. Adjustments add a ledger entry with a category and a reason the applicant sees."
-      action={<button type="button" className="aup-btn lime" disabled={!can('payments.process') || demoBlocked} title={demoBlocked ? 'In the demo only the applicant-portal user has a ledger' : undefined} onClick={() => onAdjust('grant')} data-testid="button-admin-adjust-balance"><SlidersHorizontal size={15} /> Adjust balance</button>} />
+      action={<button type="button" className="aup-btn lime" disabled={!can('payments.process') || demoBlocked} title={demoBlocked ? 'In preview mode only the applicant-portal user has a ledger' : undefined} onClick={() => onAdjust('grant')} data-testid="button-admin-adjust-balance"><SlidersHorizontal size={15} /> Adjust balance</button>} />
     <div className="aup-balances">
       <div className="aup-balance dark"><span>Grant balance</span><strong data-testid="text-admin-balance-grant">{usd(b.grant)}</strong><small>{usd(awarded)} awarded · {usd(b.pendingWithdrawals)} in pending payouts</small></div>
       <div className="aup-balance"><span>Deposit balance</span><strong data-testid="text-admin-balance-deposit">{usd(b.deposit)}</strong><small>{b.pendingDeposits ? `+${usd(b.pendingDeposits)} waiting for confirmation` : 'Pays card and application fees'}</small></div>
@@ -571,7 +571,7 @@ function AuditTrail({ applicantId, name }: { applicantId: string; name: string }
   const exportCsv = () => downloadText(`audit-${applicantId}-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`, auditToCsv(rows), 'text/csv');
 
   return <section className="aup-card" id="aup-audit" aria-labelledby="aup-audit-title">
-    <SectionTitle id="aup-audit-title" icon={<ShieldCheck size={17} />} title="Security audit trail" text={`Every staff action on ${name}'s account, newest first. ${connected ? 'Stored on the server and hash-chained; refreshed every 30 seconds.' : 'Demo: kept in this browser.'}`}
+    <SectionTitle id="aup-audit-title" icon={<ShieldCheck size={17} />} title="Security audit trail" text={`Every staff action on ${name}'s account, newest first. ${connected ? 'Stored on the server and hash-chained; refreshed every 30 seconds.' : 'Preview: kept in this browser.'}`}
       action={can('audit.view') ? <button type="button" className="aup-btn" disabled={!rows.length} onClick={exportCsv} data-testid="button-admin-profile-audit-csv"><Download size={14} /> Export CSV</button> : undefined} />
     {!can('audit.view') ? <RoleNotice permission="audit.view" />
       : <>

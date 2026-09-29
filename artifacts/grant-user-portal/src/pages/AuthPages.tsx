@@ -107,7 +107,7 @@ function AuthFrame({ children, mode, topLink }: AuthFrameProps) {
       {children}
       <footer className="auth-bottomline">
         <span>© <AppNameText /> · {live ? 'Applicant workspace' : 'Illustrative experience'}</span>
-        {live ? <span>Applicant workspace</span> : <Link href="/" data-testid="link-demo-workspace-footer">View demo workspace <ArrowRight size={13} aria-hidden="true" /></Link>}
+        {live ? <span>Applicant workspace</span> : <Link href="/" data-testid="link-demo-workspace-footer">View preview workspace <ArrowRight size={13} aria-hidden="true" /></Link>}
       </footer>
     </section>
   </main>;
@@ -171,9 +171,9 @@ export function LoginPage() {
         </form>
       </Form>
       {error && <DemoFeedback testId="status-login-error" tone="error">{error}</DemoFeedback>}
-      {feedback && <DemoFeedback testId="status-login-demo">Sign-in preview only. No credentials were checked or saved, and no account session was started. You can explore the demo workspace below.</DemoFeedback>}
+      {feedback && <DemoFeedback testId="status-login-demo">Sign-in preview only. No credentials were checked or saved, and no account session was started. You can explore the preview workspace below.</DemoFeedback>}
       {live ? <p className="auth-aside">New to <AppNameText />? <Link href="/signup" className="auth-inline-link" data-testid="link-login-signup-aside">Create an account</Link>.</p>
-        : <p className="auth-aside">Just exploring? <Link href="/" className="auth-inline-link" data-testid="link-login-demo-workspace">Open the demo workspace</Link> without signing in.</p>}
+        : <p className="auth-aside">Just exploring? <Link href="/" className="auth-inline-link" data-testid="link-login-demo-workspace">Open the preview workspace</Link> without signing in.</p>}
     </div>
   </AuthFrame>;
 }
@@ -416,7 +416,7 @@ export function SignUpPage() {
           <Suspense fallback={<span className="auth-match-loading">Loading illustration…</span>}><GrantMatchingAnimation onPlay={() => setAnimationStarted(true)} /></Suspense>
         </div>
       </section>}
-      {step !== 4 && !live && <p className="auth-aside">Prefer to look around first? <Link href="/" className="auth-inline-link" data-testid="link-signup-demo-workspace">Enter the demo workspace</Link>.</p>}
+      {step !== 4 && !live && <p className="auth-aside">Prefer to look around first? <Link href="/" className="auth-inline-link" data-testid="link-signup-demo-workspace">Enter the preview workspace</Link>.</p>}
     </div>
     <dialog ref={policyDialog} className="auth-policy-panel" onClose={() => setPolicy(null)} aria-labelledby="signup-policy-heading" data-testid="dialog-signup-policy">
       <div className="auth-step-index">Document preview</div>
@@ -450,7 +450,7 @@ export function ForgotPasswordPage() {
     <div className="auth-form-wrap">
       <div className="auth-eyebrow">{live ? 'Account recovery' : 'Account recovery / preview'}</div>
       <h1>Find your way back.</h1>
-      <p className="auth-lede">{live ? "Enter your account email and we'll send a link to choose a new password." : 'Enter an email address to preview the reset request. This demonstration cannot send a recovery email.'}</p>
+      <p className="auth-lede">{live ? "Enter your account email and we'll send a link to choose a new password." : 'Enter an email address to preview the reset request. This preview cannot send a recovery email.'}</p>
       <Form {...form}>
         <form className="auth-form" noValidate onSubmit={form.handleSubmit(submit)} data-testid="form-reset-password">
           <FormField control={form.control} name="email" render={({ field }) => <FormItem className="auth-field">
@@ -462,7 +462,7 @@ export function ForgotPasswordPage() {
         </form>
       </Form>
       {result && <DemoFeedback testId="status-reset-result" tone={result.tone}>{result.text}</DemoFeedback>}
-      {feedback && <DemoFeedback testId="status-reset-demo">Reset-request preview only. No email was sent and the address was not saved. Password recovery is not connected in this demo.</DemoFeedback>}
+      {feedback && <DemoFeedback testId="status-reset-demo">Reset-request preview only. No email was sent and the address was not saved. Password recovery is not connected in this preview.</DemoFeedback>}
       <p className="auth-aside"><Link href="/login" className="auth-inline-link" data-testid="link-reset-login"><ArrowLeft size={13} aria-hidden="true" /> Return to sign in</Link></p>
     </div>
   </AuthFrame>;
@@ -513,13 +513,13 @@ export function ResetPasswordPage() {
 }
 
 export function NotFoundPage() {
-  return <AuthFrame mode="not-found" topLink={{ href: '/', prefix: 'Looking for your applications?', label: 'Open demo workspace', testId: 'link-notfound-workspace-top' }}>
+  return <AuthFrame mode="not-found" topLink={{ href: '/', prefix: 'Looking for your applications?', label: 'Open your workspace', testId: 'link-notfound-workspace-top' }}>
     <div className="auth-form-wrap">
       <div className="auth-eyebrow">Page not found / 404</div>
       <h1>This path ends here.</h1>
-      <p className="auth-lede">The page may have moved, or the address might need another look. Your demo workspace is still right where you left it.</p>
+      <p className="auth-lede">The page may have moved, or the address might need another look. Your workspace is still right where you left it.</p>
       <div className="auth-route-code" data-testid="text-notfound-code"><span>REQUESTED PAGE</span><strong>NOT FOUND / 404</strong></div>
-      <Link href="/" className="auth-button" data-testid="link-notfound-dashboard">Back to demo dashboard <ArrowRight size={18} aria-hidden="true" /></Link>
+      <Link href="/" className="auth-button" data-testid="link-notfound-dashboard">Back to dashboard <ArrowRight size={18} aria-hidden="true" /></Link>
       <p className="auth-aside">Need another starting point? <Link href="/login" className="auth-inline-link" data-testid="link-notfound-login">View sign-in preview</Link>.</p>
     </div>
   </AuthFrame>;

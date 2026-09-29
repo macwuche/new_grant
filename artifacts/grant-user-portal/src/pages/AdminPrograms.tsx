@@ -209,6 +209,6 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
 
     <div className="admin-detail-note"><Info size={17} /><span>{connected
       ? 'Programs are saved on the server and shown to every applicant. Until applications move to the server, locked criteria and the awarded budget are checked in this browser only.'
-      : 'Demo program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.'}</span></div>
+      : 'Preview program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.'}</span></div>
   </ReviewFrame>;
 }

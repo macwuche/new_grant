@@ -334,7 +334,7 @@ export function CardManager({ holder, onHolder, mode: shownMode, onMode, hideFac
     </section>
     <div className="admin-detail-note"><Info size={17} /><span>{connected
       ? 'Cards are fictional: no card issuer or network is connected. Every change is saved on the server, role-checked, audited, and sent to the applicant. Staff never see card PINs.'
-      : 'Demo card workflow. Only the demo applicant has cards; changes are saved in this browser only, role-checked, and audited.'}</span></div>
+      : 'Preview card workflow. Only the applicant-portal preview user has cards; changes are saved in this browser only, role-checked, and audited.'}</span></div>
   </>;
 }
 

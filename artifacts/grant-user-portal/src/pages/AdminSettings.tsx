@@ -39,8 +39,8 @@ function MoneyStatus() {
   return <>{channels.filter(c => c.enabled).length} of {channels.length} payout channels on</>;
 }
 function BrandingStatus() { return <>Name: {useAppName().name}</>; }
-function AppInfoStatus() { return <>{useSignedIn() ? 'Signed in · server records' : 'Demo · this browser only'}</>; }
-function EmailStatus() { return <>{useSignedIn() ? 'Sending, domain, sign-up emails' : 'Not active in the demo'}</>; }
+function AppInfoStatus() { return <>{useSignedIn() ? 'Signed in · server records' : 'Preview · this browser only'}</>; }
+function EmailStatus() { return <>{useSignedIn() ? 'Sending, domain, sign-up emails' : 'Not active in preview mode'}</>; }
 
 function AppInfoPage() {
   const signedIn = useSignedIn();
@@ -55,9 +55,9 @@ function AppInfoPage() {
     <div className="admin-grid">
       <section className="admin-panel"><div className="admin-panel-head"><div><h2>Example sectors</h2><p>Illustrative labels, not live choices.</p></div></div><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div></section>
       <section className="admin-panel"><div className="admin-panel-head"><div><h2>About this workspace</h2><p>How this copy of {name} is running.</p></div></div>
-        <div className="admin-mini-stat"><span>Mode</span><strong>{signedIn ? 'Signed in' : 'Demo'}</strong></div>
+        <div className="admin-mini-stat"><span>Mode</span><strong>{signedIn ? 'Signed in' : 'Preview'}</strong></div>
         <div className="admin-mini-stat"><span>Staff sign-in</span><strong>{signedIn ? 'Supabase Auth' : 'Not enabled'}</strong></div>
-        <div className="admin-mini-stat"><span>Role checks</span><strong>{signedIn ? 'Enforced by the API' : 'Demo roles, this browser'}</strong></div>
+        <div className="admin-mini-stat"><span>Role checks</span><strong>{signedIn ? 'Enforced by the API' : 'Sample roles, this browser'}</strong></div>
         <div className="admin-mini-stat"><span>Data source</span><strong>{signedIn ? 'Server database' : 'This browser'}</strong></div>
       </section>
     </div>

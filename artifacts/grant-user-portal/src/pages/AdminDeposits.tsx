@@ -35,7 +35,7 @@ export function AdminDeposits() {
       <div className="admin-metric featured" data-testid="metric-admin-deposits-pending"><span className="admin-metric-label">Waiting to be confirmed</span><strong className="admin-metric-value">{String(pending.length).padStart(2, '0')}</strong><span className="admin-metric-foot">Oldest first · match by reference</span></div>
       <div className="admin-metric" data-testid="metric-admin-deposits-amount"><span className="admin-metric-label">Announced, not yet received</span><strong className="admin-metric-value">{usd(pendingDepositTotal(state))}</strong><span className="admin-metric-foot">Not counted in balances</span></div>
       <div className="admin-metric" data-testid="metric-admin-deposits-high"><span className="admin-metric-label">High-value pending</span><strong className="admin-metric-value">{String(high.length).padStart(2, '0')}</strong><span className="admin-metric-foot">{usd(state.treasury.highValueDeposit)} or more</span></div>
-      <div className="admin-metric" data-testid="metric-admin-deposits-received"><span className="admin-metric-label">Confirmed received</span><strong className="admin-metric-value">{usd(received)}</strong><span className="admin-metric-foot">Demo records</span></div>
+      <div className="admin-metric" data-testid="metric-admin-deposits-received"><span className="admin-metric-label">Confirmed received</span><strong className="admin-metric-value">{usd(received)}</strong><span className="admin-metric-foot">Confirmed by finance</span></div>
     </div>
     <section className="admin-panel">
       <div className="admin-panel-head"><div><h2>Deposits</h2><p>Transfers applicants say they've sent. Check the receiving account for the reference, then confirm or reject. No bank feed is connected.</p></div></div>
@@ -111,6 +111,6 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
     </section>
     <div className="admin-detail-note"><Info size={17} /><span>{staffMoney.connected
       ? 'No bank or mobile-money feed is connected, so check that the money really arrived before confirming. Results are saved on the server, role-checked, and audited.'
-      : 'Demo finance workflow. No bank or mobile-money feed is connected, so arrival can\'t be checked automatically. Results are saved in this browser only, and there is no real staff sign-in yet (actions are role-checked and audited).'}</span></div>
+      : 'Preview finance workflow. No bank or mobile-money feed is connected, so arrival can\'t be checked automatically. Results are saved in this browser only, and there is no real staff sign-in yet (actions are role-checked and audited).'}</span></div>
   </ReviewFrame>;
 }

@@ -135,7 +135,7 @@ export function AdminApplicants({ openApplicant }: { openApplicant: (id: string)
 
     {applicantsError && <div className="aup-flash error" role="alert" data-testid="status-admin-applicants-error">{applicantsError}</div>}
     {flash && <div className={`aup-flash ${flash.tone}`} role="status" data-testid="status-admin-applicants-flash">{flash.text}</div>}
-    {!connected && <p className="aup-hint">Demo directory: invented people; the first is the applicant-portal demo user.</p>}
+    {!connected && <p className="aup-hint">Preview directory: invented people; the first is the applicant-portal preview user.</p>}
 
     {shown.length ? <>
       <div className="aup-table-wrap"><table className="aup-table aup-directory-table">

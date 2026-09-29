@@ -126,7 +126,7 @@ export function submitKyc(state: DemoState, input: KycInput, now: Date): Result 
   });
   const logged = logStaff(submitted, { kind: 'account', title: 'Identity check submitted', body: `${state.profile.name} · ${input.documentType}`, href: '/admin/security' }, now);
   const notified = notify(logged, CURRENT_APPLICANT_ID, 'Identity check in progress', "We received your identity details. The compliance team will review them and let you know the outcome.", '/settings', now);
-  return { ok: true, message: 'Identity details submitted. The compliance team will review them (demo — no document is uploaded).', state: alertIfHighRisk(state, notified, CURRENT_APPLICANT_ID, now) };
+  return { ok: true, message: 'Identity details submitted. The compliance team will review them.', state: alertIfHighRisk(state, notified, CURRENT_APPLICANT_ID, now) };
 }
 
 function loadPendingKyc(state: DemoState, applicantId: string) {
