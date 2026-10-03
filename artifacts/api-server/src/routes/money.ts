@@ -2,7 +2,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import express, { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
 import {
   ActivatePhysicalCardBody, AdjustBalanceBody, ApprovePhysicalCardBody, ConfirmDepositParams as LedgerIdParams, DeductFromCardBody, FundCardAsStaffBody, FundCardBody,
-  CreateWithdrawalMethodBody, GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RequestDepositBody,
+  CreateDepositMethodBody, CreateWithdrawalMethodBody, GetDepositProofParams, GetCardHolderParams as ApplicantIdParams, IssuePhysicalCardBody, MarkPayoutFailedBody as ReasonBody, RequestDepositBody,
   RequestPhysicalCardBody, RequestWithdrawalBody, SetCardFreezeAsStaffBody, SetCardLimitBody, SetWithdrawalMethodAvailabilityBody, ToggleCardFreezeBody,
   UpdateMoneySettingsBody, UpdateWithdrawalMethodParams as MethodIdParams,
 } from "@workspace/api-zod";
@@ -12,17 +12,22 @@ import {
 } from "@workspace/domain/cards";
 import { staffAdjustBalance } from "@workspace/domain/adjustments";
 import { computeBalances } from "@workspace/domain/rules";
-import type { Permission } from "@workspace/authz";
-import { cancelDeposit, confirmDeposit, rejectDeposit, requestDeposit } from "@workspace/domain/deposits";
+import { roleCan, type Permission } from "@workspace/authz";
+import {
+  createDepositMethod, deleteDepositMethod, setDepositMethodAvailability, setDepositMethodPhoto, STALE_DEPOSIT_METHODS, updateDepositMethod, type DepositMethodInput,
+} from "@workspace/domain/depositMethods";
+import {
+  approveDepositRelease, attachDepositProof, cancelDeposit, confirmDeposit, MAX_PROOF_BYTES, rejectDeposit, removeDepositProof, requestDeposit,
+} from "@workspace/domain/deposits";
 import { cancelWithdrawal, requestPhysicalCard, requestWithdrawal, setCardLimit, toggleCardFreeze } from "@workspace/domain/money";
-import type { DemoState, MethodPhotoFile, Result, Transaction, Treasury, TreasuryInput } from "@workspace/domain/model";
+import type { DemoState, DepositProof, MethodPhotoFile, Result, Transaction, Treasury, TreasuryInput } from "@workspace/domain/model";
 import { approvePayoutRelease, markPayoutFailed, markPayoutPaid } from "@workspace/domain/payouts";
 import { endLockdown, startLockdown } from "@workspace/domain/security";
 import { applicantState, readApplicantSlot, serverState } from "@workspace/domain/server";
 import { CURRENT_APPLICANT_ID as SLOT } from "@workspace/domain/seed";
 import { updateTreasury } from "@workspace/domain/treasury";
 import { createMethod, deleteMethod, MAX_METHOD_PHOTO_BYTES, setMethodAvailability, setMethodPhoto, updateMethod, type MethodInput } from "@workspace/domain/withdrawalMethods";
-import { effectsOf } from "../lib/activity";
+import { auditEntry, effectsOf } from "../lib/activity";
 import type { FileStore } from "../lib/fileStore";
 import { slotApplicant } from "../lib/applicantRules";
 import { storeLedgerChanges } from "../lib/ledger";
@@ -30,10 +35,12 @@ import { logger } from "../lib/logger";
 import { newCards, type MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { cleanFileName, detectType } from "./documents";
 import { detectImage, ownProfile } from "./profile";
+import { inspectUpload } from "../lib/uploadSafety";
 
-// Money: the ledger, deposits, payouts, cards, withdrawal methods, the money
-// settings, and the lockdown. Every change runs the shared rules
+// Money: the ledger, deposits (with proof of payment), payouts, cards,
+// withdrawal and deposit methods, the money settings, and the lockdown. Every change runs the shared rules
 // (@workspace/domain/{money,deposits,payouts,treasury,security}) under the
 // locks described in ../lib/moneyRepo.ts, and stores the ledger entries, money
 // profile, notifications, feed items, and audit entry in one transaction.
@@ -47,13 +54,23 @@ const send = (res: Response, f: Failure) => res.status(f.status).json(f.body);
 const fourDigits = () => String(randomInt(10_000)).padStart(4, "0");
 
 /** Settings as they leave the server: where an uploaded method photo is stored stays on the server. */
-const outward = (t: Treasury): Treasury => ({ ...t, channels: t.channels.map(({ photoFile: _file, ...m }) => m) });
+const outward = (t: Treasury): Treasury => ({
+  ...t, channels: t.channels.map(({ photoFile: _file, ...m }) => m), depositMethods: t.depositMethods.map(({ photoFile: _file, ...m }) => m),
+});
 /** What applicants see of the settings: the available methods and the rules that apply to them, not who changed what. */
-const forApplicants = (t: Treasury): Treasury => { const o = outward(t); return { ...o, channels: o.channels.filter(c => c.enabled), changeLog: [] }; };
+const forApplicants = (t: Treasury): Treasury => {
+  const o = outward(t);
+  return { ...o, channels: o.channels.filter(c => c.enabled), depositMethods: o.depositMethods.filter(m => m.enabled), changeLog: [] };
+};
 const outwardSettings = (s: { treasury: Treasury; lockdown: DemoState["lockdown"] }) => ({ ...s, treasury: outward(s.treasury) });
 
-/** Method photos are stored under this owner id (storage keys are `<uuid>/<uuid>`). */
+/** Method photos are stored under these owner ids (storage keys are `<uuid>/<uuid>`). */
 export const METHOD_PHOTO_OWNER = "5a1e5000-0000-4000-8000-00000000f070";
+export const DEPOSIT_METHOD_PHOTO_OWNER = "5a1e5000-0000-4000-8000-00000000f071";
+/** A deposit's proof file: under the applicant's own folder, named by the proof's id. */
+export const proofKey = (applicantId: string, proofId: string) => `${applicantId}/${proofId}`;
+/** Staff who process or approve deposits can open their proof of payment. */
+const PROOF_VIEWERS: Permission[] = ["payments.process", "payments.release"];
 
 export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: FileStore): IRouter {
   const router: IRouter = Router();
@@ -72,8 +89,8 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     res.json(await myMoney(record.authUserId));
   });
 
-  /** Runs an applicant money rule on their own records, with a fresh block of ids. */
-  async function asApplicant(res: Response, command: (state: DemoState) => Result) {
+  /** Runs an applicant money rule on their own records, with a fresh block of ids; true if it was applied (the response is sent either way). */
+  async function asApplicant(res: Response, command: (state: DemoState) => Result): Promise<boolean> {
     const record = await ownProfile(profiles, authLocals(res).user);
     const nextId = await money.nextBlock();
     const outcome = await money.withApplicant(record.authUserId, async (scope): Promise<{ message: string; id?: string } | { failure: Failure }> => {
@@ -91,16 +108,86 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
       await scope.record(effectsOf(before, result.state, new Date(), { slotId: record.authUserId }));
       return { message: result.message, ...(result.id ? { id: result.id } : {}) };
     });
-    if ("failure" in outcome) { send(res, outcome.failure); return; }
+    if ("failure" in outcome) { send(res, outcome.failure); return false; }
     res.json({ money: await myMoney(record.authUserId), message: outcome.message, ...(outcome.id ? { id: outcome.id } : {}) });
+    return true;
   }
 
   const idOf = (req: Request) => { const p = LedgerIdParams.safeParse(req.params); return p.success ? p.data.id : null; };
 
   router.post("/money/deposits", async (req, res) => {
     const b = RequestDepositBody.safeParse(req.body);
-    if (!b.success) { res.status(400).json({ error: "Send an amount and a deposit method." }); return; }
-    await asApplicant(res, s => requestDeposit(s, b.data.amount, b.data.method, new Date()));
+    if (!b.success) { res.status(400).json({ error: "Send an amount, a deposit method, and the method's details." }); return; }
+    await asApplicant(res, s => requestDeposit(s, b.data.amount, b.data.method, new Date(), b.data.details ?? {}));
+  });
+
+  // ---------- Proof of payment ----------
+
+  /** The applicant's own deposit (anyone else's reads as not found). */
+  async function ownDeposit(req: Request, res: Response): Promise<Transaction | null> {
+    const id = idOf(req);
+    const tx = id ? await money.findTransaction(id) : null;
+    if (!tx || tx.type !== "Deposit" || tx.applicantId !== authLocals(res).user.id) { res.status(404).json({ error: "That deposit could not be found." }); return null; }
+    return tx;
+  }
+
+  router.put("/money/deposits/:id/proof", express.raw({ type: () => true, limit: MAX_PROOF_BYTES }), async (req: Request, res: Response) => {
+    const tx = await ownDeposit(req, res);
+    if (!tx) return;
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
+    const contentType = detectType(bytes);
+    if (!contentType) { res.status(415).json({ error: "Upload a PDF, JPG, or PNG file." }); return; }
+    const unsafe = inspectUpload(bytes, contentType);
+    if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    const proof: DepositProof = {
+      id: randomUUID(), fileName: cleanFileName(req.header("x-file-name")), contentType, sizeBytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"), uploadedAt: new Date().toISOString(),
+    };
+    const key = proofKey(tx.applicantId, proof.id);
+    await files.put(key, bytes);
+    const saved = await asApplicant(res, s => attachDepositProof(s, tx.id, proof, new Date())).catch(async err => { await files.remove(key).catch(() => {}); throw err; });
+    if (!saved) { await files.remove(key).catch(() => {}); return; }
+    logger.info({ applicant: tx.applicantId, entry: tx.id, proof: proof.id, bytes: bytes.length }, "deposit proof uploaded");
+  });
+  router.use("/money/deposits/:id/proof", (err: { type?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large") { res.status(413).json({ error: `Files can be at most ${MAX_PROOF_BYTES / 1024 / 1024} MB.` }); return; }
+    next(err);
+  });
+  router.post("/money/deposits/:id/proof/:proofId/delete", async (req, res) => {
+    const p = GetDepositProofParams.safeParse(req.params);
+    const tx = p.success ? await ownDeposit(req, res) : null;
+    if (!p.success) { res.status(404).json({ error: "That file could not be found." }); return; }
+    if (!tx) return;
+    if (await asApplicant(res, s => removeDepositProof(s, tx.id, p.data.proofId))) await files.remove(proofKey(tx.applicantId, p.data.proofId)).catch(() => {});
+  });
+  router.get("/money/deposits/:id/proof/:proofId", async (req, res) => {
+    const { user, staff } = authLocals(res);
+    const p = GetDepositProofParams.safeParse(req.params);
+    const tx = p.success ? await money.findTransaction(p.data.id) : null;
+    const proof = tx?.type === "Deposit" ? tx.proof?.find(f => f.id === p.data?.proofId) : undefined;
+    const owner = tx?.applicantId === user.id;
+    const staffMay = !!staff?.active && PROOF_VIEWERS.some(permission => roleCan(staff.role, permission));
+    // Someone else's file reads as not found, never as forbidden.
+    if (!tx || !proof || (!owner && !staffMay)) { res.status(404).json({ error: "That file could not be found." }); return; }
+    const bytes = await files.get(proofKey(tx.applicantId, proof.id));
+    if (!bytes || createHash("sha256").update(bytes).digest("hex") !== proof.sha256) {
+      logger.error({ entry: tx.id, proof: proof.id, missing: !bytes }, "deposit proof is missing or doesn't match its record");
+      res.status(500).json({ error: "This file can't be opened: the stored file is missing or has changed. The team has been alerted." }); return;
+    }
+    if (!owner) {
+      const ctx = auditContext(req, res, "View deposit proof", tx.id);
+      await money.withApplicant(tx.applicantId, scope => scope.record({ notifications: [], staffEvents: [], audit: [{ ...auditEntry(ctx, `Opened proof of payment for ${tx.reference ?? tx.id}: ${proof.fileName}`, [], new Date()), applicantId: tx.applicantId }] }));
+    }
+    res.set({
+      "Content-Type": proof.contentType,
+      "Content-Length": String(bytes.length),
+      "Content-Disposition": `attachment; filename="${proof.fileName.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(proof.fileName)}`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+    });
+    res.end(bytes);
   });
   router.post("/money/deposits/:id/cancel", async (req, res) => {
     const id = idOf(req);
@@ -183,7 +270,12 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     return b.success ? { ok: true as const, command: make(b.data.reason) } : { ok: false as const, error };
   };
 
-  txAction("deposits/:id/confirm", "payments.process", "Confirm deposit", none((s, a, tx) => confirmDeposit(s, tx.id, a.name, new Date())));
+  txAction("deposits/:id/release", "payments.release", "Approve deposit", none((s, a, tx) => approveDepositRelease(s, tx.id, a.name, new Date())));
+  txAction("deposits/:id/confirm", "payments.process", "Confirm deposit", none((s, a, tx) => {
+    // Two different people: the rule compares names, the server also compares staff ids.
+    if (tx.releaseApproval?.byId === a.id) return { ok: false, error: `You approved ${tx.reference ?? tx.id}, so a different staff member must confirm it.` };
+    return confirmDeposit(s, tx.id, a.name, new Date());
+  }));
   txAction("deposits/:id/reject", "payments.process", "Reject deposit", reason(text => (s, a, tx) => rejectDeposit(s, tx.id, text, a.name, new Date()), "Explain why the deposit was rejected."));
   txAction("withdrawals/:id/release", "payments.release", "Approve payout release", none((s, a, tx) => approvePayoutRelease(s, tx.id, a.name, new Date())));
   txAction("withdrawals/:id/paid", "payments.process", "Mark payout paid", none((s, a, tx) => {
@@ -288,10 +380,10 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   });
   // ---------- Staff: withdrawal methods ----------
 
-  /** Removes stored method photos no method uses any more (after a delete, a new upload, or switching to a link). */
+  /** Removes stored method photos no withdrawal or deposit method uses any more (after a delete, a new upload, or switching to a link). */
   async function dropUnusedPhotos(before: Treasury, after: Treasury) {
-    const kept = new Set(after.channels.map(c => c.photoFile?.key).filter(Boolean));
-    for (const c of before.channels) {
+    const kept = new Set([...after.channels, ...after.depositMethods].map(c => c.photoFile?.key).filter(Boolean));
+    for (const c of [...before.channels, ...before.depositMethods]) {
       if (c.photoFile && !kept.has(c.photoFile.key)) await files.remove(c.photoFile.key).catch(err => logger.warn({ err, method: c.id }, "couldn't remove an unused method photo"));
     }
   }
@@ -299,7 +391,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   const staleVersion = async (version: string) => (await money.settings()).treasury.updatedAt !== version;
   const STALE = "Withdrawal methods changed since you opened them. Review the latest version and try again.";
   /** Uploaded photos are set with their own endpoint; preview-mode data: URLs never reach the server. */
-  const photoLinkError = (input: MethodInput) => input.photoUrl.trim().startsWith("data:") ? { error: "Upload the photo with the photo button, or use an https link.", fieldErrors: { photoUrl: "Upload the photo with the photo button, or use an https link." } } : null;
+  const photoLinkError = (input: { photoUrl: string }) => input.photoUrl.trim().startsWith("data:") ? { error: "Upload the photo with the photo button, or use an https link.", fieldErrors: { photoUrl: "Upload the photo with the photo button, or use an https link." } } : null;
 
   router.post("/money/methods", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
     const b = CreateWithdrawalMethodBody.safeParse(req.body);
@@ -344,6 +436,8 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
     const contentType = detectImage(bytes);
     if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
+    const unsafe = inspectUpload(bytes, contentType);
+    if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
     const file: MethodPhotoFile = { key: `${METHOD_PHOTO_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex") };
     await files.put(file.key, bytes);
     const done = await asSystem(req, res, "Change withdrawal method photo", id, (s, by) => setMethodPhoto(s, id, "", file, by, new Date()));
@@ -361,6 +455,75 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     if (done.ok) await dropUnusedPhotos(done.before, done.after);
   });
 
+  // ---------- Staff: deposit methods ----------
+
+  /** The deposit method named in the path, if it exists. */
+  const depositMethodIdOf = async (req: Request): Promise<string | null> => {
+    const id = methodIdOf(req);
+    return id && (await money.settings()).treasury.depositMethods.some(m => m.id === id) ? id : null;
+  };
+  const DEPOSIT_GONE = "That deposit method no longer exists.";
+
+  router.post("/money/deposit-methods", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const b = CreateDepositMethodBody.safeParse(req.body);
+    if (!b.success) { res.status(400).json({ error: "Send the settings' version and every method field." }); return; }
+    const input = b.data.method as DepositMethodInput;
+    const photo = photoLinkError(input);
+    if (photo) { res.status(400).json(photo); return; }
+    if (await staleVersion(b.data.version)) { res.status(409).json({ error: STALE_DEPOSIT_METHODS }); return; }
+    await asSystem(req, res, "Add deposit method", "treasury", (s, by) => createDepositMethod(s, b.data.version, input, by, new Date()));
+  });
+  router.put("/money/deposit-methods/:methodId", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = await depositMethodIdOf(req);
+    const b = CreateDepositMethodBody.safeParse(req.body);
+    if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
+    if (!b.success) { res.status(400).json({ error: "Send the settings' version and every method field." }); return; }
+    const input = b.data.method as DepositMethodInput;
+    const photo = photoLinkError(input);
+    if (photo) { res.status(400).json(photo); return; }
+    if (await staleVersion(b.data.version)) { res.status(409).json({ error: STALE_DEPOSIT_METHODS }); return; }
+    const done = await asSystem(req, res, "Edit deposit method", id, (s, by) => updateDepositMethod(s, b.data.version, id, input, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+  router.post("/money/deposit-methods/:methodId/availability", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = await depositMethodIdOf(req);
+    const b = SetWithdrawalMethodAvailabilityBody.safeParse(req.body);
+    if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
+    if (!b.success) { res.status(400).json({ error: "Say whether users can choose the method." }); return; }
+    await asSystem(req, res, b.data.enabled ? "Make deposit method available" : "Make deposit method unavailable", id, (s, by) => setDepositMethodAvailability(s, id, b.data.enabled, by, new Date()));
+  });
+  router.post("/money/deposit-methods/:methodId/delete", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = await depositMethodIdOf(req);
+    if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
+    const done = await asSystem(req, res, "Delete deposit method", id, (s, by) => deleteDepositMethod(s, id, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+  router.put("/money/deposit-methods/:methodId/photo", requireStaff, requirePermission("treasury.manage"), express.raw({ type: () => true, limit: MAX_METHOD_PHOTO_BYTES }), async (req: Request, res: Response) => {
+    const id = await depositMethodIdOf(req);
+    if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
+    const contentType = detectImage(bytes);
+    if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
+    const unsafe = inspectUpload(bytes, contentType);
+    if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    const file: MethodPhotoFile = { key: `${DEPOSIT_METHOD_PHOTO_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex") };
+    await files.put(file.key, bytes);
+    const done = await asSystem(req, res, "Change deposit method photo", id, (s, by) => setDepositMethodPhoto(s, id, "", file, by, new Date()));
+    if (!done.ok) { await files.remove(file.key).catch(() => {}); return; }
+    await dropUnusedPhotos(done.before, done.after);
+  });
+  router.use("/money/deposit-methods/:methodId/photo", (err: { type?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large") { res.status(413).json({ error: `Photos can be at most ${MAX_METHOD_PHOTO_BYTES / 1024 / 1024} MB.` }); return; }
+    next(err);
+  });
+  router.post("/money/deposit-methods/:methodId/photo/delete", requireStaff, requirePermission("treasury.manage"), async (req, res) => {
+    const id = await depositMethodIdOf(req);
+    if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
+    const done = await asSystem(req, res, "Remove deposit method photo", id, (s, by) => setDepositMethodPhoto(s, id, "", null, by, new Date()));
+    if (done.ok) await dropUnusedPhotos(done.before, done.after);
+  });
+
   router.post("/money/lockdown", requireStaff, requirePermission("security.lockdown"), async (req, res) => {
     const b = ReasonBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Explain why the system is being locked down." }); return; }
@@ -374,19 +537,21 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
 }
 
 /**
- * Public: a withdrawal method's uploaded photo, so pages can show it in an
- * image tag (method logos aren't private). The address carries the photo's
- * hash, so it can be cached; the bytes are checked against that hash.
+ * Public: a withdrawal or deposit method's uploaded photo, so pages can show
+ * it in an image tag (method logos aren't private). The address carries the
+ * photo's hash, so it can be cached; the bytes are checked against that hash.
  */
-export function withdrawalMethodPhotoRouter(money: MoneyRepo, files: FileStore): IRouter {
+export function methodPhotoRouter(money: MoneyRepo, files: FileStore): IRouter {
   const router: IRouter = Router();
-  router.get("/withdrawal-methods/:methodId/photo", async (req, res) => {
+  router.get(["/withdrawal-methods/:methodId/photo", "/deposit-methods/:methodId/photo"], async (req, res) => {
     const p = MethodIdParams.safeParse(req.params);
-    const method = p.success ? (await money.settings()).treasury.channels.find(c => c.id === p.data.methodId) : undefined;
+    const { treasury } = await money.settings();
+    const list = req.path.startsWith("/deposit-methods/") ? treasury.depositMethods : treasury.channels;
+    const method = p.success ? list.find(c => c.id === p.data.methodId) : undefined;
     const file = method?.photoFile;
     const bytes = file ? await files.get(file.key) : null;
     if (!file || !bytes || createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
-      if (file) logger.error({ method: method?.id, missing: !bytes }, "withdrawal method photo is missing or doesn't match its record");
+      if (file) logger.error({ method: method?.id, missing: !bytes }, "method photo is missing or doesn't match its record");
       res.status(404).json({ error: "No photo." }); return;
     }
     res.set({ "Content-Type": file.contentType, "Content-Length": String(bytes.length), "Cache-Control": "public, max-age=86400", "Content-Security-Policy": "default-src 'none'; sandbox", "Cross-Origin-Resource-Policy": "same-site" });

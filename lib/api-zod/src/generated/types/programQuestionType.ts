@@ -6,11 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * A file field is answered by uploading documents, not by a typed answer
+ */
 export type ProgramQuestionType = typeof ProgramQuestionType[keyof typeof ProgramQuestionType];
 
 
 export const ProgramQuestionType = {
   text: 'text',
+  textarea: 'textarea',
   number: 'number',
   yesno: 'yesno',
+  file: 'file',
 } as const;

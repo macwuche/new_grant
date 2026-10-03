@@ -51,6 +51,7 @@
 
 /* Staff activity feed */
 .admin-flag { display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 99px; background: #fbe9dc; color: #9a5a22; font-size: 9px; font-weight: 800; letter-spacing: .02em; vertical-align: 1px; }
+.admin-flag.muted { background: #eef1ea; color: #4b5a45; }
 .admin-activity-wrap { position: relative; }
 .admin-shell .admin-activity-button { position: relative; width: 34px; height: 34px; border-radius: 50%; }
 .admin-activity-count { position: absolute; top: -4px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; border-radius: 99px; background: var(--admin-night); color: var(--admin-lime); font-size: 9px; font-weight: 800; box-shadow: 0 0 0 2px var(--admin-paper); }

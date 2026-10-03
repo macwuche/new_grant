@@ -8,7 +8,7 @@ import { boolean, date, jsonb, numeric, pgEnum, pgSequence, pgTable, smallint, t
 
 export const programStatusEnum = pgEnum("program_status", ["Draft", "Open", "Closed"]);
 
-export type ProgramQuestionJson = { id: string; label: string; type: "text" | "number" | "yesno"; required: boolean };
+export type ProgramQuestionJson = { id: string; label: string; type: "text" | "textarea" | "number" | "yesno" | "file"; required: boolean };
 export type ProgramChangeJson = { at: string; by: string; summary: string };
 
 const money = (name: string) => numeric(name, { precision: 12, scale: 2, mode: "number" }).notNull();
@@ -27,6 +27,10 @@ export const programsTable = pgTable("programs", {
   requirements: jsonb("requirements").$type<string[]>().notNull(),
   requiresRegistration: boolean("requires_registration").notNull(),
   questions: jsonb("questions").$type<ProgramQuestionJson[]>().notNull(),
+  /** Shown to applicants as "usually decided within N days" (added 3 Oct 2026). */
+  approvalDays: smallint("approval_days").notNull().default(7),
+  /** Percent of the approved amount taken from the deposit balance on approval (added 3 Oct 2026). */
+  commissionRate: numeric("commission_rate", { precision: 5, scale: 2, mode: "number" }).notNull().default(0),
   changeLog: jsonb("change_log").$type<ProgramChangeJson[]>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),

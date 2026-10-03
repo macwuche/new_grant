@@ -12,7 +12,7 @@ import { ADJUSTMENT_CATEGORIES, staffAdjustBalance, validateAdjustment, type Adj
 import { findApplicant, permissionsOf } from '@workspace/domain/applicants';
 import { auditToCsv } from '@workspace/domain/audit';
 import type { CardHolder } from '@workspace/domain/cards';
-import { DEPOSIT_METHODS } from '@workspace/domain/deposits';
+import { depositMethodName } from '@workspace/domain/deposits';
 import type { AccountPermissions, AdjustmentCategory, AuditEvent, Tier, Transaction } from '@workspace/domain/model';
 import { assessRisk } from '@workspace/domain/risk';
 import { findGrant, computeBalances } from '@workspace/domain/rules';
@@ -479,6 +479,7 @@ function PermissionSwitches({ applicantId, onFlash }: { applicantId: string; onF
     emailNotifications: 'Email copies of notifications. Security notices are always emailed. The applicant can change this in Settings too.',
     cardApplications: 'Off: the applicant can’t create a card or apply for a physical one. Staff can still issue cards.',
     grantApplications: 'Off: the applicant can’t submit new applications. Resubmitting requested changes still works.',
+    clearBalanceForPayouts: 'On: payouts from the grant balance wait until a negative deposit balance (e.g. an unpaid commission) is back at $0 or more. Off: grant payouts never wait for the deposit balance.',
   };
   return <section className="aup-card" aria-labelledby="aup-switches-title" data-testid="section-admin-permission-switches">
     <SectionTitle id="aup-switches-title" icon={<SlidersHorizontal size={17} />} title="Feature toggles" text="Each change takes effect at once, is audited, and the applicant is told." />
@@ -501,7 +502,7 @@ const GROUPS: Record<Group, { label: string; match: (t: Transaction) => boolean 
   deposit: { label: 'Wallet deposit', match: t => t.type === 'Deposit' },
   withdrawal: { label: 'Withdrawal', match: t => t.type === 'Withdrawal' },
   card: { label: 'Card moves and charges', match: t => t.type === 'Card top-up' || t.type === 'Card deduction' || t.type === 'Card fee' },
-  fee: { label: 'Application fee', match: t => t.type === 'Application fee' },
+  fee: { label: 'Commission and fees', match: t => t.type === 'Commission' || t.type === 'Application fee' },
   adjustment: { label: 'Admin balance adjustment', match: t => !!t.category || t.type === 'Grant adjustment' || t.type === 'Deposit adjustment' },
 };
 const TYPE_TEXT: Partial<Record<Transaction['type'], string>> = { Grant: 'Grant disbursed', Deposit: 'Wallet deposit', 'Grant adjustment': 'Admin adjustment · grant', 'Deposit adjustment': 'Admin adjustment · deposit' };
@@ -510,9 +511,9 @@ const STATUS_TONE: Record<Transaction['status'], string> = { Completed: 'good', 
 function channelOf(t: Transaction, channels: { id: string; name: string }[]): string {
   if (t.category) return t.category;
   if (t.type === 'Withdrawal') return t.destination ?? channels.find(c => c.id === t.method)?.name ?? t.method ?? '—';
-  if (t.type === 'Deposit') return `${DEPOSIT_METHODS.find(m => m.id === t.method)?.name ?? t.method ?? '—'}${t.reference ? ` · ${t.reference}` : ''}`;
+  if (t.type === 'Deposit') return `${depositMethodName(t)}${t.reference ? ` · ${t.reference}` : ''}`;
   if (t.type === 'Card top-up' || t.type === 'Card deduction') return t.counterpart === 'none' ? 'Grant team' : `${t.counterpart} balance`;
-  if (t.type === 'Card fee' || t.type === 'Application fee') return 'Deposit balance';
+  if (t.type === 'Card fee' || t.type === 'Application fee' || t.type === 'Commission') return 'Deposit balance';
   if (t.type === 'Grant') return 'Award';
   return '—';
 }

@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdjustmentCategory } from './adjustmentCategory';
+import type { DepositProof } from './depositProof';
 import type { LedgerEntryCounterpart } from './ledgerEntryCounterpart';
 import type { LedgerEntryReleaseApproval } from './ledgerEntryReleaseApproval';
 import type { LedgerEntryStatus } from './ledgerEntryStatus';
 import type { LedgerEntryType } from './ledgerEntryType';
 import type { PayoutBalance } from './payoutBalance';
 import type { PayoutDetail } from './payoutDetail';
+import type { ReceivingDetail } from './receivingDetail';
 
 export interface LedgerEntry {
   id: string;
@@ -39,4 +41,12 @@ export interface LedgerEntry {
   source?: PayoutBalance;
   /** Withdrawals - the method's form as the applicant filled it in */
   payoutDetails?: PayoutDetail[];
+  /** Deposits - the method's receiving details the applicant was given */
+  payTo?: ReceivingDetail[];
+  /** Deposits - the method's form as the applicant filled it in */
+  depositDetails?: PayoutDetail[];
+  /** Deposits - finance can't confirm until proof of payment is uploaded */
+  proofRequired?: boolean;
+  /** Deposits - the receipts or screenshots the applicant uploaded */
+  proof?: DepositProof[];
 }

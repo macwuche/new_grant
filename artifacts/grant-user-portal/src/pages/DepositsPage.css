@@ -219,3 +219,22 @@
   .dp-empty::before { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .dp-spin { animation: none; } .dp-btn, .dp-meter span, .dp-method, .dp-amount { transition: none; } }
+
+/* Deposit methods: where to send the money, proof of payment (30 Sep 2026) */
+.dp-payto { margin-top: 16px; padding: 14px 16px; border: 1.5px solid var(--dp-line); border-radius: 16px; }
+.dp-payto h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; }
+.dp-payto dl { display: grid; gap: 8px; margin: 0; }
+.dp-payto-line { display: grid; gap: 3px; min-width: 0; padding-bottom: 8px; border-bottom: 1px dashed var(--dp-line); }
+.dp-payto-line:last-child { padding-bottom: 0; border-bottom: 0; }
+.dp-payto-line dt { color: var(--dp-muted); font-size: 11px; font-weight: 700; }
+.dp-payto-line dd { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 13.5px; font-weight: 700; }
+.dp-payto-line dd .dp-mono { min-width: 0; overflow-wrap: anywhere; }
+.dp-muted-note { color: var(--dp-muted); font-size: 11px; font-weight: 500; }
+.dp-proof { display: grid; gap: 6px; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: #f8fafc; }
+.dp-proof-head h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.dp-proof-head p { margin: 3px 0 0; color: var(--dp-muted); font-size: 12px; line-height: 1.5; }
+.dp-proof > .dp-btn { justify-self: start; }
+.dp-optional { color: var(--dp-muted); font-size: 11.5px; font-weight: 500; }
+.dp-reason-warn { color: #b45309; font-weight: 700; }
+.dp-reason svg { vertical-align: -1px; }
+.wd-answer-left { overflow-wrap: anywhere; }

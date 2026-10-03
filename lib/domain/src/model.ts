@@ -8,8 +8,12 @@ export type ProgramStatus = 'Draft' | 'Open' | 'Closed';
 
 export type ProgramChange = { at: string; by: string; summary: string };
 
-export type QuestionType = 'text' | 'number' | 'yesno';
-/** A program-specific question applicants answer (configured by staff). */
+export type QuestionType = 'text' | 'textarea' | 'number' | 'yesno' | 'file';
+/**
+ * One field of a program's application form (configured by staff). A 'file'
+ * field is answered by uploading documents (signed in only; the API checks a
+ * required one has a file at submission), never by a typed answer.
+ */
 export type ProgramQuestion = { id: string; label: string; type: QuestionType; required: boolean };
 
 export type Grant = {
@@ -30,8 +34,12 @@ export type Grant = {
   requirements: string[];
   /** Whether a business/organization registration number is mandatory. */
   requiresRegistration: boolean;
-  /** Extra questions applicants answer; locked once anyone submits. */
+  /** The application form's fields (staff-built); locked once anyone submits. */
   questions: ProgramQuestion[];
+  /** Shown to applicants as "usually decided within N days". Nothing is automated from it. */
+  approvalDays: number;
+  /** Percent (0–100) of the approved amount taken from the deposit balance on approval. */
+  commissionRate: number;
   /** Record version for stale-write checks. */
   updatedAt: string;
   /** Who changed what, newest last. */
@@ -39,7 +47,7 @@ export type Grant = {
 };
 
 /** Fields a program manager edits directly. */
-export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration' | 'questions'>;
+export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration' | 'questions' | 'approvalDays' | 'commissionRate'>;
 
 /** In-app message for an applicant. Created by review and payout rules. */
 export type Notification = {
@@ -79,6 +87,8 @@ export type Application = {
   checklist: string[];
   /** Answers to the program's questions, keyed by question id. */
   answers: Record<string, string>;
+  /** The program's commission rate when the application was submitted (null until then); used on approval. */
+  commissionRate: number | null;
   createdAt: string;
   /** Doubles as the record version for stale-write checks. */
   updatedAt: string;
@@ -92,7 +102,8 @@ export type Application = {
 
 export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
 
-export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Card top-up' | 'Card deduction' | 'Grant adjustment' | 'Deposit adjustment';
+/** 'Application fee' is historical (the global fee was removed on 3 Oct 2026); 'Commission' is taken on approval. */
+export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Commission' | 'Card top-up' | 'Card deduction' | 'Grant adjustment' | 'Deposit adjustment';
 /** Why staff adjusted a balance by hand (see ./adjustments.ts). */
 export type AdjustmentCategory = 'Grant adjustment' | 'Deposit manual override' | 'Card fee refund' | 'Correction' | 'Fraud freeze';
 /** Card top-ups and deductions: the balance on the other side of the move, or 'none' when staff add or remove money outright. */
@@ -110,7 +121,7 @@ export type Transaction = {
   createdAt: string;
   /** Withdrawals: channel id; deposits: deposit method id. */
   method?: string;
-  /** Withdrawals only: processing fee taken from the amount, and where it goes. */
+  /** Withdrawals: processing fee taken from the amount. Deposits: the method's charge, taken from what's credited. */
   fee?: number;
   destination?: string;
   /** Withdrawals only: the balance the money comes from (older requests: the grant balance). */
@@ -119,14 +130,22 @@ export type Transaction = {
   payoutDetails?: PayoutDetail[];
   /** Deposits only: reference the applicant quotes when sending money. */
   reference?: string;
+  /** Deposits only: where the applicant was told to send the money (the method's receiving details at request time). */
+  payTo?: ReceivingDetail[];
+  /** Deposits only: the method's form as the applicant filled it in (e.g. the sender's name or a transaction hash). */
+  depositDetails?: PayoutDetail[];
+  /** Deposits only: finance can't confirm until proof of payment is uploaded (the method's rule at request time). */
+  proofRequired?: boolean;
+  /** Deposits only: receipts or screenshots the applicant uploaded. */
+  proof?: DepositProof[];
   /** Deposits and withdrawals: set when finance confirms/rejects, or the applicant cancels. */
   processedAt?: string;
   processedBy?: string;
   /** Shown to the applicant when a payout or deposit fails. */
   failureReason?: string;
-  /** Withdrawals only: needs a second staff sign-off before it can be paid (set at request time). */
+  /** Needs a second staff sign-off before a withdrawal can be paid or a deposit confirmed (set at request time). */
   dualControl?: boolean;
-  /** Withdrawals only: the second sign-off, by someone other than whoever marks it paid. */
+  /** The second sign-off, by someone other than whoever marks the withdrawal paid or confirms the deposit. */
   releaseApproval?: { by: string; at: string; /** Server records only: the approver's staff id, compared instead of the name. */ byId?: string };
   /** Card top-ups and deductions only (see CardCounterpart). */
   counterpart?: CardCounterpart;
@@ -192,29 +211,71 @@ export type PayoutChannel = {
 };
 export type WithdrawalMethod = PayoutChannel;
 
-export type DepositMethodId = 'bank' | 'mobile';
+/** A deposit method's id (the built-in methods are 'bank', 'mobile', and 'crypto'). */
+export type DepositMethodId = string;
+
+/** One line of where applicants send a deposit, e.g. "Account number" → "0123456789". Applicants can copy each value. */
+export type ReceivingDetail = { label: string; value: string };
+
+/** Whether applicants upload proof of payment (a receipt or screenshot) for a deposit. */
+export type ProofRule = 'required' | 'optional' | 'off';
+
+/**
+ * A receipt or screenshot for a deposit. Signed in, the file is on the API
+ * server's disk under `<applicant id>/<id>`; in the browser-only preview it's
+ * kept as a small data: URL (`previewUrl`).
+ */
+export type DepositProof = { id: string; fileName: string; contentType: string; sizeBytes: number; sha256: string; uploadedAt: string; previewUrl?: string };
+
+/** A deposit method finance manages: where to send the money, limits, charges, proof, and a form. */
+export type DepositMethod = {
+  id: DepositMethodId;
+  name: string;
+  /** Shown to applicants on /deposits. */
+  enabled: boolean;
+  /** Per-deposit limits (USD). */
+  min: number;
+  max: number;
+  /** Charge = min(feeFixed + amount × feeRate, feeCap), taken from what's credited. */
+  feeRate: number;
+  feeFixed: number;
+  feeCap: number;
+  /** e.g. "Usually 1–2 business days". */
+  processingTime: string;
+  /** Shown to the applicant with the receiving details. */
+  instructions: string;
+  /** An https link, an uploaded photo's API path, a data: URL (preview mode only), or '' for the first-letter badge. */
+  photoUrl: string;
+  photoFile?: MethodPhotoFile;
+  /** Where applicants send the money. */
+  receivingDetails: ReceivingDetail[];
+  proof: ProofRule;
+  /** The form's name, e.g. "Sender details"; '' when there are no fields. */
+  formTitle: string;
+  fields: MethodField[];
+};
 
 /** Money settings managed by finance. */
 export type Treasury = {
   channels: PayoutChannel[];
   physicalCardFee: number;
   cardDeliveryFee: number;
-  minDeposit: number;
-  maxDeposit: number;
+  /** Deposit methods (./depositMethods); per-deposit limits are set on each method. */
+  depositMethods: DepositMethod[];
   /** Deposit balance applicants must keep to request a card or a payout. */
   depositThreshold: number;
   /** Deposits at or above this amount are flagged in the staff feed. */
   highValueDeposit: number;
   /** Payouts at or above this amount need two different staff members (release approval + paid). */
   dualControlThreshold: number;
-  /** Charged to the deposit balance on first submission of an application; 0 for none. */
-  applicationFee: number;
+  /** Deposits at or above this amount need two different staff members (approval + confirmation); 0 for never. */
+  depositDualControlThreshold: number;
   updatedAt: string;
   changeLog: ProgramChange[];
 };
 
-/** Money settings as finance edits them on Settings → Money; methods are managed on their own (./withdrawalMethods). */
-export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog' | 'channels'>;
+/** Money settings as finance edits them on Settings → Money; methods are managed on their own (./withdrawalMethods, ./depositMethods). */
+export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog' | 'channels' | 'depositMethods'>;
 
 /** Staff activity feed entry (shared by the demo staff team). */
 export type StaffEvent = {
@@ -304,6 +365,8 @@ export type AccountPermissions = {
   cardApplications: boolean;
   /** The applicant may submit new grant applications (resubmitting after requested changes stays allowed). */
   grantApplications: boolean;
+  /** Grant payouts wait until a negative deposit balance (e.g. an unpaid commission) is cleared. Off: they never wait. */
+  clearBalanceForPayouts: boolean;
 };
 
 /** Which balances an applicant may move onto their card themselves (staff can use either). */

@@ -221,7 +221,7 @@ describe("initial super admin", () => {
 const newProgram = (overrides: Record<string, unknown> = {}) => ({
   name: "Rural Makers", summary: "Tools and training for rural workshops.", focus: "Rural makers",
   maxFunding: 5000, minimumRequest: 500, budget: 50000, deadline: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
-  minimumTier: 1, requirements: ["Workshop photos"], requiresRegistration: false, questions: [], ...overrides,
+  minimumTier: 1, requirements: ["Workshop photos"], requiresRegistration: false, questions: [], approvalDays: 7, commissionRate: 0, ...overrides,
 });
 const post = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "POST", body: JSON.stringify(body) });
 const put = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "PUT", body: JSON.stringify(body) });
@@ -386,7 +386,7 @@ describe("account controls and identity checks", () => {
 
   it("starts every applicant active, unverified, and at Tier 1", async () => {
     expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" },
-      permissions: { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true } });
+      permissions: { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false } });
   });
 
   it("keeps only the last four characters of the document number", async () => {
@@ -605,7 +605,7 @@ describe("applications and review", () => {
     await verify("tok-maya", MAYA);
     await verify("tok-applicant", ALEX);
     const deadline = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-    const created = await json(await post("/programs", { name: "Tight Budget", summary: "A program with room for one award.", focus: "Testing", maxFunding: 6000, minimumRequest: 100, budget: 10000, deadline, minimumTier: 1, requirements: ["A plan"], requiresRegistration: false, questions: [] }));
+    const created = await json(await post("/programs", { name: "Tight Budget", summary: "A program with room for one award.", focus: "Testing", maxFunding: 6000, minimumRequest: 100, budget: 10000, deadline, minimumTier: 1, requirements: ["A plan"], requiresRegistration: false, questions: [], approvalDays: 5, commissionRate: 0 }));
     await post(`/programs/${created.program.id}/publish`, { version: created.program.updatedAt });
     const input = { ...creative, requestedAmount: 6000, checklist: ["A plan"] };
     const a = (await json(await submit({ grantId: created.program.id, application: input }))).application;
@@ -622,7 +622,7 @@ describe("applications and review", () => {
     await applications.withProgram("creative", async scope => scope.saveApplication({
       id: "APP-9001", applicantId: USERS["tok-super"]!.id, grantId: "creative", status: "Submitted", ...creative,
       createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z", submittedAt: "2026-09-01T00:00:00.000Z",
-      reviewer: null, awardedAmount: null, history: [], internalNotes: [], escalation: null,
+      reviewer: null, awardedAmount: null, commissionRate: 5, history: [], internalNotes: [], escalation: null,
     }));
     const res = await decide("APP-9001", "start-review", { version: "2026-09-01T00:00:00.000Z" });
     expect(res.status).toBe(403);
@@ -809,20 +809,32 @@ describe("money", () => {
     expect((await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action)).toEqual(expect.arrayContaining(["Start system lockdown", "End system lockdown", "Mark payout failed"]));
   });
 
-  it("lets finance change settings with a version check, and charges the application fee from deposits", async () => {
+  it("lets finance change settings with a version check, and has no application fee any more", async () => {
     const settings = await json(await call("/money/settings", "tok-finance"));
     const { updatedAt, changeLog: _log, ...treasury } = settings.treasury;
-    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-applicant")).status).toBe(403);
-    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-finance")).status).toBe(200);
-    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 20 } }, "tok-finance")).status).toBe(409);
+    expect(treasury).not.toHaveProperty("applicationFee");
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, physicalCardFee: 10 } }, "tok-applicant")).status).toBe(403);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, applicationFee: 10 } }, "tok-finance")).status).toBe(400);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, physicalCardFee: 10 } }, "tok-finance")).status).toBe(200);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, physicalCardFee: 20 } }, "tok-finance")).status).toBe(409);
+  });
+
+  it("charges nothing at submission, then takes the plan's commission from the deposit balance on approval, below zero if need be", async () => {
     await call("/profile", "tok-maya");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
-    expect((await json(await submitApp({ grantId: "creative", application: input }, "tok-maya"))).error).toMatch(/application fee/);
-    const d = (await json(await deposit(50))).money.transactions[0];
-    await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
-    expect((await submitApp({ grantId: "creative", application: input }, "tok-maya")).status).toBe(200);
-    expect((await mine()).transactions.find((t: { type: string }) => t.type === "Application fee")).toMatchObject({ amount: -10, id: expect.stringMatching(/^TX-\d+$/) });
+    const { application } = await json(await submitApp({ grantId: "creative", application: input }, "tok-maya"));
+    expect(application.commissionRate).toBe(5);
+    expect((await mine()).transactions).toEqual([]);
+    const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
+    const approved = await json(await post(`/applications/${application.id}/approve`, { version: v, award: 3000 }));
+    expect(approved.message).toMatch(/\$150\.00 commission taken from their deposit balance/);
+    const m = await mine();
+    expect(m.transactions.map((t: { type: string; amount: number }) => [t.type, t.amount]).sort()).toEqual([["Commission", -150], ["Grant", 3000]]);
+    expect(new Set(m.transactions.map((t: { id: string }) => t.id)).size).toBe(2);
+    expect(m.transactions.every((t: { id: string }) => /^TX-\d+$/.test(t.id))).toBe(true);
+    const notes = await json(await call("/notifications", "tok-maya"));
+    expect(notes.some((n: { body: string }) => /5% commission \(\$150\.00\) has been taken from your deposit balance/.test(n.body))).toBe(true);
   });
 
   describe("cards", () => {
@@ -1073,7 +1085,7 @@ describe("withdrawal methods", () => {
   });
 
   it("takes requests with the method's form and the chosen balance, remembers the answers, and shows finance every answer", async () => {
-    await fund(3000, 200);
+    await fund(3000, 350); // creative takes a 5% commission on approval: $150 of the $350 deposit
     await create();
     const missing = await json(await withdraw({ amount: 100, channel: "paypal", source: "grant", details: {} }));
     expect(missing.fieldErrors).toEqual({ "details.paypal-email": "PayPal email is required.", "details.account-type": "Account type is required." });
@@ -1092,9 +1104,168 @@ describe("withdrawal methods", () => {
     expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
   });
 
+  it("pays grant payouts while a commission leaves the deposit balance negative, unless staff switch on clearing it first", async () => {
+    const BANK = { "bank-name": "Meridian Bank", "account-name": "Maya Okafor", "account-number": "123456789" };
+    const grantPayout = () => withdraw({ amount: 100, channel: "bank", details: BANK });
+    await fund(4000, 50); // creative takes 5% = $200 on approval, so the deposit balance ends below zero
+    const balance = async () => {
+      const txs = (await json(await call("/money/mine", "tok-maya"))).transactions as { type: string; amount: number; status: string; fee?: number }[];
+      return txs.reduce((sum, t) => sum + (t.type === "Commission" ? t.amount : t.type === "Deposit" && t.status === "Completed" ? t.amount - (t.fee ?? 0) : 0), 0);
+    };
+    expect(await balance()).toBeLessThan(0);
+    expect((await grantPayout()).status).toBe(200);
+    expect((await post(`/applicants/${MAYA}/permissions`, { key: "clearBalanceForPayouts", value: true }, "tok-finance")).status).toBe(403);
+    const switched = await post(`/applicants/${MAYA}/permissions`, { key: "clearBalanceForPayouts", value: true });
+    expect(switched.status).toBe(200);
+    expect((await json(switched)).applicant.profile.account.permissions.clearBalanceForPayouts).toBe(true);
+    const held = await grantPayout();
+    expect(held.status).toBe(400);
+    expect((await json(held)).error).toMatch(/Add funds to bring it back to \$0\.00/);
+    const d = (await json(await post("/money/deposits", { amount: 500, method: "bank" }, "tok-maya"))).money.transactions.find((t: { type: string; status: string }) => t.type === "Deposit" && t.status === "Pending");
+    await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance");
+    expect(await balance()).toBeGreaterThanOrEqual(0);
+    expect((await grantPayout()).status).toBe(200);
+  });
+
   it("has no payout-destination endpoints any more", async () => {
     await call("/profile", "tok-maya");
     expect((await post("/money/destinations", { channel: "bank", primary: "Meridian Bank", secondary: "123456789" }, "tok-maya")).status).toBe(404);
+  });
+});
+
+describe("deposit methods and proof of payment", () => {
+  const settings = async (token = "tok-finance") => json(await call("/money/settings", token));
+  const version = async () => (await settings()).treasury.updatedAt as string;
+  const paypal = (patch: Record<string, unknown> = {}) => ({
+    name: "PayPal", enabled: true, min: 20, max: 1500, feeRate: 0.02, feeFixed: 1, feeCap: 0, processingTime: "Within 24 hours",
+    instructions: "Send as friends and family.", photoUrl: "", receivingDetails: [{ label: "PayPal email", value: "funds@example.org" }], proof: "required",
+    formTitle: "Sender details", fields: [{ label: "Your PayPal email", type: "email", required: true, placeholder: "", help: "", options: [] }],
+    ...patch,
+  });
+  const create = async (patch: Record<string, unknown> = {}, token = "tok-finance") => post("/money/deposit-methods", { version: await version(), method: paypal(patch) }, token);
+  const deposit = (body: Record<string, unknown>) => post("/money/deposits", body, "tok-maya");
+  const pendingDeposit = (res: { money: { transactions: { type: string; status: string }[] } }) => res.money.transactions.find(t => t.type === "Deposit" && t.status === "Pending") as unknown as Record<string, unknown> & { id: string };
+  const uploadProof = (id: string, bytes: Buffer, token = "tok-maya", name = "receipt.png") =>
+    fetch(`${base}/money/deposits/${id}/proof`, { method: "PUT", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream", "x-file-name": encodeURIComponent(name) } });
+  const uploadPhoto = (id: string, bytes: Buffer, token = "tok-finance") => fetch(`${base}/money/deposit-methods/${id}/photo`, { method: "PUT", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
+  const ANSWERS = { "your-paypal-email": "maya@example.com" };
+
+  it("starts with bank, mobile money, and a hidden USDT method; applicants see only the available ones", async () => {
+    expect((await settings()).treasury.depositMethods.map((m: { id: string; enabled: boolean }) => [m.id, m.enabled])).toEqual([["bank", true], ["mobile", true], ["crypto", false]]);
+    await call("/profile", "tok-maya");
+    const mine = await json(await call("/money/mine", "tok-maya"));
+    expect(mine.treasury.depositMethods.map((m: { id: string }) => m.id)).toEqual(["bank", "mobile"]);
+    expect((await json(await deposit({ amount: 100, method: "crypto" }))).error).toMatch(/available deposit method/);
+  });
+
+  it("lets finance add, edit, hide, and delete methods with version checks; others get 403", async () => {
+    const res = await create();
+    expect(res.status).toBe(200);
+    expect((await json(res)).settings.treasury.changeLog.at(-1)).toMatchObject({ by: "Jordan Lee", summary: "Added deposit method PayPal." });
+    await call("/profile", "tok-maya");
+    expect((await create({ name: "Skrill" }, "tok-maya")).status).toBe(403);
+    expect((await create({ name: "Skrill" }, "tok-riley")).status).toBe(403);
+    expect((await post("/money/deposit-methods", { version: "2020-01-01T00:00:00.000Z", method: paypal({ name: "Skrill" }) }, "tok-finance")).status).toBe(409);
+    const bad = await json(await create({ name: "Skrill", receivingDetails: [] }));
+    expect(bad.fieldErrors).toMatchObject({ receivingDetails: expect.stringMatching(/at least one line/) });
+    expect((await put("/money/deposit-methods/paypal", { version: await version(), method: paypal({ max: 2000 }) }, "tok-finance")).status).toBe(200);
+    expect((await settings()).treasury.changeLog.at(-1).summary).toBe("Deposit method PayPal: limits.");
+    expect((await put("/money/deposit-methods/nope", { version: await version(), method: paypal() }, "tok-finance")).status).toBe(404);
+    expect((await post("/money/deposit-methods/paypal/availability", { enabled: false }, "tok-finance")).status).toBe(200);
+    expect((await json(await call("/money/mine", "tok-maya"))).treasury.depositMethods.map((m: { id: string }) => m.id)).not.toContain("paypal");
+    expect((await post("/money/deposit-methods/paypal/delete", {}, "tok-finance")).status).toBe(200);
+    expect((await post("/money/deposit-methods/paypal/delete", {}, "tok-finance")).status).toBe(404);
+  });
+
+  it("stores method photos on the server and serves them publicly", async () => {
+    await create();
+    expect((await uploadPhoto("paypal", Buffer.from("not an image"))).status).toBe(415);
+    expect((await uploadPhoto("paypal", PNG)).status).toBe(200);
+    const url = (await settings()).treasury.depositMethods.find((m: { id: string }) => m.id === "paypal").photoUrl as string;
+    expect(url).toMatch(/^\/api\/deposit-methods\/paypal\/photo\?v=[0-9a-f]{12}$/);
+    expect(JSON.stringify(await settings())).not.toContain("photoFile");
+    const served = await fetch(`${base}${url.replace(/^\/api/, "")}`);
+    expect([served.status, served.headers.get("content-type")]).toEqual([200, "image/png"]);
+    // The withdrawal photo route doesn't serve deposit method photos.
+    expect((await fetch(`${base}/withdrawal-methods/paypal/photo`)).status).toBe(404);
+    expect((await post("/money/deposit-methods/paypal/delete", {}, "tok-finance")).status).toBe(200);
+    expect(files.files.size).toBe(0);
+  });
+
+  it("takes deposits with the method's form and receiving details, and credits the amount less the charge", async () => {
+    await create({ proof: "optional" });
+    await call("/profile", "tok-maya");
+    expect((await json(await deposit({ amount: 100, method: "paypal", details: {} }))).fieldErrors).toEqual({ "details.your-paypal-email": "Your PayPal email is required." });
+    const d = pendingDeposit(await json(await deposit({ amount: 100, method: "paypal", details: ANSWERS })));
+    expect(d).toMatchObject({ amount: 100, fee: 3, payTo: [{ label: "PayPal email", value: "funds@example.org" }], depositDetails: [{ fieldId: "your-paypal-email", value: "maya@example.com" }] });
+    const ledger = await json(await call("/money/ledger", "tok-finance"));
+    expect(ledger.find((t: { id: string }) => t.id === d.id).depositDetails).toEqual(d.depositDetails);
+    const confirmed = await json(await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance"));
+    expect(confirmed.message).toMatch(/\$97\.00 credited/);
+    expect((await json(await call("/notifications", "tok-maya")))[0].body).toMatch(/\$97\.00 .* after the \$3\.00 charge/);
+  });
+
+  it("keeps proof of payment on the server: the owner uploads and removes it, finance opens it (audited), and confirming waits for it", async () => {
+    await create();
+    await call("/profile", "tok-maya");
+    await call("/profile", "tok-applicant");
+    const d = pendingDeposit(await json(await deposit({ amount: 100, method: "paypal", details: ANSWERS })));
+    expect(d.proofRequired).toBe(true);
+    expect((await json(await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance"))).error).toMatch(/needs proof of payment/);
+
+    expect((await uploadProof(d.id, Buffer.from("<html>"))).status).toBe(415);
+    expect((await uploadProof(d.id, Buffer.alloc(0))).status).toBe(400);
+    expect((await uploadProof(d.id, PNG, "tok-applicant")).status).toBe(404);
+    expect((await uploadProof(d.id, Buffer.concat([PDF, Buffer.alloc(10 * 1024 * 1024)]))).status).toBe(413);
+    const up = await uploadProof(d.id, PNG, "tok-maya", "my receipt.png");
+    expect(up.status).toBe(200);
+    const saved = await json(up);
+    const proof = saved.money.transactions.find((t: { id: string }) => t.id === d.id).proof[0];
+    expect(proof).toMatchObject({ id: saved.id, fileName: "my receipt.png", contentType: "image/png", sizeBytes: PNG.length });
+    expect(files.files.has(`${USERS["tok-maya"]!.id}/${proof.id}`)).toBe(true);
+
+    const open = (token: string) => call(`/money/deposits/${d.id}/proof/${proof.id}`, token);
+    const own = await open("tok-maya");
+    expect([own.status, Buffer.from(await own.arrayBuffer()).equals(PNG)]).toEqual([200, true]);
+    expect((await open("tok-applicant")).status).toBe(404);
+    expect((await open("tok-finance")).status).toBe(200);
+    const [view] = (await json(await call("/audit", "tok-super"))).events;
+    expect(view).toMatchObject({ action: "View deposit proof", target: d.id, applicantId: USERS["tok-maya"]!.id, staffName: "Jordan Lee" });
+    expect(view.summary).toContain("my receipt.png");
+
+    const second = await json(await uploadProof(d.id, JPEG, "tok-maya", "photo.jpg"));
+    expect((await post(`/money/deposits/${d.id}/proof/${second.id}/delete`, {}, "tok-applicant")).status).toBe(404);
+    expect((await post(`/money/deposits/${d.id}/proof/${second.id}/delete`, {}, "tok-maya")).status).toBe(200);
+    expect(files.files.has(`${USERS["tok-maya"]!.id}/${second.id}`)).toBe(false);
+
+    files.files.set(`${USERS["tok-maya"]!.id}/${proof.id}`, Buffer.from("changed on disk"));
+    expect((await open("tok-maya")).status).toBe(500);
+    files.files.set(`${USERS["tok-maya"]!.id}/${proof.id}`, PNG);
+    expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance")).status).toBe(200);
+    expect((await uploadProof(d.id, PNG)).status).toBe(400);
+  });
+
+  it("needs two different staff members for large deposits, compared by id", async () => {
+    await call("/profile", "tok-maya");
+    const d = pendingDeposit(await json(await deposit({ amount: 3000, method: "bank" })));
+    expect(d.dualControl).toBe(true);
+    expect((await json(await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance"))).error).toMatch(/approval from a second staff member/);
+    expect((await post(`/money/deposits/${d.id}/release`, {}, "tok-finance")).status).toBe(403);
+    expect((await post(`/money/deposits/${d.id}/release`, {})).status).toBe(200);
+    const ledger = await json(await call("/money/ledger", "tok-finance"));
+    expect(ledger.find((t: { id: string }) => t.id === d.id).releaseApproval).toMatchObject({ by: "Sam Rivera", byId: SEED[0]!.id });
+    expect((await json(await post(`/money/deposits/${d.id}/confirm`, {}))).error).toMatch(/different staff member must confirm/);
+    expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-finance")).status).toBe(200);
+  });
+
+  it("drops the old deposit limits from the money settings and adds the deposit two-person threshold", async () => {
+    const t = (await settings()).treasury;
+    expect(t).not.toHaveProperty("minDeposit");
+    expect(t.depositDualControlThreshold).toBe(2500);
+    const { channels: _c, depositMethods: _d, updatedAt, changeLog: _l, ...rest } = t;
+    const res = await put("/money/settings", { version: updatedAt, treasury: { ...rest, depositDualControlThreshold: 0 } }, "tok-finance");
+    expect(res.status).toBe(200);
+    expect((await settings()).treasury.depositDualControlThreshold).toBe(0);
   });
 });
 
@@ -1115,6 +1286,58 @@ describe("documents", () => {
     const res = await upload("tok-maya", "purpose=identity", PNG, "../../etc/passport.pdf");
     expect(res.status).toBe(201);
     expect(await json(res)).toMatchObject({ purpose: "identity", contentType: "image/png", fileName: "passport.pdf", sizeBytes: PNG.length });
+    expect(files.files.size).toBe(1);
+  });
+
+  it("takes files for a plan's form fields and needs one for each required file field before submitting", async () => {
+    await call("/profile", "tok-maya");
+    await upload("tok-maya", "purpose=identity");
+    await post("/profile/identity", identity, "tok-maya");
+    await post(`/applicants/${MAYA}/identity/approve`, {});
+    const questions = [
+      { id: "", label: "Bank statement", type: "file", required: true },
+      { id: "", label: "Extra document", type: "file", required: false },
+      { id: "", label: "Tell us about your team", type: "textarea", required: true },
+    ];
+    const created = await json(await post("/programs", newProgram({ name: "Form Plan", requirements: [], questions, commissionRate: 2.5, approvalDays: 10 })));
+    expect(created.program).toMatchObject({ approvalDays: 10, commissionRate: 2.5, questions: [{ id: "bank-statement", type: "file" }, { id: "extra-document" }, { id: "tell-us-about-your-team", type: "textarea" }] });
+    await post(`/programs/${created.program.id}/publish`, { version: created.program.updatedAt });
+    const application = { ...input, requestedAmount: 1000, checklist: [], answers: { "tell-us-about-your-team": "Two potters and an apprentice.", "bank-statement": "typed answers to file fields are dropped" } };
+    const draft = (await json(await post("/applications/save", { grantId: created.program.id, application }, "tok-maya"))).application;
+    expect(draft.answers).toEqual({ "tell-us-about-your-team": "Two potters and an apprentice." });
+    const submit = () => post("/applications/submit", { grantId: created.program.id, draftId: draft.id, application }, "tok-maya");
+    const missing = await submit();
+    expect(missing.status).toBe(400);
+    expect((await json(missing)).error).toBe("Upload a file for: Bank statement.");
+    expect((await upload("tok-maya", `purpose=application&applicationId=${draft.id}&requirement=field:nope`)).status).toBe(400);
+    expect((await upload("tok-maya", `purpose=application&applicationId=${draft.id}&requirement=${encodeURIComponent("field:bank-statement")}`)).status).toBe(201);
+    const ok = await submit();
+    expect(ok.status).toBe(200);
+    expect((await json(ok)).application.commissionRate).toBe(2.5);
+  });
+
+  it("refuses files carrying scripts, programs, hidden archives, or PDF actions", async () => {
+    await call("/profile", "tok-maya");
+    const { deflateSync } = await import("node:zlib");
+    const compressed = deflateSync(Buffer.from("<< /Type /Action /S /JavaScript /JS (app.alert(1)) >>"));
+    const cases: [Buffer, RegExp][] = [
+      [Buffer.from("%PDF-1.7\n1 0 obj << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\n"), /JavaScript/],
+      [Buffer.from("%PDF-1.7\n1 0 obj << /S /J#61vaScript >> endobj\n"), /JavaScript/],
+      [Buffer.concat([Buffer.from("%PDF-1.7\n1 0 obj << /Filter /FlateDecode >>\nstream\n"), compressed, Buffer.from("\nendstream\nendobj\n")]), /JavaScript/],
+      [Buffer.from("%PDF-1.7\n1 0 obj << /Type /Filespec /EF << /F 2 0 R >> /EmbeddedFile >> endobj\n"), /embedded file/],
+      [Buffer.from("%PDF-1.7\ntrailer << /Encrypt 5 0 R >>\n"), /password-protected or encrypted/],
+      [Buffer.concat([PNG, Buffer.from("<script>alert(1)</script>")]), /script/],
+      [Buffer.concat([PNG, Buffer.from("<?php system($_GET['c']); ?>")]), /PHP/],
+      [Buffer.concat([PNG, Buffer.from("PK\x03\x04payloadPK\x05\x06", "latin1")]), /hidden archive/],
+      [Buffer.concat([PDF, Buffer.from("MZ This program cannot be run in DOS mode")]), /Windows program/],
+    ];
+    for (const [bytes, reason] of cases) {
+      const res = await upload("tok-maya", "purpose=identity", bytes);
+      expect(res.status).toBe(422);
+      expect((await json(res)).error).toMatch(reason);
+    }
+    // A PDF that quotes markup as text is fine; so is a plain one.
+    expect((await upload("tok-maya", "purpose=identity", Buffer.from("%PDF-1.7\n(<script> is an HTML tag) Tj\n"))).status).toBe(201);
     expect(files.files.size).toBe(1);
   });
 

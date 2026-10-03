@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DepositMethod } from './depositMethod';
 import type { ProgramChange } from './programChange';
 import type { TreasuryInput } from './treasuryInput';
 import type { WithdrawalMethod } from './withdrawalMethod';
@@ -12,6 +13,8 @@ import type { WithdrawalMethod } from './withdrawalMethod';
 export type Treasury = TreasuryInput & {
   /** Withdrawal methods; applicants get only the available ones */
   channels: WithdrawalMethod[];
+  /** Deposit methods; applicants get only the available ones */
+  depositMethods: DepositMethod[];
   updatedAt: string;
   /** Staff only; empty for applicants */
   changeLog: ProgramChange[];

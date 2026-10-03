@@ -1,7 +1,7 @@
 import type { ChannelId, DemoState, PayoutBalance, PayoutChannel, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { alertIfHighRisk, logStaff } from './activity';
-import { accountLockReason, patchAccount, permissionBlocker } from './applicants';
+import { accountLockReason, patchAccount, permissionBlocker, permissionsOf } from './applicants';
 import { computeBalances, ownTransactions } from './rules';
 import { notify } from './notifications';
 import { lockdownMessage } from './security';
@@ -25,10 +25,20 @@ export const findChannel = (state: DemoState, id: string) => state.treasury.chan
 export function payoutBlocker(state: DemoState): string | null {
   const locked = accountLockReason(state) ?? lockdownMessage(state) ?? permissionBlocker(state, 'payout');
   if (locked) return locked;
-  const { deposit } = computeBalances(ownTransactions(state));
   if (!enabledChannels(state).length) return 'Payouts are temporarily unavailable: no withdrawal method is available.';
-  if (deposit < state.treasury.depositThreshold) return `Keep at least ${usd(state.treasury.depositThreshold)} in your deposit balance to request payouts (you have ${usd(deposit)}).`;
   return null;
+}
+
+/**
+ * Why grant payouts are on hold, or null. By default they never are, even with
+ * a negative deposit balance (e.g. an unpaid commission); staff can switch on
+ * "clear a negative deposit balance first" per applicant. (Grant payouts don't
+ * need the deposit reserve; payouts from the deposit balance keep it.)
+ */
+export function grantPayoutHold(state: DemoState): string | null {
+  if (!permissionsOf(state).clearBalanceForPayouts) return null;
+  const { deposit } = computeBalances(ownTransactions(state));
+  return deposit < 0 ? `Your deposit balance is ${usd(deposit)}. Add funds to bring it back to ${usd(0)} or more before requesting a payout from your grant balance.` : null;
 }
 
 /** How much the applicant can request from a balance: the grant balance, or the deposit balance above the reserve. */
@@ -61,6 +71,8 @@ export function validateWithdrawal(state: DemoState, amount: number, channelId: 
   if (blocker) return blocker;
   const chosen = balanceFor(channel, source);
   if ('error' in chosen) return chosen.error;
+  const held = chosen.balance === 'grant' ? grantPayoutHold(state) : null;
+  if (held) return held;
   if (!Number.isFinite(amount) || amount <= 0) return 'Enter an amount to withdraw.';
   if (roundCents(amount) !== amount) return 'Use at most two decimal places.';
   if (amount < channel.min) return `The minimum for ${channel.name} is ${usd(channel.min)}.`;

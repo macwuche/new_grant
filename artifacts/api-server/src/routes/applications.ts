@@ -28,10 +28,9 @@ import { ownProfile } from "./profile";
 // and stores exactly the applications the rule changed.
 //
 // The notifications and staff activity items the rules create, an audit entry
-// for each staff action, and the ledger entries (the application fee on first
-// submission, the award credit on approval) are stored in the same transaction.
-// Applicant actions also hold the applicant's money lock, so the fee is checked
-// against a balance nothing else can change meanwhile.
+// for each staff action, and the ledger entries (on approval, the award credit
+// and the commission, which may take the deposit balance below zero) are
+// stored in the same transaction.
 
 const STALE = "This application changed since you opened it. Review the latest version and try again.";
 
@@ -82,10 +81,11 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
       if (!body.success) { res.status(400).json({ error: "Send the program id and your application." }); return; }
       const { grantId, draftId, application } = body.data;
       if (path === "save") { await asApplicant(res, grantId, !draftId, s => saveDraft(s, grantId, application as ApplicationInput, new Date(), draftId)); return; }
-      // Server-only rule: every requirement needs an uploaded file, attached to the saved draft.
+      // Server-only rule: every requirement and required file field needs an uploaded file, attached to the saved draft.
       const evidence = draftId ? (await documents.listForApplication(draftId)).filter(d => d.ownerId === authLocals(res).user.id) : [];
       await asApplicant(res, grantId, !draftId, s => {
-        const missing = missingEvidence(s.grants.find(g => g.id === grantId)?.requirements ?? [], evidence);
+        const grant = s.grants.find(g => g.id === grantId);
+        const missing = grant ? missingEvidence(grant, evidence) : [];
         if (missing.length) return { ok: false, error: draftId ? `Upload a file for: ${missing.join(", ")}.` : "Save your application as a draft and upload a file for each requirement first.", fieldErrors: { checklist: `Upload a file for: ${missing.join(", ")}.` } };
         return submitApplication(s, grantId, application as ApplicationInput, new Date(), draftId);
       });

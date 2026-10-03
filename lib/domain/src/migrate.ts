@@ -1,6 +1,6 @@
 import type { DemoState } from './model';
 import { createSeedState, CURRENT_APPLICANT_ID, seedAccounts, seedGrants, seedSavedPayoutDetails, seedStaff, seedTreasury } from './seed';
-import { normalizeTreasury } from './withdrawalMethods';
+import { normalizeTreasury, type StoredTreasury } from './depositMethods';
 
 /**
  * Upgrades older saved shapes instead of discarding the visitor's work.
@@ -12,11 +12,15 @@ import { normalizeTreasury } from './withdrawalMethods';
  * instructions, photo, balance, form), and masked payout destinations became
  * remembered form answers (the masked labels can't be turned into answers, so
  * the sample answers are used).
+ * Within v6: deposit methods were added (29 Sep 2026); older saved settings
+ * get the built-in methods with their old deposit limits. Programs got
+ * approval days and a commission rate, applications a commission rate, and the
+ * application fee was removed (3 Oct 2026).
  */
 export function migrateState(raw: unknown): DemoState | null {
   const data = raw as Record<string, unknown> | null;
   if (!data || !Array.isArray(data.applications) || !Array.isArray(data.transactions)) return null;
-  if (data.version === 6 && Array.isArray(data.grants) && Array.isArray(data.staff) && Array.isArray(data.audit) && data.accounts && data.treasury && data.savedPayoutDetails) return data as unknown as DemoState;
+  if (data.version === 6 && Array.isArray(data.grants) && Array.isArray(data.staff) && Array.isArray(data.audit) && data.accounts && data.treasury && data.savedPayoutDetails) return withPlanFields({ ...(data as unknown as DemoState), treasury: normalizeTreasury(data.treasury as StoredTreasury) });
   if (data.version === 5 && Array.isArray(data.grants) && Array.isArray(data.staff) && Array.isArray(data.audit) && data.accounts && data.treasury) return migrateState(toV6(data as unknown as V5State));
   if (data.version === 4 && Array.isArray(data.grants) && Array.isArray(data.notifications) && Array.isArray(data.staffFeed) && data.treasury) return migrateState(toV5(data as unknown as V4State));
   if (data.version === 3 && Array.isArray(data.grants) && Array.isArray(data.notifications)) return migrateState({ ...data, version: 4, treasury: seedTreasury(), staffFeed: [] });
@@ -24,11 +28,20 @@ export function migrateState(raw: unknown): DemoState | null {
   return null;
 }
 
+/** Programs saved before 3 Oct 2026 get 7 approval days and no commission; their applications none either. */
+function withPlanFields(state: DemoState): DemoState {
+  return {
+    ...state,
+    grants: state.grants.map(g => ({ ...g, approvalDays: g.approvalDays ?? 7, commissionRate: g.commissionRate ?? 0 })),
+    applications: state.applications.map(a => ({ ...a, commissionRate: a.commissionRate ?? null })),
+  };
+}
+
 type V5State = Omit<DemoState, 'version' | 'savedPayoutDetails'> & { version: 5; payoutDestinations?: unknown };
 type V4State = Omit<DemoState, 'version' | 'savedPayoutDetails' | 'accounts' | 'staff' | 'actingStaffId' | 'audit' | 'lockdown'> & { version: 4 };
 
 function toV6({ payoutDestinations: _masked, ...data }: V5State): DemoState {
-  return { ...data, version: 6, treasury: normalizeTreasury(data.treasury), savedPayoutDetails: seedSavedPayoutDetails() };
+  return { ...data, version: 6, treasury: normalizeTreasury(data.treasury as StoredTreasury), savedPayoutDetails: seedSavedPayoutDetails() };
 }
 
 function toV5(data: V4State): V5State {
@@ -40,7 +53,7 @@ function toV5(data: V4State): V5State {
     ...data, version: 5,
     grants: data.grants.map(g => ({ ...g, questions: g.questions ?? [] })),
     applications: data.applications.map(a => ({ ...a, answers: a.answers ?? {}, escalation: a.escalation ?? null })),
-    treasury: { ...data.treasury, dualControlThreshold: data.treasury.dualControlThreshold ?? seedTreasury().dualControlThreshold, applicationFee: data.treasury.applicationFee ?? 0 },
+    treasury: { ...data.treasury, dualControlThreshold: data.treasury.dualControlThreshold ?? seedTreasury().dualControlThreshold },
     profile: { ...seed.profile, ...data.profile },
     otherApplicants: data.otherApplicants.map(p => ({ ...p, tier: p.tier ?? seedTiers.get(p.id) ?? 1 })),
     cards: { ...data.cards, virtual: { ...seed.cards.virtual!, ...data.cards.virtual } },

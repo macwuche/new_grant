@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { DemoState, PayoutChannel, Result } from './model';
 import * as M from './money';
 import * as R from './rules';
-import { createSeedState } from './seed';
+import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
+import { setAccountPermission } from './accounts';
 
 const now = new Date('2026-09-25T12:00:00Z');
 
@@ -48,10 +49,27 @@ describe('withdrawal validation', () => {
     expect(M.validateWithdrawal(s, 100, 'bank')).toBeNull();
   });
 
-  it('requires the deposit reserve', () => {
+  it('keeps the deposit reserve for deposit payouts only', () => {
     setTreasury({ depositThreshold: 500 });
-    expect(M.payoutBlocker(s)).toMatch(/Keep at least \$500/);
-    expect(M.validateWithdrawal(s, 100, 'bank')).toMatch(/Keep at least/);
+    expect(M.payoutBlocker(s)).toBeNull();
+    expect(M.validateWithdrawal(s, 100, 'bank')).toBeNull(); // pays from the grant balance
+    setChannel('mobile', { source: 'deposit' });
+    expect(M.availableFor(s, 'deposit')).toBe(Math.max(0, mine().deposit - 500));
+  });
+
+  it('pays grant payouts while the deposit balance is negative unless staff switch on clearing it first', () => {
+    const owe = (amount: number) => { s = { ...s, transactions: [{ id: `TX-C${amount}`, applicantId: CURRENT_APPLICANT_ID, type: 'Commission', description: 'Commission', amount, status: 'Completed', createdAt: now.toISOString() }, ...s.transactions] }; };
+    owe(-(mine().deposit + 200));
+    expect(mine().deposit).toBe(-200);
+    expect(M.validateWithdrawal(s, 100, 'bank')).toBeNull();
+    accept(setAccountPermission(s, CURRENT_APPLICANT_ID, 'clearBalanceForPayouts', true, now));
+    expect(M.grantPayoutHold(s)).toMatch(/deposit balance is -\$200\.00/);
+    expect(M.validateWithdrawal(s, 100, 'bank')).toMatch(/Add funds/);
+    expect(M.requestWithdrawal(s, { amount: 100, method: 'bank', details: {} }, now).ok).toBe(false);
+    owe(200); // a deposit clearing it would do the same
+    expect(mine().deposit).toBe(0);
+    expect(M.grantPayoutHold(s)).toBeNull();
+    expect(M.validateWithdrawal(s, 100, 'bank')).toBeNull();
   });
 
   it('blocks payouts when every channel is disabled', () => {

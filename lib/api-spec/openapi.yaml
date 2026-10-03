@@ -1335,7 +1335,10 @@ paths:
       operationId: requestDeposit
       tags: [money]
       summary: Announce a deposit
-      description: Returns a reference to quote with the transfer; finance confirms when it arrives.
+      description: >-
+        With an available deposit method: the amount (within the method's limits) and the method's form answers.
+        Returns a reference to quote with the transfer; the deposit keeps the method's receiving details and charge.
+        Finance confirms when it arrives.
       requestBody:
         required: true
         content:
@@ -2032,6 +2035,190 @@ paths:
                 format: binary
         "404":
           $ref: "#/components/responses/NotFound"
+  /money/deposit-methods:
+    post:
+      operationId: createDepositMethod
+      tags: [money]
+      summary: Add a deposit method
+      description: Requires treasury.manage. 409 if the money settings changed since `version`. The new method's id is returned as `id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositMethodSave"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /money/deposit-methods/{methodId}:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    put:
+      operationId: updateDepositMethod
+      tags: [money]
+      summary: Edit a deposit method
+      description: Requires treasury.manage. Applies to new deposits; pending ones keep the receiving details and charge they were given. 409 if stale.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositMethodSave"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Stale"
+  /money/deposit-methods/{methodId}/availability:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: setDepositMethodAvailability
+      tags: [money]
+      summary: Show or hide a deposit method for users
+      description: Requires treasury.manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MethodAvailability"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposit-methods/{methodId}/delete:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: deleteDepositMethod
+      tags: [money]
+      summary: Delete a deposit method
+      description: Requires treasury.manage. Pending deposits keep the method's name, receiving details, charge, and answers, so they can still be processed. An uploaded photo is deleted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposit-methods/{methodId}/photo:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    put:
+      operationId: uploadDepositMethodPhoto
+      tags: [money]
+      summary: Upload a deposit method's photo
+      description: Requires treasury.manage. The raw image is the body (JPEG, PNG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces a previous upload or link.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /money/deposit-methods/{methodId}/photo/delete:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    post:
+      operationId: removeDepositMethodPhoto
+      tags: [money]
+      summary: Remove a deposit method's photo
+      description: Requires treasury.manage. Users see the method's first letter instead.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneySettingsResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /deposit-methods/{methodId}/photo:
+    parameters:
+      - $ref: "#/components/parameters/MethodIdParam"
+    get:
+      operationId: getDepositMethodPhoto
+      tags: [money]
+      summary: A deposit method's uploaded photo
+      description: Public (method logos aren't private), so pages can use it in an image tag. Checked against the SHA-256 recorded at upload.
+      security: []
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
   /money/ledger:
     get:
       operationId: getLedger
@@ -2145,7 +2332,9 @@ paths:
       operationId: confirmDeposit
       tags: [money]
       summary: Confirm a deposit arrived
-      description: Requires payments.process. Credits the deposit balance.
+      description: >-
+        Requires payments.process. Credits the deposit balance with the amount less the method's charge. Refused while
+        required proof of payment is missing, and for deposits at or above the two-person threshold until someone else approved it.
       responses:
         "200":
           description: OK
@@ -2175,6 +2364,113 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/Reason"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposits/{id}/proof:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    put:
+      operationId: uploadDepositProof
+      tags: [money]
+      summary: Upload proof of payment for your pending deposit
+      description: >-
+        The raw file is the body (a receipt or screenshot: PDF, JPEG, or PNG, detected from the content; at most 10 MB).
+        Put the URI-encoded file name in the X-File-Name header. Up to 5 files per deposit, only while it's waiting for
+        confirmation. Stored on the API server's disk, never in the database.
+      parameters:
+        - name: X-File-Name
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK (`id` is the new file's id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /money/deposits/{id}/proof/{proofId}:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+      - $ref: "#/components/parameters/ProofIdParam"
+    get:
+      operationId: getDepositProof
+      tags: [money]
+      summary: Download a deposit's proof of payment
+      description: The deposit's owner, or staff with payments.process or payments.release (audited). Anyone else gets 404. Checked against the SHA-256 recorded at upload.
+      responses:
+        "200":
+          description: The file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposits/{id}/proof/{proofId}/delete:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+      - $ref: "#/components/parameters/ProofIdParam"
+    post:
+      operationId: removeDepositProof
+      tags: [money]
+      summary: Remove proof of payment from your pending deposit
+      description: Only while the deposit is waiting for confirmation. The file is deleted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoneyResult"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /money/deposits/{id}/release:
+    parameters:
+      - $ref: "#/components/parameters/LedgerId"
+    post:
+      operationId: approveDepositRelease
+      tags: [money]
+      summary: Second sign-off on a large deposit
+      description: Requires payments.release. For deposits at or above the deposit two-person threshold; the approver can't also confirm it.
       responses:
         "200":
           description: OK
@@ -2319,7 +2615,7 @@ paths:
       operationId: uploadDocument
       tags: [documents]
       summary: Upload a document
-      description: The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements. Identity documents can't change while a check is pending or verified.
+      description: The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements, or one of its form's file fields as field:<field id>. Identity documents can't change while a check is pending or verified.
       parameters:
         - name: purpose
           in: query
@@ -2780,6 +3076,13 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/ChannelId"
+    ProofIdParam:
+      name: proofId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     NotificationId:
       name: id
       in: path
@@ -3124,7 +3427,7 @@ components:
       required: [id, purpose, applicationId, requirement, fileName, contentType, sizeBytes, uploadedAt]
     ChannelId:
       type: string
-      description: A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+      description: A withdrawal or deposit method's id (built-in withdrawal methods are bank, wire, mobile, crypto; deposit methods bank, mobile, crypto)
       pattern: "^[a-z0-9-]{1,40}$"
     PayoutBalance:
       type: string
@@ -3148,7 +3451,7 @@ components:
           type: string
         type:
           type: string
-          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee, Card top-up, Card deduction, Grant adjustment, Deposit adjustment]
+          enum: [Grant, Deposit, Withdrawal, Card fee, Application fee, Commission, Card top-up, Card deduction, Grant adjustment, Deposit adjustment]
         description:
           type: string
         amount:
@@ -3201,7 +3504,52 @@ components:
           description: Withdrawals - the method's form as the applicant filled it in
           items:
             $ref: "#/components/schemas/PayoutDetail"
+        payTo:
+          type: array
+          description: Deposits - the method's receiving details the applicant was given
+          items:
+            $ref: "#/components/schemas/ReceivingDetail"
+        depositDetails:
+          type: array
+          description: Deposits - the method's form as the applicant filled it in
+          items:
+            $ref: "#/components/schemas/PayoutDetail"
+        proofRequired:
+          type: boolean
+          description: Deposits - finance can't confirm until proof of payment is uploaded
+        proof:
+          type: array
+          description: Deposits - the receipts or screenshots the applicant uploaded
+          items:
+            $ref: "#/components/schemas/DepositProof"
       required: [id, applicantId, type, description, amount, status, createdAt]
+    ReceivingDetail:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 100
+        value:
+          type: string
+          maxLength: 400
+      required: [label, value]
+      additionalProperties: false
+    DepositProof:
+      type: object
+      properties:
+        id:
+          type: string
+        fileName:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: number
+        sha256:
+          type: string
+        uploadedAt:
+          type: string
+      required: [id, fileName, contentType, sizeBytes, sha256, uploadedAt]
     MethodFieldType:
       type: string
       enum: [text, textarea, email, number, select]
@@ -3305,6 +3653,85 @@ components:
           $ref: "#/components/schemas/WithdrawalMethodInput"
       required: [version, method]
       additionalProperties: false
+    DepositMethodInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        enabled:
+          type: boolean
+          description: Shown to users on the Add funds page
+        min:
+          type: number
+        max:
+          type: number
+        feeRate:
+          type: number
+          description: 0-0.1 (a fraction of the amount), taken from what's credited
+        feeFixed:
+          type: number
+        feeCap:
+          type: number
+          description: The most a deposit is charged; 0 for no maximum
+        processingTime:
+          type: string
+          maxLength: 100
+        instructions:
+          type: string
+          maxLength: 2000
+        photoUrl:
+          type: string
+          maxLength: 1000
+          description: An https link, the method's current uploaded-photo path unchanged, or empty for the first-letter badge
+        receivingDetails:
+          type: array
+          description: Where applicants send the money (1-10 lines they can copy)
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ReceivingDetail"
+        proof:
+          type: string
+          enum: [required, optional, off]
+          description: Whether applicants upload proof of payment; required blocks confirmation until they do
+        formTitle:
+          type: string
+          maxLength: 100
+        fields:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/MethodField"
+      required: [name, enabled, min, max, feeRate, feeFixed, feeCap, processingTime, instructions, photoUrl, receivingDetails, proof, formTitle, fields]
+      additionalProperties: false
+    DepositMethod:
+      allOf:
+        - $ref: "#/components/schemas/DepositMethodInput"
+        - type: object
+          properties:
+            id:
+              $ref: "#/components/schemas/ChannelId"
+            fields:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/MethodField"
+                  - type: object
+                    properties:
+                      id:
+                        type: string
+                    required: [id]
+          required: [id]
+    DepositMethodSave:
+      type: object
+      properties:
+        version:
+          type: string
+          maxLength: 40
+        method:
+          $ref: "#/components/schemas/DepositMethodInput"
+      required: [version, method]
+      additionalProperties: false
     MethodAvailability:
       type: object
       properties:
@@ -3314,15 +3741,11 @@ components:
       additionalProperties: false
     TreasuryInput:
       type: object
-      description: Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
+      description: Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
       properties:
         physicalCardFee:
           type: number
         cardDeliveryFee:
-          type: number
-        minDeposit:
-          type: number
-        maxDeposit:
           type: number
         depositThreshold:
           type: number
@@ -3330,9 +3753,10 @@ components:
           type: number
         dualControlThreshold:
           type: number
-        applicationFee:
+        depositDualControlThreshold:
           type: number
-      required: [physicalCardFee, cardDeliveryFee, minDeposit, maxDeposit, depositThreshold, highValueDeposit, dualControlThreshold, applicationFee]
+          description: Deposits at or above this need a second staff member's approval before confirming; 0 for never
+      required: [physicalCardFee, cardDeliveryFee, depositThreshold, highValueDeposit, dualControlThreshold, depositDualControlThreshold]
       additionalProperties: false
     Treasury:
       allOf:
@@ -3344,6 +3768,11 @@ components:
               description: Withdrawal methods; applicants get only the available ones
               items:
                 $ref: "#/components/schemas/WithdrawalMethod"
+            depositMethods:
+              type: array
+              description: Deposit methods; applicants get only the available ones
+              items:
+                $ref: "#/components/schemas/DepositMethod"
             updatedAt:
               type: string
             changeLog:
@@ -3351,7 +3780,7 @@ components:
               description: Staff only; empty for applicants
               items:
                 $ref: "#/components/schemas/ProgramChange"
-          required: [channels, updatedAt, changeLog]
+          required: [channels, depositMethods, updatedAt, changeLog]
     Lockdown:
       type: object
       properties:
@@ -3381,7 +3810,7 @@ components:
           type: string
         id:
           type: string
-          description: The withdrawal method the action created or changed, if any
+          description: The withdrawal or deposit method the action created or changed, if any
       required: [settings, message]
     MoneySettingsUpdate:
       type: object
@@ -3664,13 +4093,16 @@ components:
           type: boolean
         grantApplications:
           type: boolean
-      required: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications]
+        clearBalanceForPayouts:
+          type: boolean
+          description: Grant payouts wait until a negative deposit balance is cleared
+      required: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
     AccountPermissionChange:
       type: object
       properties:
         key:
           type: string
-          enum: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications]
+          enum: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
         value:
           type: boolean
       required: [key, value]
@@ -3788,8 +4220,14 @@ components:
         amount:
           type: number
         method:
-          type: string
-          enum: [bank, mobile]
+          $ref: "#/components/schemas/ChannelId"
+        details:
+          type: object
+          description: The method's form answers (field id → value); field errors are keyed `details.<fieldId>`
+          maxProperties: 30
+          additionalProperties:
+            type: string
+            maxLength: 2000
       required: [amount, method]
       additionalProperties: false
     WithdrawalRequest:
@@ -4044,6 +4482,10 @@ components:
         awardedAmount:
           type: number
           nullable: true
+        commissionRate:
+          type: number
+          nullable: true
+          description: The program's commission percent fixed at first submission; null for drafts
         history:
           type: array
           items:
@@ -4056,7 +4498,7 @@ components:
           allOf:
             - $ref: "#/components/schemas/Escalation"
           nullable: true
-      required: [id, applicantId, grantId, status, businessName, requestedAmount, registrationNumber, purpose, checklist, answers, createdAt, updatedAt, submittedAt, reviewer, awardedAmount, history, internalNotes, escalation]
+      required: [id, applicantId, grantId, status, businessName, requestedAmount, registrationNumber, purpose, checklist, answers, createdAt, updatedAt, submittedAt, reviewer, awardedAmount, commissionRate, history, internalNotes, escalation]
     ApplicationResult:
       type: object
       properties:
@@ -4146,13 +4588,14 @@ components:
         id:
           type: string
           maxLength: 40
-          description: Empty for a new question; the server derives one from the label
+          description: Empty for a new field; the server derives one from the label
         label:
           type: string
           maxLength: 200
         type:
           type: string
-          enum: [text, number, yesno]
+          enum: [text, textarea, number, yesno, file]
+          description: A file field is answered by uploading documents, not by a typed answer
         required:
           type: boolean
       required: [id, label, type, required]
@@ -4205,7 +4648,13 @@ components:
           maxItems: 20
           items:
             $ref: "#/components/schemas/ProgramQuestion"
-      required: [name, summary, focus, maxFunding, minimumRequest, budget, deadline, minimumTier, requirements, requiresRegistration, questions]
+        approvalDays:
+          type: integer
+          description: Shown to applicants as usually decided within this many days
+        commissionRate:
+          type: number
+          description: Percent of the approved amount taken from the deposit balance on approval
+      required: [name, summary, focus, maxFunding, minimumRequest, budget, deadline, minimumTier, requirements, requiresRegistration, questions, approvalDays, commissionRate]
       additionalProperties: false
     Program:
       allOf:

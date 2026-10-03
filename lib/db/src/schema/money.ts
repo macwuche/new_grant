@@ -10,11 +10,14 @@ import { applicantProfilesTable } from "./applicants";
 
 export type ReleaseApprovalJson = { by: string; byId?: string; at: string };
 export type PayoutDetailJson = { fieldId: string; label: string; value: string };
+export type ReceivingDetailJson = { label: string; value: string };
+/** A deposit's receipt or screenshot; the file is on the API server's disk under `<applicant id>/<id>`. */
+export type DepositProofJson = { id: string; fileName: string; contentType: string; sizeBytes: number; sha256: string; uploadedAt: string };
 
 export const ledgerEntriesTable = pgTable("ledger_entries", {
   id: text("id").primaryKey(),
   applicantId: uuid("applicant_id").notNull().references(() => applicantProfilesTable.authUserId),
-  type: text("type").$type<"Grant" | "Deposit" | "Withdrawal" | "Card fee" | "Application fee" | "Card top-up" | "Card deduction" | "Grant adjustment" | "Deposit adjustment">().notNull(),
+  type: text("type").$type<"Grant" | "Deposit" | "Withdrawal" | "Card fee" | "Application fee" | "Commission" | "Card top-up" | "Card deduction" | "Grant adjustment" | "Deposit adjustment">().notNull(),
   description: text("description").notNull(),
   /** Signed: credits positive, debits negative. */
   amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
@@ -39,6 +42,14 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   source: text("source").$type<"grant" | "deposit">(),
   /** Withdrawals: the method's form as the applicant filled it in (full values; finance pays from them). */
   payoutDetails: jsonb("payout_details").$type<PayoutDetailJson[]>(),
+  /** Deposits: the method's receiving details the applicant was given. */
+  payTo: jsonb("pay_to").$type<ReceivingDetailJson[]>(),
+  /** Deposits: the method's form as the applicant filled it in. */
+  depositDetails: jsonb("deposit_details").$type<PayoutDetailJson[]>(),
+  /** Deposits: can't be confirmed until proof of payment is uploaded. */
+  proofRequired: boolean("proof_required"),
+  /** Deposits: the receipts or screenshots the applicant uploaded. */
+  proof: jsonb("proof").$type<DepositProofJson[]>(),
 }, t => [index("ledger_applicant_idx").on(t.applicantId), index("ledger_type_status_idx").on(t.type, t.status)]).enableRLS();
 
 /**
@@ -55,10 +66,23 @@ export type WithdrawalMethodJson = {
   fields?: { id: string; label: string; type: "text" | "textarea" | "email" | "number" | "select"; required: boolean; placeholder: string; help: string; options: string[] }[];
 };
 
+/** A deposit method as stored (added 30 Sep 2026). */
+export type DepositMethodJson = {
+  id: string; name: string; enabled: boolean; min: number; max: number; feeRate: number; feeFixed: number; feeCap: number;
+  processingTime: string; instructions: string; photoUrl: string; photoFile?: { key: string; contentType: string; sha256: string };
+  receivingDetails: ReceivingDetailJson[]; proof: "required" | "optional" | "off"; formTitle: string;
+  fields: NonNullable<WithdrawalMethodJson["fields"]>;
+};
+
+/**
+ * Rows saved before 30 Sep 2026 have one deposit minimum and maximum and no
+ * deposit methods; the API gives them the built-in methods with those limits.
+ */
 export type TreasuryJson = {
   channels: WithdrawalMethodJson[];
-  physicalCardFee: number; cardDeliveryFee: number; minDeposit: number; maxDeposit: number; depositThreshold: number;
-  highValueDeposit: number; dualControlThreshold: number; applicationFee: number;
+  depositMethods?: DepositMethodJson[];
+  physicalCardFee: number; cardDeliveryFee: number; minDeposit?: number; maxDeposit?: number; depositThreshold: number;
+  highValueDeposit: number; dualControlThreshold: number; depositDualControlThreshold?: number; /** Removed 3 Oct 2026; older rows still have it and the API ignores it. */ applicationFee?: number;
   updatedAt: string; changeLog: { at: string; by: string; summary: string }[];
 };
 export type LockdownJson = { since: string; by: string; reason: string };

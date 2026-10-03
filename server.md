@@ -27,8 +27,6 @@ The owner runs every command over `ssh root@77.68.98.14` from Windows PowerShell
 
 ## Target
 
-## Target
-
 | Item | Value |
 |---|---|
 | Public address | https://access.novabridgegrant.org/ |
@@ -42,7 +40,7 @@ The owner runs every command over `ssh root@77.68.98.14` from Windows PowerShell
 | DNS / proxy | Cloudflare in front of the VPS |
 | Database | Supabase Postgres (hosted, not on the VPS); project `tynjqjukramcmtotgfdw`, session pooler `aws-1-eu-west-1.pooler.supabase.com:5432`, user `postgres.tynjqjukramcmtotgfdw` |
 | Email | Resend (API key is saved in the admin settings, not in the env file) |
-| Code | `https://github.com/macwuche/new_grant`, branch `main` (deployed: `0524e86`) |
+| Code | `https://github.com/macwuche/new_grant`, branch `main` (deployed: `91074ee`; see Status) |
 | Deploy files | `deploy/novabridgegrant-api.service`, `deploy/nginx-novabridgegrant.conf`, `deploy/build.sh` (in the repo) |
 | TLS | Let's Encrypt certificate from certbot, renewed automatically by `certbot.timer`; Cloudflare SSL mode Full (strict) |
 
@@ -430,7 +428,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Profile center (29 Sep 2026) — before deploying it
+### Profile center (29 Sep 2026) — deployed in `91074ee`
 
 - **Schema:** new `applicant_profiles` columns and the `security_events` table. Run the schema push above (Step 7) before restarting the API, or `/api/profile` fails.
 - **Photos** are kept under `DOCUMENTS_DIR` with the documents, so they're in the same backup.
@@ -438,19 +436,34 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 - **Email change:** the email-change email now shows the verification code as well as the link; nothing to change in Supabase. With "Secure email change" on in Supabase, both addresses must confirm.
 - **Smoke test after deploying:** sign in as a test applicant → My profile → upload a photo, change the password (with the current one), change the email with the code, and log out other devices from a second browser.
 
-### Withdrawal methods (29 Sep 2026) — before deploying it
+### Withdrawal methods (29 Sep 2026) — deployed in `91074ee`
 
 - **Schema push required** (Step 7) before restarting the API: `ledger_entries` gains `source` and `payout_details`. Without it, withdrawals fail. The methods themselves live in `system_settings.treasury` (JSON); existing settings are filled in when read, so the four old channels appear as methods with their forms.
 - **Payout details are now stored in full** (on each withdrawal and as each applicant's last answers per method) so finance can pay from them. Old masked destinations in `applicant_profiles.payout_destinations` are ignored; applicants fill the method's form on their next request.
 - **Method photos** are stored under `DOCUMENTS_DIR` (owner folder `5a1e5000-0000-4000-8000-00000000f070`), so they're in the same backup, and served publicly at `/api/withdrawal-methods/<id>/photo`.
 - **Smoke test:** as finance, Settings → Withdrawal methods → add a method with a photo upload and a two-field form → it appears on a test applicant's Withdrawals page → request with the form → Payments → Payouts shows the answers → make the method unavailable → it disappears for the applicant.
 
-### Add funds page and dashboard buttons (29 Sep 2026) — deploy notes
+### Add funds page and dashboard buttons (29 Sep 2026) — deployed in `91074ee`
 
 - Portal-only changes: no schema push and no new environment variables. They ship with the same `git pull` + `deploy/build.sh` + restart.
 - `pnpm-lock.yaml` changed (the API server gained `@workspace/api-client-react` as a dev dependency for its tests); `deploy/build.sh` installs it with the rest.
 - **Smoke test:** as a test applicant, dashboard → **+ Deposit** opens Add funds; announce a small deposit, copy the reference, cancel it from the history. Dashboard → **Withdraw** opens Withdrawals.
-- The Add funds page still shows the placeholder receiving details; replace them in `lib/domain/src/deposits.ts` (`DEPOSIT_METHODS`) once the owner supplies the real ones.
+- The Add funds page still shows the placeholder receiving details; since deposit methods (below) they're edited in Admin → Settings → Deposit methods.
+
+### Deposit methods and proof of payment (30 Sep 2026) — not yet deployed
+
+- **Schema push required** (Step 7) before restarting the API: `ledger_entries` gains `pay_to`, `deposit_details`, `proof_required`, and `proof`. All additive. Deposit methods live in `system_settings.treasury` (JSON); the stored settings are filled in when read: Bank transfer and Mobile money with the old deposit limits and sample receiving details, and USDT (TRC-20) hidden. The old minimum/maximum deposit settings are no longer used.
+- **Proof files** are stored under `DOCUMENTS_DIR` in the applicant's folder, and **method photos** under owner folder `5a1e5000-0000-4000-8000-00000000f071`, so both are in the same backup.
+- **After deploying:** in Admin → Settings → Deposit methods, replace every "(placeholder)" value with the real details (the cards warn until you do), enter the USDT wallet address, then make USDT available if wanted. Check the deposit two-person threshold in Settings → Money (default $2,500).
+- **Smoke test:** as a test applicant, Add funds → a method with required proof → a small deposit → the receiving details and reference show → upload a receipt → as finance, Payments → Deposits shows the receipt (opens) and confirming credits the amount less the charge. A deposit at or above the threshold needs Approve (compliance or super admin) before a different person confirms.
+
+### Grant plans with commission (3 Oct 2026) — not yet deployed
+
+Built on the same branch as deposit methods (`deposit-methods`), so it ships with them.
+
+- **Schema push required** (Step 7) before restarting the API: `programs` gains `approval_days` (default 7) and `commission_rate` (default 0), and `applications` gains `commission_rate` (empty). All additive; existing plans start at 7 days and no commission, and applications already submitted take no commission. The new permission switch lives in `applicant_profiles.permissions` (JSON, no column). The application fee in `system_settings.treasury` is ignored from now on and dropped the next time finance saves Settings → Money.
+- **After deploying:** set each live plan's approval days and commission in Admin → Grant programs → Manage program. Applications already in review keep no commission; new submissions take the rate the plan has when they're submitted.
+- **Smoke test:** as staff, edit a plan with a commission (e.g. 10%) and a required "Document upload" form field; as a test applicant, apply: the form asks for the upload, and the review step shows the commission and the deposit balance after approval; submit (nothing is charged). As staff, approve: the applicant's ledger shows the grant credit and a `Commission` entry, and the deposit balance may go below $0. A grant payout still works; turn on **Clear a negative deposit balance before grant payouts** on the applicant's profile and it's refused until a deposit brings the balance back to $0. Try uploading a PDF with JavaScript: it's refused with a clear message.
 
 ## Server inventory (new VPS)
 
@@ -486,7 +499,7 @@ _Fill in from step 1's output on the new server._
 
 ## Status
 
-**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org. Deployed code: `5288eff` (29 Sep, user-visible "demo" wording removed); before it `2bbe3c4` (29 Sep, admin applicant directory and profile rebuilt, balance adjustments, permission switches); before that `00c13f0` (28 Sep, demo notices removed from the applicant dashboard, deposits, and payouts); before that `bad06bc` (auth emails only through the hook and Resend; Settings → Email shows the hook checklist); before that `0524e86` (adds the auth email hook); first deploy was `8dfe7be`.
+**Live since 27 Sep 2026 (~23:26 UTC)** at https://access.novabridgegrant.org. Deployed code: `91074ee` (29 Sep, ~21:09 UTC: applicant profile center, rebuilt Add funds page, dashboard Deposit/Withdraw buttons, admin-managed withdrawal methods and the rebuilt Withdrawals page); before it `5288eff` (29 Sep, user-visible "demo" wording removed); before that `2bbe3c4` (29 Sep, admin applicant directory and profile rebuilt, balance adjustments, permission switches); before that `00c13f0` (28 Sep, demo notices removed from the applicant dashboard, deposits, and payouts); before that `bad06bc` (auth emails only through the hook and Resend; Settings → Email shows the hook checklist); before that `0524e86` (adds the auth email hook); first deploy was `8dfe7be`.
 
 Preparation (27 Sep 2026):
 - [x] Reviewed the app's structure and runtime needs; wrote this runbook.
@@ -537,6 +550,33 @@ New VPS, 28 Sep 2026:
 - [ ] Reset the Supabase database password (it was typed into the chat on 27 Sep 2026), then redo the database line in `api.env` (Step 5) and `systemctl restart novabridgegrant-api`.
 - [ ] Change the VPS root password (`passwd`) — IONOS didn't force it on first login; deferred by the owner until after go-live.
 - [ ] Optional hardening: SSH keys instead of the root password, then `PasswordAuthentication no`.
+
+New VPS, 29 Sep 2026 (`91074ee`):
+- [x] Built and tested in Replit: profile center (`/profile`), Add funds rebuilt, dashboard buttons, withdrawal methods (Settings → Withdrawal methods) and Withdrawals rebuilt. 198 rule tests, 131 API tests, 10 wiring tests, typecheck and builds pass; headless-browser checks in preview mode.
+- [x] Committed as `91074ee` (branch `profile-deposits-withdrawal-methods`, fast-forwarded into `main`, pushed; branch deleted).
+- [x] Server was on `5288eff`, clean, API active and healthy before starting.
+- [x] `git pull --ff-only` → `91074ee`.
+- [x] Schema pushed before building (Step 7): "Changes applied", no prompts. Added: 8 `applicant_profiles` columns (display name, Telegram, two privacy switches, four photo columns), `ledger_entries.source` and `payout_details`, and the `security_events` table. All additive, so the old API kept working meanwhile.
+- [x] `sh deploy/build.sh` → Build OK (only the usual source-map and chunk-size warnings).
+- [x] API restarted ~21:09 UTC: new process listening on 3100, documents folder and Resend sender logged, no errors; `/api/healthz` → ok; `/api/withdrawal-methods/bank/photo` → `{"error":"No photo."}` (new public route live).
+- [ ] Browser smoke test (asked of the owner, not yet reported): as the super admin, Settings → Withdrawal methods shows the four existing methods; add a "Test method" with an uploaded logo and a two-field form; as a test applicant, the dashboard buttons, My profile (photo, details, a privacy switch), and the test method on Withdrawals; then delete the test method.
+- [ ] Profile smoke test with a real applicant account: change the password (current one checked), change the email with the code, log out other devices ("Profile center" section above).
+- [ ] Withdrawal smoke test end to end: a small confirmed deposit on a test applicant, a request with a method's form, the answers visible under Payments → Payouts, then mark it failed so the money returns ("Withdrawal methods" section above).
+- [ ] Owner: the real deposit receiving details (after deploying deposit methods: Admin → Settings → Deposit methods, no redeploy).
+- [ ] Optional: `GEO_HEADERS=cloudflare` for the Location column of security activity ("Profile center" section above).
+
+30 Sep 2026 (deposit methods, branch `deposit-methods`, not yet committed or deployed):
+- [x] Built in Replit: Settings → Deposit methods (receiving details, per-method limits and charges, proof of payment, form; USDT TRC-20 added, hidden until a wallet is set), the rebuilt Add funds flow with receipt uploads, the admin deposit panel with receipts and the two-person deposit rule, and the deposit two-person threshold in Settings → Money (global deposit limits removed). 208 rule tests, 149 API tests, typecheck, and headless-browser checks pass.
+- [ ] Commit, merge to `main`, push.
+- [ ] Deploy: `git pull`, **schema push** (four `ledger_entries` columns), `sh deploy/build.sh`, restart ("Deposit methods and proof of payment" section above).
+- [ ] Owner: replace every "(placeholder)" receiving detail and enter the USDT wallet address in Admin → Settings → Deposit methods; make USDT available if wanted.
+- [ ] Smoke test from that section.
+
+3 Oct 2026 (grant plans with commission, same branch, not yet committed or deployed):
+- [x] Built in Replit: approval days and a commission % per plan, a form builder with long-text and document-upload fields, the commission on the application summary and taken from the deposit balance on approval (negative allowed), the per-applicant switch for grant payouts while the deposit balance is negative, the application fee removed, and stricter upload checks. 215 rule tests, 156 API tests, typecheck, and a headless-browser check pass.
+- [ ] Deploy with deposit methods: **schema push** (`programs.approval_days`, `programs.commission_rate`, `applications.commission_rate`) before restarting ("Grant plans with commission" section above).
+- [ ] Owner: set approval days and commission on each live plan.
+- [ ] Smoke test from that section.
 
 ## Old server — retired
 
@@ -607,3 +647,6 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-28 — Deployed `00c13f0`: the phone "DEMO ONLY" banner and the demo notices on Deposits and Payouts removed (design of the banner kept in `work.md` §3). Build OK, restarted; checked from outside: `/api/healthz` 200 and the served bundle has the new wording. Open: the Deposits page still shows placeholder payment details until real ones are supplied.
 - 2026-09-29 — Deployed `2bbe3c4`: admin applicant directory and user profile rebuilt, balance adjustments, per-applicant permission switches. Schema pushed to Supabase first (`applicant_profiles.permissions`, `ledger_entries.category`; "Changes applied"), build OK, service restarted, `/api/healthz` ok. The owner ran the push without the surrounding parentheses, so that shell had `api.env` exported; close it (`exit`). Next: sign in to the admin and try Applicants and a profile (adjust, toggle, lock).
 - 2026-09-29 — Deployed `5288eff`: user-visible "demo" wording removed (no schema change). Build OK; API restarted 03:41:37 UTC (`active (running)`). Checked from outside: page title "Applicant workspace | arc.fund", `/api/healthz` ok, served bundle has the new admin sidebar note and no "Demo data" pill. Tip learned: paste one command at a time — lines typed during a build are lost when the SSH connection drops.
+- 2026-09-29 — Deployed `91074ee`: profile center, Add funds rebuilt, dashboard Deposit/Withdraw buttons, withdrawal methods and Withdrawals rebuilt (full payout details now stored; Settings → Payout destinations removed). Pulled from `5288eff`; schema pushed first ("Changes applied", no prompts: `applicant_profiles` profile columns, `ledger_entries.source`/`payout_details`, `security_events`); build OK; API restarted ~21:09 UTC, `/api/healthz` ok, new photo route answers. Browser smoke tests still to be reported by the owner.
+- 2026-09-30 — Reviewed the docs; compared deposits with withdrawals. Built deposit methods (finance-managed receiving details, limits, charges, proof of payment, forms; USDT TRC-20), receipt uploads, and the two-person deposit rule on branch `deposit-methods` (not deployed). Added the "Deposit methods and proof of payment" deploy notes (schema push needed) and the 30 Sep checklist; tidied the duplicate Target heading and the deployed commit in the table.
+- 2026-10-03 — Built grant plans with commission on branch `deposit-methods` (not deployed): approval days, commission % per plan taken from the deposit balance on approval (may go negative), a form builder with document uploads, a per-applicant switch for grant payouts while the deposit balance is negative, the application fee removed, stricter upload checks. Added the "Grant plans with commission" deploy notes (schema push needed) and the 3 Oct checklist.

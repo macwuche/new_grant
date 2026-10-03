@@ -22,7 +22,7 @@ export type CardsJson = {
 };
 
 /** Mirrors `AccountPermissions` in @workspace/domain, without `emailNotifications` (its own column). */
-export type AccountPermissionsJson = { payoutKyc: boolean; depositKyc: boolean; cardApplications: boolean; grantApplications: boolean };
+export type AccountPermissionsJson = { payoutKyc: boolean; depositKyc: boolean; cardApplications: boolean; grantApplications: boolean; /** Added 3 Oct 2026; missing means off. */ clearBalanceForPayouts?: boolean };
 
 export const accountStatusEnum = pgEnum("account_status", ["Active", "Locked"]);
 

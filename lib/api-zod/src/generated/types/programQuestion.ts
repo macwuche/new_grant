@@ -9,12 +9,13 @@ import type { ProgramQuestionType } from './programQuestionType';
 
 export interface ProgramQuestion {
   /**
-     * Empty for a new question; the server derives one from the label
+     * Empty for a new field; the server derives one from the label
      * @maxLength 40
      */
   id: string;
   /** @maxLength 200 */
   label: string;
+  /** A file field is answered by uploading documents, not by a typed answer */
   type: ProgramQuestionType;
   required: boolean;
 }

@@ -1,4 +1,5 @@
 import { BUILTIN_METHOD_DETAILS } from './withdrawalMethods';
+import { builtinDepositMethods } from './depositMethods';
 import type { AccountControls, Application, ApplicationEvent, DemoState, Grant, Notification, ProgramQuestion, SavedPayoutDetails, StaffEvent, StaffMember, Treasury } from './model';
 
 /** The demo applicant who uses the applicant portal. */
@@ -35,11 +36,11 @@ const QUESTIONS: Record<string, ProgramQuestion[]> = {
   community: [{ id: 'residents', label: 'Roughly how many residents will benefit?', type: 'number', required: true }],
 };
 const catalog: SeedGrant[] = [
-  { id: 'momentum', status: 'Open', name: 'Business Momentum', summary: 'Working capital for small businesses ready for their next chapter.', focus: 'Small businesses', maxFunding: 12500, minimumRequest: 1000, budget: 150000, deadline: '2026-11-20', minimumTier: 2, requirements: ['Business registration number', '90-day bank statement', 'A short use-of-funds plan'], requiresRegistration: true },
-  { id: 'green', status: 'Open', name: 'Green Transition', summary: 'Support for practical energy upgrades that reduce operating costs.', focus: 'Climate action', maxFunding: 18000, minimumRequest: 2500, budget: 200000, deadline: '2026-12-11', minimumTier: 2, requirements: ['Project quote or estimate', 'Business registration number', 'Impact statement'], requiresRegistration: true },
-  { id: 'creative', status: 'Open', name: 'Creative Practice', summary: 'Flexible funding for independent makers and creative studios.', focus: 'Independent makers', maxFunding: 8500, minimumRequest: 500, budget: 60000, deadline: '2027-01-15', minimumTier: 1, requirements: ['Portfolio link', 'Project budget', 'Professional reference'], requiresRegistration: false },
-  { id: 'community', status: 'Open', name: 'Community Roots', summary: 'Help local organizations build more resilient neighborhoods.', focus: 'Local organizations', maxFunding: 22000, minimumRequest: 5000, budget: 250000, deadline: '2027-02-05', minimumTier: 3, requirements: ['Organization registration', 'Community plan', 'Annual operating budget'], requiresRegistration: true },
-  { id: 'space', status: 'Draft', name: 'Shared Spaces', summary: 'Welcoming, adaptable community spaces for local groups to meet and make.', focus: 'Civic spaces', maxFunding: 14500, minimumRequest: 2000, budget: 90000, deadline: '2027-04-30', minimumTier: 2, requirements: ['Site plan or lease', 'Community partner letter', 'Project budget'], requiresRegistration: true },
+  { id: 'momentum', status: 'Open', name: 'Business Momentum', summary: 'Working capital for small businesses ready for their next chapter.', focus: 'Small businesses', maxFunding: 12500, minimumRequest: 1000, budget: 150000, deadline: '2026-11-20', minimumTier: 2, requirements: ['Business registration number', '90-day bank statement', 'A short use-of-funds plan'], requiresRegistration: true, approvalDays: 14, commissionRate: 10 },
+  { id: 'green', status: 'Open', name: 'Green Transition', summary: 'Support for practical energy upgrades that reduce operating costs.', focus: 'Climate action', maxFunding: 18000, minimumRequest: 2500, budget: 200000, deadline: '2026-12-11', minimumTier: 2, requirements: ['Project quote or estimate', 'Business registration number', 'Impact statement'], requiresRegistration: true, approvalDays: 21, commissionRate: 8 },
+  { id: 'creative', status: 'Open', name: 'Creative Practice', summary: 'Flexible funding for independent makers and creative studios.', focus: 'Independent makers', maxFunding: 8500, minimumRequest: 500, budget: 60000, deadline: '2027-01-15', minimumTier: 1, requirements: ['Portfolio link', 'Project budget', 'Professional reference'], requiresRegistration: false, approvalDays: 7, commissionRate: 5 },
+  { id: 'community', status: 'Open', name: 'Community Roots', summary: 'Help local organizations build more resilient neighborhoods.', focus: 'Local organizations', maxFunding: 22000, minimumRequest: 5000, budget: 250000, deadline: '2027-02-05', minimumTier: 3, requirements: ['Organization registration', 'Community plan', 'Annual operating budget'], requiresRegistration: true, approvalDays: 30, commissionRate: 6 },
+  { id: 'space', status: 'Draft', name: 'Shared Spaces', summary: 'Welcoming, adaptable community spaces for local groups to meet and make.', focus: 'Civic spaces', maxFunding: 14500, minimumRequest: 2000, budget: 90000, deadline: '2027-04-30', minimumTier: 2, requirements: ['Site plan or lease', 'Community partner letter', 'Project budget'], requiresRegistration: true, approvalDays: 14, commissionRate: 10 },
 ];
 
 /** Fresh copies of the seed catalog (callers may keep them in state). */
@@ -86,12 +87,11 @@ export function seedTreasury(): Treasury {
     ],
     physicalCardFee: 8.5,
     cardDeliveryFee: 3.5,
-    minDeposit: 20,
-    maxDeposit: 25000,
+    depositMethods: builtinDepositMethods(),
     depositThreshold: 25,
     highValueDeposit: 1000,
     dualControlThreshold: 2500,
-    applicationFee: 0,
+    depositDualControlThreshold: 2500,
     updatedAt: TREASURY_CREATED,
     changeLog: [{ at: TREASURY_CREATED, by: DEMO_FINANCE, summary: 'Initial money settings.' }],
   };
@@ -106,6 +106,7 @@ function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' 
   return {
     registrationNumber: '', checklist: fields.status === 'Draft' ? [] : allRequirements(fields.grantId), answers: {}, createdAt: first, updatedAt: last,
     submittedAt: fields.history.find(h => h.status === 'Submitted')?.at ?? null, reviewer: null, awardedAmount: null, internalNotes: [], escalation: null,
+    commissionRate: fields.status === 'Draft' ? null : catalog.find(g => g.id === fields.grantId)!.commissionRate,
     ...fields,
   };
 }

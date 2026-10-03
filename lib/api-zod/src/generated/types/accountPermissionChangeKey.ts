@@ -15,4 +15,5 @@ export const AccountPermissionChangeKey = {
   emailNotifications: 'emailNotifications',
   cardApplications: 'cardApplications',
   grantApplications: 'grantApplications',
+  clearBalanceForPayouts: 'clearBalanceForPayouts',
 } as const;

@@ -12,4 +12,6 @@ export interface AccountPermissions {
   emailNotifications: boolean;
   cardApplications: boolean;
   grantApplications: boolean;
+  /** Grant payouts wait until a negative deposit balance is cleared */
+  clearBalanceForPayouts: boolean;
 }

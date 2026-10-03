@@ -337,7 +337,7 @@ export interface Document {
 }
 
 /**
- * A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+ * A withdrawal or deposit method's id (built-in withdrawal methods are bank, wire, mobile, crypto; deposit methods bank, mobile, crypto)
  * @pattern ^[a-z0-9-]{1,40}$
  */
 export type ChannelId = string;
@@ -365,6 +365,7 @@ export const LedgerEntryType = {
   Withdrawal: 'Withdrawal',
   Card_fee: 'Card fee',
   Application_fee: 'Application fee',
+  Commission: 'Commission',
   'Card_top-up': 'Card top-up',
   Card_deduction: 'Card deduction',
   Grant_adjustment: 'Grant adjustment',
@@ -410,6 +411,22 @@ export const AdjustmentCategory = {
   Fraud_freeze: 'Fraud freeze',
 } as const;
 
+export interface ReceivingDetail {
+  /** @maxLength 100 */
+  label: string;
+  /** @maxLength 400 */
+  value: string;
+}
+
+export interface DepositProof {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  uploadedAt: string;
+}
+
 export interface LedgerEntry {
   id: string;
   applicantId: string;
@@ -436,6 +453,14 @@ export interface LedgerEntry {
   source?: PayoutBalance;
   /** Withdrawals - the method's form as the applicant filled it in */
   payoutDetails?: PayoutDetail[];
+  /** Deposits - the method's receiving details the applicant was given */
+  payTo?: ReceivingDetail[];
+  /** Deposits - the method's form as the applicant filled it in */
+  depositDetails?: PayoutDetail[];
+  /** Deposits - finance can't confirm until proof of payment is uploaded */
+  proofRequired?: boolean;
+  /** Deposits - the receipts or screenshots the applicant uploaded */
+  proof?: DepositProof[];
 }
 
 export type MethodFieldType = typeof MethodFieldType[keyof typeof MethodFieldType];
@@ -522,22 +547,82 @@ export interface WithdrawalMethodSave {
   method: WithdrawalMethodInput;
 }
 
+/**
+ * Whether applicants upload proof of payment; required blocks confirmation until they do
+ */
+export type DepositMethodInputProof = typeof DepositMethodInputProof[keyof typeof DepositMethodInputProof];
+
+
+export const DepositMethodInputProof = {
+  required: 'required',
+  optional: 'optional',
+  off: 'off',
+} as const;
+
+export interface DepositMethodInput {
+  /** @maxLength 80 */
+  name: string;
+  /** Shown to users on the Add funds page */
+  enabled: boolean;
+  min: number;
+  max: number;
+  /** 0-0.1 (a fraction of the amount), taken from what's credited */
+  feeRate: number;
+  feeFixed: number;
+  /** The most a deposit is charged; 0 for no maximum */
+  feeCap: number;
+  /** @maxLength 100 */
+  processingTime: string;
+  /** @maxLength 2000 */
+  instructions: string;
+  /**
+     * An https link, the method's current uploaded-photo path unchanged, or empty for the first-letter badge
+     * @maxLength 1000
+     */
+  photoUrl: string;
+  /**
+     * Where applicants send the money (1-10 lines they can copy)
+     * @maxItems 20
+     */
+  receivingDetails: ReceivingDetail[];
+  /** Whether applicants upload proof of payment; required blocks confirmation until they do */
+  proof: DepositMethodInputProof;
+  /** @maxLength 100 */
+  formTitle: string;
+  /** @maxItems 20 */
+  fields: MethodField[];
+}
+
+export type DepositMethodFieldsItem = MethodField & {
+  id: string;
+};
+
+export type DepositMethod = DepositMethodInput & {
+  id: ChannelId;
+  fields?: DepositMethodFieldsItem[];
+};
+
+export interface DepositMethodSave {
+  /** @maxLength 40 */
+  version: string;
+  method: DepositMethodInput;
+}
+
 export interface MethodAvailability {
   enabled: boolean;
 }
 
 /**
- * Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
+ * Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
  */
 export interface TreasuryInput {
   physicalCardFee: number;
   cardDeliveryFee: number;
-  minDeposit: number;
-  maxDeposit: number;
   depositThreshold: number;
   highValueDeposit: number;
   dualControlThreshold: number;
-  applicationFee: number;
+  /** Deposits at or above this need a second staff member's approval before confirming; 0 for never */
+  depositDualControlThreshold: number;
 }
 
 export interface ProgramChange {
@@ -549,6 +634,8 @@ export interface ProgramChange {
 export type Treasury = TreasuryInput & {
   /** Withdrawal methods; applicants get only the available ones */
   channels: WithdrawalMethod[];
+  /** Deposit methods; applicants get only the available ones */
+  depositMethods: DepositMethod[];
   updatedAt: string;
   /** Staff only; empty for applicants */
   changeLog: ProgramChange[];
@@ -568,7 +655,7 @@ export interface MoneySettings {
 export interface MoneySettingsResult {
   settings: MoneySettings;
   message: string;
-  /** The withdrawal method the action created or changed, if any */
+  /** The withdrawal or deposit method the action created or changed, if any */
   id?: string;
 }
 
@@ -832,6 +919,8 @@ export interface AccountPermissions {
   emailNotifications: boolean;
   cardApplications: boolean;
   grantApplications: boolean;
+  /** Grant payouts wait until a negative deposit balance is cleared */
+  clearBalanceForPayouts: boolean;
 }
 
 export type AccountPermissionChangeKey = typeof AccountPermissionChangeKey[keyof typeof AccountPermissionChangeKey];
@@ -843,6 +932,7 @@ export const AccountPermissionChangeKey = {
   emailNotifications: 'emailNotifications',
   cardApplications: 'cardApplications',
   grantApplications: 'grantApplications',
+  clearBalanceForPayouts: 'clearBalanceForPayouts',
 } as const;
 
 export interface AccountPermissionChange {
@@ -939,17 +1029,16 @@ export interface LedgerResult {
   message: string;
 }
 
-export type DepositRequestMethod = typeof DepositRequestMethod[keyof typeof DepositRequestMethod];
-
-
-export const DepositRequestMethod = {
-  bank: 'bank',
-  mobile: 'mobile',
-} as const;
+/**
+ * The method's form answers (field id → value); field errors are keyed `details.<fieldId>`
+ */
+export type DepositRequestDetails = {[key: string]: string};
 
 export interface DepositRequest {
   amount: number;
-  method: DepositRequestMethod;
+  method: ChannelId;
+  /** The method's form answers (field id → value); field errors are keyed `details.<fieldId>` */
+  details?: DepositRequestDetails;
 }
 
 export type WithdrawalRequestDetails = {[key: string]: string};
@@ -1141,6 +1230,8 @@ export interface Application {
   submittedAt: string | null;
   reviewer: string | null;
   awardedAmount: number | null;
+  /** The program's commission percent fixed at first submission; null for drafts */
+  commissionRate: number | null;
   history: ApplicationEvent[];
   internalNotes: InternalNote[];
   escalation: Escalation | null;
@@ -1206,23 +1297,29 @@ export const ProgramStatus = {
   Closed: 'Closed',
 } as const;
 
+/**
+ * A file field is answered by uploading documents, not by a typed answer
+ */
 export type ProgramQuestionType = typeof ProgramQuestionType[keyof typeof ProgramQuestionType];
 
 
 export const ProgramQuestionType = {
   text: 'text',
+  textarea: 'textarea',
   number: 'number',
   yesno: 'yesno',
+  file: 'file',
 } as const;
 
 export interface ProgramQuestion {
   /**
-     * Empty for a new question; the server derives one from the label
+     * Empty for a new field; the server derives one from the label
      * @maxLength 40
      */
   id: string;
   /** @maxLength 200 */
   label: string;
+  /** A file field is answered by uploading documents, not by a typed answer */
   type: ProgramQuestionType;
   required: boolean;
 }
@@ -1260,6 +1357,10 @@ export interface ProgramInput {
   requiresRegistration: boolean;
   /** @maxItems 20 */
   questions: ProgramQuestion[];
+  /** Shown to applicants as usually decided within this many days */
+  approvalDays: number;
+  /** Percent of the approved amount taken from the deposit balance on approval */
+  commissionRate: number;
 }
 
 export type Program = ProgramInput & {

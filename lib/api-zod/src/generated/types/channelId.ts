@@ -7,7 +7,7 @@
  */
 
 /**
- * A withdrawal method's id (the built-in methods are bank, wire, mobile, crypto)
+ * A withdrawal or deposit method's id (built-in withdrawal methods are bank, wire, mobile, crypto; deposit methods bank, mobile, crypto)
  * @pattern ^[a-z0-9-]{1,40}$
  */
 export type ChannelId = string;

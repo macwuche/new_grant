@@ -32,4 +32,8 @@ export interface ProgramInput {
   requiresRegistration: boolean;
   /** @maxItems 20 */
   questions: ProgramQuestion[];
+  /** Shown to applicants as usually decided within this many days */
+  approvalDays: number;
+  /** Percent of the approved amount taken from the deposit balance on approval */
+  commissionRate: number;
 }

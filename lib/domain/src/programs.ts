@@ -8,15 +8,21 @@ import { programBudget } from './review';
 
 export const MAX_REQUIREMENTS = 8;
 export const MAX_REQUIREMENT_LENGTH = 80;
-export const MAX_QUESTIONS = 6;
-export const QUESTION_TYPES: { id: ProgramQuestion['type']; label: string }[] = [{ id: 'text', label: 'Short text' }, { id: 'number', label: 'Number' }, { id: 'yesno', label: 'Yes / no' }];
+export const MAX_QUESTIONS = 15;
+export const QUESTION_TYPES: { id: ProgramQuestion['type']; label: string }[] = [
+  { id: 'text', label: 'Short text' }, { id: 'textarea', label: 'Long text' }, { id: 'number', label: 'Number' }, { id: 'yesno', label: 'Yes / no' }, { id: 'file', label: 'Document upload' },
+];
+export const MAX_APPROVAL_DAYS = 365;
+export const MAX_COMMISSION_RATE = 100;
+export { commissionFor } from './core';
 
 /** Eligibility criteria that can't change once someone has submitted, so in-flight applications stay valid. */
 export const LOCKED_WHEN_SUBMITTED: (keyof GrantInput)[] = ['minimumTier', 'requirements', 'requiresRegistration', 'minimumRequest', 'questions'];
 
 const FIELD_LABELS: Record<keyof GrantInput, string> = {
   name: 'name', summary: 'summary', focus: 'focus', maxFunding: 'maximum award', minimumRequest: 'minimum request',
-  budget: 'budget', deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'questions',
+  budget: 'budget', deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'application form',
+  approvalDays: 'approval days', commissionRate: 'commission',
 };
 
 const todayIso = (now: Date) => {
@@ -77,15 +83,19 @@ export function validateProgram(state: DemoState, raw: GrantInput, now: Date, ex
   else if (existing?.status === 'Open' && input.deadline < todayIso(now)) errors.deadline = 'An open program needs a deadline today or later. Close it instead.';
   if (![1, 2, 3].includes(input.minimumTier)) errors.minimumTier = 'Choose tier 1, 2, or 3.';
 
-  if (!input.requirements.length) errors.requirements = 'Add at least one requirement.';
-  else if (input.requirements.length > MAX_REQUIREMENTS) errors.requirements = `Use at most ${MAX_REQUIREMENTS} requirements.`;
+  // Requirements are optional now that the application form can ask for documents.
+  if (input.requirements.length > MAX_REQUIREMENTS) errors.requirements = `Use at most ${MAX_REQUIREMENTS} requirements.`;
   else if (input.requirements.some(r => r.length > MAX_REQUIREMENT_LENGTH)) errors.requirements = `Keep each requirement under ${MAX_REQUIREMENT_LENGTH} characters.`;
   else if (new Set(input.requirements.map(r => r.toLowerCase())).size !== input.requirements.length) errors.requirements = 'Each requirement must be different.';
 
-  if (input.questions.length > MAX_QUESTIONS) errors.questions = `Use at most ${MAX_QUESTIONS} questions.`;
-  else if (input.questions.some(q => q.label.length < 5 || q.label.length > 120)) errors.questions = 'Keep each question between 5 and 120 characters.';
-  else if (input.questions.some(q => !QUESTION_TYPES.some(t => t.id === q.type))) errors.questions = 'Choose a type for each question.';
-  else if (new Set(input.questions.map(q => q.label.toLowerCase())).size !== input.questions.length) errors.questions = 'Each question must be different.';
+  if (input.questions.length > MAX_QUESTIONS) errors.questions = `Use at most ${MAX_QUESTIONS} form fields.`;
+  else if (input.questions.some(q => q.label.length < 3 || q.label.length > 120)) errors.questions = 'Keep each field label between 3 and 120 characters.';
+  else if (input.questions.some(q => !QUESTION_TYPES.some(t => t.id === q.type))) errors.questions = 'Choose a type for each field.';
+  else if (input.questions.some(q => typeof q.required !== 'boolean')) errors.questions = 'Say whether each field is required.';
+  else if (new Set(input.questions.map(q => q.label.toLowerCase())).size !== input.questions.length) errors.questions = 'Each field must have a different label.';
+
+  if (!Number.isInteger(input.approvalDays) || input.approvalDays < 1 || input.approvalDays > MAX_APPROVAL_DAYS) errors.approvalDays = `Enter whole days, 1–${MAX_APPROVAL_DAYS}.`;
+  if (!Number.isFinite(input.commissionRate) || input.commissionRate < 0 || input.commissionRate > MAX_COMMISSION_RATE || roundCents(input.commissionRate) !== input.commissionRate) errors.commissionRate = `Enter a percentage from 0 to ${MAX_COMMISSION_RATE} (max two decimals).`;
 
   if (existing && hasSubmissions(state, existing.id)) {
     for (const key of LOCKED_WHEN_SUBMITTED) {
@@ -172,5 +182,5 @@ export function deleteProgram(state: DemoState, id: string, expectedVersion: str
 
 export const emptyProgram = (now: Date): GrantInput => {
   const deadline = new Date(now.getTime() + 90 * 86_400_000);
-  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, budget: 100000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [''], requiresRegistration: false, questions: [] };
+  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, budget: 100000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [], requiresRegistration: false, questions: [], approvalDays: 7, commissionRate: 0 };
 };

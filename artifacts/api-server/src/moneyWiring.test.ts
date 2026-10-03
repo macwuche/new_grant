@@ -2,8 +2,10 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  cancelWithdrawal, confirmDeposit, createWithdrawalMethod, deleteWithdrawalMethod, getLedger, getMoneySettings, getMyMoney, requestDeposit, requestWithdrawal,
-  setAuthTokenGetter, setBaseUrl, setWithdrawalMethodAvailability, updateWithdrawalMethod, uploadWithdrawalMethodPhoto, type WithdrawalMethodInput,
+  approveDepositRelease, cancelWithdrawal, confirmDeposit, createDepositMethod, createWithdrawalMethod, deleteWithdrawalMethod, getDepositProof, getLedger,
+  getMoneySettings, getMyMoney, removeDepositProof, requestDeposit, requestWithdrawal, setAuthTokenGetter, setBaseUrl, setWithdrawalMethodAvailability,
+  updateDepositMethod, updateWithdrawalMethod, uploadDepositMethodPhoto, uploadDepositProof, uploadWithdrawalMethodPhoto, type DepositMethodInput,
+  type WithdrawalMethodInput,
 } from "@workspace/api-client-react";
 import { adoptServerMoney, adoptServerSettings, type ServerMoney } from "@workspace/domain/sync";
 import { createSeedState, seedGrants, seedTreasury } from "@workspace/domain/seed";
@@ -23,10 +25,10 @@ import { memoryProgramRepo } from "./lib/programRepo";
 import { memorySignInRepo } from "./lib/signIns";
 import { memoryStaffRepo, type StaffRecord } from "./lib/staffRepo";
 
-// Withdrawal methods' wiring: the portal's own generated client (the functions
-// the admin and withdrawal pages call, through the same customFetch) against
-// the real API router, so a path, method, body encoding, or response shape
-// mismatch between the two sides fails here.
+// Withdrawal and deposit methods' wiring: the portal's own generated client
+// (the functions the admin, withdrawal, and Add funds pages call, through the
+// same customFetch) against the real API router, so a path, method, body
+// encoding, or response shape mismatch between the two sides fails here.
 
 const TWO_STEP = { aal: "aal2" as const, factors: [{ id: "factor-1", createdAt: "2025-01-01T00:00:00.000Z" }] };
 const USERS: Record<string, AuthUser> = {
@@ -137,5 +139,56 @@ describe("withdrawal wiring: portal client ↔ API", () => {
     as("tok-ada");
     const back = await cancelWithdrawal(w.id);
     expect(back.message).toMatch(/back in your deposit balance/);
+  });
+});
+
+const usdt = (patch: Partial<DepositMethodInput> = {}): DepositMethodInput => ({
+  name: "Tether wallet", enabled: true, min: 20, max: 20000, feeRate: 0, feeFixed: 1, feeCap: 0, processingTime: "Within an hour",
+  instructions: "TRC-20 only.", photoUrl: "", receivingDetails: [{ label: "Network", value: "TRON (TRC-20)" }, { label: "Wallet address", value: "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE" }],
+  proof: "required", formTitle: "Transfer details",
+  fields: [{ label: "Transaction hash", type: "text", required: true, placeholder: "", help: "", options: [] }],
+  ...patch,
+});
+
+describe("deposit wiring: portal client ↔ API", () => {
+  it("finance adds a deposit method with a photo; the Add funds page sees it, deposits with its form, and uploads, opens, and removes proof", async () => {
+    as("tok-finance");
+    const created = await createDepositMethod({ version: (await getMoneySettings()).treasury.updatedAt, method: usdt() });
+    expect(created.id).toBe("tether-wallet");
+    const saved = created.settings.treasury.depositMethods.find(m => m.id === "tether-wallet")!;
+    const edited = await updateDepositMethod("tether-wallet", { version: created.settings.treasury.updatedAt, method: { ...usdt({ max: 15000 }), fields: saved.fields } });
+    expect(edited.message).toMatch(/saved/);
+    const photo = await uploadDepositMethodPhoto("tether-wallet", new Blob([new Uint8Array(PNG)], { type: "image/png" }));
+    const photoUrl = photo.settings.treasury.depositMethods.find(m => m.id === "tether-wallet")!.photoUrl;
+    const img = await fetch(`http://127.0.0.1:${port}${photoUrl}`);
+    expect([img.status, img.headers.get("content-type")]).toEqual([200, "image/png"]);
+
+    as("tok-ada");
+    const mine = await getMyMoney();
+    const adopted = adoptServerMoney(createSeedState(), mine as unknown as ServerMoney, USERS["tok-ada"]!.id);
+    expect(adopted.ok && adopted.state.treasury.depositMethods.map(m => m.id)).toEqual(["bank", "mobile", "tether-wallet"]);
+    const refused = await requestDeposit({ amount: 100, method: "tether-wallet", details: {} }).then(() => null, (e: { status: number; data: { fieldErrors?: Record<string, string> } }) => e);
+    expect(refused?.data.fieldErrors).toEqual({ "details.transaction-hash": "Transaction hash is required." });
+    const res = await requestDeposit({ amount: 100, method: "tether-wallet", details: { "transaction-hash": "ab".repeat(32) } });
+    const d = res.money.transactions.find(t => t.id === res.id)!;
+    expect(d).toMatchObject({ amount: 100, fee: 1, proofRequired: true, payTo: [{ label: "Network" }, { label: "Wallet address" }] });
+
+    // Exactly as the Add funds page uploads: the raw file with its name in a header.
+    const up = await uploadDepositProof(d.id, new Blob([new Uint8Array(PNG)], { type: "image/png" }), { headers: { "X-File-Name": encodeURIComponent("tron scan.png") } });
+    const withProof = up.money.transactions.find(t => t.id === d.id)!;
+    expect(withProof.proof).toMatchObject([{ id: up.id, fileName: "tron scan.png", contentType: "image/png" }]);
+    const blob = await getDepositProof(d.id, up.id!);
+    expect(Buffer.from(await blob.arrayBuffer()).equals(PNG)).toBe(true);
+    const second = await uploadDepositProof(d.id, new Blob([new Uint8Array(PNG)], { type: "image/png" }));
+    const removed = await removeDepositProof(d.id, second.id!);
+    expect(removed.money.transactions.find(t => t.id === d.id)!.proof).toHaveLength(1);
+
+    as("tok-finance");
+    expect(Buffer.from(await (await getDepositProof(d.id, up.id!)).arrayBuffer()).equals(PNG)).toBe(true);
+    const confirmed = await confirmDeposit(d.id);
+    expect(confirmed.transaction).toMatchObject({ status: "Completed", fee: 1 });
+    // Finance can't give the second sign-off (compliance and super admins can).
+    const released = await approveDepositRelease(d.id).then(() => null, (e: { status: number }) => e.status);
+    expect(released).toBe(403);
   });
 });

@@ -8,7 +8,7 @@ const now = new Date('2026-09-25T12:00:00Z');
 const FINANCE = 'Jordan Lee';
 
 let s: DemoState;
-const input = (): TreasuryInput => { const { updatedAt: _u, changeLog: _c, channels: _ch, ...rest } = s.treasury; return rest; };
+const input = (): TreasuryInput => { const { updatedAt: _u, changeLog: _c, channels: _ch, depositMethods: _dm, ...rest } = s.treasury; return rest; };
 function accept(result: Result): Result & { ok: true } {
   if (!result.ok) throw new Error(`expected success, got: ${result.error} ${JSON.stringify(result.fieldErrors ?? {})}`);
   s = result.state;
@@ -23,16 +23,19 @@ describe('validation', () => {
   });
 
   it('checks deposit and card settings', () => {
-    const errors = T.validateTreasury({ ...input(), physicalCardFee: 500, cardDeliveryFee: -1, minDeposit: 100, maxDeposit: 50, depositThreshold: -5, highValueDeposit: 0 });
-    expect(Object.keys(errors).sort()).toEqual(['cardDeliveryFee', 'depositThreshold', 'highValueDeposit', 'maxDeposit', 'physicalCardFee']);
+    const errors = T.validateTreasury({ ...input(), physicalCardFee: 500, cardDeliveryFee: -1, depositThreshold: -5, highValueDeposit: 0, depositDualControlThreshold: -1 });
+    expect(Object.keys(errors).sort()).toEqual(['cardDeliveryFee', 'depositDualControlThreshold', 'depositThreshold', 'highValueDeposit', 'physicalCardFee']);
+    expect(T.validateTreasury({ ...input(), depositDualControlThreshold: 0 })).toEqual({});
   });
 });
 
 describe('saving', () => {
   it('applies to new requests and logs a readable summary, leaving withdrawal methods as they are', () => {
     const methods = s.treasury.channels;
-    accept(T.updateTreasury(s, s.treasury.updatedAt, { ...input(), minDeposit: 50, applicationFee: 2 }, FINANCE, now));
-    expect(s.treasury.changeLog.at(-1)).toMatchObject({ by: FINANCE, summary: 'Changed minimum deposit, application fee.' });
+    const depositMethods = s.treasury.depositMethods;
+    accept(T.updateTreasury(s, s.treasury.updatedAt, { ...input(), depositDualControlThreshold: 5000, physicalCardFee: 2 }, FINANCE, now));
+    expect(s.treasury.changeLog.at(-1)).toMatchObject({ by: FINANCE, summary: 'Changed physical card fee, deposit two-person threshold.' });
+    expect(s.treasury.depositMethods).toBe(depositMethods);
     expect(s.treasury.channels).toBe(methods);
     expect(M.validateWithdrawal(s, 600, 'bank')).toBeNull();
   });

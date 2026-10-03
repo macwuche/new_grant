@@ -5,6 +5,8 @@ import * as M from './money';
 import * as R from './rules';
 import { createSeedState } from './seed';
 import { migrateState } from './migrate';
+import * as V from './review';
+import { CURRENT_APPLICANT_ID } from './seed';
 
 const now = new Date('2026-09-25T12:00:00Z');
 let s: DemoState;
@@ -40,30 +42,67 @@ describe('program questions', () => {
     expect(G.updateProgram(s, 'creative', creative.updatedAt, { ...input, questions }, 'Sam Rivera', now).ok).toBe(false); // creative has submissions
     const space = grant('space');
     const { updatedAt: _u2, changeLog: _c2, status: _s2, id: _i2, ...draftInput } = space;
-    expect(G.validateProgram(s, { ...draftInput, questions: [...questions, { id: '', label: 'link to your portfolio', type: 'number', required: false }] }, now, space).questions).toMatch(/must be different/);
+    expect(G.validateProgram(s, { ...draftInput, questions: [...questions, { id: '', label: 'link to your portfolio', type: 'number', required: false }] }, now, space).questions).toMatch(/different label/);
     accept(G.updateProgram(s, 'space', space.updatedAt, { ...draftInput, questions: [...questions, { id: '', label: '', type: 'text', required: false }] }, 'Sam Rivera', now));
     expect(grant('space').questions).toEqual([{ id: 'link-to-your-portfolio', label: 'Link to your portfolio', type: 'text', required: true }]);
-    expect(G.validateProgram(s, { ...draftInput, questions: Array.from({ length: 7 }, (_, i) => ({ id: `q${i}`, label: `Question ${i}`, type: 'text' as const, required: false })) }, now, space).questions).toMatch(/at most 6/);
+    expect(G.validateProgram(s, { ...draftInput, questions: Array.from({ length: 16 }, (_, i) => ({ id: `q${i}`, label: `Question ${i}`, type: 'text' as const, required: false })) }, now, space).questions).toMatch(/at most 15/);
   });
 });
 
-describe('application fee', () => {
+describe('commission', () => {
   const complete = () => ({ ...app('APP-2101'), purpose: 'Replace the kiln with an efficient electric model.', checklist: grant('green').requirements });
+  const deposit = () => R.computeBalances(R.ownTransactions(s)).deposit;
+  const submitAndReview = () => {
+    accept(R.submitApplication(s, 'green', complete(), now, 'APP-2101'));
+    accept(V.startReview(s, 'APP-2101', app('APP-2101').updatedAt, 'Avery Taylor', now));
+  };
 
-  it('charges the deposit balance once, on first submission', () => {
-    s = { ...s, treasury: { ...s.treasury, applicationFee: 15 } };
-    const before = R.computeBalances(R.ownTransactions(s)).deposit;
+  it('charges nothing at submission and fixes the plan’s rate on the application', () => {
+    const before = s.transactions.length;
     const result = accept(R.submitApplication(s, 'green', complete(), now, 'APP-2101'));
-    expect(result.message).toMatch(/\$15\.00 application fee/);
-    expect(R.computeBalances(R.ownTransactions(s)).deposit).toBe(before - 15);
-    expect(s.transactions[0]).toMatchObject({ type: 'Application fee', amount: -15 });
+    expect(result.message).not.toMatch(/fee|commission/);
+    expect(s.transactions).toHaveLength(before);
+    expect(app('APP-2101').commissionRate).toBe(8);
+    expect(s.notifications[0]!.body).toMatch(/8% commission on the amount approved is taken from your deposit balance/);
   });
 
-  it('blocks submission when the deposit balance cannot cover it', () => {
-    s = { ...s, treasury: { ...s.treasury, applicationFee: 99 }, transactions: s.transactions.filter(t => t.type !== 'Deposit') };
-    const result = R.submitApplication(s, 'green', complete(), now, 'APP-2101');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/application fee/);
+  it('takes the commission on the approved amount from the deposit balance on approval, even below zero', () => {
+    s = { ...s, transactions: s.transactions.filter(t => t.applicantId !== CURRENT_APPLICANT_ID || t.type !== 'Deposit') };
+    submitAndReview();
+    const before = deposit();
+    const result = accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 2500, 'Avery Taylor', now));
+    expect(result.message).toMatch(/\$200\.00 commission taken/);
+    expect(s.transactions.slice(0, 2)).toMatchObject([
+      { type: 'Commission', amount: -200, status: 'Completed', applicantId: CURRENT_APPLICANT_ID },
+      { type: 'Grant', amount: 2500 },
+    ]);
+    expect(s.transactions[0]!.id).not.toBe(s.transactions[1]!.id);
+    expect(deposit()).toBe(before - 200);
+    expect(deposit()).toBeLessThan(0);
+    expect(s.notifications[0]!.body).toMatch(/8% commission \(\$200\.00\) has been taken from your deposit balance/);
+  });
+
+  it('uses the rate fixed at submission, not a later change to the plan', () => {
+    submitAndReview();
+    s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 50 } : g) };
+    accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 1000, 'Avery Taylor', now));
+    expect(s.transactions[0]).toMatchObject({ type: 'Commission', amount: -80 });
+  });
+
+  it('keeps the first rate through a resubmission', () => {
+    submitAndReview();
+    accept(V.requestChanges(s, 'APP-2101', app('APP-2101').updatedAt, 'Please add the installer quote.', 'Avery Taylor', now));
+    s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 20 } : g) };
+    accept(R.submitApplication(s, 'green', complete(), now, 'APP-2101'));
+    expect(app('APP-2101').commissionRate).toBe(8);
+  });
+
+  it('adds no ledger entry when the plan takes no commission', () => {
+    s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 0 } : g) };
+    submitAndReview();
+    accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 1000, 'Avery Taylor', now));
+    expect(s.transactions[0]).toMatchObject({ type: 'Grant' });
+    expect(s.transactions.some(t => t.type === 'Commission')).toBe(false);
   });
 });
 
@@ -116,5 +155,21 @@ describe('saved-data migration v4 → v6', () => {
     expect(migrated.treasury.dualControlThreshold).toBe(2500);
     expect(migrated.lockdown).toBeNull();
     expect(migrated.cards.virtual!.pin).toBeDefined();
+  });
+});
+
+describe('saved data from before commissions', () => {
+  it('gives programs 7 approval days and no commission, applications no rate, and drops the application fee', () => {
+    const fresh = createSeedState();
+    const old = JSON.parse(JSON.stringify({
+      ...fresh,
+      grants: fresh.grants.map(({ approvalDays: _d, commissionRate: _c, ...g }) => g),
+      applications: fresh.applications.map(({ commissionRate: _r, ...a }) => a),
+      treasury: { ...fresh.treasury, applicationFee: 15 },
+    }));
+    const migrated = migrateState(old)!;
+    expect(migrated.grants.every(g => g.approvalDays === 7 && g.commissionRate === 0)).toBe(true);
+    expect(migrated.applications.every(a => a.commissionRate === null)).toBe(true);
+    expect('applicationFee' in migrated.treasury).toBe(false);
   });
 });

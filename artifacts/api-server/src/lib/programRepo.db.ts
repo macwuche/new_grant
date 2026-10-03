@@ -12,6 +12,7 @@ export const toGrant = (row: ProgramRow): Grant => ({
   maxFunding: row.maxFunding, minimumRequest: row.minimumRequest, budget: row.budget, deadline: row.deadline,
   minimumTier: row.minimumTier as Tier, requirements: row.requirements, requiresRegistration: row.requiresRegistration,
   questions: row.questions.map(q => ({ id: q.id, label: q.label, type: q.type, required: q.required })),
+  approvalDays: row.approvalDays, commissionRate: row.commissionRate,
   changeLog: row.changeLog.map(c => ({ at: c.at, by: c.by, summary: c.summary })), updatedAt: row.updatedAt.toISOString(),
 });
 
@@ -19,7 +20,7 @@ export const toProgramRow = (g: Grant) => ({
   status: g.status, name: g.name, summary: g.summary, focus: g.focus,
   maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline,
   minimumTier: g.minimumTier, requirements: g.requirements, requiresRegistration: g.requiresRegistration,
-  questions: g.questions, changeLog: g.changeLog, updatedAt: new Date(g.updatedAt),
+  questions: g.questions, approvalDays: g.approvalDays, commissionRate: g.commissionRate, changeLog: g.changeLog, updatedAt: new Date(g.updatedAt),
 });
 
 // Compare versions at millisecond precision (JavaScript dates); see profileRepo.db.ts.

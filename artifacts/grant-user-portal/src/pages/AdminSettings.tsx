@@ -1,12 +1,13 @@
 import type { ComponentType } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, ArrowRight, Banknote, ClipboardList, FileText, Info, Mail, Palette, ShieldCheck, Users, WalletCards, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Banknote, ClipboardList, FileText, Info, Landmark, Mail, Palette, ShieldCheck, Users, WalletCards, type LucideIcon } from 'lucide-react';
+import { hasPlaceholderDetails } from '@workspace/domain/depositMethods';
 import { useAppName } from '@/lib/appName';
 import { useSession } from '@/lib/session';
 import { useDemoStore } from '@/lib/store';
 import { AdminEmailSettings } from './AdminEmailSettings';
 import { AdminTreasurySettings } from './AdminTreasurySettings';
-import { AdminWithdrawalMethods } from './AdminWithdrawalMethods';
+import { AdminDepositMethods, AdminWithdrawalMethods } from './AdminPaymentMethods';
 import { AdminTeamServer, AdminTeamSettings } from './AdminStaff';
 import { AppNameSettings } from './AppNameSettings';
 import { BrandColorSettings } from './BrandColorSettings';
@@ -37,11 +38,16 @@ function BrandingPage() { return <><AppNameSettings /><BrandColorSettings /></>;
 
 function MoneyStatus() {
   const { depositThreshold } = useDemoStore().state.treasury;
-  return <>Reserve ${depositThreshold.toLocaleString('en-US')} · card and application fees</>;
+  return <>Reserve ${depositThreshold.toLocaleString('en-US')} · card fees</>;
 }
 function MethodsStatus() {
   const { channels } = useDemoStore().state.treasury;
   return <>{channels.filter(c => c.enabled).length} of {channels.length} available to users</>;
+}
+function DepositMethodsStatus() {
+  const { depositMethods } = useDemoStore().state.treasury;
+  const samples = depositMethods.filter(m => m.enabled && hasPlaceholderDetails(m)).length;
+  return <>{depositMethods.filter(m => m.enabled).length} of {depositMethods.length} available to users{samples ? ` · ${samples} with sample details` : ''}</>;
 }
 function BrandingStatus() { return <>Name: {useAppName().name}</>; }
 function AppInfoStatus() { return <>{useSignedIn() ? 'Signed in · server records' : 'Preview · this browser only'}</>; }
@@ -73,7 +79,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'email', title: 'Email', icon: Mail, access: 'Super admin', Status: EmailStatus, Page: EmailPage,
     description: 'Resend connection, sender and team mailbox, sending domain and DNS, webhook, sign-up verification, and delivery status.' },
   { id: 'money', title: 'Money', icon: Banknote, access: 'Finance', Status: MoneyStatus, Page: AdminTreasurySettings,
-    description: 'Card fees, deposit limits and reserve, the two-person threshold, and the application fee.' },
+    description: 'Card fees, the deposit reserve, and the two-person thresholds for payouts and deposits. Commission is set on each grant program.' },
+  { id: 'deposit-methods', title: 'Deposit methods', icon: Landmark, access: 'Finance', Status: DepositMethodsStatus, Page: AdminDepositMethods,
+    description: 'How users add funds: where to send the money, each method\'s photo, limits, charges, processing time, instructions, proof of payment, and the form users fill in.' },
   { id: 'withdrawal-methods', title: 'Withdrawal methods', icon: WalletCards, access: 'Finance', Status: MethodsStatus, Page: AdminWithdrawalMethods,
     description: 'How users are paid out: each method\'s photo, limits, charges, processing time, instructions, balance, and the form users fill in.' },
   { id: 'team', title: 'Team & roles', icon: Users, access: 'Super admin', Page: TeamPage,

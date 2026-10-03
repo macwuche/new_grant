@@ -13,6 +13,10 @@ export { fail, nextIds, roundCents };
 
 export const MIN_PURPOSE_LENGTH = 30;
 export const MAX_ANSWER_LENGTH = 500;
+export const MAX_LONG_ANSWER_LENGTH = 2000;
+
+/** Form fields answered by typing (file fields are answered by uploads, checked by the API). */
+const typedQuestions = (grant: Grant) => grant.questions.filter(q => q.type !== 'file');
 
 /** Statuses the applicant can still edit and (re)submit. */
 export const EDITABLE_STATUSES: ApplicationStatus[] = ['Draft', 'Changes requested'];
@@ -96,13 +100,14 @@ export function validateApplication(input: ApplicationInput, grant: Grant, upToS
   if (upToStep >= 2) {
     const missing = grant.requirements.filter(r => !input.checklist.includes(r));
     if (missing.length) errors.checklist = `Confirm you have every requirement ready (${missing.length} remaining).`;
-    for (const q of grant.questions) {
+    for (const q of typedQuestions(grant)) {
       const value = (input.answers?.[q.id] ?? '').trim();
       const key = `answers.${q.id}`;
+      const limit = q.type === 'textarea' ? MAX_LONG_ANSWER_LENGTH : MAX_ANSWER_LENGTH;
       if (!value) { if (q.required) errors[key] = 'Answer this question.'; continue; }
       if (q.type === 'number' && !/^\d+(\.\d{1,2})?$/.test(value.replace(/,/g, ''))) errors[key] = 'Enter a number (digits only).';
       else if (q.type === 'yesno' && value !== 'Yes' && value !== 'No') errors[key] = 'Choose yes or no.';
-      else if (value.length > MAX_ANSWER_LENGTH) errors[key] = `Keep answers under ${MAX_ANSWER_LENGTH} characters.`;
+      else if (value.length > limit) errors[key] = `Keep answers under ${limit} characters.`;
     }
   }
   return errors;
@@ -115,7 +120,7 @@ function normalizeInput(input: ApplicationInput, grant: Grant): ApplicationInput
     registrationNumber: input.registrationNumber.trim(),
     purpose: input.purpose.trim(),
     checklist: grant.requirements.filter(r => input.checklist.includes(r)),
-    answers: Object.fromEntries(grant.questions.map(q => [q.id, (input.answers?.[q.id] ?? '').trim()]).filter(([, v]) => v)),
+    answers: Object.fromEntries(typedQuestions(grant).map(q => [q.id, (input.answers?.[q.id] ?? '').trim()]).filter(([, v]) => v)),
   };
 }
 
@@ -140,7 +145,7 @@ export function saveDraft(state: DemoState, grantId: string, input: ApplicationI
   if (eligibility.existing && isEditable(eligibility.existing)) return saveDraft(state, grantId, input, now, eligibility.existing.id);
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
   const ids = nextIds(state);
-  const draft: Application = { id: ids.app, applicantId: CURRENT_APPLICANT_ID, grantId, status: 'Draft', ...fields, createdAt: at, updatedAt: at, submittedAt: null, reviewer: null, awardedAmount: null, history: [{ status: 'Draft', at, actor: 'Applicant', note: 'Draft started.' }], internalNotes: [], escalation: null };
+  const draft: Application = { id: ids.app, applicantId: CURRENT_APPLICANT_ID, grantId, status: 'Draft', ...fields, createdAt: at, updatedAt: at, submittedAt: null, reviewer: null, awardedAmount: null, commissionRate: null, history: [{ status: 'Draft', at, actor: 'Applicant', note: 'Draft started.' }], internalNotes: [], escalation: null };
   return { ok: true, id: draft.id, message: 'Draft saved.', state: { ...state, nextId: ids.nextId, applications: [draft, ...state.applications] } };
 }
 
@@ -157,9 +162,6 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
   if (switchedOff) return fail(switchedOff);
   const eligibility = checkEligibility(grant, state.profile, others, now, { allowClosed: resubmitting });
   if (!eligibility.eligible) return fail(eligibility.reasons[0]);
-  // A processing fee (if finance set one) is charged once, on first submission, from the deposit balance.
-  const fee = resubmitting ? 0 : state.treasury.applicationFee;
-  if (fee > 0 && computeBalances(ownTransactions(state)).deposit < fee) return fail(`Submitting needs ${usd(fee)} in your deposit balance for the application fee. Add funds first.`);
 
   const saved = saveDraft(state, grantId, input, now, draftId);
   if (!saved.ok) return saved;
@@ -168,25 +170,23 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
   const before = saved.state.applications.find(a => a.id === id)!;
   if (!canTransition(before.status, 'Submitted')) return fail('This application can no longer be submitted.');
   const resubmission = before.status === 'Changes requested';
+  // Nothing is charged now. The program's commission rate is fixed on the application at its
+  // first submission and taken from the deposit balance only if it's approved (./review).
   const next = saved.state.applications.map(a => a.id !== id ? a : {
-    ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at,
+    ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at, commissionRate: a.commissionRate ?? grant.commissionRate,
     history: [...a.history, { status: 'Submitted' as const, at, actor: 'Applicant' as const, note: resubmission ? 'Application resubmitted with the requested changes.' : 'Application submitted.' }],
   });
-  let charged: DemoState = { ...saved.state, applications: next };
-  if (fee > 0) {
-    const ids = nextIds(charged);
-    const tx: Transaction = { id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Application fee', description: `${grant.name} application fee (${id})`, amount: -fee, status: 'Completed', createdAt: at };
-    charged = { ...charged, nextId: ids.nextId, transactions: [tx, ...charged.transactions] };
-  }
-  const logged = logStaff(charged, {
+  const rate = next.find(a => a.id === id)!.commissionRate ?? 0;
+  const commission = rate > 0 ? ` If it's approved, a ${rate}% commission on the amount approved is taken from your deposit balance.` : '';
+  const logged = logStaff({ ...saved.state, applications: next }, {
     kind: 'application',
     title: resubmission ? `${id} resubmitted with changes` : `New application ${id}`,
     body: `${state.profile.name} · ${grant.name} · $${input.requestedAmount.toLocaleString('en-US')}`,
     href: '/admin/applications',
   }, now);
   const notified = notify(logged, CURRENT_APPLICANT_ID, `${grant.name} application ${resubmission ? 'resubmitted' : 'received'}`,
-    `Your application ${id} for ${usd(input.requestedAmount)} is pending review.${fee > 0 ? ` A ${usd(fee)} application fee was charged to your deposit balance.` : ''} We'll let you know when a reviewer picks it up and when there's a decision.`, `/applications/${id}`, now);
-  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.${fee > 0 ? ` ${usd(fee)} application fee charged to your deposit balance.` : ''}`, state: notified };
+    `Your application ${id} for ${usd(input.requestedAmount)} is pending review.${commission} We'll let you know when a reviewer picks it up and when there's a decision.`, `/applications/${id}`, now);
+  return { ok: true, id, message: `${grant.name} application ${resubmission ? 'resubmitted' : 'submitted'}.`, state: notified };
 }
 
 export function deleteDraft(state: DemoState, id: string): Result {
@@ -213,8 +213,10 @@ export function computeBalances(transactions: Transaction[]): Balances {
     if (tx.type === 'Grant' && tx.status === 'Completed') grant += tx.amount;
     // Withdrawals come from the grant balance unless the method paid out from the deposit balance.
     if (tx.type === 'Withdrawal') { if (tx.source === 'deposit') deposit += tx.amount; else { grant += tx.amount; if (tx.status === 'Pending') pendingWithdrawals -= tx.amount; } }
-    if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount; else pendingDeposits += tx.amount; }
-    if (tx.type === 'Card fee' || tx.type === 'Application fee' || tx.type === 'Deposit adjustment') deposit += tx.amount;
+    // A confirmed deposit is credited less the method's charge (older deposits have none).
+    if (tx.type === 'Deposit') { if (tx.status === 'Completed') deposit += tx.amount - (tx.fee ?? 0); else pendingDeposits += tx.amount; }
+    // Fees and commissions come from the deposit balance, which may go negative (a later deposit clears it).
+    if (tx.type === 'Card fee' || tx.type === 'Application fee' || tx.type === 'Commission' || tx.type === 'Deposit adjustment') deposit += tx.amount;
     if (tx.type === 'Grant adjustment') grant += tx.amount;
     // Card moves: the amount is the change to the card balance; the other side moves the opposite way.
     if (tx.type === 'Card top-up' || tx.type === 'Card deduction') {

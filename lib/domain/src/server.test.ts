@@ -35,8 +35,8 @@ describe('serverState', () => {
     expect(slot.profile).not.toHaveProperty('twoFactor');
   });
 
-  it('charges no application fee on the server, and hides staff-only fields from applicants', () => {
-    expect(serverState({}).treasury.applicationFee).toBe(0);
+  it('hides staff-only fields from applicants', () => {
+    expect('applicationFee' in serverState({}).treasury).toBe(false);
     const app = { ...createSeedState().applications[0]!, reviewer: 'Avery Taylor', internalNotes: [{ at: 'x', author: 'Avery', text: 'secret' }] };
     expect(applicantView(app)).toMatchObject({ reviewer: null, internalNotes: [], escalation: null });
   });

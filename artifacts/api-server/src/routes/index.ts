@@ -21,7 +21,7 @@ import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
 import { authEmailHookRouter } from "./authEmailHook";
 import { brandingRouter, emailRouter, emailWebhookRouter } from "./email";
-import { moneyRouter, withdrawalMethodPhotoRouter } from "./money";
+import { methodPhotoRouter, moneyRouter } from "./money";
 import healthRouter from "./health";
 import meRouter from "./me";
 import { profileRouter, supabasePasswordChecker } from "./profile";
@@ -50,8 +50,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(authEmailHookRouter(email));
   // The application name, for pages shown before sign-in.
   router.use(brandingRouter(emailSettings));
-  // Withdrawal method photos, for image tags (public; the bytes are checked against their recorded hash).
-  router.use(withdrawalMethodPhotoRouter(moneyRepo, fileStore));
+  // Withdrawal and deposit method photos, for image tags (public; the bytes are checked against their recorded hash).
+  router.use(methodPhotoRouter(moneyRepo, fileStore));
   // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
   const writes = rateLimiter(limit.writes, byUser);
   const uploads = rateLimiter(limit.uploads, byUser);
@@ -60,6 +60,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.post("/documents", uploads);
   router.put("/profile/avatar", uploads);
   router.put("/money/methods/:methodId/photo", uploads);
+  router.put("/money/deposit-methods/:methodId/photo", uploads);
+  router.put("/money/deposits/:id/proof", uploads);
   router.post("/profile/check-password", rateLimiter(limit.passwordChecks, byUser));
   router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
   router.use(meRouter(staffMfa));

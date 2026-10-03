@@ -90,9 +90,9 @@ describe('audit log', () => {
   it('flattens nested settings into readable field paths', () => {
     const { updatedAt: _u, changeLog: _c, ...input } = s.treasury;
     const { channels: _ch, ...rest } = input;
-    const next = { ...rest, applicationFee: 5 };
+    const next = { ...rest, physicalCardFee: 5 };
     accept(S.asStaff(s, 'treasury.manage', { action: 'Update money settings', target: 'treasury' }, now, (st, actor) => T.updateTreasury(st, st.treasury.updatedAt, next, actor.name, now)));
-    expect(s.audit.at(-1)!.changes).toEqual([{ field: 'applicationFee', before: '0', after: '5' }]);
+    expect(s.audit.at(-1)!.changes).toEqual([{ field: 'physicalCardFee', before: '8.5', after: '5' }]);
     expect(s.audit.at(-1)!.applicantId).toBeNull();
   });
 

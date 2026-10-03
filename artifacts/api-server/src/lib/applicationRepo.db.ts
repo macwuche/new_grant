@@ -10,7 +10,7 @@ import { toGrant, toProgramRow } from "./programRepo.db";
 const toApplication = (r: ApplicationRow): Application => ({
   id: r.id, applicantId: r.applicantId, grantId: r.grantId, status: r.status,
   businessName: r.businessName, requestedAmount: r.requestedAmount, registrationNumber: r.registrationNumber, purpose: r.purpose,
-  checklist: r.checklist, answers: r.answers,
+  checklist: r.checklist, answers: r.answers, commissionRate: r.commissionRate,
   createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), submittedAt: r.submittedAt?.toISOString() ?? null,
   reviewer: r.reviewer, awardedAmount: r.awardedAmount,
   history: r.history.map(h => ({ status: h.status, at: h.at, actor: h.actor, note: h.note })),
@@ -26,7 +26,7 @@ const toApplication = (r: ApplicationRow): Application => ({
 const toRow = (a: Application) => ({
   id: a.id, applicantId: a.applicantId, grantId: a.grantId, status: a.status,
   businessName: a.businessName, requestedAmount: a.requestedAmount, registrationNumber: a.registrationNumber, purpose: a.purpose,
-  checklist: a.checklist, answers: a.answers,
+  checklist: a.checklist, answers: a.answers, commissionRate: a.commissionRate,
   createdAt: new Date(a.createdAt), updatedAt: new Date(a.updatedAt), submittedAt: a.submittedAt ? new Date(a.submittedAt) : null,
   reviewer: a.reviewer, awardedAmount: a.awardedAmount, history: a.history, internalNotes: a.internalNotes, escalation: a.escalation,
 });

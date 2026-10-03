@@ -21,7 +21,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'notes.add': 'add internal notes',
   'programs.manage': 'manage grant programs',
   'payments.process': 'process deposits and payouts',
-  'payments.release': 'give the second sign-off on large payouts',
+  'payments.release': 'give the second sign-off on large payouts and deposits',
   'treasury.manage': 'change money settings',
   'kyc.review': 'review identity checks',
   'accounts.manage': 'lock accounts and force credential resets',

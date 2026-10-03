@@ -7,15 +7,14 @@
  */
 
 /**
- * Money settings as finance edits them on Settings - Money; withdrawal methods have their own endpoints
+ * Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
  */
 export interface TreasuryInput {
   physicalCardFee: number;
   cardDeliveryFee: number;
-  minDeposit: number;
-  maxDeposit: number;
   depositThreshold: number;
   highValueDeposit: number;
   dualControlThreshold: number;
-  applicationFee: number;
+  /** Deposits at or above this need a second staff member's approval before confirming; 0 for never */
+  depositDualControlThreshold: number;
 }

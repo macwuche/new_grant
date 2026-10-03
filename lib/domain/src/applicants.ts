@@ -62,7 +62,7 @@ export function accountLockReason(state: DemoState): string | null {
 
 // ---------- Permissions staff switch per applicant ----------
 
-export const DEFAULT_PERMISSIONS: AccountPermissions = { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true };
+export const DEFAULT_PERMISSIONS: AccountPermissions = { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false };
 export const permissionsOf = (state: DemoState, applicantId = CURRENT_APPLICANT_ID): AccountPermissions => ({ ...DEFAULT_PERMISSIONS, ...accountOf(state, applicantId).permissions });
 
 /** Why the demo applicant can't do `what` because of a switch staff set, or null. */

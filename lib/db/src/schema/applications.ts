@@ -26,6 +26,8 @@ export const applicationsTable = pgTable("applications", {
   purpose: text("purpose").notNull(),
   checklist: jsonb("checklist").$type<string[]>().notNull(),
   answers: jsonb("answers").$type<Record<string, string>>().notNull(),
+  /** The program's commission rate fixed at first submission (null for drafts and rows from before 3 Oct 2026). */
+  commissionRate: numeric("commission_rate", { precision: 5, scale: 2, mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),

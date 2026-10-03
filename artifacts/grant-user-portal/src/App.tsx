@@ -31,6 +31,7 @@ import { CURRENT_APPLICANT_ID } from '@workspace/domain/seed';
 import { accountLockReason, accountOf } from '@workspace/domain/applicants';
 import { KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
 import { lockdownMessage } from '@workspace/domain/security';
+import { commissionFor } from '@workspace/domain/core';
 import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
@@ -191,7 +192,7 @@ function Dashboard({ onToast }: { onToast: Toast }) {
       <Metric label="Eligible amount" value={money(maxEligibleAward(state.grants, state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
       <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" 
         action={<Link href="/withdrawals" className="metric-action" data-testid="link-dashboard-withdraw"><ArrowUpRight size={13} aria-hidden="true" />Withdraw</Link>} />
-      <Metric label="Successful deposit" value={money(balances.deposit)} helper={balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees'}
+      <Metric label="Successful deposit" value={money(balances.deposit)} helper={balances.deposit < 0 ? 'Below zero: a deposit clears it' : balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees and commissions'}
         action={<Link href="/deposits" className="metric-action" data-testid="link-dashboard-deposit"><Plus size={13} aria-hidden="true" />Deposit</Link>} />
       <Metric label="Account tier" value={`Tier ${state.profile.tier}`} helper={state.profile.identityVerified ? 'Verified applicant' : 'Verification needed'} />
     </section>
@@ -229,8 +230,10 @@ function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
     : existing ? <Link className="btn btn-ghost" style={{ flex: 1 }} href={`/applications/${existing.id}`} data-testid={`link-apply-${grant.id}`}>View application <ArrowRight size={14} /></Link>
     : eligible ? <Link className="btn btn-dark" style={{ flex: 1 }} href={`/applications/new/${grant.id}`} data-testid={`link-apply-${grant.id}`}>Start application <ArrowRight size={14} /></Link>
     : <button className="btn btn-dark" style={{ flex: 1 }} disabled data-testid={`link-apply-${grant.id}`}>Not eligible</button>;
-  const details = reasons.length ? reasons.join(' ') : `You meet the requirements. You'll need: ${grant.requirements.join(', ')}.`;
-  return <div className="card grant-card" data-testid={`grant-card-${grant.id}`}><div className="grant-top"><div className="grant-symbol"><GrantIcon size={19} /></div>{badge}</div><h3>{grant.name}</h3><p>{grant.summary}</p><div className="grant-meta"><div className="grant-meta-item"><span className="grant-meta-label">Up to</span><span className="grant-meta-value">{money(grant.maxFunding)}</span></div><div className="grant-meta-item"><span className="grant-meta-label">Deadline</span><span className="grant-meta-value">{fmtDate(grant.deadline)}</span></div></div><div style={{ display: 'flex', gap: 8 }}>{action}<button className="icon-btn" onClick={() => onToast(details)} aria-label={`View ${grant.name} details`} data-testid={`button-details-${grant.id}`}><Info size={15} /></button></div></div>;
+  const needs = [...grant.requirements, ...grant.questions.filter(q => q.type === 'file' && q.required).map(q => q.label)];
+  const terms = `Usually decided within ${grant.approvalDays} day${grant.approvalDays === 1 ? '' : 's'}.${grant.commissionRate > 0 ? ` If approved, a ${grant.commissionRate}% commission on the amount approved is taken from your deposit balance.` : ''}`;
+  const details = reasons.length ? reasons.join(' ') : `You meet the requirements.${needs.length ? ` You'll need: ${needs.join(', ')}.` : ''} ${terms}`;
+  return <div className="card grant-card" data-testid={`grant-card-${grant.id}`}><div className="grant-top"><div className="grant-symbol"><GrantIcon size={19} /></div>{badge}</div><h3>{grant.name}</h3><p>{grant.summary}</p><div className="grant-meta"><div className="grant-meta-item"><span className="grant-meta-label">Up to</span><span className="grant-meta-value">{money(grant.maxFunding)}</span></div><div className="grant-meta-item"><span className="grant-meta-label">Deadline</span><span className="grant-meta-value">{fmtDate(grant.deadline)}</span></div><div className="grant-meta-item"><span className="grant-meta-label">Commission</span><span className="grant-meta-value" data-testid={`text-commission-${grant.id}`}>{grant.commissionRate > 0 ? `${grant.commissionRate}%` : 'None'}</span></div><div className="grant-meta-item"><span className="grant-meta-label">Decision</span><span className="grant-meta-value">~{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</span></div></div><div style={{ display: 'flex', gap: 8 }}>{action}<button className="icon-btn" onClick={() => onToast(details)} aria-label={`View ${grant.name} details`} data-testid={`button-details-${grant.id}`}><Info size={15} /></button></div></div>;
 }
 function GrantsPage({ onToast }: { onToast: Toast }) {
   const { state } = useDemoStore();
@@ -303,6 +306,13 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const setField = (key: Exclude<keyof FormState, 'checklist' | 'answers'>, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
   const { docs: myDocs, refresh: refreshDocs } = useMyDocuments(connected);
   const evidence = (req: string) => myDocs.filter(d => d.applicationId === draftId && d.requirement === req);
+  const fileFields = grant.questions.filter(q => q.type === 'file');
+  const typedFields = grant.questions.filter(q => q.type !== 'file');
+  // File fields are stored under `field:<id>` (the API checks required ones at submission).
+  const fieldFiles = (id: string) => evidence(`field:${id}`);
+  const missingFiles = connected ? fileFields.filter(q => q.required && !fieldFiles(q.id).length) : [];
+  const rate = draft?.commissionRate ?? grant.commissionRate;
+  const deposit = computeBalances(ownTransactions(state)).deposit;
   // Signed in, a requirement counts as ready once a file for it is uploaded.
   const withEvidence = grant.requirements.filter(req => myDocs.some(d => d.applicationId === draftId && d.requirement === req)).join('\n');
   useEffect(() => { if (connected) setForm(v => ({ ...v, checklist: withEvidence ? withEvidence.split('\n') : [] })); }, [connected, withEvidence]);
@@ -335,6 +345,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
     const stepErrors = validateApplication(input, grant, step === 1 ? 1 : 2);
     if (step < 3) {
       const relevant = Object.fromEntries(Object.entries(stepErrors).filter(([k]) => step === 1 ? STEP_ONE_FIELDS.includes(k) : k === 'checklist' || k.startsWith('answers.')));
+      if (step === 2) for (const q of missingFiles) relevant[`answers.${q.id}`] = 'Upload a file for this field.';
       if (Object.keys(relevant).length) { setErrors(relevant); return; }
       if (await persistDraft(true)) setStep((step + 1) as ApplicationStep);
       return;
@@ -372,16 +383,27 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       <div className="field field-full"><label className="field-label" htmlFor="purpose">What would this funding unlock?</label><textarea id="purpose" className="textarea" value={form.purpose} onChange={e => setField('purpose', e.target.value)} placeholder="Share a few sentences about your plan..." data-testid="textarea-funding-purpose" {...invalid('purpose')} />{errors.purpose ? <FieldError id="purpose-error" message={errors.purpose} /> : <span className="field-hint">{form.purpose.trim().length} characters · at least 30</span>}</div>
     </div>}
     {step === 2 && <div className="stack" style={{ gap: 13 }}>
-      {connected ? <><div className="notice"><Info size={16} />Upload a file for each requirement: PDF, JPEG, or PNG, up to 10 MB each. Only the grant team can open them.</div>
+      {grant.requirements.length > 0 && (connected ? <><div className="notice"><Info size={16} />Upload a file for each requirement: PDF, JPEG, or PNG, up to 10 MB each. Only the grant team can open them.</div>
       {grant.requirements.map((req, i) => { const files = evidence(req); return <div className="upload upload-files" key={req} data-testid={`row-requirement-${i}`}><div className="upload-icon">{files.length ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{files.length ? `${files.length} file${files.length === 1 ? '' : 's'} uploaded` : 'Required'}</span>
         <DocumentFiles docs={files} editable onDeleted={() => void refreshDocs()} onToast={onToast} /></div>
         {draftId && <UploadButton params={{ purpose: 'application', applicationId: draftId, requirement: req }} label={files.length ? 'Add file' : 'Upload'} onUploaded={() => { void refreshDocs(); setErrors(({ checklist: _, ...rest }) => rest); }} onToast={onToast} testId={`button-upload-requirement-${i}`} />}</div>; })}</>
       : <><div className="notice"><Info size={16} />Confirm you have each document ready. Files aren't uploaded in preview mode.</div>
-      {grant.requirements.map((req, i) => <label className="upload" key={req} style={{ cursor: 'pointer' }}><div className="upload-icon">{form.checklist.includes(req) ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{form.checklist.includes(req) ? 'Marked as ready' : 'Required'}</span></div><input type="checkbox" checked={form.checklist.includes(req)} onChange={() => toggleRequirement(req)} aria-label={`I have ${req} ready`} data-testid={`checkbox-requirement-${i}`} /></label>)}</>}
+      {grant.requirements.map((req, i) => <label className="upload" key={req} style={{ cursor: 'pointer' }}><div className="upload-icon">{form.checklist.includes(req) ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{req}</strong><span>{form.checklist.includes(req) ? 'Marked as ready' : 'Required'}</span></div><input type="checkbox" checked={form.checklist.includes(req)} onChange={() => toggleRequirement(req)} aria-label={`I have ${req} ready`} data-testid={`checkbox-requirement-${i}`} /></label>)}</>)}
       <FieldError id="checklist-error" message={errors.checklist} />
-      {grant.questions.length > 0 && <div className="stack" style={{ gap: 12, marginTop: 8 }} data-testid="section-program-questions"><h3 className="section-title" style={{ fontSize: 14 }}>A few questions from the program team</h3>{grant.questions.map(q => { const id = `question-${q.id}`; const err = errors[`answers.${q.id}`]; const value = form.answers[q.id] ?? ''; return <div className="field" key={q.id}>
+      {grant.questions.length > 0 && <div className="stack" style={{ gap: 12, marginTop: 8 }} data-testid="section-program-questions"><h3 className="section-title" style={{ fontSize: 14 }}>Application form</h3>{grant.questions.map(q => { const id = `question-${q.id}`; const err = errors[`answers.${q.id}`]; const value = form.answers[q.id] ?? '';
+        if (q.type === 'file') { const files = fieldFiles(q.id); return <div className="field" key={q.id}>
+          <span className="field-label" id={id}>{q.label}{q.required ? '' : ' (optional)'}</span>
+          {connected ? <div className="upload upload-files" data-testid={`row-file-field-${q.id}`}><div className="upload-icon">{files.length ? <Check size={15} /> : <FileText size={15} />}</div><div className="upload-copy"><strong>{files.length ? `${files.length} file${files.length === 1 ? '' : 's'} uploaded` : 'PDF, JPEG, or PNG, up to 10 MB'}</strong><span>Only the grant team can open it.</span>
+            <DocumentFiles docs={files} editable onDeleted={() => void refreshDocs()} onToast={onToast} /></div>
+            {draftId && <UploadButton params={{ purpose: 'application', applicationId: draftId, requirement: `field:${q.id}` }} label={files.length ? 'Add file' : 'Upload'} onUploaded={() => { void refreshDocs(); setErrors(({ [`answers.${q.id}`]: _, ...rest }) => rest); }} onToast={onToast} testId={`button-upload-field-${q.id}`} />}</div>
+            : <div className="notice"><Info size={16} />Documents are uploaded when you're signed in; this preview skips them.</div>}
+          <FieldError id={`${id}-error`} message={err} />
+        </div>; }
+        return <div className="field" key={q.id}>
         <label className="field-label" htmlFor={id}>{q.label}{q.required ? '' : ' (optional)'}</label>
-        {q.type === 'yesno'
+        {q.type === 'textarea'
+          ? <textarea id={id} className="textarea" value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`textarea-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />
+          : q.type === 'yesno'
           ? <select id={id} className="select" value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`select-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined}><option value="">Choose…</option><option>Yes</option><option>No</option></select>
           : <input id={id} className="input" inputMode={q.type === 'number' ? 'decimal' : undefined} value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`input-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />}
         <FieldError id={`${id}-error`} message={err} />
@@ -394,10 +416,20 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
         <div className="fee-row"><span>Requested amount</span><strong>{money(input.requestedAmount || 0)}</strong></div>
         <div className="fee-row"><span>Project or business</span><strong>{form.businessName.trim()}</strong></div>
         <div className="fee-row"><span>Registration number</span><strong>{form.registrationNumber.trim() || 'Not provided'}</strong></div>
-        <div className="fee-row"><span>{connected ? 'Requirements with files' : 'Requirements ready'}</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>
-        {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{form.answers[q.id]?.trim() || '—'}</strong></div>)}
-        {!changeRequest && state.treasury.applicationFee > 0 && <div className="fee-row"><span>Application fee (from deposit balance)</span><strong>{money(state.treasury.applicationFee)}</strong></div>}
+        {grant.requirements.length > 0 && <div className="fee-row"><span>{connected ? 'Requirements with files' : 'Requirements ready'}</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>}
+        {typedFields.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong style={{ whiteSpace: 'pre-wrap' }}>{form.answers[q.id]?.trim() || '—'}</strong></div>)}
+        {connected && fileFields.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{fieldFiles(q.id).length ? `${fieldFiles(q.id).length} file${fieldFiles(q.id).length === 1 ? '' : 's'}` : 'None'}</strong></div>)}
+        <div className="fee-row"><span>Usually decided within</span><strong>{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</strong></div>
         <div className="fee-row"><span>Current state</span><StatusBadge status={draft?.status ?? 'Draft'} /></div>
+      </div>
+      <div className="card" style={{ padding: 16, background: 'hsl(var(--background))' }} data-testid="section-commission-summary">
+        <div className="fee-row"><span>Commission</span><strong data-testid="text-commission-rate">{rate > 0 ? `${rate}% of the amount approved` : 'None'}</strong></div>
+        {rate > 0 && <>
+          <div className="fee-row"><span>If approved in full ({money(input.requestedAmount || 0)})</span><strong data-testid="text-commission-amount">{money(commissionFor(input.requestedAmount || 0, rate))}</strong></div>
+          <div className="fee-row"><span>Deposit balance now</span><strong>{money(deposit)}</strong></div>
+          <div className="fee-row"><span>Deposit balance after approval</span><strong data-testid="text-deposit-after">{money(deposit - commissionFor(input.requestedAmount || 0, rate))}</strong></div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Nothing is charged when you submit. If the grant is approved, the commission on the amount approved is taken from your deposit balance, even if that takes it below zero; a deposit clears it. The award itself goes to your grant balance.</p>
+        </>}
       </div>
       <div><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{form.purpose.trim()}</p></div>
     </div>}
@@ -412,7 +444,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       <button className="btn btn-primary" onClick={() => void next()} disabled={busy} data-testid="button-application-next">{step === 3 ? (changeRequest ? 'Resubmit application' : 'Submit application') : 'Continue'} <ArrowRight size={15} /></button>
     </div>
   </div>
-  <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Before you begin</h2><p className="section-subtitle">Key details for this category.</p></div><FileCheck2 size={20} color="hsl(var(--lime-deep))" /></div><div className="timeline"><TimelineRow title={`${money(grant.minimumRequest)} – ${money(grant.maxFunding)}`} text="Allowed request range." done /><TimelineRow title={`Minimum Tier ${grant.minimumTier}`} text={tierOk ? `Your Tier ${state.profile.tier} account qualifies.` : `Your account is Tier ${state.profile.tier}, so it can't be submitted.`} done={tierOk} /><TimelineRow title={fmtDate(grant.deadline)} text={daysLeft >= 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to submit.` : 'Deadline has passed.'} current={daysLeft >= 0 && daysLeft <= 14} /></div></div><Link className="btn btn-ghost" href="/grants" data-testid="link-back-to-grants"><ArrowLeft size={15} /> Back to grant categories</Link></aside></div>;
+  <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Before you begin</h2><p className="section-subtitle">Key details for this category.</p></div><FileCheck2 size={20} color="hsl(var(--lime-deep))" /></div><div className="timeline"><TimelineRow title={`${money(grant.minimumRequest)} – ${money(grant.maxFunding)}`} text="Allowed request range." done /><TimelineRow title={`Minimum Tier ${grant.minimumTier}`} text={tierOk ? `Your Tier ${state.profile.tier} account qualifies.` : `Your account is Tier ${state.profile.tier}, so it can't be submitted.`} done={tierOk} /><TimelineRow title={fmtDate(grant.deadline)} text={daysLeft >= 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to submit.` : 'Deadline has passed.'} current={daysLeft >= 0 && daysLeft <= 14} /><TimelineRow title={`About ${grant.approvalDays} day${grant.approvalDays === 1 ? '' : 's'}`} text="Usual time to a decision after you submit." /><TimelineRow title={rate > 0 ? `${rate}% commission` : 'No commission'} text={rate > 0 ? 'Taken from your deposit balance only if approved.' : 'Nothing is taken from your balance.'} /></div></div><Link className="btn btn-ghost" href="/grants" data-testid="link-back-to-grants"><ArrowLeft size={15} /> Back to grant categories</Link></aside></div>;
 }
 
 function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: Grant; onToast: Toast }) {
@@ -426,11 +458,12 @@ function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: G
       {app.awardedAmount !== null && <div className="fee-row"><span>Awarded</span><strong>{money(app.awardedAmount)}</strong></div>}
       <div className="fee-row"><span>Project or business</span><strong>{app.businessName}</strong></div>
       <div className="fee-row"><span>Registration number</span><strong>{app.registrationNumber || 'Not provided'}</strong></div>
-      <div className="fee-row"><span>Requirements ready</span><strong>{app.checklist.length} of {grant.requirements.length}</strong></div>
-      {grant.questions.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong>{app.answers[q.id] || '—'}</strong></div>)}
+      {grant.requirements.length > 0 && <div className="fee-row"><span>Requirements ready</span><strong>{app.checklist.length} of {grant.requirements.length}</strong></div>}
+      {grant.questions.filter(q => q.type !== 'file').map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong style={{ whiteSpace: 'pre-wrap' }}>{app.answers[q.id] || '—'}</strong></div>)}
+      {app.commissionRate !== null && <div className="fee-row"><span>Commission</span><strong data-testid="text-application-commission">{app.commissionRate > 0 ? `${app.commissionRate}%${app.awardedAmount !== null ? ` · ${money(commissionFor(app.awardedAmount, app.commissionRate))} taken from your deposit balance` : ' of the amount approved, if approved'}` : 'None'}</strong></div>}
     </div>
     <div className="mt"><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{app.purpose}</p></div>
-    {connected && <div className="mt" data-testid="section-application-files"><span className="field-label">Files</span>{grant.requirements.map(req => <div key={req} style={{ marginTop: 10 }}><strong style={{ fontSize: 11 }}>{req}</strong><DocumentFiles docs={files.filter(d => d.requirement === req)} editable={false} onToast={onToast} empty="No file." /></div>)}</div>}
+    {connected && <div className="mt" data-testid="section-application-files"><span className="field-label">Files</span>{[...grant.requirements.map(r => ({ slot: r, label: r })), ...grant.questions.filter(q => q.type === 'file').map(q => ({ slot: `field:${q.id}`, label: q.label }))].map(e => <div key={e.slot} style={{ marginTop: 10 }}><strong style={{ fontSize: 11 }}>{e.label}</strong><DocumentFiles docs={files.filter(d => d.requirement === e.slot)} editable={false} onToast={onToast} empty="No file." /></div>)}</div>}
     <div className="notice mt"><Info size={16} />{app.status === 'Approved' ? 'This decision is final. The award is in your grant balance and can be requested as a payout.' : app.status === 'Declined' ? `This decision is final. ${app.history[app.history.length - 1]!.note}` : 'Submitted applications are read-only while the grant team reviews them. If they need anything, the application will reopen for your changes.'}</div>
   </div>
   <aside className="stack"><div className="card card-pad"><div className="section-head"><div><h2 className="section-title">History</h2><p className="section-subtitle">Every status change, newest first.</p></div></div><div className="timeline">{history.map((h, i) => <TimelineRow key={`${h.status}-${h.at}`} title={h.status} text={`${fmtDate(h.at)} · ${h.actor === 'Reviewer' ? 'Grant team' : 'You'} · ${h.note}`} current={i === 0 && h.status !== 'Approved' && h.status !== 'Declined'} done={i > 0 || h.status === 'Approved'} />)}</div></div><Link className="btn btn-ghost" href="/applications" data-testid="link-back-to-applications"><ArrowLeft size={15} /> All applications</Link></aside></div>;
@@ -666,7 +699,7 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
 }
 const TRANSACTION_TABS: { label: string; types: Transaction['type'][] | null }[] = [
   { label: 'All', types: null }, { label: 'Grants', types: ['Grant', 'Grant adjustment'] }, { label: 'Deposits', types: ['Deposit', 'Deposit adjustment'] },
-  { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Card', types: ['Card top-up', 'Card deduction'] }, { label: 'Fees', types: ['Card fee', 'Application fee'] },
+  { label: 'Withdrawals', types: ['Withdrawal'] }, { label: 'Card', types: ['Card top-up', 'Card deduction'] }, { label: 'Fees', types: ['Card fee', 'Application fee', 'Commission'] },
 ];
 function TransactionsPage() {
   const { name: appName } = useAppName();

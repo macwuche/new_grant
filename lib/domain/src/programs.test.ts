@@ -12,8 +12,8 @@ const PM = 'Sam Rivera';
 
 let s: DemoState;
 const program = (id: string) => s.grants.find(g => g.id === id)!;
-const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration, questions: g.questions.map(q => ({ ...q })) });
-const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, budget: 60000, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false, questions: [] };
+const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration, questions: g.questions.map(q => ({ ...q })), approvalDays: g.approvalDays, commissionRate: g.commissionRate });
+const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, budget: 60000, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false, questions: [], approvalDays: 10, commissionRate: 7.5 };
 function accept(result: Result): Result & { ok: true } {
   if (!result.ok) throw new Error(`expected success, got: ${result.error} ${JSON.stringify(result.fieldErrors ?? {})}`);
   s = result.state;
@@ -34,8 +34,29 @@ describe('create', () => {
   });
 
   it('validates every field', () => {
-    const errors = errorsOf(G.createProgram(s, { ...valid, name: 'x', summary: 'short', focus: '', minimumRequest: -1, maxFunding: 100.001, budget: 0, deadline: '2027-02-30', minimumTier: 4 as never, requirements: ['  '] }, PM, now));
-    expect(Object.keys(errors).sort()).toEqual(['budget', 'deadline', 'focus', 'maxFunding', 'minimumRequest', 'minimumTier', 'name', 'requirements', 'summary']);
+    const errors = errorsOf(G.createProgram(s, { ...valid, name: 'x', summary: 'short', focus: '', minimumRequest: -1, maxFunding: 100.001, budget: 0, deadline: '2027-02-30', minimumTier: 4 as never, requirements: ['x'.repeat(81)], approvalDays: 2.5, commissionRate: 100.5 }, PM, now));
+    expect(Object.keys(errors).sort()).toEqual(['approvalDays', 'budget', 'commissionRate', 'deadline', 'focus', 'maxFunding', 'minimumRequest', 'minimumTier', 'name', 'requirements', 'summary']);
+  });
+
+  it('keeps approval days and the commission rate, and allows a plan without requirements', () => {
+    const { id } = accept(G.createProgram(s, { ...valid, requirements: [] }, PM, now));
+    expect(program(id!)).toMatchObject({ approvalDays: 10, commissionRate: 7.5, requirements: [] });
+    expect(errorsOf(G.createProgram(s, { ...valid, name: 'Other plan', approvalDays: 0 }, PM, now)).approvalDays).toMatch(/1–365/);
+    expect(errorsOf(G.createProgram(s, { ...valid, name: 'Other plan', commissionRate: 12.345 }, PM, now)).commissionRate).toMatch(/two decimals/);
+    expect(errorsOf(G.createProgram(s, { ...valid, name: 'Other plan', commissionRate: -1 }, PM, now)).commissionRate).toMatch(/0 to 100/);
+    expect(G.commissionFor(12500, 7.5)).toBe(937.5);
+    expect(G.commissionFor(333.33, 10)).toBe(33.33);
+  });
+
+  it('accepts long-text and document-upload form fields', () => {
+    const questions = [
+      { id: '', label: 'Tell us about your team', type: 'textarea' as const, required: true },
+      { id: '', label: 'Bank statement', type: 'file' as const, required: true },
+      { id: '', label: 'Optional extra document', type: 'file' as const, required: false },
+    ];
+    const { id } = accept(G.createProgram(s, { ...valid, questions }, PM, now));
+    expect(program(id!).questions.map(q => [q.id, q.type, q.required])).toEqual([['tell-us-about-your-team', 'textarea', true], ['bank-statement', 'file', true], ['optional-extra-document', 'file', false]]);
+    expect(errorsOf(G.createProgram(s, { ...valid, name: 'Other plan', questions: [{ id: '', label: 'Upload', type: 'video' as never, required: true }] }, PM, now)).questions).toMatch(/type/);
   });
 
   it('checks amounts relate sensibly and names are unique', () => {

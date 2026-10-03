@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import * as api from '@workspace/api-client-react';
 import type { DemoState, Grant, GrantInput, ProgramQuestion, Result, Tier } from '@workspace/domain/model';
 import {
-  closeProgram, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
+  closeProgram, commissionFor, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@workspace/domain/programs';
 import { programBudget } from '@workspace/domain/review';
@@ -38,7 +38,7 @@ export function AdminPrograms() {
       return <article className="admin-program-card" key={grant.id} data-testid={`card-admin-grant-${grant.id}`}>
         <div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid={`status-admin-program-${grant.id}`}>{grant.status}</span></div>
         <h2>{grant.name}</h2><p>{grant.summary}</p>
-        <div className="admin-program-meta"><div><span>Award range</span><strong>{usd(grant.minimumRequest)} – {usd(grant.maxFunding)}</strong></div><div><span>Budget left</span><strong>{usd(budget.remaining)} of {usd(budget.budget)}</strong></div><div><span>Deadline</span><strong>{day(grant.deadline)}</strong></div><div><span>Submitted</span><strong>{count} application{count === 1 ? '' : 's'}</strong></div></div>
+        <div className="admin-program-meta"><div><span>Award range</span><strong>{usd(grant.minimumRequest)} – {usd(grant.maxFunding)}</strong></div><div><span>Commission</span><strong>{grant.commissionRate}%</strong></div><div><span>Approval time</span><strong>{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</strong></div><div><span>Budget left</span><strong>{usd(budget.remaining)} of {usd(budget.budget)}</strong></div><div><span>Deadline</span><strong>{day(grant.deadline)}</strong></div><div><span>Submitted</span><strong>{count} application{count === 1 ? '' : 's'}</strong></div></div>
         <button type="button" onClick={() => setEditing(grant.id)} aria-label={`Manage ${grant.name}`} data-testid={`button-manage-admin-grant-${grant.id}`}>Manage program <ArrowRight size={14} /></button>
       </article>;
     })}</div>
@@ -46,13 +46,21 @@ export function AdminPrograms() {
   </>;
 }
 
+/** What the commission comes to on the maximum award, as a hint under the field. */
+function commissionHint(f: Form): string {
+  const rate = num(f.commissionRate);
+  const max = num(f.maxFunding);
+  if (!Number.isFinite(rate) || !Number.isFinite(max)) return 'Taken from the deposit balance on approval; it may go negative.';
+  return `${usd(commissionFor(max, rate))} on a ${usd(max)} award. Taken from the deposit balance on approval; it may go negative.`;
+}
+
 type Outcome = { ok: true; message: string; program?: Grant } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[] };
+type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[]; approvalDays: string; commissionRate: string };
 
-const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: g.requirements.length ? [...g.requirements] : [''], questions: g.questions.map(q => ({ ...q })) });
+const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: [...g.requirements], questions: g.questions.map(q => ({ ...q })), approvalDays: String(g.approvalDays), commissionRate: String(g.commissionRate) });
 const num = (value: string) => value.trim() === '' ? NaN : Number(value);
-const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), budget: num(f.budget), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements, questions: f.questions });
+const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), budget: num(f.budget), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements, questions: f.questions, approvalDays: num(f.approvalDays), commissionRate: num(f.commissionRate) });
 
 function ProgramPanel({ programId, onClose, onCreated }: { programId: string | null; onClose: () => void; onCreated: (id: string) => void }) {
   const { state } = useDemoStore();
@@ -132,7 +140,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
     {input}
     {errors[key] ? <small className="admin-field-error">{errors[key]}</small> : hint ? <small>{hint}</small> : null}
   </label>;
-  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'budget' | 'deadline', type = 'text') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? '0.01' : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
+  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'budget' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={grant ? `${grant.id} / Program` : 'New program'}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{grant.status}</span>}</div>
@@ -178,25 +186,30 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
         {field('deadline', 'Application deadline', text('deadline', 'date'))}
       </div>
       <div className="admin-form-row">
+        {field('approvalDays', 'Approval time (days)', text('approvalDays', 'number', '1'), `Shown to applicants: "usually decided within ${form.approvalDays.trim() || 'N'} days"`)}
+        {field('commissionRate', 'Commission (% of the amount approved)', text('commissionRate', 'number'), commissionHint(form))}
+      </div>
+      <div className="admin-form-row">
         {field('minimumTier', 'Minimum account tier', <select className="admin-input" value={form.minimumTier} disabled={locked.has('minimumTier')} onChange={e => set('minimumTier', e.target.value)} data-testid="select-admin-program-tier"><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option></select>)}
         <label className="admin-review-field admin-check"><span>Registration number {locked.has('requiresRegistration') && <Lock size={11} aria-label="Locked" />}</span><span className="admin-check-row"><input type="checkbox" checked={form.requiresRegistration} disabled={locked.has('requiresRegistration')} onChange={e => set('requiresRegistration', e.target.checked)} data-testid="checkbox-admin-program-registration" /> Required</span>{errors.requiresRegistration && <small className="admin-field-error">{errors.requiresRegistration}</small>}</label>
       </div>
       <fieldset className="admin-review-field admin-requirements" disabled={locked.has('requirements')}>
-        <legend>Requirements applicants must confirm {locked.has('requirements') && <Lock size={11} aria-label="Locked" />}</legend>
-        {form.requirements.map((req, i) => <div className="admin-requirement" key={i}><input className="admin-input" value={req} onChange={e => set('requirements', form.requirements.map((r, j) => j === i ? e.target.value : r))} aria-label={`Requirement ${i + 1}`} data-testid={`input-admin-program-requirement-${i}`} /><button type="button" className="admin-icon-button" onClick={() => set('requirements', form.requirements.filter((_, j) => j !== i))} disabled={form.requirements.length === 1} aria-label={`Remove requirement ${i + 1}`} data-testid={`button-admin-program-remove-requirement-${i}`}><X size={14} /></button></div>)}
+        <legend>Required documents {locked.has('requirements') && <Lock size={11} aria-label="Locked" />}</legend>
+        <small>Optional. Each one needs an uploaded file before the applicant can submit. You can also add document fields to the application form below.</small>
+        {form.requirements.map((req, i) => <div className="admin-requirement" key={i}><input className="admin-input" value={req} onChange={e => set('requirements', form.requirements.map((r, j) => j === i ? e.target.value : r))} aria-label={`Requirement ${i + 1}`} data-testid={`input-admin-program-requirement-${i}`} /><button type="button" className="admin-icon-button" onClick={() => set('requirements', form.requirements.filter((_, j) => j !== i))} aria-label={`Remove requirement ${i + 1}`} data-testid={`button-admin-program-remove-requirement-${i}`}><X size={14} /></button></div>)}
         {form.requirements.length < MAX_REQUIREMENTS && <button type="button" className="admin-btn" onClick={() => set('requirements', [...form.requirements, ''])} data-testid="button-admin-program-add-requirement"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add requirement</button>}
         {errors.requirements && <small className="admin-field-error">{errors.requirements}</small>}
       </fieldset>
       <fieldset className="admin-review-field admin-requirements" disabled={locked.has('questions')} data-testid="fieldset-admin-program-questions">
-        <legend>Application questions {locked.has('questions') && <Lock size={11} aria-label="Locked" />}</legend>
-        <small>Extra questions applicants answer on the requirements step. Up to {MAX_QUESTIONS}; blank ones are dropped.</small>
+        <legend>Application form {locked.has('questions') && <Lock size={11} aria-label="Locked" />}</legend>
+        <small>The fields applicants fill in after the basics: text, numbers, yes/no, or a document upload (PDF, JPEG, or PNG, checked for hidden content). Up to {MAX_QUESTIONS}; blank ones are dropped.</small>
         {form.questions.map((q, i) => <div className="admin-question" key={q.id || `new-${i}`}>
-          <input className="admin-input" value={q.label} placeholder="e.g. How many people will this help?" onChange={e => setQuestion(i, { label: e.target.value })} aria-label={`Question ${i + 1}`} data-testid={`input-admin-program-question-${i}`} />
-          <select className="admin-input" value={q.type} onChange={e => setQuestion(i, { type: e.target.value as ProgramQuestion['type'] })} aria-label={`Answer type for question ${i + 1}`} data-testid={`select-admin-program-question-type-${i}`}>{QUESTION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
+          <input className="admin-input" value={q.label} placeholder={q.type === 'file' ? 'e.g. Latest bank statement' : 'e.g. How many people will this help?'} onChange={e => setQuestion(i, { label: e.target.value })} aria-label={`Field ${i + 1}`} data-testid={`input-admin-program-question-${i}`} />
+          <select className="admin-input" value={q.type} onChange={e => setQuestion(i, { type: e.target.value as ProgramQuestion['type'] })} aria-label={`Type of field ${i + 1}`} data-testid={`select-admin-program-question-type-${i}`}>{QUESTION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
           <label className="admin-check-row"><input type="checkbox" checked={q.required} onChange={e => setQuestion(i, { required: e.target.checked })} data-testid={`checkbox-admin-program-question-required-${i}`} /> Required</label>
-          <button type="button" className="admin-icon-button" onClick={() => set('questions', form.questions.filter((_, j) => j !== i))} aria-label={`Remove question ${i + 1}`} data-testid={`button-admin-program-remove-question-${i}`}><X size={14} /></button>
+          <button type="button" className="admin-icon-button" onClick={() => set('questions', form.questions.filter((_, j) => j !== i))} aria-label={`Remove field ${i + 1}`} data-testid={`button-admin-program-remove-question-${i}`}><X size={14} /></button>
         </div>)}
-        {form.questions.length < MAX_QUESTIONS && <button type="button" className="admin-btn" onClick={() => set('questions', [...form.questions, { id: '', label: '', type: 'text', required: true }])} data-testid="button-admin-program-add-question"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add question</button>}
+        {form.questions.length < MAX_QUESTIONS && <button type="button" className="admin-btn" onClick={() => set('questions', [...form.questions, { id: '', label: '', type: 'text', required: true }])} data-testid="button-admin-program-add-question"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add field</button>}
         {errors.questions && <small className="admin-field-error">{errors.questions}</small>}
       </fieldset>
       <div className="admin-review-buttons">

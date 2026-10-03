@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Info, Search } from 'lucide-react';
+import { ArrowRight, Check, Copy, Info, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { applicantName } from '@workspace/domain/review';
-import { confirmDeposit, DEPOSIT_METHODS, depositQueue, MIN_REJECTION_REASON_LENGTH, pendingDepositTotal, rejectDeposit } from '@workspace/domain/deposits';
+import {
+  approveDepositRelease, confirmDeposit, depositCredit, depositMethodName, depositQueue, MIN_REJECTION_REASON_LENGTH, needsDepositSignOff, pendingDepositTotal, rejectDeposit,
+} from '@workspace/domain/deposits';
+import { ProofFiles } from '@/components/DepositProof';
 import { actingStaff } from '@workspace/domain/staff';
 import * as api from '@workspace/api-client-react';
 import { useStaffMoney, type Outcome } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import { RoleNotice, useCan, useStaffCommand } from './AdminStaff';
-import type { Result, Transaction } from '@workspace/domain/model';
+import type { PayoutDetail, Transaction } from '@workspace/domain/model';
 import { ReviewFrame } from './AdminReviewPanel';
 
 const usd = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -16,7 +19,36 @@ const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
 const day = (iso: string) => format(new Date(iso), 'dd MMM yyyy');
 const label = (tx: Transaction) => tx.status === 'Completed' ? 'Received' : tx.status === 'Failed' ? 'Rejected' : tx.status;
 const badgeClass = (tx: Transaction) => `admin-badge ${tx.status === 'Completed' ? 'approved' : tx.status === 'Failed' ? 'declined' : tx.status === 'Cancelled' ? 'draft' : 'submitted'}`;
-const methodName = (tx: Transaction) => DEPOSIT_METHODS.find(m => m.id === tx.method)?.name ?? 'Unknown method';
+const methodName = (tx: Transaction) => depositMethodName(tx);
+const waitingForProof = (tx: Transaction) => tx.status === 'Pending' && !!tx.proofRequired && !tx.proof?.length;
+
+/** Deposit flags for the queue: high value, the two sign-offs, and proof of payment. */
+function Flags({ tx }: { tx: Transaction }) {
+  const { state } = useDemoStore();
+  if (tx.status !== 'Pending') return null;
+  return <>
+    {tx.amount >= state.treasury.highValueDeposit && <span className="admin-flag">High value</span>}
+    {needsDepositSignOff(state, tx) && <span className="admin-flag">{tx.releaseApproval ? 'Approved' : '2 sign-offs'}</span>}
+    {waitingForProof(tx) ? <span className="admin-flag" data-testid={`flag-admin-deposit-proof-${tx.id}`}>No proof yet</span> : tx.proof?.length ? <span className="admin-flag muted">Proof added</span> : null}
+  </>;
+}
+
+/** What the applicant was told and what they entered: where to send the money and the method's form. */
+function DepositDetails({ title, hint, rows, testId }: { title: string; hint: string; rows: { key: string; label: string; value: string }[]; testId: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async (key: string, value: string) => {
+    try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(c => c === key ? null : c), 1500); } catch { setCopied(null); }
+  };
+  if (!rows.length) return null;
+  return <section className="admin-review-section" aria-label={title} data-testid={testId}>
+    <h3>{title}</h3>
+    <p className="admin-review-hint">{hint}</p>
+    <dl className="admin-detail-fields">{rows.map(r => <div key={r.key} data-testid={`row-${testId}-${r.key}`}><dt>{r.label}</dt>
+      <dd style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between', overflowWrap: 'anywhere' }}><span>{r.value}</span>
+        <button type="button" className="admin-btn" style={{ minHeight: 28, padding: '0 10px', flex: '0 0 auto' }} onClick={() => void copy(r.key, r.value)} aria-label={`Copy ${r.label}`}>{copied === r.key ? <Check size={13} /> : <Copy size={13} />}</button></dd></div>)}</dl>
+  </section>;
+}
+const detailRows = (details: PayoutDetail[]) => details.map(d => ({ key: d.fieldId, label: d.label, value: d.value }));
 
 export function AdminDeposits() {
   const { state } = useDemoStore();
@@ -38,12 +70,12 @@ export function AdminDeposits() {
       <div className="admin-metric" data-testid="metric-admin-deposits-received"><span className="admin-metric-label">Confirmed received</span><strong className="admin-metric-value">{usd(received)}</strong><span className="admin-metric-foot">Confirmed by finance</span></div>
     </div>
     <section className="admin-panel">
-      <div className="admin-panel-head"><div><h2>Deposits</h2><p>Transfers applicants say they've sent. Check the receiving account for the reference, then confirm or reject. No bank feed is connected.</p></div></div>
+      <div className="admin-panel-head"><div><h2>Deposits</h2><p>Transfers applicants say they've sent. Check the receiving account for the reference (and any receipt they uploaded), then confirm or reject. Confirming credits the amount less the method's charge. No bank feed is connected.</p></div></div>
       <div className="admin-toolbar"><div className="admin-toolbar-left"><label className="admin-search"><Search size={15} /><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search reference or applicant" aria-label="Search deposits" data-testid="input-admin-search-deposits" /></label><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter deposits by status" data-testid="select-admin-filter-deposits"><option>All statuses</option><option>Pending</option><option>Received</option><option>Rejected</option><option>Cancelled</option></select></div><span className="admin-count" data-testid="text-admin-deposits-count">{rows.length} of {queue.length} deposits</span></div>
       {rows.length ? <>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Reference</th><th>Method</th><th>Amount</th><th>Status</th><th>Announced</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Process</span></th></tr></thead><tbody>{rows.map(tx => <tr key={tx.id} data-testid={`row-admin-deposit-${tx.id}`}><td><span className="admin-table-primary">{tx.reference ?? tx.id}{tx.status === 'Pending' && tx.amount >= state.treasury.highValueDeposit && <span className="admin-flag">High value</span>}</span><span className="admin-table-secondary">{applicantName(state, tx.applicantId)}</span></td><td className="admin-table-muted">{methodName(tx)}</td><td className="admin-table-number">{usd(tx.amount)}</td><td><span className={badgeClass(tx)}>{label(tx)}</span></td><td className="admin-table-muted">{day(tx.createdAt)}</td><td><button type="button" className="admin-icon-button" onClick={() => setOpenId(tx.id)} aria-label={`Open deposit ${tx.reference}`} data-testid={`button-open-admin-deposit-${tx.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Reference</th><th>Method</th><th>Amount</th><th>Status</th><th>Announced</th><th><span className="admin-eyebrow" style={{ margin: 0 }}>Process</span></th></tr></thead><tbody>{rows.map(tx => <tr key={tx.id} data-testid={`row-admin-deposit-${tx.id}`}><td><span className="admin-table-primary">{tx.reference ?? tx.id}<Flags tx={tx} /></span><span className="admin-table-secondary">{applicantName(state, tx.applicantId)}</span></td><td className="admin-table-muted">{methodName(tx)}</td><td className="admin-table-number">{usd(tx.amount)}{tx.fee ? <span className="admin-table-secondary">credit {usd(depositCredit(tx))}</span> : null}</td><td><span className={badgeClass(tx)}>{label(tx)}</span></td><td className="admin-table-muted">{day(tx.createdAt)}</td><td><button type="button" className="admin-icon-button" onClick={() => setOpenId(tx.id)} aria-label={`Open deposit ${tx.reference}`} data-testid={`button-open-admin-deposit-${tx.id}`}><ArrowRight size={15} /></button></td></tr>)}</tbody></table></div>
         <div className="admin-mobile-records" role="list" aria-label="Deposits">{rows.map(tx => <article className="admin-mobile-record" role="listitem" key={tx.id} data-testid={`card-admin-deposit-${tx.id}`}>
-          <div className="admin-mobile-record-top"><div className="admin-mobile-record-identity"><strong>{tx.reference ?? tx.id}</strong><span>{applicantName(state, tx.applicantId)}</span></div><span className={badgeClass(tx)}>{label(tx)}</span></div>
+          <div className="admin-mobile-record-top"><div className="admin-mobile-record-identity"><strong>{tx.reference ?? tx.id}<Flags tx={tx} /></strong><span>{applicantName(state, tx.applicantId)}</span></div><span className={badgeClass(tx)}>{label(tx)}</span></div>
           <dl className="admin-mobile-record-facts"><div><dt>Amount</dt><dd>{usd(tx.amount)}</dd></div><div><dt>Method</dt><dd>{methodName(tx)}</dd></div><div><dt>Announced</dt><dd>{day(tx.createdAt)}</dd></div></dl>
           <button type="button" className="admin-mobile-record-action" onClick={() => setOpenId(tx.id)} data-testid={`button-open-admin-deposit-mobile-${tx.id}`}>{tx.status === 'Pending' ? 'Confirm or reject' : 'View deposit'} <ArrowRight size={15} /></button>
         </article>)}</div>
@@ -65,6 +97,7 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const toast = (text: string) => setFlash({ tone: 'error', text });
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -87,6 +120,14 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
   };
   const pick = (next: 'confirm' | 'reject') => { setMode(next); setConfirming(false); setError(null); setFlash(null); };
   const high = tx.amount >= state.treasury.highValueDeposit;
+  const me = actingStaff(state);
+  const dual = needsDepositSignOff(state, tx);
+  const noProof = waitingForProof(tx);
+  const credit = depositCredit(tx);
+  const release = () => staffMoney.connected
+    ? void staffMoney.entry(() => api.approveDepositRelease(tx.id)).then(after)
+    : after(command('payments.release', { action: 'Approve deposit', target: tx.id }, (s, actor) => approveDepositRelease(s, tx.id, actor.name, new Date())));
+  const confirmBlocked = mode === 'confirm' && (noProof || (dual && (!tx.releaseApproval || me?.name === tx.releaseApproval.by)));
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${tx.reference ?? tx.id} / Deposit`}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{usd(tx.amount)}</h2><span className={badgeClass(tx)} data-testid="status-admin-deposit">{label(tx)}</span></div>
@@ -94,17 +135,32 @@ function DepositPanel({ txId, onClose }: { txId: string; onClose: () => void }) 
     {high && tx.status === 'Pending' && <div className="admin-review-stale" role="note"><span>High-value deposit ({usd(state.treasury.highValueDeposit)} or more). Confirm the sender's identity matches the applicant before crediting.</span></div>}
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-deposit-flash">{flash.text}</div>}
     <dl className="admin-detail-fields">
-      {[['Reference', tx.reference ?? '—'], ['Method', methodName(tx)], ['Amount announced', usd(tx.amount)], ...(tx.processedAt ? [[tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', `${when(tx.processedAt)}${tx.processedBy && tx.status !== 'Cancelled' ? ` by ${tx.processedBy}` : ' by the applicant'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      {[['Reference', tx.reference ?? '—'], ['Method', methodName(tx)], ['Amount announced', usd(tx.amount)], ['Charge', tx.fee ? usd(tx.fee) : 'None'], ['Credited on confirmation', usd(credit)], ...(tx.processedAt ? [[tx.status === 'Cancelled' ? 'Cancelled' : 'Processed', `${when(tx.processedAt)}${tx.processedBy && tx.status !== 'Cancelled' ? ` by ${tx.processedBy}` : ' by the applicant'}`]] : [])].map(([k, v]) => <div className="admin-detail-field" key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
     </dl>
+    <DepositDetails title="Sent to" hint="The receiving details the applicant was given with this deposit." rows={(tx.payTo ?? []).map((d, i) => ({ key: `pay-${i}`, label: d.label, value: d.value }))} testId="panel-admin-deposit-payto" />
+    <DepositDetails title="Transfer details" hint="As the applicant entered them for this deposit." rows={detailRows(tx.depositDetails ?? [])} testId="panel-admin-deposit-details" />
+    {(tx.proofRequired || !!tx.proof?.length) && <section className="admin-review-section" aria-label="Proof of payment" data-testid="panel-admin-deposit-proof">
+      <h3>Proof of payment{tx.proofRequired ? ' (required)' : ''}</h3>
+      {tx.proof?.length
+        ? <><p className="admin-review-hint">Check the amount, the date, and that the reference {tx.reference} appears on it. Opening a file is audited.</p><ProofFiles tx={tx} editable={false} onToast={toast} buttonClass="admin-btn" testId="admin-deposit-proof" /></>
+        : <p className="admin-review-hint" data-testid="text-admin-deposit-no-proof">The applicant hasn't uploaded a receipt yet{tx.status === 'Pending' ? ', so this deposit can\'t be confirmed. Reject it if the money didn\'t arrive' : ''}.</p>}
+    </section>}
     <section className="admin-review-section admin-review-actions" aria-label="Process deposit">
       <h3>Process</h3>
       {tx.status === 'Pending' ? <>
+        {dual && <div className="admin-dual-control" data-testid="panel-admin-deposit-dual-control">
+          <strong>Two sign-offs required</strong>
+          <p className="admin-review-hint">At or above the {usd(state.treasury.depositDualControlThreshold)} deposit threshold, a second staff member (compliance or a super admin) approves it, and someone else confirms it.</p>
+          <ol className="admin-dual-steps"><li className={tx.releaseApproval ? 'done' : ''}>Approved{tx.releaseApproval ? ` by ${tx.releaseApproval.by} · ${when(tx.releaseApproval.at)}` : ' — waiting'}</li><li>Confirmed by a different person</li></ol>
+          {!tx.releaseApproval && (can('payments.release') ? <button type="button" className="admin-btn primary" disabled={noProof} onClick={release} data-testid="button-admin-deposit-release">Approve deposit</button> : <RoleNotice permission="payments.release" />)}
+          {tx.releaseApproval && me?.name === tx.releaseApproval.by && <p className="admin-review-hint admin-role-notice">You approved this deposit, so a different staff member must confirm it.</p>}
+        </div>}
         <p className="admin-review-hint">Look for {usd(tx.amount)} with reference <strong>{tx.reference}</strong> in the receiving account. {actingStaff(state) ? <> Acting as <strong>{actingStaff(state)!.name}</strong>.</> : null}</p><RoleNotice permission="payments.process" />
         <div className="admin-segment" role="tablist" aria-label="Deposit result">{([['confirm', 'Confirm received'], ['reject', 'Reject']] as const).map(([key, text]) => <button type="button" role="tab" key={key} aria-selected={mode === key} className={mode === key ? 'active' : ''} onClick={() => pick(key)} data-testid={`tab-admin-deposit-${key}`}>{text}</button>)}</div>
         {mode === 'reject' && <label className="admin-review-field"><span>Why wasn't it credited? (sent to applicant)</span><textarea className="admin-input" rows={3} value={reason} onChange={e => { setReason(e.target.value); setConfirming(false); setError(null); }} aria-invalid={!!error} data-testid="textarea-admin-deposit-reason" /><small className={error ? 'admin-field-error' : ''}>{error ?? `At least ${MIN_REJECTION_REASON_LENGTH} characters, e.g. "No transfer with this reference arrived within 5 days."`}</small></label>}
         <div className="admin-review-buttons">
           {confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-deposit">Cancel</button>}
-          <button type="button" className={`admin-btn ${mode === 'reject' ? 'danger' : 'primary'}`} disabled={!can('payments.process')} onClick={submit} data-testid="button-admin-submit-deposit">{confirming ? (mode === 'confirm' ? `Confirm: credit ${usd(tx.amount)}` : 'Confirm rejection') : mode === 'confirm' ? 'Confirm received' : 'Reject deposit'}</button>
+          <button type="button" className={`admin-btn ${mode === 'reject' ? 'danger' : 'primary'}`} disabled={!can('payments.process') || confirmBlocked} onClick={submit} data-testid="button-admin-submit-deposit">{confirming ? (mode === 'confirm' ? `Confirm: credit ${usd(credit)}` : 'Confirm rejection') : mode === 'confirm' ? 'Confirm received' : 'Reject deposit'}</button>
         </div>
         {confirming && <p className="admin-review-hint">This can't be undone.</p>}
       </> : <p className="admin-review-hint">{tx.status === 'Completed' ? 'Confirmed and credited to the applicant’s deposit balance. This is final.' : tx.status === 'Cancelled' ? 'The applicant cancelled this deposit. If the money arrives anyway, return it outside the app.' : `Rejected: ${tx.failureReason}`}</p>}

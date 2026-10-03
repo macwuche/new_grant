@@ -194,7 +194,7 @@ button { cursor: pointer; }
 .grant-symbol { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 13px; background: hsl(var(--charcoal)); color: hsl(var(--lime)); }
 .grant-card h3 { margin: 19px 0 7px; font: 700 18px var(--app-font-display); letter-spacing: -.045em; }
 .grant-card p { min-height: 36px; margin: 0; color: hsl(var(--muted)); font-size: 12px; line-height: 1.45; }
-.grant-meta { display: flex; gap: 13px; margin: 19px 0; padding-top: 14px; border-top: 1px solid hsl(var(--line)); }
+.grant-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 12px 13px; margin: 19px 0; padding-top: 14px; border-top: 1px solid hsl(var(--line)); }
 .grant-meta-item { display: grid; gap: 3px; }
 .grant-meta-label { color: hsl(var(--muted)); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
 .grant-meta-value { font: 700 12px var(--app-font-display); }

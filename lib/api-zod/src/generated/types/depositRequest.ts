@@ -5,9 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { DepositRequestMethod } from './depositRequestMethod';
+import type { ChannelId } from './channelId';
+import type { DepositRequestDetails } from './depositRequestDetails';
 
 export interface DepositRequest {
   amount: number;
-  method: DepositRequestMethod;
+  method: ChannelId;
+  /** The method's form answers (field id → value); field errors are keyed `details.<fieldId>` */
+  details?: DepositRequestDetails;
 }

@@ -21,11 +21,13 @@ function accept(result: Result): Result & { ok: true } {
 beforeEach(() => { s = createSeedState(); });
 
 describe('requesting', () => {
-  it('validates against the configured limits', () => {
-    expect(D.validateDeposit(s, 10)).toMatch(/minimum deposit is \$20/);
-    expect(D.validateDeposit(s, 30000)).toMatch(/maximum deposit/);
-    expect(D.validateDeposit(s, 20.001)).toMatch(/decimal/);
-    expect(D.validateDeposit(s, 100)).toBeNull();
+  it("validates against the method's limits", () => {
+    expect(D.validateDeposit(s, 10, 'bank')).toMatch(/minimum for Bank transfer is \$20/);
+    expect(D.validateDeposit(s, 30000, 'bank')).toMatch(/maximum for Bank transfer/);
+    expect(D.validateDeposit(s, 20.001, 'bank')).toMatch(/decimal/);
+    expect(D.validateDeposit(s, 100, 'bank')).toBeNull();
+    expect(D.validateDeposit(s, 100, 'crypto')).toMatch(/available deposit method/);
+    expect(D.validateDeposit(s, 100, 'nope')).toMatch(/available deposit method/);
   });
 
   it('records a pending deposit with a reference that does not count yet', () => {

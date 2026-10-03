@@ -4,7 +4,7 @@ import { Link } from 'wouter';
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock3, FileText, Info, LoaderCircle, Plus, Receipt, ShieldCheck, Wallet, X } from 'lucide-react';
 import * as api from '@workspace/api-client-react';
 import type { PayoutBalance, Transaction, TransactionStatus, WithdrawalMethod } from '@workspace/domain/model';
-import { availableFor, cancelWithdrawal, channelFee, enabledChannels, payoutBlocker, requestWithdrawal, validateWithdrawal, withdrawalBalance } from '@workspace/domain/money';
+import { availableFor, cancelWithdrawal, channelFee, enabledChannels, grantPayoutHold, payoutBlocker, requestWithdrawal, validateWithdrawal, withdrawalBalance } from '@workspace/domain/money';
 import { computeBalances, ownTransactions } from '@workspace/domain/rules';
 import { answerLimit, BALANCE_LABELS, chargesLabel, checkAnswers, methodBalances } from '@workspace/domain/withdrawalMethods';
 import { MethodBadge } from '@/components/MethodBadge';
@@ -58,15 +58,16 @@ function BalanceHero() {
   const balances = computeBalances(ownTransactions(state));
   const pending = ownTransactions(state).filter(t => t.type === 'Withdrawal' && t.status === 'Pending');
   const reserve = state.treasury.depositThreshold;
+  const hold = grantPayoutHold(state);
   return <section className="dp-hero wd-hero" aria-labelledby="wd-hero-title">
     <div className="dp-hero-glow" aria-hidden="true" />
     <div className="dp-hero-main">
       <p className="dp-eyebrow" id="wd-hero-title"><Wallet size={14} aria-hidden="true" /> Available to withdraw</p>
       <p className="dp-hero-amount" data-testid="text-withdraw-grant">{usd(availableFor(state, 'grant'))}</p>
-      <p className="dp-hero-sub">From your grant balance. Methods that pay from your deposit balance can use what's above the {usd(reserve)} reserve.</p>
+      <p className="dp-hero-sub" data-testid="text-withdraw-hold">{hold ?? `From your grant balance. Methods that pay from your deposit balance can use what's above the ${usd(reserve)} reserve.`}</p>
     </div>
     <div className="dp-hero-stats">
-      <div className="dp-stat"><span>Deposit balance available</span><strong data-testid="text-withdraw-deposit-available">{usd(availableFor(state, 'deposit'))}</strong><small>{usd(balances.deposit)} held, {usd(reserve)} reserve kept</small></div>
+      <div className="dp-stat"><span>Deposit balance available</span><strong data-testid="text-withdraw-deposit-available">{usd(availableFor(state, 'deposit'))}</strong><small>{balances.deposit < 0 ? `${usd(balances.deposit)}: below zero, a deposit clears it` : `${usd(balances.deposit)} held, ${usd(reserve)} reserve kept`}</small></div>
       <div className="dp-stat"><span>Pending payouts</span><strong data-testid="text-withdraw-pending">{usd(pending.reduce((sum, t) => sum + gross(t), 0))}</strong><small data-testid="text-withdraw-pending-count">{pending.length} request{pending.length === 1 ? '' : 's'} with finance</small></div>
     </div>
   </section>;

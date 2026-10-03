@@ -69,7 +69,7 @@ describe('balance adjustments', () => {
 
 describe('permission switches', () => {
   it('defaults everything open and refuses a no-op change', () => {
-    expect(permissionsOf(s)).toEqual({ payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true });
+    expect(permissionsOf(s)).toEqual({ payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false });
     refuse(setAccountPermission(s, CURRENT_APPLICANT_ID, 'cardApplications', true, now), /already on/);
     refuse(setAccountPermission(s, 'APL-nobody', 'cardApplications', false, now), /could not be found/);
   });

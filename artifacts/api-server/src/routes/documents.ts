@@ -8,11 +8,15 @@ import type { DocumentPurpose, DocumentRecord, DocumentRepo } from "../lib/docum
 import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
+import type { Grant } from "@workspace/domain/model";
 import { auditContext, authLocals, requireStaff } from "../middlewares/auth";
 import { ownProfile } from "./profile";
+import { inspectUpload } from "../lib/uploadSafety";
 
 // Documents applicants upload: identity documents for the identity check, and
-// evidence for each requirement of an application. Files go to the server's
+// evidence for an application: a file for each of its program's requirements
+// (`requirement` is the requirement's text) and for the form's file fields
+// (`requirement` is `field:<field id>`). Files go to the server's
 // disk (FileStore); the database keeps a record with a SHA-256 of the content,
 // checked on every download.
 //
@@ -58,9 +62,18 @@ export const toDocument = (d: DocumentRecord) => ({
   fileName: d.fileName, contentType: d.contentType, sizeBytes: d.sizeBytes, uploadedAt: d.uploadedAt,
 });
 
-/** Program requirements with no evidence uploaded for this application. */
-export const missingEvidence = (requirements: string[], docs: DocumentRecord[]) =>
-  requirements.filter(r => !docs.some(d => d.requirement === r));
+/** The `requirement` a file for a form's file field is stored under. */
+export const fieldSlot = (fieldId: string) => `field:${fieldId}`;
+
+/** Where an application's evidence can go: each requirement, and each file field of the form. */
+export const evidenceSlots = (grant: Pick<Grant, "requirements" | "questions">) => [
+  ...grant.requirements.map(r => ({ slot: r, label: r, required: true })),
+  ...grant.questions.filter(q => q.type === "file").map(q => ({ slot: fieldSlot(q.id), label: q.label, required: q.required })),
+];
+
+/** Required requirements and file fields with nothing uploaded for this application (their labels). */
+export const missingEvidence = (grant: Pick<Grant, "requirements" | "questions">, docs: DocumentRecord[]) =>
+  evidenceSlots(grant).filter(e => e.required && !docs.some(d => d.requirement === e.slot)).map(e => e.label);
 
 export type DocumentDeps = { documents: DocumentRepo; files: FileStore; profiles: ProfileRepo; applications: ApplicationRepo; programs: ProgramRepo };
 
@@ -98,6 +111,8 @@ export function documentsRouter({ documents, files, profiles, applications, prog
     if (!bytes.length) return fail(res, 400, "The file is empty.");
     const contentType = detectType(bytes);
     if (!contentType) return fail(res, 415, "Upload a PDF, JPEG, or PNG file.");
+    const unsafe = inspectUpload(bytes, contentType);
+    if (!unsafe.ok) return fail(res, 422, unsafe.reason);
 
     const locked = await evidenceLock(user.id, purpose, applicationId);
     if (locked) return fail(res, locked.includes("could not be found") ? 404 : 409, locked);
@@ -107,7 +122,7 @@ export function documentsRouter({ documents, files, profiles, applications, prog
     if (purpose === "application") {
       const app = (await applications.get(applicationId!))!;
       const grant = (await programs.list()).find(g => g.id === app.grantId);
-      if (!grant?.requirements.includes(requirement!)) return fail(res, 400, "That isn't one of this program's requirements.");
+      if (!grant || !evidenceSlots(grant).some(e => e.slot === requirement)) return fail(res, 400, "That isn't one of this program's requirements or file fields.");
       if (own.filter(d => d.applicationId === applicationId && d.requirement === requirement).length >= MAX_PER_REQUIREMENT) return fail(res, 409, `Upload at most ${MAX_PER_REQUIREMENT} files per requirement.`);
     }
 

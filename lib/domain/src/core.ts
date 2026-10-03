@@ -12,4 +12,6 @@ export function nextIds(state: DemoState) {
   return { app: `APP-${n}`, tx: `TX-${80000 + n}`, notification: `NT-${n}`, program: `PRG-${n}`, feed: `FD-${n}`, reference: `ARC-${n}`, audit: `AU-${n}`, nextId: n + 1 };
 }
 
+/** The commission on an approved amount: `rate` percent, rounded to cents. */
+export const commissionFor = (amount: number, rate: number) => roundCents(Math.max(0, amount) * Math.max(0, rate) / 100);
 export const usd = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });

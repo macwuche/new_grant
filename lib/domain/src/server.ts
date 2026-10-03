@@ -15,8 +15,7 @@ export function serverState(loaded: Loaded): DemoState {
     ...base,
     grants: [], applications: [], notifications: [], transactions: [], staffFeed: [], otherApplicants: [],
     accounts: {}, staff: [], actingStaffId: '', audit: [], savedPayoutDetails: {}, lockdown: null,
-    // Callers pass the stored money settings; without them no application fee can be charged.
-    treasury: { ...base.treasury, applicationFee: 0 },
+    treasury: base.treasury,
     ...loaded,
   };
 }

@@ -1,5 +1,6 @@
 import type { Application, ApplicationStatus, DemoState, Result, Transaction } from './model';
 import { canTransition, fail, findGrant, nextIds, roundCents } from './rules';
+import { commissionFor, usd } from './core';
 import { CURRENT_APPLICANT_ID } from './seed';
 import { notify } from './notifications';
 import { logStaff } from './activity';
@@ -98,7 +99,17 @@ export function validateAward(state: DemoState, app: Application, amount: number
   return null;
 }
 
-/** Approves and credits the award to the applicant's grant balance in the same step. */
+/** The commission approving `app` for `amount` takes from the deposit balance (the rate fixed at submission). */
+export function commissionOn(state: DemoState, app: Application, amount: number): { rate: number; amount: number } {
+  const rate = app.commissionRate ?? findGrant(state, app.grantId)?.commissionRate ?? 0;
+  return { rate, amount: commissionFor(amount, rate) };
+}
+
+/**
+ * Approves and credits the award to the applicant's grant balance in the same
+ * step, and takes the commission from the deposit balance, even if that leaves
+ * it negative (a later deposit clears it).
+ */
 export function approveApplication(state: DemoState, appId: string, expectedVersion: string, awardAmount: number, reviewer: string, now: Date): Result {
   const g = guard(state, appId, expectedVersion, 'Approved');
   if (!g.ok) return g.result;
@@ -108,11 +119,22 @@ export function approveApplication(state: DemoState, appId: string, expectedVers
   const grant = findGrant(state, g.app.grantId)!;
   const amountText = `$${awardAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   const partial = awardAmount < g.app.requestedAmount;
-  const note = `Approved for ${amountText}${partial ? ` (of $${g.app.requestedAmount.toLocaleString('en-US')} requested)` : ''}. The award has been added to your grant balance.`;
+  const commission = commissionOn(state, g.app, awardAmount);
+  const commissionText = commission.amount > 0 ? ` A ${commission.rate}% commission (${usd(commission.amount)}) has been taken from your deposit balance.` : '';
+  const note = `Approved for ${amountText}${partial ? ` (of $${g.app.requestedAmount.toLocaleString('en-US')} requested)` : ''}. The award has been added to your grant balance.${commissionText}`;
   const approved = transition(state, g.app, 'Approved', reviewer, note, now, { awardedAmount: awardAmount });
   const ids = nextIds(approved);
-  const credit: Transaction = { id: ids.tx, applicantId: g.app.applicantId, type: 'Grant', description: `${grant.name} award (${appId})`, amount: awardAmount, status: 'Completed', createdAt: now.toISOString() };
-  return { ok: true, id: appId, message: `${appId} approved for ${amountText}. Award credited to the applicant's grant balance.`, state: { ...approved, nextId: ids.nextId, transactions: [credit, ...approved.transactions] } };
+  const at = now.toISOString();
+  const credit: Transaction = { id: ids.tx, applicantId: g.app.applicantId, type: 'Grant', description: `${grant.name} award (${appId})`, amount: awardAmount, status: 'Completed', createdAt: at };
+  // nextIds hands out one transaction id per call; the commission takes the next one.
+  const second = nextIds({ ...approved, nextId: ids.nextId });
+  const charge: Transaction[] = commission.amount > 0 ? [{
+    id: second.tx, applicantId: g.app.applicantId, type: 'Commission', description: `${grant.name} commission, ${commission.rate}% of ${amountText} (${appId})`,
+    amount: -commission.amount, status: 'Completed', createdAt: at,
+  }] : [];
+  const nextId = charge.length ? second.nextId : ids.nextId;
+  const charged = charge.length ? ` ${usd(commission.amount)} commission taken from their deposit balance.` : '';
+  return { ok: true, id: appId, message: `${appId} approved for ${amountText}. Award credited to the applicant's grant balance.${charged}`, state: { ...approved, nextId, transactions: [...charge, credit, ...approved.transactions] } };
 }
 
 /** Internal notes don't change the record's version, so they never invalidate a reviewer's open decision. */

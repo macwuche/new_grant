@@ -76,7 +76,8 @@ describe('approval', () => {
   it('credits the award to that applicant only and uses program budget', () => {
     accept(V.approveApplication(s, 'APP-2050', version('APP-2050'), 10000, REVIEWER, later(1)));
     expect(app('APP-2050').awardedAmount).toBe(10000);
-    expect(s.transactions.find(t => t.applicantId === 'APL-1045')).toMatchObject({ type: 'Grant', amount: 10000, status: 'Completed' });
+    expect(s.transactions.find(t => t.applicantId === 'APL-1045' && t.type === 'Grant')).toMatchObject({ amount: 10000, status: 'Completed' });
+    expect(s.transactions.find(t => t.applicantId === 'APL-1045' && t.type === 'Commission')).toMatchObject({ amount: -800, status: 'Completed' }); // green: 8%
     expect(mine().grant).toBe(4075);
     expect(V.programBudget(s, 'green')).toEqual({ budget: 200000, awarded: 10000, remaining: 190000 });
   });

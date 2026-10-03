@@ -45,6 +45,7 @@ import type {
   ChangeRequest,
   CredentialReset,
   DeclineDecision,
+  DepositMethodSave,
   DepositRequest,
   Document,
   EmailDomain,
@@ -4693,7 +4694,7 @@ export const getRequestDepositUrl = () => {
 }
 
 /**
- * Returns a reference to quote with the transfer; finance confirms when it arrives.
+ * With an available deposit method: the amount (within the method's limits) and the method's form answers. Returns a reference to quote with the transfer; the deposit keeps the method's receiving details and charge. Finance confirms when it arrives.
  * @summary Announce a deposit
  */
 export const requestDeposit = async (depositRequest: DepositRequest, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
@@ -7070,6 +7071,593 @@ export function useGetWithdrawalMethodPhoto<TData = Awaited<ReturnType<typeof ge
 
 
 
+export const getCreateDepositMethodUrl = () => {
+
+
+
+
+  return `/api/money/deposit-methods`
+}
+
+/**
+ * Requires treasury.manage. 409 if the money settings changed since `version`. The new method's id is returned as `id`.
+ * @summary Add a deposit method
+ */
+export const createDepositMethod = async (depositMethodSave: DepositMethodSave, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getCreateDepositMethodUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(depositMethodSave)
+  }
+);}
+
+
+
+
+
+export const getCreateDepositMethodMutationKey = () => ['createDepositMethod'] as const;
+
+export const getCreateDepositMethodMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepositMethod>>, TError,CreateDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDepositMethod>>, TError,CreateDepositMethodMutationVariables, TContext> => {
+
+const mutationKey = getCreateDepositMethodMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDepositMethod>>, CreateDepositMethodMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDepositMethod(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDepositMethodMutationResult = NonNullable<Awaited<ReturnType<typeof createDepositMethod>>>
+    export type CreateDepositMethodMutationBody = BodyType<DepositMethodSave>
+    export type CreateDepositMethodMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>
+    export type CreateDepositMethodMutationVariables = {data: BodyType<DepositMethodSave>}
+
+    /**
+ * @summary Add a deposit method
+ */
+export const useCreateDepositMethod = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepositMethod>>, TError,CreateDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDepositMethod>>,
+        TError,
+        CreateDepositMethodMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateDepositMethodMutationOptions(options));
+    }
+
+export const getUpdateDepositMethodUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/deposit-methods/${methodId}`
+}
+
+/**
+ * Requires treasury.manage. Applies to new deposits; pending ones keep the receiving details and charge they were given. 409 if stale.
+ * @summary Edit a deposit method
+ */
+export const updateDepositMethod = async (methodId: string,
+    depositMethodSave: DepositMethodSave, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getUpdateDepositMethodUrl(methodId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(depositMethodSave)
+  }
+);}
+
+
+
+
+
+export const getUpdateDepositMethodMutationKey = () => ['updateDepositMethod'] as const;
+
+export const getUpdateDepositMethodMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepositMethod>>, TError,UpdateDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDepositMethod>>, TError,UpdateDepositMethodMutationVariables, TContext> => {
+
+const mutationKey = getUpdateDepositMethodMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDepositMethod>>, UpdateDepositMethodMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  updateDepositMethod(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDepositMethodMutationResult = NonNullable<Awaited<ReturnType<typeof updateDepositMethod>>>
+    export type UpdateDepositMethodMutationBody = BodyType<DepositMethodSave>
+    export type UpdateDepositMethodMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>
+    export type UpdateDepositMethodMutationVariables = {methodId: string;data: BodyType<DepositMethodSave>}
+
+    /**
+ * @summary Edit a deposit method
+ */
+export const useUpdateDepositMethod = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | StaleResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDepositMethod>>, TError,UpdateDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDepositMethod>>,
+        TError,
+        UpdateDepositMethodMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateDepositMethodMutationOptions(options));
+    }
+
+export const getSetDepositMethodAvailabilityUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/deposit-methods/${methodId}/availability`
+}
+
+/**
+ * Requires treasury.manage.
+ * @summary Show or hide a deposit method for users
+ */
+export const setDepositMethodAvailability = async (methodId: string,
+    methodAvailability: MethodAvailability, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getSetDepositMethodAvailabilityUrl(methodId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(methodAvailability)
+  }
+);}
+
+
+
+
+
+export const getSetDepositMethodAvailabilityMutationKey = () => ['setDepositMethodAvailability'] as const;
+
+export const getSetDepositMethodAvailabilityMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setDepositMethodAvailability>>, TError,SetDepositMethodAvailabilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setDepositMethodAvailability>>, TError,SetDepositMethodAvailabilityMutationVariables, TContext> => {
+
+const mutationKey = getSetDepositMethodAvailabilityMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setDepositMethodAvailability>>, SetDepositMethodAvailabilityMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  setDepositMethodAvailability(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetDepositMethodAvailabilityMutationResult = NonNullable<Awaited<ReturnType<typeof setDepositMethodAvailability>>>
+    export type SetDepositMethodAvailabilityMutationBody = BodyType<MethodAvailability>
+    export type SetDepositMethodAvailabilityMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type SetDepositMethodAvailabilityMutationVariables = {methodId: string;data: BodyType<MethodAvailability>}
+
+    /**
+ * @summary Show or hide a deposit method for users
+ */
+export const useSetDepositMethodAvailability = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setDepositMethodAvailability>>, TError,SetDepositMethodAvailabilityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setDepositMethodAvailability>>,
+        TError,
+        SetDepositMethodAvailabilityMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetDepositMethodAvailabilityMutationOptions(options));
+    }
+
+export const getDeleteDepositMethodUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/deposit-methods/${methodId}/delete`
+}
+
+/**
+ * Requires treasury.manage. Pending deposits keep the method's name, receiving details, charge, and answers, so they can still be processed. An uploaded photo is deleted.
+ * @summary Delete a deposit method
+ */
+export const deleteDepositMethod = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+  return customFetch<MoneySettingsResult>(getDeleteDepositMethodUrl(methodId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteDepositMethodMutationKey = () => ['deleteDepositMethod'] as const;
+
+export const getDeleteDepositMethodMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDepositMethod>>, TError,DeleteDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDepositMethod>>, TError,DeleteDepositMethodMutationVariables, TContext> => {
+
+const mutationKey = getDeleteDepositMethodMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDepositMethod>>, DeleteDepositMethodMutationVariables> = (props) => {
+          const {methodId} = props ?? {};
+
+          return  deleteDepositMethod(methodId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDepositMethodMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDepositMethod>>>
+
+    export type DeleteDepositMethodMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeleteDepositMethodMutationVariables = {methodId: string}
+
+    /**
+ * @summary Delete a deposit method
+ */
+export const useDeleteDepositMethod = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDepositMethod>>, TError,DeleteDepositMethodMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDepositMethod>>,
+        TError,
+        DeleteDepositMethodMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteDepositMethodMutationOptions(options));
+    }
+
+export const getUploadDepositMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/deposit-methods/${methodId}/photo`
+}
+
+/**
+ * Requires treasury.manage. The raw image is the body (JPEG, PNG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces a previous upload or link.
+ * @summary Upload a deposit method's photo
+ */
+export const uploadDepositMethodPhoto = async (methodId: string,
+    uploadDepositMethodPhotoBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneySettingsResult>(getUploadDepositMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadDepositMethodPhotoBody
+  }
+);}
+
+
+
+
+
+export const getUploadDepositMethodPhotoMutationKey = () => ['uploadDepositMethodPhoto'] as const;
+
+export const getUploadDepositMethodPhotoMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadDepositMethodPhoto>>, TError,UploadDepositMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadDepositMethodPhoto>>, TError,UploadDepositMethodPhotoMutationVariables, TContext> => {
+
+const mutationKey = getUploadDepositMethodPhotoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadDepositMethodPhoto>>, UploadDepositMethodPhotoMutationVariables> = (props) => {
+          const {methodId,data} = props ?? {};
+
+          return  uploadDepositMethodPhoto(methodId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadDepositMethodPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadDepositMethodPhoto>>>
+    export type UploadDepositMethodPhotoMutationBody = BodyType<Blob>
+    export type UploadDepositMethodPhotoMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type UploadDepositMethodPhotoMutationVariables = {methodId: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a deposit method's photo
+ */
+export const useUploadDepositMethodPhoto = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadDepositMethodPhoto>>, TError,UploadDepositMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadDepositMethodPhoto>>,
+        TError,
+        UploadDepositMethodPhotoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadDepositMethodPhotoMutationOptions(options));
+    }
+
+export const getRemoveDepositMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/money/deposit-methods/${methodId}/photo/delete`
+}
+
+/**
+ * Requires treasury.manage. Users see the method's first letter instead.
+ * @summary Remove a deposit method's photo
+ */
+export const removeDepositMethodPhoto = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneySettingsResult> => {
+
+  return customFetch<MoneySettingsResult>(getRemoveDepositMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveDepositMethodPhotoMutationKey = () => ['removeDepositMethodPhoto'] as const;
+
+export const getRemoveDepositMethodPhotoMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeDepositMethodPhoto>>, TError,RemoveDepositMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeDepositMethodPhoto>>, TError,RemoveDepositMethodPhotoMutationVariables, TContext> => {
+
+const mutationKey = getRemoveDepositMethodPhotoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeDepositMethodPhoto>>, RemoveDepositMethodPhotoMutationVariables> = (props) => {
+          const {methodId} = props ?? {};
+
+          return  removeDepositMethodPhoto(methodId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveDepositMethodPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof removeDepositMethodPhoto>>>
+
+    export type RemoveDepositMethodPhotoMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type RemoveDepositMethodPhotoMutationVariables = {methodId: string}
+
+    /**
+ * @summary Remove a deposit method's photo
+ */
+export const useRemoveDepositMethodPhoto = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeDepositMethodPhoto>>, TError,RemoveDepositMethodPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeDepositMethodPhoto>>,
+        TError,
+        RemoveDepositMethodPhotoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemoveDepositMethodPhotoMutationOptions(options));
+    }
+
+export const getGetDepositMethodPhotoUrl = (methodId: string,) => {
+
+
+
+
+  return `/api/deposit-methods/${methodId}/photo`
+}
+
+/**
+ * Public (method logos aren't private), so pages can use it in an image tag. Checked against the SHA-256 recorded at upload.
+ * @summary A deposit method's uploaded photo
+ */
+export const getDepositMethodPhoto = async (methodId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetDepositMethodPhotoUrl(methodId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDepositMethodPhotoQueryKey = (methodId: string,) => {
+    return [
+    `/api/deposit-methods/${methodId}/photo`
+    ] as const;
+    }
+
+
+export const getGetDepositMethodPhotoQueryOptions = <TData = Awaited<ReturnType<typeof getDepositMethodPhoto>>, TError = ErrorType<NotFoundResponse>>(methodId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepositMethodPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDepositMethodPhotoQueryKey(methodId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepositMethodPhoto>>> = ({ signal }) => getDepositMethodPhoto(methodId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: methodId !== null && methodId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDepositMethodPhoto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDepositMethodPhotoQueryResult = NonNullable<Awaited<ReturnType<typeof getDepositMethodPhoto>>>
+export type GetDepositMethodPhotoQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary A deposit method's uploaded photo
+ */
+
+export function useGetDepositMethodPhoto<TData = Awaited<ReturnType<typeof getDepositMethodPhoto>>, TError = ErrorType<NotFoundResponse>>(
+ methodId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepositMethodPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDepositMethodPhotoQueryOptions(methodId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetLedgerUrl = () => {
 
 
@@ -7488,7 +8076,7 @@ export const getConfirmDepositUrl = (id: string,) => {
 }
 
 /**
- * Requires payments.process. Credits the deposit balance.
+ * Requires payments.process. Credits the deposit balance with the amount less the method's charge. Refused while required proof of payment is missing, and for deposits at or above the two-person threshold until someone else approved it.
  * @summary Confirm a deposit arrived
  */
 export const confirmDeposit = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
@@ -7642,6 +8230,331 @@ export const useRejectDeposit = <TError = ErrorType<InvalidResponse | Unauthoriz
         TContext
       > => {
       return useMutation(getRejectDepositMutationOptions(options));
+    }
+
+export const getUploadDepositProofUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/proof`
+}
+
+/**
+ * The raw file is the body (a receipt or screenshot: PDF, JPEG, or PNG, detected from the content; at most 10 MB). Put the URI-encoded file name in the X-File-Name header. Up to 5 files per deposit, only while it's waiting for confirmation. Stored on the API server's disk, never in the database.
+ * @summary Upload proof of payment for your pending deposit
+ */
+export const uploadDepositProof = async (id: string,
+    uploadDepositProofBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MoneyResult>(getUploadDepositProofUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadDepositProofBody
+  }
+);}
+
+
+
+
+
+export const getUploadDepositProofMutationKey = () => ['uploadDepositProof'] as const;
+
+export const getUploadDepositProofMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadDepositProof>>, TError,UploadDepositProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadDepositProof>>, TError,UploadDepositProofMutationVariables, TContext> => {
+
+const mutationKey = getUploadDepositProofMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadDepositProof>>, UploadDepositProofMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  uploadDepositProof(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadDepositProofMutationResult = NonNullable<Awaited<ReturnType<typeof uploadDepositProof>>>
+    export type UploadDepositProofMutationBody = BodyType<Blob>
+    export type UploadDepositProofMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>
+    export type UploadDepositProofMutationVariables = {id: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Upload proof of payment for your pending deposit
+ */
+export const useUploadDepositProof = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadDepositProof>>, TError,UploadDepositProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadDepositProof>>,
+        TError,
+        UploadDepositProofMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadDepositProofMutationOptions(options));
+    }
+
+export const getGetDepositProofUrl = (id: string,
+    proofId: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/proof/${proofId}`
+}
+
+/**
+ * The deposit's owner, or staff with payments.process or payments.release (audited). Anyone else gets 404. Checked against the SHA-256 recorded at upload.
+ * @summary Download a deposit's proof of payment
+ */
+export const getDepositProof = async (id: string,
+    proofId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetDepositProofUrl(id,proofId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDepositProofQueryKey = (id: string,
+    proofId: string,) => {
+    return [
+    `/api/money/deposits/${id}/proof/${proofId}`
+    ] as const;
+    }
+
+
+export const getGetDepositProofQueryOptions = <TData = Awaited<ReturnType<typeof getDepositProof>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(id: string,
+    proofId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepositProof>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDepositProofQueryKey(id,proofId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepositProof>>> = ({ signal }) => getDepositProof(id,proofId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && proofId !== null && proofId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDepositProof>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDepositProofQueryResult = NonNullable<Awaited<ReturnType<typeof getDepositProof>>>
+export type GetDepositProofQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+/**
+ * @summary Download a deposit's proof of payment
+ */
+
+export function useGetDepositProof<TData = Awaited<ReturnType<typeof getDepositProof>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ id: string,
+    proofId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepositProof>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDepositProofQueryOptions(id,proofId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRemoveDepositProofUrl = (id: string,
+    proofId: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/proof/${proofId}/delete`
+}
+
+/**
+ * Only while the deposit is waiting for confirmation. The file is deleted.
+ * @summary Remove proof of payment from your pending deposit
+ */
+export const removeDepositProof = async (id: string,
+    proofId: string, options?: Parameters<typeof customFetch>[1]): Promise<MoneyResult> => {
+
+  return customFetch<MoneyResult>(getRemoveDepositProofUrl(id,proofId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveDepositProofMutationKey = () => ['removeDepositProof'] as const;
+
+export const getRemoveDepositProofMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeDepositProof>>, TError,RemoveDepositProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeDepositProof>>, TError,RemoveDepositProofMutationVariables, TContext> => {
+
+const mutationKey = getRemoveDepositProofMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeDepositProof>>, RemoveDepositProofMutationVariables> = (props) => {
+          const {id,proofId} = props ?? {};
+
+          return  removeDepositProof(id,proofId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveDepositProofMutationResult = NonNullable<Awaited<ReturnType<typeof removeDepositProof>>>
+
+    export type RemoveDepositProofMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>
+    export type RemoveDepositProofMutationVariables = {id: string;proofId: string}
+
+    /**
+ * @summary Remove proof of payment from your pending deposit
+ */
+export const useRemoveDepositProof = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeDepositProof>>, TError,RemoveDepositProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeDepositProof>>,
+        TError,
+        RemoveDepositProofMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemoveDepositProofMutationOptions(options));
+    }
+
+export const getApproveDepositReleaseUrl = (id: string,) => {
+
+
+
+
+  return `/api/money/deposits/${id}/release`
+}
+
+/**
+ * Requires payments.release. For deposits at or above the deposit two-person threshold; the approver can't also confirm it.
+ * @summary Second sign-off on a large deposit
+ */
+export const approveDepositRelease = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<LedgerResult> => {
+
+  return customFetch<LedgerResult>(getApproveDepositReleaseUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApproveDepositReleaseMutationKey = () => ['approveDepositRelease'] as const;
+
+export const getApproveDepositReleaseMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveDepositRelease>>, TError,ApproveDepositReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveDepositRelease>>, TError,ApproveDepositReleaseMutationVariables, TContext> => {
+
+const mutationKey = getApproveDepositReleaseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveDepositRelease>>, ApproveDepositReleaseMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  approveDepositRelease(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveDepositReleaseMutationResult = NonNullable<Awaited<ReturnType<typeof approveDepositRelease>>>
+
+    export type ApproveDepositReleaseMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type ApproveDepositReleaseMutationVariables = {id: string}
+
+    /**
+ * @summary Second sign-off on a large deposit
+ */
+export const useApproveDepositRelease = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveDepositRelease>>, TError,ApproveDepositReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveDepositRelease>>,
+        TError,
+        ApproveDepositReleaseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveDepositReleaseMutationOptions(options));
     }
 
 export const getApprovePayoutReleaseUrl = (id: string,) => {
@@ -8063,7 +8976,7 @@ export const getUploadDocumentUrl = (params: UploadDocumentParams,) => {
 }
 
 /**
- * The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements. Identity documents can't change while a check is pending or verified.
+ * The raw file is the request body (at most 10 MB; PDF, JPEG, or PNG, detected from the content). Put the URI-encoded file name in the X-File-Name header. Application evidence must name a saved application of yours that is a draft or has changes requested, and one of its program's requirements, or one of its form's file fields as field:<field id>. Identity documents can't change while a check is pending or verified.
  * @summary Upload a document
  */
 export const uploadDocument = async (uploadDocumentBody: Blob,

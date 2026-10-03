@@ -28,6 +28,8 @@ export interface Application {
   submittedAt: string | null;
   reviewer: string | null;
   awardedAmount: number | null;
+  /** The program's commission percent fixed at first submission; null for drafts */
+  commissionRate: number | null;
   history: ApplicationEvent[];
   internalNotes: InternalNote[];
   escalation: Escalation | null;

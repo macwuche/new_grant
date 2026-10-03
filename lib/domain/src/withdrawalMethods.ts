@@ -1,5 +1,5 @@
 import type {
-  ChannelId, DemoState, MethodField, MethodFieldType, MethodPhotoFile, PayoutBalance, PayoutChannel, PayoutDetail, Result, Treasury, WithdrawalMethod, WithdrawalSource,
+  ChannelId, DemoState, MethodField, MethodFieldType, MethodPhotoFile, PayoutBalance, PayoutChannel, PayoutDetail, Result, WithdrawalMethod, WithdrawalSource,
 } from './model';
 import { fail, roundCents } from './core';
 
@@ -85,16 +85,15 @@ export function normalizeMethod(raw: Partial<WithdrawalMethod> & Pick<Withdrawal
   };
 }
 
-export const normalizeTreasury = (t: Treasury): Treasury => ({ ...t, channels: t.channels.map(normalizeMethod) });
-
 // ---------- Validation ----------
 
 const isAmount = (value: number, allowZero = false) => Number.isFinite(value) && (allowZero ? value >= 0 : value > 0) && roundCents(value) === value;
 const len = (v: string) => v.trim().length;
-const slug = (text: string) => text.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'method';
+/** A method or field id made from its name: lowercase letters, digits, and dashes. */
+export const slug = (text: string) => text.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'method';
 
-/** Limits and charges; error keys are the field names, prefixed with `prefix`. */
-export function validateLimitsAndCharges(c: Pick<PayoutChannel, 'min' | 'max' | 'feeRate' | 'feeFixed' | 'feeCap'>, prefix = ''): Record<string, string> {
+/** Limits and charges; error keys are the field names, prefixed with `prefix`. `noun` names a request in messages. */
+export function validateLimitsAndCharges(c: Pick<PayoutChannel, 'min' | 'max' | 'feeRate' | 'feeFixed' | 'feeCap'>, prefix = '', noun = 'payout'): Record<string, string> {
   const errors: Record<string, string> = {};
   const key = (f: string) => `${prefix}${f}`;
   if (!isAmount(c.min)) errors[key('min')] = 'Enter a positive amount.';
@@ -104,16 +103,19 @@ export function validateLimitsAndCharges(c: Pick<PayoutChannel, 'min' | 'max' | 
   if (!isAmount(c.feeFixed, true)) errors[key('feeFixed')] = 'Enter 0 or more.';
   if (!isAmount(c.feeCap, true)) errors[key('feeCap')] = 'Enter 0 or more.';
   else if (!errors[key('feeFixed')] && c.feeCap > 0 && c.feeCap < c.feeFixed) errors[key('feeCap')] = 'The maximum must be at least the fixed charge (or 0 for no maximum).';
-  if (!errors[key('min')] && !errors[key('feeFixed')] && c.feeFixed >= c.min) errors[key('feeFixed')] = 'The fixed fee must be below the minimum, or the smallest payout would be all fee.';
+  if (!errors[key('min')] && !errors[key('feeFixed')] && c.feeFixed >= c.min) errors[key('feeFixed')] = `The fixed fee must be below the minimum, or the smallest ${noun} would be all fee.`;
   return errors;
 }
 
-/** A photo link must be https; an uploaded photo's path is only accepted unchanged; data: URLs are preview-mode uploads. */
-function photoError(url: string, current: WithdrawalMethod | undefined): string | null {
+/**
+ * A photo link must be https; an uploaded photo's path (under `uploadPrefix`) is only accepted unchanged;
+ * data: URLs are preview-mode uploads.
+ */
+export function photoError(url: string, current: { photoUrl: string } | undefined, uploadPrefix = '/api/withdrawal-methods/'): string | null {
   const value = url.trim();
   if (!value) return null;
   if (value.length > LIMITS.photoUrl && !value.startsWith('data:')) return 'That link is too long.';
-  if (value.startsWith('/api/withdrawal-methods/')) return current && current.photoUrl === value ? null : 'Upload the photo again or use a link.';
+  if (value.startsWith(uploadPrefix)) return current && current.photoUrl === value ? null : 'Upload the photo again or use a link.';
   if (value.startsWith('data:')) {
     if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)) return 'Upload a JPG, PNG, or WEBP image.';
     return value.length > Math.ceil(MAX_PREVIEW_PHOTO_BYTES * 4 / 3) + 40 ? `Photos can be at most ${MAX_PREVIEW_PHOTO_BYTES / 1024} KB in this preview.` : null;
@@ -125,7 +127,7 @@ function photoError(url: string, current: WithdrawalMethod | undefined): string 
 }
 
 /** Field ids: kept when the field already has one, otherwise made from the label; unique within the method. */
-function withFieldIds(fields: MethodInput['fields']): MethodField[] {
+export function withFieldIds(fields: MethodInput['fields']): MethodField[] {
   const used = new Set<string>();
   return fields.map(f => {
     let id = f.id && /^[a-z0-9-]{1,40}$/.test(f.id) && !used.has(f.id) ? f.id : slug(f.label);
@@ -150,6 +152,12 @@ export function validateMethod(input: MethodInput, others: WithdrawalMethod[], c
   if (len(input.processingTime) < 2 || input.processingTime.trim().length > LIMITS.processingTime) errors.processingTime = `Say how long it takes (2–${LIMITS.processingTime} characters), e.g. "1–2 business days".`;
   if (input.instructions.trim().length > LIMITS.instructions) errors.instructions = `Keep instructions under ${LIMITS.instructions} characters.`;
   if (!['grant', 'deposit', 'both'].includes(input.source)) errors.source = 'Choose the balance users withdraw from.';
+  return Object.assign(errors, validateForm(input));
+}
+
+/** The form users fill in: its name and fields. Errors keyed `formTitle`, `fields`, and `fields.<index>.<name>`. */
+export function validateForm(input: Pick<MethodInput, 'formTitle' | 'fields'>): Record<string, string> {
+  const errors: Record<string, string> = {};
   if (input.fields.length > MAX_FIELDS) errors.fields = `A form can have up to ${MAX_FIELDS} fields.`;
   if (input.fields.length && (len(input.formTitle) < 2 || input.formTitle.trim().length > LIMITS.formTitle)) errors.formTitle = `Name the form (2–${LIMITS.formTitle} characters), e.g. "Wallet details".`;
   const labels = new Set<string>();
@@ -282,7 +290,7 @@ const NUMBER = /^[+-]?(\d+(\.\d+)?|\.\d+)$/;
 export const answerLimit = (type: MethodFieldType) => type === 'textarea' ? 1000 : 200;
 
 /** Checks the applicant's answers against the method's form. Errors are keyed `details.<fieldId>`. */
-export function checkAnswers(method: WithdrawalMethod, answers: Record<string, string>): { details: PayoutDetail[] } | { errors: Record<string, string> } {
+export function checkAnswers(method: { fields: MethodField[] }, answers: Record<string, string>): { details: PayoutDetail[] } | { errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   const details: PayoutDetail[] = [];
   for (const f of method.fields) {

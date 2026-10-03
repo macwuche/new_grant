@@ -4,7 +4,7 @@ import { differenceInDays, format } from 'date-fns';
 import { findGrant } from '@workspace/domain/rules';
 import {
   addInternalNote, applicantName, approveApplication, clearEscalation, declineApplication, escalateApplication, MAX_NOTE_LENGTH,
-  MIN_MESSAGE_LENGTH, programBudget, requestChanges, startReview, validateAward,
+  commissionOn, MIN_MESSAGE_LENGTH, programBudget, requestChanges, startReview, validateAward,
 } from '@workspace/domain/review';
 import { findApplicant } from '@workspace/domain/applicants';
 import { assessRisk } from '@workspace/domain/risk';
@@ -94,6 +94,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   const now = () => new Date();
   const awardValue = award.trim() === '' ? NaN : Number(award);
   const awardError = validateAward(state, app, awardValue);
+  const commission = commissionOn(state, app, Number.isFinite(awardValue) ? awardValue : 0);
   const pickDecision = (next: Decision) => { setDecision(next); setConfirming(false); setErrors({}); setFlash(null); };
 
   const review = (action: string, fn: Parameters<typeof command>[2]) => command('applications.review', { action, target: app.id }, fn);
@@ -136,6 +137,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     <dl className="admin-detail-fields">
       <Field label="Requested" value={usd(app.requestedAmount)} />
       {app.awardedAmount !== null && <Field label="Awarded" value={usd(app.awardedAmount)} />}
+      <Field label="Commission" value={commission.rate > 0 ? `${commission.rate}%${app.awardedAmount !== null ? ` · ${usd(commissionOn(state, app, app.awardedAmount).amount)} taken` : ''}` : 'None'} />
       <Field label="Submitted" value={app.submittedAt ? when(app.submittedAt) : '—'} />
       <Field label="Registration" value={app.registrationNumber || 'Not provided'} />
       <Field label="Reviewer" value={app.reviewer ?? 'Unassigned'} />
@@ -150,10 +152,10 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
         {!mayOpenEvidence ? <p className="admin-review-hint">Your role can't open application files.</p>
           : evidence.error ? <p className="admin-field-error">{evidence.error}</p>
           : evidence.docs === null ? <p className="admin-review-hint">Loading…</p>
-          : grant.requirements.map(req => { const files = evidence.docs!.filter(d => d.requirement === req); return <div key={req}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{req}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
+          : [...grant.requirements.map(r => ({ slot: r, label: r })), ...grant.questions.filter(q => q.type === 'file').map(q => ({ slot: `field:${q.id}`, label: `${q.label}${q.required ? '' : ' (optional)'}` }))].map(({ slot, label }) => { const files = evidence.docs!.filter(d => d.requirement === slot); return <div key={slot}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{label}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
         <p className="admin-review-hint">Opening a file is recorded in the audit log.</p></section>
       : <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Preview: applicants confirm readiness only; no files are uploaded.</p></section>}
-    {grant.questions.length > 0 && <section className="admin-review-section"><h3>Program questions</h3><dl className="admin-detail-fields">{grant.questions.map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}</dl></section>}
+    {grant.questions.some(q => q.type !== 'file') && <section className="admin-review-section"><h3>Application form</h3><dl className="admin-detail-fields">{grant.questions.filter(q => q.type !== 'file').map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}</dl></section>}
 
     <section className="admin-review-section admin-review-actions" aria-label="Decision">
       <h3>Decision</h3>
@@ -162,7 +164,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
       {app.status === 'Submitted' && <><p className="admin-review-hint">Start the review to assign it to yourself and unlock decisions. The applicant will see it is under review.</p><button type="button" className="admin-btn primary" disabled={stale || !canReview || busy} onClick={() => void act(() => review('Start review', (s, actor) => startReview(s, app.id, seenVersion, actor.name, now())), () => api.startReview(app.id, { version: seenVersion }))} data-testid="button-admin-start-review">Start review</button></>}
       {app.status === 'Under review' && <>
         <div className="admin-segment" role="tablist" aria-label="Decision type">{([['approve', 'Approve'], ['changes', 'Request changes'], ['decline', 'Decline']] as const).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={decision === key} className={decision === key ? 'active' : ''} onClick={() => pickDecision(key)} data-testid={`tab-admin-decision-${key}`}>{label}</button>)}</div>
-        {decision === 'approve' ? <label className="admin-review-field"><span>Award amount (USD)</span><input className="admin-input" type="number" inputMode="decimal" step="0.01" min="0" value={award} onChange={e => { setAward(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors.award} data-testid="input-admin-award" /><small className={errors.award ? 'admin-field-error' : ''}>{errors.award ?? `Up to ${usd(Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))}. Approval credits the applicant's grant balance immediately.`}</small></label>
+        {decision === 'approve' ? <label className="admin-review-field"><span>Award amount (USD)</span><input className="admin-input" type="number" inputMode="decimal" step="0.01" min="0" value={award} onChange={e => { setAward(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors.award} data-testid="input-admin-award" /><small className={errors.award ? 'admin-field-error' : ''}>{errors.award ?? `Up to ${usd(Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))}. Approval credits the applicant's grant balance immediately${commission.rate > 0 ? ` and takes a ${commission.rate}% commission (${usd(commission.amount)}) from their deposit balance, even below zero` : ''}.`}</small></label>
           : <label className="admin-review-field"><span>{decision === 'decline' ? 'Reason for declining (sent to applicant)' : 'What should the applicant change? (sent to applicant)'}</span><textarea className="admin-input" rows={4} value={message} onChange={e => { setMessage(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors[messageKey]} data-testid="textarea-admin-decision-message" /><small className={errors[messageKey] ? 'admin-field-error' : ''}>{errors[messageKey] ?? `At least ${MIN_MESSAGE_LENGTH} characters.`}</small></label>}
         <div className="admin-review-buttons">
           {confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-decision">Cancel</button>}
@@ -191,7 +193,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
     </section>
 
     <div className="admin-detail-note"><Info size={17} /><span>{connected
-      ? 'Decisions are saved on the server, role-checked there, and shown to the applicant. Approved awards are credited to the applicant\'s grant balance. The applicant isn\'t emailed or notified in the app yet.'
+      ? 'Decisions are saved on the server, role-checked there, and shown to the applicant. Approved awards are credited to the applicant\'s grant balance and the plan\'s commission is taken from their deposit balance. The applicant is notified in the app and by email.'
       : 'Preview review workflow. Decisions are saved in this browser only and update the applicant preview here. Actions are checked against the acting staff member\'s role and audited, but there is no real staff sign-in yet, so never use this with real applicant data.'}</span></div>
   </ReviewFrame>;
 }
