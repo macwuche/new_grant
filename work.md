@@ -184,7 +184,7 @@ On 28 Sep the first test sign-up's confirmation came from Supabase's own mailer,
 
 Still open on production: confirming Supabase → Authentication → URL configuration for the live address; the Resend webhook (team inbox and delivery status); the application name (default "arc.fund") if not yet set; regenerating the hook secret (it was shared in chat); the applicant smoke test; backups (`api.env` and its encryption key, the documents folder); resetting the Supabase database password and the server's root password. `server.md` is the runbook and records every step.
 
-### Grant plans: commission, approval days, form builder (3 Oct 2026, built, not yet deployed)
+### Grant plans: commission, approval days, form builder (3 Oct 2026, built and committed in `2ae8223`, not yet deployed)
 
 **What we're building (owner's flow).** Staff create a grant plan (grant amount, approval days, commission %), save it, and make it active or inactive; applicants see active plans, pick one, and fill in the form staff built for it (text fields and document uploads), type the amount they want, and see a summary that includes the commission. Nothing is charged at submission. When staff **approve** the application, the award goes to the grant balance and the commission (the plan's % of the amount approved) is taken from the **deposit balance** (the owner's "main balance"; it keeps its name). The deposit balance may go negative (e.g. −$200); a later deposit clears it. The applicant gets the approval notice in the app and by email (already built).
 
@@ -213,7 +213,7 @@ Still open on production: confirming Supabase → Authentication → URL configu
 
 **Next, in order:**
 
-0. Deploy deposit methods and grant plans with commission together (branch `deposit-methods`, 30 Sep and 3 Oct 2026): push the schema first (four new `ledger_entries` columns; `programs.approval_days`, `programs.commission_rate`, `applications.commission_rate`), then enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
+0. Deploy deposit methods and grant plans with commission together (30 Sep and 3 Oct 2026, committed as `2ae8223` and merged into `main` on 3 Oct): push the schema first (four new `ledger_entries` columns; `programs.approval_days`, `programs.commission_rate`, `applications.commission_rate`), then enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
 
 1. Smoke-test the 29 Sep deploy (`91074ee`, live since ~21:09 UTC; schema pushed first): the admin withdrawal methods, the profile's password, email, and sign-out-others flows, and a withdrawal end to end with a real applicant and finance account (`server.md`, "New VPS, 29 Sep 2026").
 2. The live check, now on https://access.novabridgegrant.org (the super admin sign-in is done): one full pass through an application, a review, a deposit, and a payout, and a look at the audit log's IP addresses.
