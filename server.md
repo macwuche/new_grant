@@ -450,14 +450,14 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 - **Smoke test:** as a test applicant, dashboard → **+ Deposit** opens Add funds; announce a small deposit, copy the reference, cancel it from the history. Dashboard → **Withdraw** opens Withdrawals.
 - The Add funds page still shows the placeholder receiving details; since deposit methods (below) they're edited in Admin → Settings → Deposit methods.
 
-### Deposit methods and proof of payment (30 Sep 2026) — in `2ae8223`, not yet deployed
+### Deposit methods and proof of payment (30 Sep 2026) — deployed in `894f51a`
 
 - **Schema push required** (Step 7) before restarting the API: `ledger_entries` gains `pay_to`, `deposit_details`, `proof_required`, and `proof`. All additive. Deposit methods live in `system_settings.treasury` (JSON); the stored settings are filled in when read: Bank transfer and Mobile money with the old deposit limits and sample receiving details, and USDT (TRC-20) hidden. The old minimum/maximum deposit settings are no longer used.
 - **Proof files** are stored under `DOCUMENTS_DIR` in the applicant's folder, and **method photos** under owner folder `5a1e5000-0000-4000-8000-00000000f071`, so both are in the same backup.
 - **After deploying:** in Admin → Settings → Deposit methods, replace every "(placeholder)" value with the real details (the cards warn until you do), enter the USDT wallet address, then make USDT available if wanted. Check the deposit two-person threshold in Settings → Money (default $2,500).
 - **Smoke test:** as a test applicant, Add funds → a method with required proof → a small deposit → the receiving details and reference show → upload a receipt → as finance, Payments → Deposits shows the receipt (opens) and confirming credits the amount less the charge. A deposit at or above the threshold needs Approve (compliance or super admin) before a different person confirms.
 
-### Grant plans with commission (3 Oct 2026) — in `2ae8223`, not yet deployed
+### Grant plans with commission (3 Oct 2026) — deployed in `894f51a`
 
 Built on the same branch as deposit methods (`deposit-methods`), so it ships with them.
 
@@ -565,17 +565,17 @@ New VPS, 29 Sep 2026 (`91074ee`):
 - [ ] Owner: the real deposit receiving details (after deploying deposit methods: Admin → Settings → Deposit methods, no redeploy).
 - [ ] Optional: `GEO_HEADERS=cloudflare` for the Location column of security activity ("Profile center" section above).
 
-30 Sep 2026 (deposit methods, committed as `2ae8223`, not yet deployed):
+30 Sep 2026 (deposit methods, committed as `2ae8223`, deployed 3 Oct as `894f51a`):
 - [x] Built in Replit: Settings → Deposit methods (receiving details, per-method limits and charges, proof of payment, form; USDT TRC-20 added, hidden until a wallet is set), the rebuilt Add funds flow with receipt uploads, the admin deposit panel with receipts and the two-person deposit rule, and the deposit two-person threshold in Settings → Money (global deposit limits removed). 208 rule tests, 149 API tests, typecheck, and headless-browser checks pass.
 - [x] Commit and merge to `main` (`2ae8223`, 3 Oct 2026).
-- [ ] Push `main` to GitHub.
-- [ ] Deploy: `git pull`, **schema push** (four `ledger_entries` columns), `sh deploy/build.sh`, restart ("Deposit methods and proof of payment" section above).
+- [x] Push `main` to GitHub (`894f51a`).
+- [x] Deploy (3 Oct 2026, ~23:22 UTC): `git pull` (fast-forward `91074ee..894f51a`), **schema push** ("Changes applied", no prompts), `sh deploy/build.sh` (Build OK), restart; `/api/healthz` ok locally and from outside, and the served bundle has the new pages.
 - [ ] Owner: replace every "(placeholder)" receiving detail and enter the USDT wallet address in Admin → Settings → Deposit methods; make USDT available if wanted.
 - [ ] Smoke test from that section.
 
-3 Oct 2026 (grant plans with commission, same commit `2ae8223`, not yet deployed):
+3 Oct 2026 (grant plans with commission, same commit `2ae8223`, deployed with it):
 - [x] Built in Replit: approval days and a commission % per plan, a form builder with long-text and document-upload fields, the commission on the application summary and taken from the deposit balance on approval (negative allowed), the per-applicant switch for grant payouts while the deposit balance is negative, the application fee removed, and stricter upload checks. 215 rule tests, 156 API tests, typecheck, and a headless-browser check pass.
-- [ ] Deploy with deposit methods: **schema push** (`programs.approval_days`, `programs.commission_rate`, `applications.commission_rate`) before restarting ("Grant plans with commission" section above).
+- [x] Deployed with deposit methods; the same schema push added `programs.approval_days`, `programs.commission_rate`, `applications.commission_rate`.
 - [ ] Owner: set approval days and commission on each live plan.
 - [ ] Smoke test from that section.
 
@@ -652,3 +652,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-09-30 — Reviewed the docs; compared deposits with withdrawals. Built deposit methods (finance-managed receiving details, limits, charges, proof of payment, forms; USDT TRC-20), receipt uploads, and the two-person deposit rule on branch `deposit-methods` (not deployed). Added the "Deposit methods and proof of payment" deploy notes (schema push needed) and the 30 Sep checklist; tidied the duplicate Target heading and the deployed commit in the table.
 - 2026-10-03 — Built grant plans with commission on branch `deposit-methods` (not deployed): approval days, commission % per plan taken from the deposit balance on approval (may go negative), a form builder with document uploads, a per-applicant switch for grant payouts while the deposit balance is negative, the application fee removed, stricter upload checks. Added the "Grant plans with commission" deploy notes (schema push needed) and the 3 Oct checklist.
 - 2026-10-03 — Committed deposit methods and grant plans with commission together as `2ae8223` (215 rule tests, 156 API tests, typecheck pass) and merged branch `deposit-methods` into `main`. Not yet pushed or deployed; deploy needs the schema push first (see the two sections above).
+- 2026-10-03 — Deployed `894f51a` (deposit methods and grant plans with commission): pulled from `91074ee`; schema pushed to Supabase first ("Changes applied", no prompts: the four `ledger_entries` deposit columns, `programs.approval_days`/`commission_rate`, `applications.commission_rate`); Build OK (~23:22 UTC); API restarted, `/api/healthz` ok. Checked from outside: healthz ok, the page serves the new bundle `index-Tb4XJ6wa.js`, which contains the Deposit methods and the negative-balance switch. Open: real receiving details and USDT wallet, approval days and commission per live plan, both smoke tests.
