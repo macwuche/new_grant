@@ -417,6 +417,7 @@ Back up, alongside the Supabase database:
 ssh root@77.68.98.14
 cd /var/www/novabridgegrant
 sudo -u novabridgegrant git pull --ff-only
+sudo -u novabridgegrant git log --oneline -1   # the commit you pushed (as root, plain `git` refuses: "dubious ownership")
 sh deploy/build.sh                      # install + build both apps; ends with "Build OK"
 # Only if the schema changed:
 #   (set -a; . /etc/novabridgegrant/api.env; set +a; PATH=/opt/novabridgegrant-node/bin:$PATH pnpm -F @workspace/db run push)
@@ -428,7 +429,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Identity checks for withdrawals only, and Active/Inactive plans (4 Oct 2026)
+### Identity checks for withdrawals only, and Active/Inactive plans (4 Oct 2026) — deployed as `96d6f31`
 
 - **No schema push** and no new environment variables: `git pull` + `deploy/build.sh` + restart.
 - Applying for a grant no longer needs a verified identity; every withdrawal does. Grant plans read Draft / Active / Inactive, and inactive plans are hidden from applicants (except those with an application on them).
@@ -659,3 +660,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-03 — Built grant plans with commission on branch `deposit-methods` (not deployed): approval days, commission % per plan taken from the deposit balance on approval (may go negative), a form builder with document uploads, a per-applicant switch for grant payouts while the deposit balance is negative, the application fee removed, stricter upload checks. Added the "Grant plans with commission" deploy notes (schema push needed) and the 3 Oct checklist.
 - 2026-10-03 — Committed deposit methods and grant plans with commission together as `2ae8223` (215 rule tests, 156 API tests, typecheck pass) and merged branch `deposit-methods` into `main`. Not yet pushed or deployed; deploy needs the schema push first (see the two sections above).
 - 2026-10-03 — Deployed `894f51a` (deposit methods and grant plans with commission): pulled from `91074ee`; schema pushed to Supabase first ("Changes applied", no prompts: the four `ledger_entries` deposit columns, `programs.approval_days`/`commission_rate`, `applications.commission_rate`); Build OK (~23:22 UTC); API restarted, `/api/healthz` ok. Checked from outside: healthz ok, the page serves the new bundle `index-Tb4XJ6wa.js`, which contains the Deposit methods and the negative-balance switch. Open: real receiving details and USDT wallet, approval days and commission per live plan, both smoke tests.
+- 2026-10-04 — Deployed `96d6f31` (identity checks for withdrawals only; Active/Inactive plans), which fixed every plan showing "Not eligible" to applicants without a verified identity. Pushed from Replit after `gh auth login` (the Replit Git credential had stopped working); on the server: `git pull` (fast-forward `894f51a..96d6f31`), no schema push, Build OK (~17:42 UTC), API restarted, `/api/healthz` ok. Checked from outside: the page serves `index--QTNE1ZL.js`, which has "Make inactive" and no longer has the identity-before-applying rule. Added the `git log` check (run as `novabridgegrant`) to "Redeploy an update". Open: commission % per live plan, the smoke test from that section.
