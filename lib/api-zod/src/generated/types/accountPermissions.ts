@@ -7,7 +7,6 @@
  */
 
 export interface AccountPermissions {
-  payoutKyc: boolean;
   depositKyc: boolean;
   emailNotifications: boolean;
   cardApplications: boolean;

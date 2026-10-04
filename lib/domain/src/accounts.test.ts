@@ -83,7 +83,8 @@ describe('identity verification', () => {
     expect(Ac.submitKyc(s, input, now).ok).toBe(false); // already verified
     accept(Ac.requestReverification(s, ME, 'Your passport on file has expired.', 'Riley Chen', now));
     expect(s.profile.identityVerified).toBe(false);
-    expect(R.checkEligibility(R.findGrant(s, 'creative')!, s.profile, R.ownApplications(s), now).reasons).toContain('Identity verification is required before applying.');
+    // Applying doesn't need a verified identity (owner's rule, 3 Oct 2026); payouts do.
+    expect(R.checkEligibility(R.findGrant(s, 'creative')!, s.profile, R.ownApplications(s), now).reasons.join(' ')).not.toMatch(/identity/i);
     expect(Object.keys(Ac.validateKyc({ ...input, documentNumber: '12', nameOnDocument: '' })).sort()).toEqual(['documentNumber', 'nameOnDocument']);
     accept(Ac.submitKyc(s, input, now));
     expect(accountOf(s, ME).kyc).toMatchObject({ status: 'Pending', documentLast4: '5678' });

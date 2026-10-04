@@ -1,4 +1,4 @@
-import { DEFAULT_PERMISSIONS } from "@workspace/domain/applicants";
+import { knownPermissions } from "@workspace/domain/applicants";
 import type { AccountControls, AccountPermissions } from "@workspace/domain/model";
 import { DEFAULT_PRIVACY, type PrivacyPreferences } from "@workspace/domain/profile";
 import { NO_EFFECTS, type Effects } from "./activity";
@@ -61,7 +61,7 @@ export interface ProfileRepo {
 
 /** The account's permission switches as stored: the switches, with email copies from their own field. */
 export const permissionsFrom = (stored: Partial<AccountPermissions> | null | undefined, emailNotifications: boolean): AccountPermissions =>
-  ({ ...DEFAULT_PERMISSIONS, ...stored, emailNotifications });
+  ({ ...knownPermissions(stored), emailNotifications });
 
 export const NEW_ACCOUNT: StoredAccount = { status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" } };
 

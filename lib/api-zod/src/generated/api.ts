@@ -580,7 +580,6 @@ export const GetProfileResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -658,7 +657,6 @@ export const UpdateProfileResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -725,7 +723,6 @@ export const SubmitIdentityCheckResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -787,7 +784,6 @@ export const UploadAvatarResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -842,7 +838,6 @@ export const RemoveAvatarResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -902,7 +897,6 @@ export const SetPrivacyResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1016,7 +1010,6 @@ export const ReportPasswordChangedResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1075,7 +1068,6 @@ export const CompleteCredentialResetResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1132,7 +1124,6 @@ export const ListApplicantsResponseItem = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1205,7 +1196,6 @@ export const SetApplicantTierResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1275,7 +1265,6 @@ export const SetCardSettingsResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1305,7 +1294,7 @@ export const SetAccountPermissionParams = zod.object({
 })
 
 export const SetAccountPermissionBody = zod.object({
-  "key": zod.enum(['payoutKyc', 'depositKyc', 'emailNotifications', 'cardApplications', 'grantApplications', 'clearBalanceForPayouts']),
+  "key": zod.enum(['depositKyc', 'emailNotifications', 'cardApplications', 'grantApplications', 'clearBalanceForPayouts']),
   "value": zod.boolean()
 })
 
@@ -1345,7 +1334,6 @@ export const SetAccountPermissionResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1418,7 +1406,6 @@ export const LockApplicantResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1483,7 +1470,6 @@ export const UnlockApplicantResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1552,7 +1538,6 @@ export const RequireCredentialResetResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1617,7 +1602,6 @@ export const ApproveIdentityCheckResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1690,7 +1674,6 @@ export const RejectIdentityCheckResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
@@ -1763,7 +1746,6 @@ export const RequestReverificationResponse = zod.object({
   "kycRequired": zod.boolean()
 }).optional(),
   "permissions": zod.object({
-  "payoutKyc": zod.boolean(),
   "depositKyc": zod.boolean(),
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),

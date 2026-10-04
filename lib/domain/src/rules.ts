@@ -1,4 +1,4 @@
-import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, Result, Transaction } from './model';
+import type { Application, ApplicationInput, ApplicationStatus, DemoState, Grant, Profile, ProgramStatus, Result, Transaction } from './model';
 import { fail, nextIds, roundCents, usd } from './core';
 import { logStaff } from './activity';
 import { accountLockReason, permissionBlocker } from './applicants';
@@ -53,7 +53,11 @@ export function isGrantOpen(grant: Grant, now: Date): boolean {
 }
 
 /** Programs applicants can see: everything except staff-only drafts. */
-export const visibleGrants = (state: DemoState) => state.grants.filter(g => g.status !== 'Draft');
+/** What staff and applicants call each status: an open plan is Active, a closed one Inactive. */
+export const PROGRAM_STATUS_LABELS: Record<ProgramStatus, string> = { Draft: 'Draft', Open: 'Active', Closed: 'Inactive' };
+
+/** The applicant catalog: active plans only. Drafts and inactive plans are hidden. */
+export const visibleGrants = (state: DemoState) => state.grants.filter(g => g.status === 'Open');
 
 export type Eligibility = {
   eligible: boolean;
@@ -71,7 +75,6 @@ export function checkEligibility(grant: Grant, profile: Profile, applications: A
   else if (grant.status === 'Closed' && !inFlight) reasons.push('This program is not accepting new applications.');
   else if (!isBeforeDeadline(grant, now) && !inFlight) reasons.push(`Applications closed on ${grant.deadline}.`);
   if (profile.tier < grant.minimumTier) reasons.push(`Requires Tier ${grant.minimumTier}; your account is Tier ${profile.tier}.`);
-  if (!profile.identityVerified) reasons.push('Identity verification is required before applying.');
   if (existing && !isEditable(existing)) reasons.push(`You already have an application for this grant (${existing.id}, ${existing.status.toLowerCase()}).`);
   return { eligible: reasons.length === 0, reasons, existing };
 }

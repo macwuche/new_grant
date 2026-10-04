@@ -8,6 +8,7 @@ import {
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@workspace/domain/programs';
 import { programBudget } from '@workspace/domain/review';
+import { PROGRAM_STATUS_LABELS } from '@workspace/domain/rules';
 import { adoptServerProgram, dropServerProgram } from '@workspace/domain/sync';
 import { apiError, useServerData } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
@@ -30,13 +31,13 @@ export function AdminPrograms() {
   const visible = all.filter(g => filter === 'All programs' || g.status === filter);
   return <>
     {programsError && <div className="admin-review-flash error" role="alert" data-testid="status-admin-programs-error">{programsError}</div>}
-    <div className="admin-toolbar"><span className="admin-count" data-testid="text-admin-grants-count">{visible.length} of {all.length} programs</span><div className="admin-toolbar-left" style={{ flex: '0 1 auto' }}><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter grant programs by status" data-testid="select-admin-filter-grants"><option>All programs</option><option>Open</option><option>Draft</option><option>Closed</option></select><button type="button" className="admin-btn primary" onClick={() => setEditing('new')} data-testid="button-admin-new-program"><Plus size={14} style={{ verticalAlign: '-2px' }} /> New program</button></div></div>
+    <div className="admin-toolbar"><span className="admin-count" data-testid="text-admin-grants-count">{visible.length} of {all.length} programs</span><div className="admin-toolbar-left" style={{ flex: '0 1 auto' }}><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter grant programs by status" data-testid="select-admin-filter-grants"><option>All programs</option><option value="Open">Active</option><option>Draft</option><option value="Closed">Inactive</option></select><button type="button" className="admin-btn primary" onClick={() => setEditing('new')} data-testid="button-admin-new-program"><Plus size={14} style={{ verticalAlign: '-2px' }} /> New program</button></div></div>
     <div className="admin-program-grid">{visible.map(grant => {
       const Icon = icons[grant.id] ?? FolderOpen;
       const budget = programBudget(state, grant.id);
       const count = state.applications.filter(a => a.grantId === grant.id && a.status !== 'Draft').length;
       return <article className="admin-program-card" key={grant.id} data-testid={`card-admin-grant-${grant.id}`}>
-        <div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid={`status-admin-program-${grant.id}`}>{grant.status}</span></div>
+        <div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid={`status-admin-program-${grant.id}`}>{PROGRAM_STATUS_LABELS[grant.status]}</span></div>
         <h2>{grant.name}</h2><p>{grant.summary}</p>
         <div className="admin-program-meta"><div><span>Award range</span><strong>{usd(grant.minimumRequest)} – {usd(grant.maxFunding)}</strong></div><div><span>Commission</span><strong>{grant.commissionRate}%</strong></div><div><span>Approval time</span><strong>{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</strong></div><div><span>Budget left</span><strong>{usd(budget.remaining)} of {usd(budget.budget)}</strong></div><div><span>Deadline</span><strong>{day(grant.deadline)}</strong></div><div><span>Submitted</span><strong>{count} application{count === 1 ? '' : 's'}</strong></div></div>
         <button type="button" onClick={() => setEditing(grant.id)} aria-label={`Manage ${grant.name}`} data-testid={`button-manage-admin-grant-${grant.id}`}>Manage program <ArrowRight size={14} /></button>
@@ -131,7 +132,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
       ? remote(() => api.createProgram(toInput(form) as api.ProgramInput))
       : local('Create program', '', (s, by) => createProgram(s, toInput(form), by, now())), o => o.program && onCreated(o.program.id));
   const doDelete = (id: string) => after(connected ? remote(() => api.deleteProgram(id, version), id) : local('Delete program', id, s => deleteProgram(s, id, seenVersion)), onClose);
-  const doClose = (id: string) => after(connected ? remote(() => api.closeProgram(id, version)) : local('Close program', id, (s, by) => closeProgram(s, id, seenVersion, by, now())));
+  const doClose = (id: string) => after(connected ? remote(() => api.closeProgram(id, version)) : local('Make program inactive', id, (s, by) => closeProgram(s, id, seenVersion, by, now())));
   const doPublish = (id: string, action: string) => after(connected ? remote(() => api.publishProgram(id, version)) : local(action, id, (s, by) => publishProgram(s, id, seenVersion, by, now())));
   const setQuestion = (i: number, patch: Partial<ProgramQuestion>) => set('questions', form.questions.map((q, j) => j === i ? { ...q, ...patch } : q));
 
@@ -143,7 +144,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'budget' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={grant ? `${grant.id} / Program` : 'New program'}>
-    <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{grant.status}</span>}</div>
+    <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{PROGRAM_STATUS_LABELS[grant.status]}</span>}</div>
     <RoleNotice permission="programs.manage" />
     <p className="admin-detail-lead">{grant ? `${grant.focus} · last changed ${when(grant.updatedAt)}` : 'New programs start as drafts. Applicants see them only after you publish.'}</p>
 
@@ -158,16 +159,16 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
 
     {grant && <section className="admin-review-section admin-review-actions" aria-label="Program status">
       <h3>Status</h3>
-      {grant.status === 'Draft' && <p className="admin-review-hint">Only staff can see a draft. Publishing makes it visible and open to eligible applicants.</p>}
-      {grant.status === 'Open' && <p className="admin-review-hint">Accepting applications until {day(grant.deadline)}. Closing stops new submissions; submitted applications continue through review{drafts ? `, and ${drafts} applicant${drafts === 1 ? '' : 's'} with drafts will be notified` : ''}.</p>}
-      {grant.status === 'Closed' && <p className="admin-review-hint">Not accepting new applications. Reopen it to accept them again (the deadline must be in the future).</p>}
+      {grant.status === 'Draft' && <p className="admin-review-hint">Only staff can see a draft. Publishing makes it active: visible and open to eligible applicants.</p>}
+      {grant.status === 'Open' && <p className="admin-review-hint">Accepting applications until {day(grant.deadline)}. Making it inactive hides it from applicants and stops new submissions; submitted applications continue through review{drafts ? `, and ${drafts} applicant${drafts === 1 ? '' : 's'} with drafts will be notified` : ''}.</p>}
+      {grant.status === 'Closed' && <p className="admin-review-hint">Inactive: hidden from applicants and not accepting new applications. Make it active to show it again (the deadline must be in the future).</p>}
       {dirty && grant.status !== 'Open' && <p className="admin-review-hint">Save or discard your edits before changing the status.</p>}
       <div className="admin-review-buttons">
         {confirm && <button type="button" className="admin-btn" onClick={() => setConfirm(null)} data-testid="button-admin-program-cancel">Cancel</button>}
         {grant.status === 'Draft' && !apps.length && !drafts && <button type="button" className="admin-btn" disabled={stale || !allowed || busy} onClick={() => confirm === 'delete' ? doDelete(grant.id) : setConfirm('delete')} data-testid="button-admin-program-delete"><Trash2 size={13} style={{ verticalAlign: '-2px' }} /> {confirm === 'delete' ? 'Confirm delete' : 'Delete'}</button>}
         {grant.status === 'Open'
-          ? <button type="button" className="admin-btn danger" disabled={stale || !allowed || busy} onClick={() => confirm === 'close' ? doClose(grant.id) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm close' : 'Close to new applications'}</button>
-          : <button type="button" className="admin-btn primary" disabled={stale || dirty || !allowed || busy} onClick={() => doPublish(grant.id, grant.status === 'Draft' ? 'Publish program' : 'Reopen program')} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Reopen'}</button>}
+          ? <button type="button" className="admin-btn danger" disabled={stale || !allowed || busy} onClick={() => confirm === 'close' ? doClose(grant.id) : setConfirm('close')} data-testid="button-admin-program-close">{confirm === 'close' ? 'Confirm: make inactive' : 'Make inactive'}</button>
+          : <button type="button" className="admin-btn primary" disabled={stale || dirty || !allowed || busy} onClick={() => doPublish(grant.id, grant.status === 'Draft' ? 'Publish program' : 'Make program active')} data-testid="button-admin-program-publish">{grant.status === 'Draft' ? 'Publish' : 'Make active'}</button>}
       </div>
     </section>}
 

@@ -181,7 +181,7 @@ function NewWithdrawal({ onToast }: { onToast: Toast }) {
 
   return <section className="dp-card dp-pad" aria-labelledby="wd-new-title" data-testid="card-new-withdrawal">
     <div className="dp-card-head"><div><h2 id="wd-new-title">New withdrawal</h2><p>Finance reviews every request and sends the money.</p></div><Stepper step={step} /></div>
-    {blocker && <div className="dp-alert" role="alert" data-testid="notice-payout-blocked"><CircleAlert size={15} aria-hidden="true" /><span>{blocker}{blocker.includes('deposit balance') && <> <Link className="wd-link" href="/deposits">Add funds</Link></>}</span></div>}
+    {blocker && <div className="dp-alert" role="alert" data-testid="notice-payout-blocked"><CircleAlert size={15} aria-hidden="true" /><span>{blocker}{blocker.includes('deposit balance') && <> <Link className="wd-link" href="/deposits">Add funds</Link></>}{blocker.includes('Verify your identity') && <> <Link className="wd-link" href="/settings#verification">Verify now</Link></>}</span></div>}
 
     {step === 'method' && <form className="dp-step-body" onSubmit={e => { e.preventDefault(); if (method) go('amount'); }}>
       <h3 ref={headingRef} tabIndex={-1} className="dp-step-title">How do you want to be paid?</h3>

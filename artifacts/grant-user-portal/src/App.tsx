@@ -221,9 +221,9 @@ function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
   const { eligible, reasons, existing } = checkEligibility(grant, state.profile, ownApplications(state), now);
   const open = isGrantOpen(grant, now);
   const badge = existing && existing.status !== 'Draft' ? <StatusBadge status={existing.status} tone={existing.status} />
-    : !open ? <StatusBadge status="Closed" tone="Declined" />
+    : !open ? <StatusBadge status="Deadline passed" tone="Declined" />
     : existing ? <StatusBadge status="Draft saved" tone="Draft" />
-    : eligible ? <StatusBadge status="Open" tone="Complete" /> : <StatusBadge status="Not eligible" tone="Pending" />;
+    : eligible ? <StatusBadge status="Active" tone="Complete" /> : <StatusBadge status="Not eligible" tone="Pending" />;
   const action = existing?.status === 'Draft'
     ? <Link className="btn btn-dark" style={{ flex: 1 }} href={`/applications/${existing.id}`} data-testid={`link-apply-${grant.id}`}>Resume draft <ArrowRight size={14} /></Link>
     : existing?.status === 'Changes requested' ? <Link className="btn btn-dark" style={{ flex: 1 }} href={`/applications/${existing.id}`} data-testid={`link-apply-${grant.id}`}>Update application <ArrowRight size={14} /></Link>
@@ -763,7 +763,7 @@ function IdentityCheck({ onToast }: { onToast: Toast }) {
   };
   const tone = kyc.status === 'Verified' ? 'Completed' : kyc.status === 'Pending' ? 'Pending' : kyc.status === 'Rejected' ? 'Failed' : 'Draft';
   return <div className="verification-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }} data-testid="section-identity-check"><div className="verification-icon"><Check size={15} /></div><div className="verification-copy" style={{ flex: '1 1 240px' }}><strong>Identity verification</strong>
-    <span>{kyc.status === 'Verified' ? `Verified${kyc.documentType ? ` with ${kyc.documentType.toLowerCase()} ending ${kyc.documentLast4}` : ''}.` : kyc.status === 'Pending' ? `Submitted ${kyc.submittedAt ? fmtDate(kyc.submittedAt) : ''} · waiting for the compliance team.` : kyc.status === 'Rejected' ? `Not approved: ${kyc.rejectionReason}` : kyc.rejectionReason ? `Please verify again: ${kyc.rejectionReason}` : 'Required before you can apply for grants.'}</span>
+    <span>{kyc.status === 'Verified' ? `Verified${kyc.documentType ? ` with ${kyc.documentType.toLowerCase()} ending ${kyc.documentLast4}` : ''}.` : kyc.status === 'Pending' ? `Submitted ${kyc.submittedAt ? fmtDate(kyc.submittedAt) : ''} · waiting for the compliance team.` : kyc.status === 'Rejected' ? `Not approved: ${kyc.rejectionReason}` : kyc.rejectionReason ? `Please verify again: ${kyc.rejectionReason}` : 'Required before you can withdraw. You can apply for grants without it.'}</span>
     {connected && !canSubmit && identityDocs.length > 0 && <div style={{ marginTop: 10 }}><DocumentFiles docs={identityDocs} editable={false} onToast={onToast} /></div>}
     {canSubmit && <div className="field-grid" style={{ marginTop: 12 }}>
       <div className="field"><label className="field-label" htmlFor="kyc-type">Document</label><select id="kyc-type" className="select" value={form.documentType} onChange={e => setForm({ ...form, documentType: e.target.value as KycDocumentType })} data-testid="select-kyc-document">{KYC_DOCUMENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>

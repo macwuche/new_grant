@@ -316,7 +316,7 @@ describe("grant programs", () => {
     expect((await json(res)).program.status).toBe("Closed");
     version = (await program("space")).updatedAt;
     res = await post("/programs/space/publish", { version });
-    expect((await json(res)).message).toMatch(/reopened/);
+    expect((await json(res)).message).toMatch(/active again/);
   });
 
   it("deletes unused drafts only", async () => {
@@ -386,7 +386,7 @@ describe("account controls and identity checks", () => {
 
   it("starts every applicant active, unverified, and at Tier 1", async () => {
     expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" },
-      permissions: { payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false } });
+      permissions: { depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false } });
   });
 
   it("keeps only the last four characters of the document number", async () => {
@@ -487,10 +487,13 @@ describe("account controls and identity checks", () => {
   });
 
   it("lets compliance switch account permissions, enforced on the applicant and shown to them", async () => {
-    expect((await act("permissions", { key: "payoutKyc", value: true }, "tok-finance")).status).toBe(403);
+    expect((await act("permissions", { key: "depositKyc", value: true }, "tok-finance")).status).toBe(403);
     expect((await act("permissions", { key: "somethingElse", value: true }, "tok-riley")).status).toBe(400);
+    // Retired 3 Oct 2026: payouts always need a verified identity, so there's no switch.
+    expect((await act("permissions", { key: "payoutKyc", value: false }, "tok-riley")).status).toBe(400);
     const changed = await json(await act("permissions", { key: "depositKyc", value: true }, "tok-riley"));
-    expect(changed.applicant.profile.account.permissions).toMatchObject({ depositKyc: true, payoutKyc: false });
+    expect(changed.applicant.profile.account.permissions).toMatchObject({ depositKyc: true });
+    expect(changed.applicant.profile.account.permissions).not.toHaveProperty("payoutKyc");
     expect((await act("permissions", { key: "depositKyc", value: true }, "tok-riley")).status).toBe(400);
     expect((await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-maya"))).error).toMatch(/Verify your identity/);
     expect((await json(await call("/notifications", "tok-maya")))[0]).toMatchObject({ title: "Account settings changed" });
@@ -526,11 +529,22 @@ describe("applications and review", () => {
   const queued = async (id: string) => (await json(await call("/applications", "tok-super"))).find((a: { id: string }) => a.id === id);
   const decide = (id: string, path: string, body: Record<string, unknown>, token = "tok-super") => post(`/applications/${id}/${path}`, body, token);
 
-  it("requires a verified identity before applying", async () => {
+  it("lets an unverified applicant apply (identity is only needed for payouts)", async () => {
     await call("/profile", "tok-maya");
     const res = await post("/applications/save", { grantId: "creative", application: creative }, "tok-maya");
-    expect(res.status).toBe(400);
-    expect((await json(res)).error).toMatch(/Identity verification/);
+    expect(res.status).toBe(200);
+    expect((await json(res)).application).toMatchObject({ status: "Draft" });
+  });
+
+  it("hides inactive plans from applicants, except from those with an application on them", async () => {
+    await call("/profile", "tok-maya");
+    expect((await post("/applications/save", { grantId: "creative", application: creative }, "tok-maya")).status).toBe(200);
+    const ids = async (token: string) => (await json(await call("/programs", token))).map((g: { id: string }) => g.id);
+    expect(await ids("tok-applicant")).toContain("creative");
+    expect((await post("/programs/creative/close", { version: (await program("creative")).updatedAt })).status).toBe(200);
+    expect(await ids("tok-applicant")).not.toContain("creative");
+    expect(await ids("tok-maya")).toContain("creative");
+    expect(await ids("tok-super")).toContain("creative");
   });
 
   it("keeps drafts private to the applicant, and submits with validation", async () => {
@@ -673,7 +687,7 @@ describe("notifications, team activity, and the audit log", () => {
     await verifyMaya();
     await post("/applications/save", { grantId: "creative", application: input }, "tok-maya");
     await post("/programs/creative/close", { version: (await program("creative")).updatedAt });
-    expect((await notes())[0]).toMatchObject({ title: "Creative Practice closed", href: expect.stringMatching(/^\/applications\/APP-/) });
+    expect((await notes())[0]).toMatchObject({ title: "Creative Practice is no longer active", href: expect.stringMatching(/^\/applications\/APP-/) });
   });
 
   it("feeds applicant actions to staff, with each person's own read state", async () => {

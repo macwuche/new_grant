@@ -4083,8 +4083,6 @@ components:
     AccountPermissions:
       type: object
       properties:
-        payoutKyc:
-          type: boolean
         depositKyc:
           type: boolean
         emailNotifications:
@@ -4096,13 +4094,13 @@ components:
         clearBalanceForPayouts:
           type: boolean
           description: Grant payouts wait until a negative deposit balance is cleared
-      required: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
+      required: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
     AccountPermissionChange:
       type: object
       properties:
         key:
           type: string
-          enum: [payoutKyc, depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
+          enum: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
         value:
           type: boolean
       required: [key, value]

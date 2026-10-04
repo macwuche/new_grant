@@ -428,6 +428,12 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Identity checks for withdrawals only, and Active/Inactive plans (4 Oct 2026)
+
+- **No schema push** and no new environment variables: `git pull` + `deploy/build.sh` + restart.
+- Applying for a grant no longer needs a verified identity; every withdrawal does. Grant plans read Draft / Active / Inactive, and inactive plans are hidden from applicants (except those with an application on them).
+- **Smoke test:** as staff, make a test plan inactive → it disappears from a test applicant's Grants page → make it active → it's back. As an unverified test applicant, start an application (allowed) and open Withdrawals (asks for the identity check).
+
 ### Profile center (29 Sep 2026) — deployed in `91074ee`
 
 - **Schema:** new `applicant_profiles` columns and the `security_events` table. Run the schema push above (Step 7) before restarting the API, or `/api/profile` fails.

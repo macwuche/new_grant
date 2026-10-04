@@ -25,15 +25,20 @@ type Command = (state: DemoState, by: string, now: Date) => Result;
 export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRouter {
   const router: IRouter = Router();
 
+  // Applicants see active plans, plus inactive ones they already have an
+  // application on (so their application pages still show the plan). Drafts
+  // stay staff-only.
   router.get("/programs", async (_req, res) => {
-    const { staff } = authLocals(res);
+    const { staff, user } = authLocals(res);
     const all = await repo.list();
-    res.json(staff?.active ? all : all.filter(g => g.status !== "Draft"));
+    if (staff?.active) { res.json(all); return; }
+    const mine = new Set((await apps.listForApplicant(user.id)).map(a => a.grantId));
+    res.json(all.filter(g => g.status === "Open" || (g.status === "Closed" && mine.has(g.id))));
   });
 
   /** Runs a rule for one existing program (or a new one when `id` is null) and stores the result. */
   // Audit labels match the ones the browser demo uses.
-  const LABELS: Record<string, string> = { create: "Create program", edit: "Edit program", close: "Close program", delete: "Delete program" };
+  const LABELS: Record<string, string> = { create: "Create program", edit: "Edit program", close: "Make program inactive", delete: "Delete program" };
 
   async function apply(req: Request, res: Response, action: string, id: string | null, version: string | null, command: Command) {
     const actor = authLocals(res).staff!;
@@ -72,7 +77,7 @@ export function programsRouter(repo: ProgramRepo, apps: ApplicationRepo): IRoute
       const saved = result.state.grants.find(g => g.id === id);
       const outcome = saved ? await scope.saveGrant(saved, version) : await scope.removeGrant(id, version);
       if (outcome !== "ok") return refusal(outcome);
-      const label = action === "publish" ? (existing.status === "Closed" ? "Reopen program" : "Publish program") : LABELS[action]!;
+      const label = action === "publish" ? (existing.status === "Closed" ? "Make program active" : "Publish program") : LABELS[action]!;
       await scope.record(effectsOf(before, result.state, now, { audit: auditContext(req, res, label, id), summary: result.message }));
       return { saved, message: result.message };
     }));

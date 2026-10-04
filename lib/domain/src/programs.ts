@@ -80,7 +80,7 @@ export function validateProgram(state: DemoState, raw: GrantInput, now: Date, ex
   }
 
   if (!isIsoDate(input.deadline)) errors.deadline = 'Enter a valid date.';
-  else if (existing?.status === 'Open' && input.deadline < todayIso(now)) errors.deadline = 'An open program needs a deadline today or later. Close it instead.';
+  else if (existing?.status === 'Open' && input.deadline < todayIso(now)) errors.deadline = 'An active program needs a deadline today or later. Make it inactive instead.';
   if (![1, 2, 3].includes(input.minimumTier)) errors.minimumTier = 'Choose tier 1, 2, or 3.';
 
   // Requirements are optional now that the application form can ask for documents.
@@ -149,26 +149,26 @@ export function publishProgram(state: DemoState, id: string, expectedVersion: st
   const loaded = load(state, id, expectedVersion);
   if (!loaded.ok) return loaded.result;
   const { grant } = loaded;
-  if (!STATUS_MOVES[grant.status].includes('Open')) return fail(`${grant.name} is already open.`);
+  if (!STATUS_MOVES[grant.status].includes('Open')) return fail(`${grant.name} is already active.`);
   const errors = validateProgram(state, grant, now, { ...grant, status: 'Open' });
-  if (Object.keys(errors).length) return fail(`Fix the program before opening it: ${Object.values(errors)[0]}`, errors);
+  if (Object.keys(errors).length) return fail(`Fix the program before making it active: ${Object.values(errors)[0]}`, errors);
   const reopening = grant.status === 'Closed';
-  return { ok: true, id, message: `${grant.name} is ${reopening ? 'reopened' : 'published'} and accepting applications.`, state: save(state, grant, by, reopening ? 'Reopened.' : 'Published.', now, { status: 'Open' }) };
+  return { ok: true, id, message: `${grant.name} is ${reopening ? 'active again' : 'published'} and accepting applications.`, state: save(state, grant, by, reopening ? 'Made active.' : 'Published.', now, { status: 'Open' }) };
 }
 
-/** Open → Closed. In-flight applications continue; applicants holding drafts are told they can't submit. */
+/** Open → Closed (Active → Inactive): hidden from applicants. In-flight applications continue; applicants holding drafts are told they can't submit. */
 export function closeProgram(state: DemoState, id: string, expectedVersion: string, by: string, now: Date): Result {
   const loaded = load(state, id, expectedVersion);
   if (!loaded.ok) return loaded.result;
   const { grant } = loaded;
-  if (grant.status !== 'Open') return fail(`${grant.name} isn't open.`);
-  let next = save(state, grant, by, 'Closed to new applications.', now, { status: 'Closed' });
+  if (grant.status !== 'Open') return fail(`${grant.name} isn't active.`);
+  let next = save(state, grant, by, 'Made inactive.', now, { status: 'Closed' });
   const drafts = state.applications.filter(a => a.grantId === id && a.status === 'Draft');
   for (const draft of drafts) {
-    next = notify(next, draft.applicantId, `${grant.name} closed`, 'This program stopped accepting applications, so your draft can no longer be submitted.', `/applications/${draft.id}`, now);
+    next = notify(next, draft.applicantId, `${grant.name} is no longer active`, 'This program stopped accepting applications, so your draft can no longer be submitted.', `/applications/${draft.id}`, now);
   }
   const suffix = drafts.length ? ` ${drafts.length} applicant${drafts.length === 1 ? '' : 's'} with drafts notified.` : '';
-  return { ok: true, id, message: `${grant.name} closed to new applications. Submitted applications continue through review.${suffix}`, state: next };
+  return { ok: true, id, message: `${grant.name} is inactive: hidden from applicants and closed to new applications. Submitted applications continue through review.${suffix}`, state: next };
 }
 
 /** Only never-used drafts can be deleted; everything else is closed instead, to keep history. */

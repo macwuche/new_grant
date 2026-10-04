@@ -914,7 +914,6 @@ export interface BalanceAdjustment {
 }
 
 export interface AccountPermissions {
-  payoutKyc: boolean;
   depositKyc: boolean;
   emailNotifications: boolean;
   cardApplications: boolean;
@@ -927,7 +926,6 @@ export type AccountPermissionChangeKey = typeof AccountPermissionChangeKey[keyof
 
 
 export const AccountPermissionChangeKey = {
-  payoutKyc: 'payoutKyc',
   depositKyc: 'depositKyc',
   emailNotifications: 'emailNotifications',
   cardApplications: 'cardApplications',

@@ -45,12 +45,13 @@ let server: Server;
 let port = 0;
 let token: string | null = null;
 let files: ReturnType<typeof memoryFileStore>;
+let profiles: ReturnType<typeof memoryProfileRepo>;
 const as = (who: string) => { token = who; };
 
 beforeEach(async () => {
   const outbox = memoryOutbox();
   const activity = memoryActivity({ outbox, recipient: () => undefined });
-  const profiles = memoryProfileRepo([], activity);
+  profiles = memoryProfileRepo([], activity);
   const programs = memoryProgramRepo(seedGrants(), activity);
   const money = memoryMoneyRepo(profiles, { treasury: seedTreasury(), lockdown: null }, activity);
   files = memoryFileStore();
@@ -118,6 +119,9 @@ describe("withdrawal wiring: portal client ↔ API", () => {
     await createWithdrawalMethod({ version: (await getMoneySettings()).treasury.updatedAt, method: method({ source: "both" }) });
     as("tok-ada");
     const mine = await getMyMoney();
+    // Payouts always need a verified identity (owner's rule, 3 Oct 2026).
+    const ada = profiles.peek(USERS["tok-ada"]!.id)!;
+    await profiles.saveAccount(ada.authUserId, { identityVerified: true }, ada.updatedAt);
     expect(mine.treasury.channels.map(c => c.id)).toContain("crypto-usdt");
     expect(mine.savedPayoutDetails).toEqual({});
     const deposit = await requestDeposit({ amount: 200, method: "bank" });

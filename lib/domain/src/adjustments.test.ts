@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Application, DemoState, Result } from './model';
+import type { AccountPermissions, Application, DemoState, Result } from './model';
 import * as A from './adjustments';
 import { setAccountPermission } from './accounts';
-import { permissionsOf } from './applicants';
+import { DEFAULT_PERMISSIONS, knownPermissions, permissionsOf } from './applicants';
 import { snapshot } from './audit';
 import * as C from './cards';
 import * as D from './deposits';
@@ -69,22 +69,27 @@ describe('balance adjustments', () => {
 
 describe('permission switches', () => {
   it('defaults everything open and refuses a no-op change', () => {
-    expect(permissionsOf(s)).toEqual({ payoutKyc: false, depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false });
+    expect(permissionsOf(s)).toEqual({ depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false });
     refuse(setAccountPermission(s, CURRENT_APPLICANT_ID, 'cardApplications', true, now), /already on/);
     refuse(setAccountPermission(s, 'APL-nobody', 'cardApplications', false, now), /could not be found/);
   });
 
-  it('requires a verified identity for payouts and deposits when switched on', () => {
+  it('always requires a verified identity for payouts, and for deposits when switched on', () => {
     unverified();
-    expect(M.payoutBlocker(s)).toBeNull();
-    turn('payoutKyc', true);
-    expect(s.notifications[0]!.body).toMatch(/Payouts now need a verified identity/);
+    expect(M.payoutBlocker(s)).toMatch(/Verify your identity .* payout/);
     refuse(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: s.savedPayoutDetails['bank'] }, now), /Verify your identity .* payout/);
+    refuse(setAccountPermission(s, CURRENT_APPLICANT_ID, 'payoutKyc' as never, false, now), /Choose a setting/);
     accept(D.requestDeposit(s, 50, 'bank', now));
     turn('depositKyc', true);
     refuse(D.requestDeposit(s, 50, 'bank', now), /Verify your identity .* adding funds/);
     s = { ...s, profile: { ...s.profile, identityVerified: true } };
     accept(D.requestDeposit(s, 50, 'bank', now));
+    expect(M.payoutBlocker(s)).toBeNull();
+  });
+
+  it('ignores the retired payoutKyc switch in older saved data', () => {
+    const stored = { payoutKyc: false, depositKyc: true } as Partial<AccountPermissions>;
+    expect(knownPermissions(stored)).toEqual({ ...DEFAULT_PERMISSIONS, depositKyc: true });
   });
 
   it('blocks card applications but not staff issuing', () => {

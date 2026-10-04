@@ -10,7 +10,6 @@ export type AccountPermissionChangeKey = typeof AccountPermissionChangeKey[keyof
 
 
 export const AccountPermissionChangeKey = {
-  payoutKyc: 'payoutKyc',
   depositKyc: 'depositKyc',
   emailNotifications: 'emailNotifications',
   cardApplications: 'cardApplications',

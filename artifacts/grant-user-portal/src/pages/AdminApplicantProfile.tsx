@@ -474,7 +474,6 @@ function PermissionSwitches({ applicantId, onFlash }: { applicantId: string; onF
     } finally { setBusy(null); }
   };
   const describe: Record<keyof AccountPermissions, string> = {
-    payoutKyc: 'On: payout requests need a verified identity.',
     depositKyc: 'On: adding funds needs a verified identity.',
     emailNotifications: 'Email copies of notifications. Security notices are always emailed. The applicant can change this in Settings too.',
     cardApplications: 'Off: the applicant can’t create a card or apply for a physical one. Staff can still issue cards.',

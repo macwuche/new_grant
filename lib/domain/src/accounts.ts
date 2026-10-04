@@ -23,7 +23,6 @@ function load(state: DemoState, applicantId: string) {
 // ---------- Permission switches (staff) ----------
 
 export const PERMISSION_SWITCHES: { key: keyof AccountPermissions; label: string; on: string; off: string }[] = [
-  { key: 'payoutKyc', label: 'Identity check for payouts', on: 'Payouts now need a verified identity.', off: 'Payouts no longer need an identity check.' },
   { key: 'depositKyc', label: 'Identity check for deposits', on: 'Adding funds now needs a verified identity.', off: 'Adding funds no longer needs an identity check.' },
   { key: 'emailNotifications', label: 'Email copies of notifications', on: 'Notifications will also be emailed to you.', off: "Notifications will no longer be emailed to you (security notices still are)." },
   { key: 'cardApplications', label: 'Card applications', on: 'You can create and apply for cards again.', off: 'Card applications are turned off for your account.' },

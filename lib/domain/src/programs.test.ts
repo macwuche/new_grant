@@ -85,8 +85,10 @@ describe('publish, close, reopen, delete', () => {
   it('closes an open program, keeps in-flight work, and notifies draft holders', () => {
     accept(G.closeProgram(s, 'green', program('green').updatedAt, PM, now));
     expect(program('green').status).toBe('Closed');
-    expect(N.ownNotifications(s)[0]).toMatchObject({ title: 'Green Transition closed', href: '/applications/APP-2101' });
+    expect(N.ownNotifications(s)[0]).toMatchObject({ title: 'Green Transition is no longer active', href: '/applications/APP-2101' });
     expect(R.checkEligibility(program('green'), s.profile, [], now).eligible).toBe(false);
+    // Inactive plans are hidden from the applicant catalog.
+    expect(R.visibleGrants(s).map(g => g.id)).not.toContain('green');
     // Reviews on the closed program continue.
     accept(V.startReview(s, 'APP-2050', s.applications.find(a => a.id === 'APP-2050')!.updatedAt, 'Avery Taylor', now));
   });
@@ -95,7 +97,8 @@ describe('publish, close, reopen, delete', () => {
     accept(G.closeProgram(s, 'green', program('green').updatedAt, PM, now));
     accept(G.publishProgram(s, 'green', program('green').updatedAt, PM, now));
     expect(program('green').status).toBe('Open');
-    expect(program('green').changeLog.at(-1)!.summary).toBe('Reopened.');
+    expect(program('green').changeLog.at(-1)!.summary).toBe('Made active.');
+    expect(R.visibleGrants(s).map(g => g.id)).toContain('green');
   });
 
   it('rejects invalid status moves', () => {
@@ -146,7 +149,7 @@ describe('editing', () => {
 
   it('requires an open program’s deadline to stay in the future', () => {
     const g = program('green');
-    expect(errorsOf(G.updateProgram(s, 'green', g.updatedAt, { ...inputOf(g), deadline: '2026-09-01' }, PM, now)).deadline).toMatch(/Close it instead/);
+    expect(errorsOf(G.updateProgram(s, 'green', g.updatedAt, { ...inputOf(g), deadline: '2026-09-01' }, PM, now)).deadline).toMatch(/Make it inactive instead/);
   });
 });
 

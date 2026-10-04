@@ -355,8 +355,6 @@ export type AccountControls = {
 
 /** Per-applicant switches staff turn on or off (Feature toggles on the admin profile page). */
 export type AccountPermissions = {
-  /** Payout requests need a verified identity. */
-  payoutKyc: boolean;
   /** Deposits need a verified identity. */
   depositKyc: boolean;
   /** Notifications are also emailed (security notices always are). */
