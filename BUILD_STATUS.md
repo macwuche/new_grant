@@ -14,6 +14,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **4 Oct 2026 — Active/Inactive plans (owner's request; committed as `96d6f31`, deployed 4 Oct 2026 with the identity change):** staff see plans as **Draft / Active / Inactive** (stored values stay `Draft`/`Open`/`Closed`, so no schema change); the buttons read **Publish**, **Make inactive**, and **Make active**, with matching audit labels and messages. Inactive plans are hidden from applicants: `/grants` lists active plans only, and `GET /api/programs` returns an inactive plan only to applicants who already have an application on it (so their application pages still show it). Draft holders are told "<plan> is no longer active". An active plan past its deadline shows "Deadline passed" to applicants. 216 rule tests, 157 API tests (1 new), typecheck pass.
 
+**4 Oct 2026 — session notes (details: `work.md` §6, "4 Oct 2026 session"):** `96d6f31` pushed (Replit's Git credential had failed; pushed through `gh auth login`) and deployed, which fixed every plan showing "Not eligible" to unverified applicants. Support: "New grant applications are turned off" is the per-applicant switch (turn it on in the applicant's profile), not a bug. Investigating: an applicant's dashboard deposit balance not reflecting a commission — the code path is correct and tested; most likely the application was submitted while its plan's commission was 0% (the rate is fixed at submission); queries to confirm are in `work.md`. Commission stays a percentage (owner, 4 Oct). **Planned, not started:** ClamAV virus scanning on every upload route, waiting on the owner (4 GB RAM upgrade or 2 GB; refuse uploads while the scanner is down or not).
+
 ## Build plan
 
 1. **Applicant UI prototype — Complete**

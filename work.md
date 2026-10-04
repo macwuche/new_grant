@@ -215,9 +215,40 @@ Still open on production: confirming Supabase → Authentication → URL configu
 
 **Not done in this build:** a virus scanner (ClamAV on the VPS would scan files after these checks; needs installing on the server), automatic actions from approval days.
 
+### 4 Oct 2026 session: "Not eligible" fix deployed, support issues, virus-scan plan
+
+**Owner's grant flow, restated and checked against the build (4 Oct 2026).** Staff create a plan (grant amount, approval days, commission %), save it, and make it active or inactive; applicants see active plans, pick one, fill in the form staff built (text fields and document uploads, with content checks on every file and per-user rate limits), type the amount, and see a summary with the commission; nothing is charged until staff approve; on approval the commission is taken from the deposit ("main") balance, even below zero (e.g. −$200); a deposit clears it, and a negative deposit balance doesn't stop grant withdrawals; the applicant is told in the app and by email. All of this was already built. Gap: no virus scanner (planned below). The owner confirmed the commission stays a **percentage**.
+
+**"Not eligible" on every plan (fixed).** The live site was on `894f51a`, which still required a verified identity before applying, so unverified applicants (e.g. a Tier 3 test applicant) saw "Not eligible" everywhere. The fix was already in `96d6f31` but had never been pushed: the Replit Git credential had stopped working ("Invalid username or token"). The owner ran `gh auth login` (as `macwuche`; the token sits in plain text in `.config/gh/hosts.yml`, which is git-ignored), we pushed with `git -c credential.helper='!gh auth git-credential' push origin main`, and the owner deployed `96d6f31` (no schema push). Checked from outside: `/api/healthz` ok, the served bundle `index--QTNE1ZL.js` has no identity-before-applying rule. Deploy notes: `server.md` change log, 4 Oct.
+
+**"New grant applications are turned off for your account" (not a bug).** That message comes only from the per-applicant **New grant applications** switch being off (on by default; `96d6f31` didn't change the default or stored values). Fix: Admin → Applicants → the applicant → turn **New grant applications** on; the audit log shows who turned it off. To list every account with it off: `select name, email, permissions from applicant_profiles where permissions->>'grantApplications' = 'false';`.
+
+**"Dashboard deposit balance doesn't show the commission" (investigating, waiting on the owner).** The code path is correct and tested: approval writes a negative `Commission` ledger entry, the API stores every new entry, `/api/money/mine` returns it, and the dashboard's **Successful deposit** card is `computeBalances(...).deposit`, which subtracts commissions. Most likely cause: the application's commission rate is fixed at **submission**, and the live plans showed "Commission: None" (0%) until the owner set the %, so an application submitted before that keeps 0% and approval takes nothing. To confirm, run in Supabase (replace the email):
+
+```sql
+select a.id, a.status, a.commission_rate, a.awarded_amount, a.submitted_at
+from applications a join applicant_profiles p on p.auth_user_id = a.applicant_id
+where p.email = '<applicant email>';
+select l.id, l.type, l.amount, l.status, l.description, l.created_at
+from ledger_entries l join applicant_profiles p on p.auth_user_id = l.applicant_id
+where p.email = '<applicant email>' order by l.created_at;
+```
+
+`commission_rate = 0` and no `Commission` row → the cause above; to charge an approval already made, use **Adjust balance** (debit the deposit balance, with a reason). A `Commission` row that the dashboard ignores → a real bug, to fix. **Owner decision pending:** keep the rate fixed at submission (recommended; the applicant pays what the summary showed) or use the plan's rate at approval.
+
+**Virus scanning of uploads: plan (not started; waiting on two owner decisions).** Today every upload (application documents, identity documents, deposit receipts, profile photos, withdrawal/deposit method photos) is type-checked from its bytes and content-checked (`artifacts/api-server/src/lib/uploadSafety.ts`), but not virus-scanned.
+1. Server: install `clamav-daemon` and `clamav-freshclam` (signature updates), clamd on a local Unix socket only, scan size limits above our upload limits, `ConcurrentDatabaseReload no` to avoid doubling memory on updates; added to `deploy/` and `server.md`.
+2. API: `lib/virusScan.ts` streams the bytes to clamd (`INSTREAM`) with a timeout; infected files are refused with a clear message, audited, and raised as a staff security event.
+3. All five upload routes scan after `inspectUpload` and before anything is stored.
+4. Scanner unavailable: refuse the upload ("Uploads are temporarily unavailable, try again shortly") rather than store it unscanned; controlled by a setting in `api.env`; development and tests use a stand-in scanner.
+5. Files already stored: a one-time scan of `DOCUMENTS_DIR`, then a nightly rescan with fresh signatures; detections quarantined and reported to staff.
+6. Tests: the EICAR test file refused on every route, clean files accepted, scanner-down refused, detections audited; then a live EICAR check on the server.
+Owner decisions needed first: (a) upgrade the VPS to 4 GB RAM (recommended; clamd needs about 1–1.3 GB and the VPS has 2 GB + 2 GB swap) or try on 2 GB; (b) refuse uploads while the scanner is down (recommended) or let them through.
+Not used, on purpose: online scanners such as VirusTotal (uploaded files can be shared with security vendors; unacceptable for identity documents).
+
 **Next, in order:**
 
-0. Deposit methods and grant plans with commission were deployed together on 3 Oct 2026 as `894f51a` (schema pushed first). Still to do: enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
+0. 4 Oct 2026 open items (section above): the owner's two virus-scanning decisions, then build it; the dashboard commission check (run the two queries) and the rate decision (submission vs approval). Live since 4 Oct: `96d6f31`. Deposit methods and grant plans with commission were deployed together on 3 Oct 2026 as `894f51a` (schema pushed first). Still to do: enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
 
 1. Smoke-test the 29 Sep deploy (`91074ee`, live since ~21:09 UTC; schema pushed first): the admin withdrawal methods, the profile's password, email, and sign-out-others flows, and a withdrawal end to end with a real applicant and finance account (`server.md`, "New VPS, 29 Sep 2026").
 2. The live check, now on https://access.novabridgegrant.org (the super admin sign-in is done): one full pass through an application, a review, a deposit, and a payout, and a look at the audit log's IP addresses.
