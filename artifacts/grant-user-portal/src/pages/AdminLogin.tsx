@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { AppNameText, BrandLetter, Wordmark } from '@/lib/appName';
+import { AppNameText, BrandLockup } from '@/lib/appName';
 import { Link, Redirect, useLocation } from 'wouter';
 import { ArrowRight, Eye, EyeOff, Info, LoaderCircle, LogOut, ShieldCheck } from 'lucide-react';
 import { ROLE_LABELS } from '@workspace/authz';
@@ -15,8 +15,7 @@ function StaffFrame({ serial, title, children }: { serial: string; title: ReactN
   return <main className="auth-page auth-staff">
     <aside className="auth-story" aria-label="About the admin workspace">
       <Link href="/admin/login" className="auth-logo" aria-label="Admin sign-in" data-testid="link-admin-auth-brand">
-        <span className="auth-logo-mark" aria-hidden="true"><BrandLetter /></span>
-        <span className="auth-logo-word"><Wordmark /></span>
+        <BrandLockup onDark markClass="auth-logo-mark" nameClass="auth-logo-word" logoClass="auth-logo-img" />
       </Link>
       <div className="auth-story-center">
         <div className="auth-serial">{serial}</div>

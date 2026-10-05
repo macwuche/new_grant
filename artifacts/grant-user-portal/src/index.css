@@ -59,6 +59,8 @@ button { cursor: pointer; }
 .brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 10px; background: hsl(var(--lime)); color: var(--brand-accent-ink); font: 700 18px var(--app-font-display); transform: rotate(-9deg); }
 .brand-name { font: 700 17px var(--app-font-display); letter-spacing: -.04em; }
 .brand-name span { color: hsl(var(--lime)); }
+/* An uploaded logo replaces the mark and the name. */
+.brand-logo { display: block; width: auto; height: auto; max-height: 38px; max-width: 190px; object-fit: contain; }
 .nav-label { padding: 0 12px 10px; color: #83868c; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .16em; }
 .nav-list { display: grid; gap: clamp(0px, .45vh, 4px); }
 .nav-link { min-height: clamp(28px, 5vh, 44px); display: flex; align-items: center; gap: 12px; padding: 0 13px; color: #afb2b7; border-radius: 12px; font-size: 13px; font-weight: 600; transition: background .18s ease, color .18s ease, transform .18s ease; }
@@ -306,6 +308,7 @@ button { cursor: pointer; }
   .mobile-brand { display: flex; align-items: center; gap: 8px; }
   .mobile-brand .brand-mark { width: 27px; height: 27px; font-size: 15px; }
   .mobile-brand .brand-name { font-size: 15px; }
+  .mobile-brand .brand-logo { max-height: 28px; max-width: 140px; }
   .topbar-left > div:not(.mobile-brand) { display: none; }
   .page-wrap { width: 100%; min-width: 0; padding: 8px 16px 88px; }
   .top-actions .icon-btn { width: 35px; height: 35px; }

@@ -13,7 +13,7 @@ import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRe
 import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore } from "./lib/fileStore";
-import { deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
+import { appUrl, deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
 import { hookEmails } from "./lib/authEmails";
 import { memoryEmailSettingsRepo } from "./lib/emailSettings";
 import { memoryInboxRepo } from "./lib/inbox";
@@ -1709,20 +1709,91 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
   it("lets super admins rename the app for everyone, including emails and sign-in pages", async () => {
     const anon = await fetch(`${base}/branding`);
     expect(anon.status).toBe(200);
-    expect(await json(anon)).toEqual({ appName: "arc.fund", isDefault: true });
+    expect(await json(anon)).toEqual({ appName: "arc.fund", isDefault: true, brandColor: null, emailColor: null, logoUrl: null, logoDarkUrl: null, faviconUrl: null });
     expect((await put("/branding", { appName: "Nova Bridge" }, "tok-finance")).status).toBe(403);
     expect((await put("/branding", { appName: "<b>Nova</b>" })).status).toBe(400);
     expect((await put("/branding", { appName: "x".repeat(41) })).status).toBe(400);
-    expect(await json(await put("/branding", { appName: "  Nova   Bridge " }))).toEqual({ appName: "Nova Bridge", isDefault: false });
-    expect(await json(await fetch(`${base}/branding`))).toEqual({ appName: "Nova Bridge", isDefault: false });
+    expect(await json(await put("/branding", { appName: "  Nova   Bridge " }))).toMatchObject({ appName: "Nova Bridge", isDefault: false });
+    expect(await json(await fetch(`${base}/branding`))).toMatchObject({ appName: "Nova Bridge", isDefault: false });
     const [entry] = (await json(await call("/audit", "tok-super"))).events;
     expect(entry).toMatchObject({ action: "Change application name" });
     const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null);
     expect(invite.subject).toBe("You've been added to the Nova Bridge grant team");
-    expect(invite.html).toContain(">Nova Bridge</p>");
+    expect(invite.html).toContain(">Nova Bridge</div>");
     expect(hookEmails({ user: { email: "a@example.org" }, email_data: { email_action_type: "signup", token_hash: "h" } }, "https://ref.supabase.co")[0]!.subject).toBe("Confirm your Nova Bridge email");
-    expect(await json(await put("/branding", { appName: "" }))).toEqual({ appName: "arc.fund", isDefault: true });
+    expect(await json(await put("/branding", { appName: "" }))).toMatchObject({ appName: "arc.fund", isDefault: true });
     expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).subject).toContain("arc.fund");
+  });
+
+  describe("brand colours, logos, and favicon", () => {
+    const LOGO = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+    const putImage = (path: string, bytes: Buffer, token = "tok-super") => fetch(`${base}${path}`, { method: "PUT", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
+    const savedAppUrl = process.env["APP_URL"];
+    beforeEach(() => { process.env["APP_URL"] = "https://grants.example.org"; });
+    afterEach(async () => {
+      if (savedAppUrl === undefined) delete process.env["APP_URL"]; else process.env["APP_URL"] = savedAppUrl;
+      // Emails read the branding from module state, so leave the defaults for the other tests.
+      await put("/branding/colors", { brandColor: null, emailColor: null });
+      for (const path of ["/branding/logo", "/branding/logo-dark", "/branding/favicon"]) await post(`${path}/delete`, {});
+    });
+
+    it("lets super admins set the app and email colours for everyone, validated and audited", async () => {
+      expect((await put("/branding/colors", { brandColor: "#123456" }, "tok-finance")).status).toBe(403);
+      const bad = await put("/branding/colors", { brandColor: "red", emailColor: "#12345" });
+      expect(bad.status).toBe(400);
+      expect(Object.keys((await json(bad)).fieldErrors).sort()).toEqual(["brandColor", "emailColor"]);
+      expect((await put("/branding/colors", {})).status).toBe(400);
+      expect(await json(await put("/branding/colors", { brandColor: "#1d4ed8" }))).toMatchObject({ brandColor: "#1D4ED8", emailColor: null });
+      // Only the colours sent change.
+      expect(await json(await put("/branding/colors", { emailColor: "#0F766E" }))).toMatchObject({ brandColor: "#1D4ED8", emailColor: "#0F766E" });
+      expect(await json(await fetch(`${base}/branding`))).toMatchObject({ brandColor: "#1D4ED8", emailColor: "#0F766E" });
+      const [entry] = (await json(await call("/audit", "tok-super"))).events;
+      expect(entry).toMatchObject({ action: "Change brand colours", changes: [{ field: "Email colour", before: "#1D1D1B (default)", after: "#0F766E" }] });
+      // The email colour is the top bar and button; light colours get dark text.
+      const light = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", "https://grants.example.org");
+      expect(light.html).toContain("border-top:6px solid #0F766E");
+      expect(light.html).toContain("background:#0F766E;color:#FFFFFF");
+      await put("/branding/colors", { emailColor: "#C9F35B" });
+      expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", "https://grants.example.org").html).toContain("background:#C9F35B;color:#1D2330");
+      expect(await json(await put("/branding/colors", { brandColor: "", emailColor: null }))).toMatchObject({ brandColor: null, emailColor: null });
+    });
+
+    it("stores the logo, dark logo, and favicon on disk, serves them publicly, puts the logo in emails, and removes them", async () => {
+      expect((await putImage("/branding/logo", LOGO, "tok-finance")).status).toBe(403);
+      expect((await putImage("/branding/logo", Buffer.from("not an image"))).status).toBe(415);
+      expect((await putImage("/branding/favicon", Buffer.concat([LOGO, Buffer.alloc(1024 * 1024)]))).status).toBe(413);
+      expect((await putImage("/branding/logo", Buffer.concat([LOGO, Buffer.from("<script>alert(1)</script>")]))).status).toBe(422);
+      const saved = await json(await putImage("/branding/logo", LOGO));
+      expect(saved.logoUrl).toMatch(/^\/api\/branding\/logo\?v=[0-9a-f]{12}$/);
+      expect(saved.logoDarkUrl).toBeNull();
+      const anon = await fetch(`${base}/branding/logo`);
+      expect(anon.status).toBe(200);
+      expect(anon.headers.get("content-type")).toBe("image/png");
+      expect(anon.headers.get("cross-origin-resource-policy")).toBe("cross-origin");
+      expect(Buffer.from(await anon.arrayBuffer()).equals(LOGO)).toBe(true);
+      expect((await json(await putImage("/branding/logo-dark", WEBP))).logoDarkUrl).toMatch(/^\/api\/branding\/logo-dark\?v=/);
+      expect((await json(await putImage("/branding/favicon", LOGO))).faviconUrl).toMatch(/^\/api\/branding\/favicon\?v=/);
+      expect((await fetch(`${base}/branding/logo-dark`)).headers.get("content-type")).toBe("image/webp");
+      // Emails show the (light-background) logo from the portal's address instead of the name.
+      const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", "https://grants.example.org");
+      expect(invite.html).toContain(`<img src="${appUrl()}${saved.logoUrl}" alt="arc.fund"`);
+      const preview = await json(await post("/branding/email-preview", { emailColor: "#7c3aed" }));
+      expect(preview).toMatchObject({ logoShown: true });
+      expect(preview.html).toContain("border-top:6px solid #7C3AED");
+      expect(preview.html).toContain(saved.logoUrl);
+      expect((await post("/branding/email-preview", { emailColor: "purple" })).status).toBe(400);
+      expect((await post("/branding/email-preview", {}, "tok-finance")).status).toBe(403);
+      // Replacing keeps one file; removing goes back to the name.
+      const replaced = await json(await putImage("/branding/logo", JPEG));
+      expect(replaced.logoUrl).not.toBe(saved.logoUrl);
+      expect(files.files.size).toBe(3);
+      expect(await json(await post("/branding/logo/delete", {}))).toMatchObject({ logoUrl: null });
+      expect((await fetch(`${base}/branding/logo`)).status).toBe(404);
+      expect((await post("/branding/logo/delete", {})).status).toBe(404);
+      expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).html).not.toContain("<img");
+      const actions = (await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action);
+      expect(actions).toEqual(expect.arrayContaining(["Change logo", "Change logo for dark backgrounds", "Change favicon", "Remove logo"]));
+    });
   });
 
   it("shows whether sign-in emails go through the Send Email Hook and Resend", async () => {

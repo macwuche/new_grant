@@ -11850,12 +11850,17 @@ export const SetSignupEmailSettingResponse = zod.object({
 
 
 /**
- * Shown on every page, including sign-in pages, so no sign-in is needed.
- * @summary The application name (public)
+ * Shown on every page, including sign-in pages, so no sign-in is needed. Colours and image addresses are null when the default is in use.
+ * @summary The application name, colours, logos, and favicon (public)
  */
 export const GetBrandingResponse = zod.object({
   "appName": zod.string(),
-  "isDefault": zod.boolean()
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
 })
 
 
@@ -11869,7 +11874,158 @@ export const SetBrandingBody = zod.object({
 
 export const SetBrandingResponse = zod.object({
   "appName": zod.string(),
-  "isDefault": zod.boolean()
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Each colour is `#RRGGBB`, or null for the default; only the colours sent change. The app colour applies to the portal and admin for everyone; the email colour to the top bar and button of every email. Audited.
+ * @summary Change the app and email colours (super admin)
+ */
+export const SetBrandColorsBody = zod.object({
+  "brandColor": zod.string().nullish(),
+  "emailColor": zod.string().nullish()
+})
+
+export const SetBrandColorsResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded logo (public)
+ */
+export const GetBrandLogoResponse = zod.unknown()
+
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the logo (super admin)
+ */
+export const UploadBrandLogoResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the logo (super admin)
+ */
+export const RemoveBrandLogoResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded logo for dark backgrounds (public)
+ */
+export const GetBrandLogoDarkResponse = zod.unknown()
+
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the logo for dark backgrounds (super admin)
+ */
+export const UploadBrandLogoDarkResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the logo for dark backgrounds (super admin)
+ */
+export const RemoveBrandLogoDarkResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded favicon (public)
+ */
+export const GetBrandFaviconResponse = zod.unknown()
+
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 1 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the favicon (super admin)
+ */
+export const UploadBrandFaviconResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the favicon (super admin)
+ */
+export const RemoveBrandFaviconResponse = zod.object({
+  "appName": zod.string(),
+  "isDefault": zod.boolean(),
+  "brandColor": zod.string().nullable(),
+  "emailColor": zod.string().nullable(),
+  "logoUrl": zod.string().nullable(),
+  "logoDarkUrl": zod.string().nullable(),
+  "faviconUrl": zod.string().nullable()
+})
+
+
+/**
+ * Uses `emailColor` when given (a draft, before saving), else the saved colour. Nothing is sent.
+ * @summary A sample email with the saved logo (super admin)
+ */
+export const PreviewBrandEmailBody = zod.object({
+  "emailColor": zod.string().nullish()
+})
+
+export const PreviewBrandEmailResponse = zod.object({
+  "subject": zod.string(),
+  "html": zod.string(),
+  "logoShown": zod.boolean()
 })
 
 

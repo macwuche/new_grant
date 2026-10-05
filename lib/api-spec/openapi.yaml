@@ -2938,8 +2938,8 @@ paths:
       operationId: getBranding
       tags: [email]
       security: []
-      summary: The application name (public)
-      description: Shown on every page, including sign-in pages, so no sign-in is needed.
+      summary: The application name, colours, logos, and favicon (public)
+      description: Shown on every page, including sign-in pages, so no sign-in is needed. Colours and image addresses are null when the default is in use.
       responses:
         "200":
           description: OK
@@ -2965,6 +2965,251 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /branding/colors:
+    put:
+      operationId: setBrandColors
+      tags: [email]
+      summary: Change the app and email colours (super admin)
+      description: Each colour is `#RRGGBB`, or null for the default; only the colours sent change. The app colour applies to the portal and admin for everyone; the email colour to the top bar and button of every email. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandColorsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /branding/logo:
+    get:
+      operationId: getBrandLogo
+      tags: [email]
+      security: []
+      summary: The uploaded logo (public)
+      description: Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: uploadBrandLogo
+      tags: [email]
+      summary: Upload the logo (super admin)
+      description: The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /branding/logo/delete:
+    post:
+      operationId: removeBrandLogo
+      tags: [email]
+      summary: Remove the logo (super admin)
+      description: Goes back to the default. Audited.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /branding/logo-dark:
+    get:
+      operationId: getBrandLogoDark
+      tags: [email]
+      security: []
+      summary: The uploaded logo for dark backgrounds (public)
+      description: Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: uploadBrandLogoDark
+      tags: [email]
+      summary: Upload the logo for dark backgrounds (super admin)
+      description: The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /branding/logo-dark/delete:
+    post:
+      operationId: removeBrandLogoDark
+      tags: [email]
+      summary: Remove the logo for dark backgrounds (super admin)
+      description: Goes back to the default. Audited.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /branding/favicon:
+    get:
+      operationId: getBrandFavicon
+      tags: [email]
+      security: []
+      summary: The uploaded favicon (public)
+      description: Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+      responses:
+        "200":
+          description: The image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: uploadBrandFavicon
+      tags: [email]
+      summary: Upload the favicon (super admin)
+      description: The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 1 MB). Stored on the API server's disk; replaces the previous one. Audited.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/Invalid"
+  /branding/favicon/delete:
+    post:
+      operationId: removeBrandFavicon
+      tags: [email]
+      summary: Remove the favicon (super admin)
+      description: Goes back to the default. Audited.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /branding/email-preview:
+    post:
+      operationId: previewBrandEmail
+      tags: [email]
+      summary: A sample email with the saved logo (super admin)
+      description: Uses `emailColor` when given (a draft, before saving), else the saved colour. Nothing is sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandEmailPreviewInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandEmailPreview"
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
@@ -3274,7 +3519,28 @@ components:
       properties:
         appName: { type: string }
         isDefault: { type: boolean }
-      required: [appName, isDefault]
+        brandColor: { type: [string, "null"] }
+        emailColor: { type: [string, "null"] }
+        logoUrl: { type: [string, "null"] }
+        logoDarkUrl: { type: [string, "null"] }
+        faviconUrl: { type: [string, "null"] }
+      required: [appName, isDefault, brandColor, emailColor, logoUrl, logoDarkUrl, faviconUrl]
+    BrandColorsInput:
+      type: object
+      properties:
+        brandColor: { type: [string, "null"] }
+        emailColor: { type: [string, "null"] }
+    BrandEmailPreviewInput:
+      type: object
+      properties:
+        emailColor: { type: [string, "null"] }
+    BrandEmailPreview:
+      type: object
+      properties:
+        subject: { type: string }
+        html: { type: string }
+        logoShown: { type: boolean }
+      required: [subject, html, logoShown]
     BrandingInput:
       type: object
       properties:

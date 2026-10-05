@@ -157,6 +157,34 @@ export interface SignInResult {
 export interface Branding {
   appName: string;
   isDefault: boolean;
+  /** @nullable */
+  brandColor: string | null;
+  /** @nullable */
+  emailColor: string | null;
+  /** @nullable */
+  logoUrl: string | null;
+  /** @nullable */
+  logoDarkUrl: string | null;
+  /** @nullable */
+  faviconUrl: string | null;
+}
+
+export interface BrandColorsInput {
+  /** @nullable */
+  brandColor?: string | null;
+  /** @nullable */
+  emailColor?: string | null;
+}
+
+export interface BrandEmailPreviewInput {
+  /** @nullable */
+  emailColor?: string | null;
+}
+
+export interface BrandEmailPreview {
+  subject: string;
+  html: string;
+  logoShown: boolean;
 }
 
 export interface BrandingInput {

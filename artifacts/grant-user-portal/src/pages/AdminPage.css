@@ -27,6 +27,7 @@
 .admin-brand-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--admin-lime); color: var(--brand-accent-ink); font: 700 20px var(--app-font-display, sans-serif); transform: rotate(-9deg); }
 .admin-brand-name { font: 700 18px var(--app-font-display, sans-serif); letter-spacing: -.06em; }
 .admin-brand-name span { color: var(--admin-lime); }
+.admin-brand-logo { display: block; width: auto; height: auto; max-height: 34px; max-width: 150px; object-fit: contain; }
 .admin-brand-divider { height: 19px; width: 1px; background: #58606a; margin: 0 1px; }
 .admin-brand-role { font-size: 11px; color: #b8c0bd; font-weight: 700; letter-spacing: .02em; }
 .admin-sidebar-label { margin: clamp(12px, 5vh, 50px) 12px clamp(8px, 1.4vh, 14px); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: #838f95; }
@@ -193,6 +194,7 @@
   .admin-topbar { min-height: 65px; padding: 0 18px; }
   .admin-mobile-brand { display: flex; align-items: center; gap: 8px; font: 700 15px var(--app-font-display, sans-serif); letter-spacing: -.04em; }
   .admin-mobile-brand .admin-brand-mark { width: 27px; height: 27px; font-size: 16px; }
+  .admin-mobile-brand .admin-brand-logo { max-height: 26px; max-width: 120px; }
   .admin-breadcrumb { display: none; }
   .admin-content { padding: 22px 18px 55px; }
   .admin-pagehead { align-items: flex-start; }

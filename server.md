@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Shared branding: logo, favicon, colours, email look (5 Oct 2026) — not yet deployed
+
+**Schema change: push before restarting** (new `email_settings.branding` column; the API reads it at startup, so the old schema would stop it starting). `git pull`, schema push (Step 7 / the commented line above), `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Logos and the favicon are stored in `DOCUMENTS_DIR` like documents (back them up with it). Check: as the super admin, Settings → App branding: upload a logo and a favicon, pick and save a colour, pick an email colour and see the preview; open the portal in a private window (sign-in page shows the logo and the tab icon); send a test email (Settings → Email) and see the logo and colour. Emails need the portal address set (Settings → Email or `APP_URL`) to show the logo.
+
 ### Commission at the plan's rate at approval (5 Oct 2026) — deployed as `4f99dad`
 
 No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: submit a test application on a plan with a commission, change the plan's commission, approve it, and confirm the `Commission` ledger entry uses the new rate and the application's detail page shows it.

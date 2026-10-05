@@ -9,4 +9,14 @@
 export interface Branding {
   appName: string;
   isDefault: boolean;
+  /** @nullable */
+  brandColor: string | null;
+  /** @nullable */
+  emailColor: string | null;
+  /** @nullable */
+  logoUrl: string | null;
+  /** @nullable */
+  logoDarkUrl: string | null;
+  /** @nullable */
+  faviconUrl: string | null;
 }

@@ -11,6 +11,7 @@ import { AdminDepositMethods, AdminWithdrawalMethods } from './AdminPaymentMetho
 import { AdminTeamServer, AdminTeamSettings } from './AdminStaff';
 import { AppNameSettings } from './AppNameSettings';
 import { BrandColorSettings } from './BrandColorSettings';
+import { BrandImageSettings, EmailBrandSettings } from './BrandImageSettings';
 import './AdminSettings.css';
 
 // Admin settings, one section per area. /admin/settings lists the sections as
@@ -34,7 +35,7 @@ const useSignedIn = () => useSession().status === 'signedIn';
 
 function EmailPage() { return <AdminEmailSettings signedIn={useSignedIn()} />; }
 function TeamPage() { return useSignedIn() ? <AdminTeamServer /> : <AdminTeamSettings />; }
-function BrandingPage() { return <><AppNameSettings /><BrandColorSettings /></>; }
+function BrandingPage() { return <><AppNameSettings /><BrandImageSettings /><BrandColorSettings /><EmailBrandSettings /></>; }
 
 function MoneyStatus() {
   const { depositThreshold } = useDemoStore().state.treasury;
@@ -49,7 +50,7 @@ function DepositMethodsStatus() {
   const samples = depositMethods.filter(m => m.enabled && hasPlaceholderDetails(m)).length;
   return <>{depositMethods.filter(m => m.enabled).length} of {depositMethods.length} available to users{samples ? ` · ${samples} with sample details` : ''}</>;
 }
-function BrandingStatus() { return <>Name: {useAppName().name}</>; }
+function BrandingStatus() { const b = useAppName(); return <>Name: {b.name}{b.logoUrl ? ' · logo' : ''}{b.brandColor ? ` · ${b.brandColor}` : ''}</>; }
 function AppInfoStatus() { return <>{useSignedIn() ? 'Signed in · server records' : 'Preview · this browser only'}</>; }
 function EmailStatus() { return <>{useSignedIn() ? 'Sending, domain, sign-up emails' : 'Not active in preview mode'}</>; }
 
@@ -87,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'team', title: 'Team & roles', icon: Users, access: 'Super admin', Page: TeamPage,
     description: 'Who is on the grant team, their roles, and what each role can do.' },
   { id: 'branding', title: 'App branding', icon: Palette, access: 'Super admin', Status: BrandingStatus, Page: BrandingPage,
-    description: 'The application name shown everywhere, including emails, and the accent colour.' },
+    description: 'The name, logo, favicon, and colours shown everywhere, and how emails look.' },
   { id: 'app-info', title: 'App info', icon: Info, access: 'Everyone on the team', Status: AppInfoStatus, Page: AppInfoPage,
     description: 'How this workspace is running, and the configuration that is fixed or still to come.' },
 ];

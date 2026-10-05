@@ -31,6 +31,9 @@ import type {
   AwardDecision,
   BadRequestResponse,
   BalanceAdjustment,
+  BrandColorsInput,
+  BrandEmailPreview,
+  BrandEmailPreviewInput,
   Branding,
   BrandingInput,
   CardActivation,
@@ -10129,8 +10132,8 @@ export const getGetBrandingUrl = () => {
 }
 
 /**
- * Shown on every page, including sign-in pages, so no sign-in is needed.
- * @summary The application name (public)
+ * Shown on every page, including sign-in pages, so no sign-in is needed. Colours and image addresses are null when the default is in use.
+ * @summary The application name, colours, logos, and favicon (public)
  */
 export const getBranding = async ( options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
 
@@ -10177,7 +10180,7 @@ export type GetBrandingQueryError = ErrorType<unknown>
 
 
 /**
- * @summary The application name (public)
+ * @summary The application name, colours, logos, and favicon (public)
  */
 
 export function useGetBranding<TData = Awaited<ReturnType<typeof getBranding>>, TError = ErrorType<unknown>>(
@@ -10285,6 +10288,910 @@ export const useSetBranding = <TError = ErrorType<InvalidResponse | Unauthorized
         TContext
       > => {
       return useMutation(getSetBrandingMutationOptions(options));
+    }
+
+export const getSetBrandColorsUrl = () => {
+
+
+
+
+  return `/api/branding/colors`
+}
+
+/**
+ * Each colour is `#RRGGBB`, or null for the default; only the colours sent change. The app colour applies to the portal and admin for everyone; the email colour to the top bar and button of every email. Audited.
+ * @summary Change the app and email colours (super admin)
+ */
+export const setBrandColors = async (brandColorsInput: BrandColorsInput, options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Branding>(getSetBrandColorsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(brandColorsInput)
+  }
+);}
+
+
+
+
+
+export const getSetBrandColorsMutationKey = () => ['setBrandColors'] as const;
+
+export const getSetBrandColorsMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBrandColors>>, TError,SetBrandColorsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setBrandColors>>, TError,SetBrandColorsMutationVariables, TContext> => {
+
+const mutationKey = getSetBrandColorsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setBrandColors>>, SetBrandColorsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setBrandColors(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetBrandColorsMutationResult = NonNullable<Awaited<ReturnType<typeof setBrandColors>>>
+    export type SetBrandColorsMutationBody = BodyType<BrandColorsInput>
+    export type SetBrandColorsMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type SetBrandColorsMutationVariables = {data: BodyType<BrandColorsInput>}
+
+    /**
+ * @summary Change the app and email colours (super admin)
+ */
+export const useSetBrandColors = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBrandColors>>, TError,SetBrandColorsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setBrandColors>>,
+        TError,
+        SetBrandColorsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetBrandColorsMutationOptions(options));
+    }
+
+export const getGetBrandLogoUrl = () => {
+
+
+
+
+  return `/api/branding/logo`
+}
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded logo (public)
+ */
+export const getBrandLogo = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBrandLogoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrandLogoQueryKey = () => {
+    return [
+    `/api/branding/logo`
+    ] as const;
+    }
+
+
+export const getGetBrandLogoQueryOptions = <TData = Awaited<ReturnType<typeof getBrandLogo>>, TError = ErrorType<NotFoundResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrandLogoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBrandLogo>>> = ({ signal }) => getBrandLogo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBrandLogo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrandLogoQueryResult = NonNullable<Awaited<ReturnType<typeof getBrandLogo>>>
+export type GetBrandLogoQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary The uploaded logo (public)
+ */
+
+export function useGetBrandLogo<TData = Awaited<ReturnType<typeof getBrandLogo>>, TError = ErrorType<NotFoundResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrandLogoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadBrandLogoUrl = () => {
+
+
+
+
+  return `/api/branding/logo`
+}
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the logo (super admin)
+ */
+export const uploadBrandLogo = async (uploadBrandLogoBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Branding>(getUploadBrandLogoUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadBrandLogoBody
+  }
+);}
+
+
+
+
+
+export const getUploadBrandLogoMutationKey = () => ['uploadBrandLogo'] as const;
+
+export const getUploadBrandLogoMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogo>>, TError,UploadBrandLogoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogo>>, TError,UploadBrandLogoMutationVariables, TContext> => {
+
+const mutationKey = getUploadBrandLogoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadBrandLogo>>, UploadBrandLogoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadBrandLogo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadBrandLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBrandLogo>>>
+    export type UploadBrandLogoMutationBody = BodyType<Blob>
+    export type UploadBrandLogoMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type UploadBrandLogoMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload the logo (super admin)
+ */
+export const useUploadBrandLogo = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogo>>, TError,UploadBrandLogoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadBrandLogo>>,
+        TError,
+        UploadBrandLogoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadBrandLogoMutationOptions(options));
+    }
+
+export const getRemoveBrandLogoUrl = () => {
+
+
+
+
+  return `/api/branding/logo/delete`
+}
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the logo (super admin)
+ */
+export const removeBrandLogo = async ( options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+  return customFetch<Branding>(getRemoveBrandLogoUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveBrandLogoMutationKey = () => ['removeBrandLogo'] as const;
+
+export const getRemoveBrandLogoMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogo>>, TError,void, TContext> => {
+
+const mutationKey = getRemoveBrandLogoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeBrandLogo>>, void> = () => {
+
+
+          return  removeBrandLogo(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveBrandLogoMutationResult = NonNullable<Awaited<ReturnType<typeof removeBrandLogo>>>
+
+    export type RemoveBrandLogoMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+
+
+    /**
+ * @summary Remove the logo (super admin)
+ */
+export const useRemoveBrandLogo = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeBrandLogo>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRemoveBrandLogoMutationOptions(options));
+    }
+
+export const getGetBrandLogoDarkUrl = () => {
+
+
+
+
+  return `/api/branding/logo-dark`
+}
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded logo for dark backgrounds (public)
+ */
+export const getBrandLogoDark = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBrandLogoDarkUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrandLogoDarkQueryKey = () => {
+    return [
+    `/api/branding/logo-dark`
+    ] as const;
+    }
+
+
+export const getGetBrandLogoDarkQueryOptions = <TData = Awaited<ReturnType<typeof getBrandLogoDark>>, TError = ErrorType<NotFoundResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandLogoDark>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrandLogoDarkQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBrandLogoDark>>> = ({ signal }) => getBrandLogoDark({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBrandLogoDark>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrandLogoDarkQueryResult = NonNullable<Awaited<ReturnType<typeof getBrandLogoDark>>>
+export type GetBrandLogoDarkQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary The uploaded logo for dark backgrounds (public)
+ */
+
+export function useGetBrandLogoDark<TData = Awaited<ReturnType<typeof getBrandLogoDark>>, TError = ErrorType<NotFoundResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandLogoDark>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrandLogoDarkQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadBrandLogoDarkUrl = () => {
+
+
+
+
+  return `/api/branding/logo-dark`
+}
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 2 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the logo for dark backgrounds (super admin)
+ */
+export const uploadBrandLogoDark = async (uploadBrandLogoDarkBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Branding>(getUploadBrandLogoDarkUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadBrandLogoDarkBody
+  }
+);}
+
+
+
+
+
+export const getUploadBrandLogoDarkMutationKey = () => ['uploadBrandLogoDark'] as const;
+
+export const getUploadBrandLogoDarkMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogoDark>>, TError,UploadBrandLogoDarkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogoDark>>, TError,UploadBrandLogoDarkMutationVariables, TContext> => {
+
+const mutationKey = getUploadBrandLogoDarkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadBrandLogoDark>>, UploadBrandLogoDarkMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadBrandLogoDark(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadBrandLogoDarkMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBrandLogoDark>>>
+    export type UploadBrandLogoDarkMutationBody = BodyType<Blob>
+    export type UploadBrandLogoDarkMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type UploadBrandLogoDarkMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload the logo for dark backgrounds (super admin)
+ */
+export const useUploadBrandLogoDark = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandLogoDark>>, TError,UploadBrandLogoDarkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadBrandLogoDark>>,
+        TError,
+        UploadBrandLogoDarkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadBrandLogoDarkMutationOptions(options));
+    }
+
+export const getRemoveBrandLogoDarkUrl = () => {
+
+
+
+
+  return `/api/branding/logo-dark/delete`
+}
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the logo for dark backgrounds (super admin)
+ */
+export const removeBrandLogoDark = async ( options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+  return customFetch<Branding>(getRemoveBrandLogoDarkUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveBrandLogoDarkMutationKey = () => ['removeBrandLogoDark'] as const;
+
+export const getRemoveBrandLogoDarkMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogoDark>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogoDark>>, TError,void, TContext> => {
+
+const mutationKey = getRemoveBrandLogoDarkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeBrandLogoDark>>, void> = () => {
+
+
+          return  removeBrandLogoDark(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveBrandLogoDarkMutationResult = NonNullable<Awaited<ReturnType<typeof removeBrandLogoDark>>>
+
+    export type RemoveBrandLogoDarkMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+
+
+    /**
+ * @summary Remove the logo for dark backgrounds (super admin)
+ */
+export const useRemoveBrandLogoDark = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandLogoDark>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeBrandLogoDark>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRemoveBrandLogoDarkMutationOptions(options));
+    }
+
+export const getGetBrandFaviconUrl = () => {
+
+
+
+
+  return `/api/branding/favicon`
+}
+
+/**
+ * Public, so pages and email clients can show it. Checked against the SHA-256 recorded at upload.
+ * @summary The uploaded favicon (public)
+ */
+export const getBrandFavicon = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBrandFaviconUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrandFaviconQueryKey = () => {
+    return [
+    `/api/branding/favicon`
+    ] as const;
+    }
+
+
+export const getGetBrandFaviconQueryOptions = <TData = Awaited<ReturnType<typeof getBrandFavicon>>, TError = ErrorType<NotFoundResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandFavicon>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrandFaviconQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBrandFavicon>>> = ({ signal }) => getBrandFavicon({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBrandFavicon>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrandFaviconQueryResult = NonNullable<Awaited<ReturnType<typeof getBrandFavicon>>>
+export type GetBrandFaviconQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary The uploaded favicon (public)
+ */
+
+export function useGetBrandFavicon<TData = Awaited<ReturnType<typeof getBrandFavicon>>, TError = ErrorType<NotFoundResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandFavicon>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrandFaviconQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadBrandFaviconUrl = () => {
+
+
+
+
+  return `/api/branding/favicon`
+}
+
+/**
+ * The raw image is the body (PNG, JPEG, or WEBP, detected from the content; at most 1 MB). Stored on the API server's disk; replaces the previous one. Audited.
+ * @summary Upload the favicon (super admin)
+ */
+export const uploadBrandFavicon = async (uploadBrandFaviconBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Branding>(getUploadBrandFaviconUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadBrandFaviconBody
+  }
+);}
+
+
+
+
+
+export const getUploadBrandFaviconMutationKey = () => ['uploadBrandFavicon'] as const;
+
+export const getUploadBrandFaviconMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandFavicon>>, TError,UploadBrandFaviconMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadBrandFavicon>>, TError,UploadBrandFaviconMutationVariables, TContext> => {
+
+const mutationKey = getUploadBrandFaviconMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadBrandFavicon>>, UploadBrandFaviconMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadBrandFavicon(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadBrandFaviconMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBrandFavicon>>>
+    export type UploadBrandFaviconMutationBody = BodyType<Blob>
+    export type UploadBrandFaviconMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type UploadBrandFaviconMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload the favicon (super admin)
+ */
+export const useUploadBrandFavicon = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBrandFavicon>>, TError,UploadBrandFaviconMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadBrandFavicon>>,
+        TError,
+        UploadBrandFaviconMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadBrandFaviconMutationOptions(options));
+    }
+
+export const getRemoveBrandFaviconUrl = () => {
+
+
+
+
+  return `/api/branding/favicon/delete`
+}
+
+/**
+ * Goes back to the default. Audited.
+ * @summary Remove the favicon (super admin)
+ */
+export const removeBrandFavicon = async ( options?: Parameters<typeof customFetch>[1]): Promise<Branding> => {
+
+  return customFetch<Branding>(getRemoveBrandFaviconUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveBrandFaviconMutationKey = () => ['removeBrandFavicon'] as const;
+
+export const getRemoveBrandFaviconMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandFavicon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeBrandFavicon>>, TError,void, TContext> => {
+
+const mutationKey = getRemoveBrandFaviconMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeBrandFavicon>>, void> = () => {
+
+
+          return  removeBrandFavicon(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveBrandFaviconMutationResult = NonNullable<Awaited<ReturnType<typeof removeBrandFavicon>>>
+
+    export type RemoveBrandFaviconMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+
+
+    /**
+ * @summary Remove the favicon (super admin)
+ */
+export const useRemoveBrandFavicon = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeBrandFavicon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeBrandFavicon>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRemoveBrandFaviconMutationOptions(options));
+    }
+
+export const getPreviewBrandEmailUrl = () => {
+
+
+
+
+  return `/api/branding/email-preview`
+}
+
+/**
+ * Uses `emailColor` when given (a draft, before saving), else the saved colour. Nothing is sent.
+ * @summary A sample email with the saved logo (super admin)
+ */
+export const previewBrandEmail = async (brandEmailPreviewInput: BrandEmailPreviewInput, options?: Parameters<typeof customFetch>[1]): Promise<BrandEmailPreview> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BrandEmailPreview>(getPreviewBrandEmailUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(brandEmailPreviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewBrandEmailMutationKey = () => ['previewBrandEmail'] as const;
+
+export const getPreviewBrandEmailMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBrandEmail>>, TError,PreviewBrandEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBrandEmail>>, TError,PreviewBrandEmailMutationVariables, TContext> => {
+
+const mutationKey = getPreviewBrandEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBrandEmail>>, PreviewBrandEmailMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewBrandEmail(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBrandEmailMutationResult = NonNullable<Awaited<ReturnType<typeof previewBrandEmail>>>
+    export type PreviewBrandEmailMutationBody = BodyType<BrandEmailPreviewInput>
+    export type PreviewBrandEmailMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>
+    export type PreviewBrandEmailMutationVariables = {data: BodyType<BrandEmailPreviewInput>}
+
+    /**
+ * @summary A sample email with the saved logo (super admin)
+ */
+export const usePreviewBrandEmail = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBrandEmail>>, TError,PreviewBrandEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBrandEmail>>,
+        TError,
+        PreviewBrandEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPreviewBrandEmailMutationOptions(options));
     }
 
 export const getGetInboxUrl = (params?: GetInboxParams,) => {

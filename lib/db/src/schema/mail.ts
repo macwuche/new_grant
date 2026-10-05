@@ -6,6 +6,11 @@ import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } fr
 // artifacts/api-server/src/lib/secrets.ts). Row-level security is on with no
 // policies (see ./staff.ts).
 
+/** An uploaded brand image, kept on the API server's disk like documents (DOCUMENTS_DIR). */
+export type BrandImageJson = { key: string; contentType: "image/jpeg" | "image/png" | "image/webp"; sha256: string; updatedAt: string };
+/** Shared branding: accent colours and uploaded images (null: the default). */
+export type BrandingJson = { brandColor: string | null; emailColor: string | null; logo: BrandImageJson | null; logoDark: BrandImageJson | null; favicon: BrandImageJson | null };
+
 /** One row, id "email". Unset fields fall back to the server's environment variables. */
 export const emailSettingsTable = pgTable("email_settings", {
   id: text("id").primaryKey(),
@@ -22,6 +27,8 @@ export const emailSettingsTable = pgTable("email_settings", {
   supabaseTokenEnc: text("supabase_token_enc"),
   /** The application's name, shown across the portal, emails, and authenticator apps (null: the default). */
   appName: text("app_name"),
+  /** Accent colours, logo, logo for dark backgrounds, and favicon (null: all defaults). Since 5 Oct 2026. */
+  branding: jsonb("branding").$type<Partial<BrandingJson>>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
 }).enableRLS();

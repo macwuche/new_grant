@@ -1,5 +1,5 @@
 import { completeCredentialReset, reportPasswordChanged } from '@workspace/api-client-react';
-import { AppNameText, brandLetter, useAppName, Wordmark } from '@/lib/appName';
+import { AppNameText, BrandLockup, useAppName } from '@/lib/appName';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info, LoaderCircle, MailCheck } from 'lucide-react';
@@ -70,8 +70,7 @@ type AuthFrameProps = {
 function Brand() {
   const { name } = useAppName();
   return <Link href="/" className="auth-logo" aria-label={`${name} workspace`} data-testid="link-auth-brand">
-    <span className="auth-logo-mark" aria-hidden="true">{brandLetter(name)}</span>
-    <span className="auth-logo-word"><Wordmark /></span>
+    <BrandLockup onDark markClass="auth-logo-mark" nameClass="auth-logo-word" logoClass="auth-logo-img" />
   </Link>;
 }
 

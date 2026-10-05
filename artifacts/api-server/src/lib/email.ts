@@ -1,3 +1,4 @@
+import { DEFAULT_EMAIL_COLOR, inkFor } from "@workspace/domain/branding";
 import { logger } from "./logger";
 
 // Outgoing email: what is sent, how it's rendered, and the delivery loop.
@@ -50,16 +51,32 @@ export function appUrl(env: NodeJS.ProcessEnv = process.env): string | null {
   return dev ? `https://${dev}` : null;
 }
 
-/** A plain, accessible message: greeting, paragraphs, an optional button, and a footer. */
-export function renderEmail(opts: { greeting: string; paragraphs: string[]; action?: { label: string; href: string }; footer: string }): { text: string; html: string } {
+/** How emails look: the email accent colour and the logo's public path (both null: the defaults). Set with the app name. */
+export type EmailBrand = { color: string | null; logoPath: string | null };
+let emailBrand: EmailBrand = { color: null, logoPath: null };
+export const setEmailBrand = (brand: EmailBrand) => { emailBrand = brand; };
+export const currentEmailBrand = () => emailBrand;
+
+/**
+ * A plain, accessible message: logo (or the app name), greeting, paragraphs, an optional
+ * button, and a footer. The logo needs the portal address, since email clients load it
+ * from there; without one the name is shown instead. `brand` overrides the saved look (previews).
+ */
+export function renderEmail(opts: { greeting: string; paragraphs: string[]; action?: { label: string; href: string }; footer: string }, brand: EmailBrand = emailBrand): { text: string; html: string } {
   const { greeting, paragraphs, action, footer } = opts;
   const text = [greeting, "", ...paragraphs.flatMap(p => [p, ""]), ...(action ? [`${action.label}: ${action.href}`, ""] : []), "—", footer].join("\n");
+  const color = brand.color ?? DEFAULT_EMAIL_COLOR;
+  const ink = inkFor(color);
+  const base = appUrl();
+  const header = brand.logoPath && base
+    ? `<img src="${escape(base + brand.logoPath)}" alt="${escape(appName())}" height="40" style="display:block;height:40px;width:auto;max-width:220px;border:0">`
+    : escape(appName());
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;color:#1d1d1b">
-<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px">
-<p style="margin:0 0 18px;font-weight:bold;font-size:15px">${escape(appName())}</p>
+<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;border-top:6px solid ${color};padding:28px">
+<div style="margin:0 0 18px;font-weight:bold;font-size:15px">${header}</div>
 <p style="margin:0 0 14px;font-size:14px;line-height:1.5">${escape(greeting)}</p>
 ${paragraphs.map(p => `<p style="margin:0 0 14px;font-size:14px;line-height:1.5">${escape(p)}</p>`).join("\n")}
-${action ? `<p style="margin:22px 0"><a href="${escape(action.href)}" style="display:inline-block;background:#1d1d1b;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:14px">${escape(action.label)}</a></p>` : ""}
+${action ? `<p style="margin:22px 0"><a href="${escape(action.href)}" style="display:inline-block;background:${color};color:${ink};text-decoration:none;padding:11px 18px;border-radius:8px;font-size:14px;font-weight:bold">${escape(action.label)}</a></p>` : ""}
 <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#6b6b66">${escape(footer)}</p>
 </div></body></html>`;
   return { text, html };

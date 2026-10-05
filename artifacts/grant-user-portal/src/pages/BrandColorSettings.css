@@ -17,11 +17,37 @@
 .admin-brand-preview-kicker { color: #aeb9b4; font: 700 9px var(--app-font-mono, monospace); letter-spacing: .12em; }
 .admin-brand-preview-title { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .admin-brand-preview-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--admin-lime); color: var(--brand-accent-ink); font: 700 21px var(--app-font-display, sans-serif); transform: rotate(-9deg); }
-.admin-brand-preview-title strong { font: 700 20px var(--app-font-display, sans-serif); letter-spacing: -.05em; }
-.admin-brand-preview-title strong span { color: var(--admin-lime); }
+.admin-brand-preview-title strong, .admin-brand-preview-name { font: 700 20px var(--app-font-display, sans-serif); letter-spacing: -.05em; }
+.admin-brand-preview-title strong span, .admin-brand-preview-name span { color: var(--admin-lime); }
+.admin-brand-preview-logo { display: block; width: auto; height: auto; max-height: 38px; max-width: 200px; object-fit: contain; }
 .admin-brand-preview p { max-width: 300px; margin: 14px 0; color: #bbc6bf; font-size: 11px; line-height: 1.5; }
 .admin-brand-preview-action { display: inline-flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 8px; background: var(--admin-lime); color: var(--brand-accent-ink); font-size: 11px; font-weight: 800; }
+/* Logo and favicon slots: each previewed on the background it's shown on. */
+.admin-brand-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.admin-brand-slot { display: flex; flex-direction: column; border: 1px solid var(--admin-line, #dfe4dc); border-radius: 12px; overflow: hidden; background: #fff; }
+.admin-brand-slot-stage { display: grid; place-items: center; min-height: 96px; padding: 16px; }
+.admin-brand-slot-stage.light { background: #f5f4ef; color: #1d1d1b; }
+.admin-brand-slot-stage.dark { background: var(--admin-night); color: #fff; }
+.admin-brand-slot-logo { display: block; width: auto; height: auto; max-height: 48px; max-width: 100%; object-fit: contain; }
+.admin-brand-slot-fallback { display: flex; align-items: center; gap: 10px; opacity: .55; }
+.admin-brand-slot-fallback strong { font: 700 18px var(--app-font-display, sans-serif); letter-spacing: -.05em; }
+.admin-brand-slot-body { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px 16px; }
+.admin-brand-slot-body strong { font-size: 12px; }
+.admin-brand-slot-body small { color: #69766b; font-size: 11px; line-height: 1.45; }
+.admin-brand-slot-body .admin-btn { display: inline-flex; align-items: center; gap: 6px; }
+.admin-brand-slot-body .admin-field-error { margin: 8px 0 0; font-size: 11px; line-height: 1.45; }
+.admin-brand-tab { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 8px 12px; border-radius: 8px 8px 0 0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.admin-brand-tab img, .admin-brand-tab-default { flex: 0 0 auto; width: 16px; height: 16px; object-fit: contain; }
+.admin-brand-tab-default { display: grid; place-items: center; border-radius: 4px; background: var(--admin-lime); color: var(--brand-accent-ink); font: 700 11px var(--app-font-display, sans-serif); }
+.admin-brand-tab span:last-child { overflow: hidden; text-overflow: ellipsis; }
+/* Email look: the picker beside the real email, rendered by the server. */
+.admin-brand-email-layout { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 28px; align-items: start; }
+.admin-brand-email-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.admin-brand-email-preview .admin-brand-preview-kicker { color: #69766b; overflow-wrap: anywhere; }
+.admin-brand-email-preview iframe { width: 100%; height: 470px; border: 1px solid var(--admin-line, #dfe4dc); border-radius: 12px; background: #f5f4ef; }
 @media (max-width: 680px) {
+  .admin-brand-email-layout { grid-template-columns: 1fr; gap: 20px; }
+  .admin-brand-email-preview iframe { height: 520px; }
   .admin-brand-settings-layout { grid-template-columns: 1fr; gap: 20px; }
   .admin-brand-settings .admin-panel-head { flex-wrap: wrap; }
 }

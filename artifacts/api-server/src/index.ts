@@ -12,7 +12,8 @@ import { dbActivityRepo } from "./lib/activity.db";
 import { dbMoneyRepo, ensureSettings } from "./lib/moneyRepo.db";
 import { dbDocumentRepo } from "./lib/documentRepo.db";
 import { diskFileStore, documentsDir } from "./lib/fileStore";
-import { mailerFor, setAppName, setAppUrlOverride, startEmailWorker } from "./lib/email";
+import { mailerFor, setAppUrlOverride, startEmailWorker } from "./lib/email";
+import { applyBranding } from "./routes/branding";
 import { effectiveConfig } from "./lib/emailSettings";
 import { dbEmailSettingsRepo } from "./lib/emailSettings.db";
 import { dbInboxRepo } from "./lib/inbox.db";
@@ -55,7 +56,7 @@ logger.info({ dir: docsDir }, "document files are stored on this server's disk")
 const emailSettings = dbEmailSettingsRepo(serverCipher());
 const startup = effectiveConfig(await emailSettings.get());
 if ((await emailSettings.get()).appUrl) setAppUrlOverride(startup.appUrl);
-setAppName((await emailSettings.get()).appName);
+applyBranding(await emailSettings.get());
 if (startup.resendKey && startup.from) logger.info({ from: startup.from, links: startup.appUrl }, "email is sent through Resend");
 else logger.warn("No Resend key and sender yet (admin Settings or RESEND_API_KEY / EMAIL_FROM): email is off (queued messages are marked skipped)");
 startEmailWorker(dbEmailOutbox, async () => mailerFor(effectiveConfig(await emailSettings.get())));

@@ -1,3 +1,4 @@
+import type { BrandingJson } from "@workspace/db";
 import type { Effects } from "./activity";
 
 // Email settings a super admin saves in the app. Saved values win; anything
@@ -18,12 +19,15 @@ export type StoredEmailSettings = {
   webhookSecret: string | null;
   supabaseToken: string | null;
   appName: string | null;
+  branding: BrandingJson;
   updatedAt: string | null;
   updatedBy: string | null;
 };
 
-/** Fields to change; null clears a field, undefined leaves it. */
-export type EmailSettingsPatch = Partial<Omit<StoredEmailSettings, "resendKeyLast4" | "updatedAt" | "updatedBy">>;
+/** Fields to change; null clears a field, undefined leaves it. `branding` merges only the keys given. */
+export type EmailSettingsPatch = Partial<Omit<StoredEmailSettings, "resendKeyLast4" | "updatedAt" | "updatedBy" | "branding">> & { branding?: Partial<BrandingJson> };
+
+export const EMPTY_BRANDING: BrandingJson = { brandColor: null, emailColor: null, logo: null, logoDark: null, favicon: null };
 
 export interface EmailSettingsRepo {
   get(): Promise<StoredEmailSettings>;
@@ -34,7 +38,7 @@ export interface EmailSettingsRepo {
 
 export const EMPTY_SETTINGS: StoredEmailSettings = {
   resendKey: null, resendKeyLast4: null, fromAddress: null, replyTo: null, appUrl: null, inboxAddress: null,
-  domainName: null, domainId: null, webhookSecret: null, supabaseToken: null, appName: null, updatedAt: null, updatedBy: null,
+  domainName: null, domainId: null, webhookSecret: null, supabaseToken: null, appName: null, branding: EMPTY_BRANDING, updatedAt: null, updatedBy: null,
 };
 
 export const last4 = (secret: string) => secret.slice(-4);
@@ -68,8 +72,9 @@ export function memoryEmailSettingsRepo(activity?: { write(effects: Effects): vo
   return {
     get: async () => ({ ...row }),
     save: async (patch, by, effects) => {
-      const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-      row = { ...row, ...defined, updatedAt: new Date().toISOString(), updatedBy: by };
+      const { branding, ...rest } = patch;
+      const defined = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+      row = { ...row, ...defined, branding: { ...row.branding, ...branding }, updatedAt: new Date().toISOString(), updatedBy: by };
       if (patch.resendKey !== undefined) row.resendKeyLast4 = patch.resendKey ? last4(patch.resendKey) : null;
       if (effects) activity?.write(effects);
       return { ...row };

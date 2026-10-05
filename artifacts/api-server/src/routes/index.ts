@@ -20,7 +20,8 @@ import { applicantsRouter } from "./applicants";
 import { applicationsRouter } from "./applications";
 import { documentsRouter } from "./documents";
 import { authEmailHookRouter } from "./authEmailHook";
-import { brandingRouter, emailRouter, emailWebhookRouter } from "./email";
+import { brandingAdminRouter, brandingRouter } from "./branding";
+import { emailRouter, emailWebhookRouter } from "./email";
 import { methodPhotoRouter, moneyRouter } from "./money";
 import healthRouter from "./health";
 import meRouter from "./me";
@@ -48,8 +49,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(emailWebhookRouter(email));
   // Supabase's Send Email Hook: auth emails (sign-up, reset, sign-in links) rendered and sent here, signed with the hook secret.
   router.use(authEmailHookRouter(email));
-  // The application name, for pages shown before sign-in.
-  router.use(brandingRouter(emailSettings));
+  // The application name, colours, logos, and favicon, for pages shown before sign-in (and the logo for emails).
+  router.use(brandingRouter(emailSettings, fileStore));
   // Withdrawal and deposit method photos, for image tags (public; the bytes are checked against their recorded hash).
   router.use(methodPhotoRouter(moneyRepo, fileStore));
   // Everything below requires a verified sign-in token; requests are rate-limited per address before it and per user after.
@@ -62,6 +63,7 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.put("/money/methods/:methodId/photo", uploads);
   router.put("/money/deposit-methods/:methodId/photo", uploads);
   router.put("/money/deposits/:id/proof", uploads);
+  router.put(["/branding/logo", "/branding/logo-dark", "/branding/favicon"], uploads);
   router.post("/profile/check-password", rateLimiter(limit.passwordChecks, byUser));
   router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
   router.use(meRouter(staffMfa));
@@ -76,5 +78,6 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(moneyRouter(moneyRepo, profileRepo, fileStore));
   router.use(activityRouter(activityRepo));
   router.use(emailRouter(email));
+  router.use(brandingAdminRouter(emailSettings, fileStore));
   return router;
 }

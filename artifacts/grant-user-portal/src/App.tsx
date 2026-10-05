@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppNameProvider, AppNameText, BrandLetter, ShortAppName, useAppName, Wordmark } from '@/lib/appName';
+import { AppNameProvider, AppNameText, BrandLockup, ShortAppName, useAppName } from '@/lib/appName';
 import { supabase } from '@/lib/supabase';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { format } from 'date-fns';
@@ -55,7 +55,7 @@ const grantName = (state: DemoState, grantId: string) => findGrant(state, grantI
 const daysUntil = (isoDate: string, now: Date) => Math.ceil((new Date(`${isoDate}T23:59:59`).getTime() - now.getTime()) / 86_400_000);
 
 function Logo() {
-  return <div className="brand"><div className="brand-mark"><BrandLetter /></div><div className="brand-name"><Wordmark /></div></div>;
+  return <div className="brand"><BrandLockup onDark markClass="brand-mark" nameClass="brand-name" logoClass="brand-logo" /></div>;
 }
 function Icon({ item }: { item: typeof Home }) { const I = item; return <I size={17} strokeWidth={1.8} />; }
 const navItems = [
@@ -125,7 +125,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
     </aside>
     <main className="main">
       <header className="topbar">
-        <div className="topbar-left"><div className="mobile-brand"><div className="brand-mark"><BrandLetter /></div><div className="brand-name"><Wordmark /></div></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
+        <div className="topbar-left"><div className="mobile-brand"><BrandLockup onDark={false} markClass="brand-mark" nameClass="brand-name" logoClass="brand-logo" /></div><div><p className="eyebrow">Applicant workspace</p><h1 className="page-title">{pageTitle(location, profile.name)}</h1></div></div>
         <div className="top-actions"><button className="icon-btn" aria-label="Help" data-testid="button-help"><CircleHelp size={17} /></button><NotificationsMenu />{session.status === 'signedIn'
           ? <><Link href="/profile" className="top-avatar" aria-label="My profile" title="My profile" data-testid="link-top-profile">{initials}</Link><button className="icon-btn" onClick={() => void session.signOut()} aria-label="Sign out" title="Sign out" data-testid="button-signout"><LogOut size={16} /></button></>
           : <Link href="/login" className="top-avatar" aria-label="Preview sign-in screen" title="Preview sign-in screen" data-testid="link-preview-login">{initials}</Link>}</div>

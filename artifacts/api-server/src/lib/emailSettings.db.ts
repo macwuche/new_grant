@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, emailSettingsTable } from "@workspace/db";
 import { withEffects, writeEffects } from "./activity.db";
 import { NO_EFFECTS } from "./activity";
-import { EMPTY_SETTINGS, last4, type EmailSettingsRepo, type StoredEmailSettings } from "./emailSettings";
+import { EMPTY_BRANDING, EMPTY_SETTINGS, last4, type EmailSettingsRepo, type StoredEmailSettings } from "./emailSettings";
 import type { Cipher } from "./secrets";
 
 const ROW = "email";
@@ -19,7 +19,7 @@ export function dbEmailSettingsRepo(cipher: Cipher): EmailSettingsRepo {
     return {
       resendKey: open(r.resendKeyEnc), resendKeyLast4: r.resendKeyLast4, fromAddress: r.fromAddress, replyTo: r.replyTo, appUrl: r.appUrl,
       inboxAddress: r.inboxAddress, domainName: r.domainName, domainId: r.domainId, webhookSecret: open(r.webhookSecretEnc),
-      supabaseToken: open(r.supabaseTokenEnc), appName: r.appName, updatedAt: r.updatedAt.toISOString(), updatedBy: r.updatedBy,
+      supabaseToken: open(r.supabaseTokenEnc), appName: r.appName, branding: { ...EMPTY_BRANDING, ...r.branding }, updatedAt: r.updatedAt.toISOString(), updatedBy: r.updatedBy,
     };
   };
   return {
@@ -37,10 +37,12 @@ export function dbEmailSettingsRepo(cipher: Cipher): EmailSettingsRepo {
         ...(patch.domainName !== undefined ? { domainName: patch.domainName } : {}),
         ...(patch.domainId !== undefined ? { domainId: patch.domainId } : {}),
         ...(patch.appName !== undefined ? { appName: patch.appName } : {}),
+        // Merged in the database, so a change to one branding field never undoes a simultaneous change to another.
+        ...(patch.branding !== undefined ? { branding: sql`coalesce(${emailSettingsTable.branding}, '{}'::jsonb) || ${JSON.stringify(patch.branding)}::jsonb` } : {}),
         updatedAt: new Date(), updatedBy: by,
       };
       await db.transaction(async tx => {
-        await tx.insert(emailSettingsTable).values({ id: ROW, ...values }).onConflictDoUpdate({ target: emailSettingsTable.id, set: values });
+        await tx.insert(emailSettingsTable).values({ id: ROW, ...values, ...(patch.branding !== undefined ? { branding: patch.branding } : {}) }).onConflictDoUpdate({ target: emailSettingsTable.id, set: values });
         await writeEffects(tx, effects);
       });
       return read();

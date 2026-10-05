@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { auditEntry, type Effects } from "../lib/activity";
-import { appName, DEFAULT_APP_NAME, mailerFor, setAppName, setAppUrlOverride, type EmailOutbox } from "../lib/email";
+import { appName, mailerFor, setAppUrlOverride, type EmailOutbox } from "../lib/email";
 import { effectiveConfig, type EmailSettingsPatch, type EmailSettingsRepo } from "../lib/emailSettings";
 import type { InboxFolder, InboxRepo } from "../lib/inbox";
 import { logger } from "../lib/logger";
@@ -25,8 +25,6 @@ export type EmailDeps = { outbox: EmailOutbox; settings: EmailSettingsRepo; inbo
 const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const FROM = /^(?:[^<>]{1,80}<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/;
 const DOMAIN = /^(?=.{3,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
-const APP_NAME = /^[\p{L}\p{N}][\p{L}\p{N} .&'-]{0,39}$/u;
-const brandingView = (saved: string | null) => ({ appName: saved ?? DEFAULT_APP_NAME, isDefault: !saved });
 const addressOf = (from: string) => /<([^>]+)>/.exec(from)?.[1] ?? from;
 const nameOf = (from: string) => /^([^<]+)</.exec(from)?.[1]?.trim() ?? null;
 const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -160,21 +158,6 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     res.json(got.ok ? got.data : { id: s.domainId, name: s.domainName, status: "pending" });
   });
 
-  // ---------- Application name ----------
-
-  router.put("/branding", admin, async (req, res) => {
-    const raw = req.body?.appName;
-    if (typeof raw !== "string") { res.status(400).json({ error: "Enter the application name." }); return; }
-    const name = raw.trim().replace(/\s+/g, " ");
-    // Empty restores the default. The name goes into email subjects, HTML, and authenticator apps, so keep it plain.
-    if (name && !APP_NAME.test(name)) { res.status(400).json({ error: "Use up to 40 letters, numbers, spaces, and . - & ' only.", fieldErrors: { appName: "Use up to 40 letters, numbers, spaces, and . - & ' only." } }); return; }
-    const before = appName();
-    const next = name && name !== DEFAULT_APP_NAME ? name : null;
-    await settings.save({ appName: next }, authLocals(res).staff!.name, audit(req, res, "Change application name", `Application name changed from ${before} to ${next ?? DEFAULT_APP_NAME}.`, [{ field: "Application name", before, after: next ?? DEFAULT_APP_NAME }]));
-    setAppName(next);
-    res.json(brandingView(next));
-  });
-
   // ---------- Sign-up email confirmation (Supabase) ----------
 
   // Sign-up confirmation, password reset, and two-step emails: Supabase Auth
@@ -277,17 +260,6 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
  * secret. Received mail (email.received) is fetched from Resend and stored in
  * the team inbox; delivery events update sent mail. Mounted before sign-in.
  */
-/** Public (before sign-in): the application name, so sign-in pages can show it. */
-export function brandingRouter(settings: EmailSettingsRepo): IRouter {
-  const router: IRouter = Router();
-  router.get("/branding", async (_req, res) => {
-    const saved = (await settings.get()).appName;
-    setAppName(saved);
-    res.json(brandingView(saved));
-  });
-  return router;
-}
-
 export function emailWebhookRouter({ outbox, settings, inbox, fetchImpl = fetch, env = process.env }: EmailDeps): IRouter {
   const router: IRouter = Router();
   const DELIVERY: Record<string, string> = { "email.delivered": "delivered", "email.bounced": "bounced", "email.complained": "complained", "email.delivery_delayed": "delayed", "email.failed": "failed" };
