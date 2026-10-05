@@ -429,7 +429,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Shared branding: logo, favicon, colours, email look (5 Oct 2026) — not yet deployed
+### Shared branding: logo, favicon, colours, email look (5 Oct 2026) — deployed as `1ee502b`
 
 **Schema change: push before restarting** (new `email_settings.branding` column; the API reads it at startup, so the old schema would stop it starting). `git pull`, schema push (Step 7 / the commented line above), `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Logos and the favicon are stored in `DOCUMENTS_DIR` like documents (back them up with it). Check: as the super admin, Settings → App branding: upload a logo and a favicon, pick and save a colour, pick an email colour and see the preview; open the portal in a private window (sign-in page shows the logo and the tab icon); send a test email (Settings → Email) and see the logo and colour. Emails need the portal address set (Settings → Email or `APP_URL`) to show the logo.
 
@@ -556,7 +556,7 @@ New VPS, 28 Sep 2026:
 - [x] Resend: domain `novabridgegrant.org` verified (Ireland, sending + receiving + tracking); key and sender saved in the admin.
 - [x] Cloudflare: Bot Fight Mode off.
 - [x] Send Email hook enabled in Supabase; test sign-up confirmation arrived from our address through Resend.
-- [ ] Set the application name (Settings → App branding; default "arc.fund") if not done — it appears in every email's subject and text.
+- [x] Application name set to "Nova Bridge Grant" (seen on `/api/branding`, 5 Oct 2026).
 - [ ] Optional: DMARC record in Cloudflare (`TXT` `_dmarc` = `v=DMARC1; p=none;`) to help deliverability. Resend lists `rsend` → `rsend-euw1.forge.rmta.net` while Cloudflare has `rsend.forge.rmta.net`; Resend shows it verified, so leave it unless it turns red.
 - [ ] After go-live: regenerate the Send Email hook secret in Supabase (it was typed into the chat on 28 Sep 2026) and replace the `SUPABASE_EMAIL_HOOK_SECRET` line (Step 11b, step 5).
 - [ ] Step 12 — applicant smoke test (sign up → confirmation email → apply → upload → file in `/var/lib/novabridgegrant/documents`).
@@ -671,3 +671,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-04 — Deployed `96d6f31` (identity checks for withdrawals only; Active/Inactive plans), which fixed every plan showing "Not eligible" to applicants without a verified identity. Pushed from Replit after `gh auth login` (the Replit Git credential had stopped working); on the server: `git pull` (fast-forward `894f51a..96d6f31`), no schema push, Build OK (~17:42 UTC), API restarted, `/api/healthz` ok. Checked from outside: the page serves `index--QTNE1ZL.js`, which has "Make inactive" and no longer has the identity-before-applying rule. Added the `git log` check (run as `novabridgegrant`) to "Redeploy an update". Open: commission % per live plan, the smoke test from that section.
 - 2026-10-04 — After the deploy: "New grant applications are turned off for your account" traced to that per-applicant switch being off (turn it on in Admin → Applicants → the applicant; not a code change). A report that the dashboard deposit balance ignores a commission is being checked with the queries in `work.md` ("4 Oct 2026 session"). Planned: ClamAV on this VPS for upload virus scanning (needs ~1–1.3 GB RAM; the owner is deciding on a 4 GB upgrade); nothing installed yet.
 - 2026-10-05 — Deployed `4f99dad` (commission charged at the plan's rate at approval; no schema push): pull, `sh deploy/build.sh` (Build OK), restart (the first attempt was typed during the build and swallowed; rerun on its own), `/api/healthz` ok locally and from outside, bundle `index-BrZDvpP_.js` served. Tip recorded: paste one command at a time and wait for the prompt.
+- 2026-10-05 — Deployed `1ee502b` (shared branding: logo, dark logo, favicon, app colour for everyone, email colour with preview): pull, **schema push** (`email_settings.branding`; "Changes applied", no prompts), `sh deploy/build.sh` (Build OK), restart, `/api/healthz` ok locally and from outside; bundle `index-Cggam0We.js`; `/api/branding` returns the new fields. The application name is already "Nova Bridge Grant". Next: the owner uploads the logo and favicon and picks the colours in Settings → App branding.
