@@ -16,6 +16,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **4 Oct 2026 — session notes (details: `work.md` §6, "4 Oct 2026 session"):** `96d6f31` pushed (Replit's Git credential had failed; pushed through `gh auth login`) and deployed, which fixed every plan showing "Not eligible" to unverified applicants. Support: "New grant applications are turned off" is the per-applicant switch (turn it on in the applicant's profile), not a bug. Investigating: an applicant's dashboard deposit balance not reflecting a commission — the code path is correct and tested; most likely the application was submitted while its plan's commission was 0% (the rate is fixed at submission); queries to confirm are in `work.md`. Commission stays a percentage (owner, 4 Oct). **Planned, not started:** ClamAV virus scanning on every upload route, waiting on the owner (4 GB RAM upgrade or 2 GB; refuse uploads while the scanner is down or not).
 
+**5 Oct 2026 — commission at the plan's rate at approval (owner's decision; not yet committed or deployed):** the commission is now charged at the plan's rate **when the application is approved**, not the rate when it was submitted, and that rate is recorded on the application at approval (so a later plan change doesn't rewrite what was charged). Submitting no longer stores a rate; a rate stored at submission by earlier versions is ignored at approval. Pending applications show the plan's current rate ("the plan's rate at approval applies"). No schema change. 217 rule tests, 157 API tests, typecheck, and production builds pass. **Virus scanning (ClamAV) is postponed** by the owner (5 Oct 2026); the plan in `work.md` §6 stays for later.
+
 ## Build plan
 
 1. **Applicant UI prototype — Complete**

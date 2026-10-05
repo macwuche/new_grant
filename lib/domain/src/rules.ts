@@ -173,14 +173,14 @@ export function submitApplication(state: DemoState, grantId: string, input: Appl
   const before = saved.state.applications.find(a => a.id === id)!;
   if (!canTransition(before.status, 'Submitted')) return fail('This application can no longer be submitted.');
   const resubmission = before.status === 'Changes requested';
-  // Nothing is charged now. The program's commission rate is fixed on the application at its
-  // first submission and taken from the deposit balance only if it's approved (./review).
+  // Nothing is charged now. The plan's commission rate at approval is taken from the deposit
+  // balance and recorded on the application then (./review; owner's rule, 5 Oct 2026).
   const next = saved.state.applications.map(a => a.id !== id ? a : {
-    ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at, commissionRate: a.commissionRate ?? grant.commissionRate,
+    ...a, status: 'Submitted' as const, submittedAt: at, updatedAt: at,
     history: [...a.history, { status: 'Submitted' as const, at, actor: 'Applicant' as const, note: resubmission ? 'Application resubmitted with the requested changes.' : 'Application submitted.' }],
   });
-  const rate = next.find(a => a.id === id)!.commissionRate ?? 0;
-  const commission = rate > 0 ? ` If it's approved, a ${rate}% commission on the amount approved is taken from your deposit balance.` : '';
+  const rate = grant.commissionRate;
+  const commission = rate > 0 ? ` If it's approved, the plan's commission on the amount approved (currently ${rate}%) is taken from your deposit balance.` : '';
   const logged = logStaff({ ...saved.state, applications: next }, {
     kind: 'application',
     title: resubmission ? `${id} resubmitted with changes` : `New application ${id}`,

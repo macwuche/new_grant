@@ -234,7 +234,7 @@ from ledger_entries l join applicant_profiles p on p.auth_user_id = l.applicant_
 where p.email = '<applicant email>' order by l.created_at;
 ```
 
-`commission_rate = 0` and no `Commission` row → the cause above; to charge an approval already made, use **Adjust balance** (debit the deposit balance, with a reason). A `Commission` row that the dashboard ignores → a real bug, to fix. **Owner decision pending:** keep the rate fixed at submission (recommended; the applicant pays what the summary showed) or use the plan's rate at approval.
+`commission_rate = 0` and no `Commission` row → the cause above; to charge an approval already made, use **Adjust balance** (debit the deposit balance, with a reason). A `Commission` row that the dashboard ignores → a real bug, to fix. **Decided 5 Oct 2026 (owner):** use the plan's rate **at approval**. Built: submitting stores no rate; approval charges the plan's current rate and records it on the application; older rates stored at submission are ignored. So once deployed, an application submitted while its plan was at 0% is charged the plan's current % when approved. Already-approved applications are not re-charged; use **Adjust balance** for those.
 
 **Virus scanning of uploads: plan (not started; waiting on two owner decisions).** Today every upload (application documents, identity documents, deposit receipts, profile photos, withdrawal/deposit method photos) is type-checked from its bytes and content-checked (`artifacts/api-server/src/lib/uploadSafety.ts`), but not virus-scanned.
 1. Server: install `clamav-daemon` and `clamav-freshclam` (signature updates), clamd on a local Unix socket only, scan size limits above our upload limits, `ConcurrentDatabaseReload no` to avoid doubling memory on updates; added to `deploy/` and `server.md`.
@@ -243,12 +243,12 @@ where p.email = '<applicant email>' order by l.created_at;
 4. Scanner unavailable: refuse the upload ("Uploads are temporarily unavailable, try again shortly") rather than store it unscanned; controlled by a setting in `api.env`; development and tests use a stand-in scanner.
 5. Files already stored: a one-time scan of `DOCUMENTS_DIR`, then a nightly rescan with fresh signatures; detections quarantined and reported to staff.
 6. Tests: the EICAR test file refused on every route, clean files accepted, scanner-down refused, detections audited; then a live EICAR check on the server.
-Owner decisions needed first: (a) upgrade the VPS to 4 GB RAM (recommended; clamd needs about 1–1.3 GB and the VPS has 2 GB + 2 GB swap) or try on 2 GB; (b) refuse uploads while the scanner is down (recommended) or let them through.
+**Postponed by the owner on 5 Oct 2026.** Owner decisions needed before starting: (a) upgrade the VPS to 4 GB RAM (recommended; clamd needs about 1–1.3 GB and the VPS has 2 GB + 2 GB swap) or try on 2 GB; (b) refuse uploads while the scanner is down (recommended) or let them through.
 Not used, on purpose: online scanners such as VirusTotal (uploaded files can be shared with security vendors; unacceptable for identity documents).
 
 **Next, in order:**
 
-0. 4 Oct 2026 open items (section above): the owner's two virus-scanning decisions, then build it; the dashboard commission check (run the two queries) and the rate decision (submission vs approval). Live since 4 Oct: `96d6f31`. Deposit methods and grant plans with commission were deployed together on 3 Oct 2026 as `894f51a` (schema pushed first). Still to do: enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
+0. 4 Oct 2026 open items (section above): virus scanning postponed (5 Oct); the rate decision is made and built (plan's rate at approval, 5 Oct; to commit and deploy); the dashboard commission check (run the two queries). Live since 4 Oct: `96d6f31`. Deposit methods and grant plans with commission were deployed together on 3 Oct 2026 as `894f51a` (schema pushed first). Still to do: enter the real receiving details in Settings → Deposit methods, set approval days and commission on each live plan, and run both `server.md` smoke tests.
 
 1. Smoke-test the 29 Sep deploy (`91074ee`, live since ~21:09 UTC; schema pushed first): the admin withdrawal methods, the profile's password, email, and sign-out-others flows, and a withdrawal end to end with a real applicant and finance account (`server.md`, "New VPS, 29 Sep 2026").
 2. The live check, now on https://access.novabridgegrant.org (the super admin sign-in is done): one full pass through an application, a review, a deposit, and a payout, and a look at the audit log's IP addresses.

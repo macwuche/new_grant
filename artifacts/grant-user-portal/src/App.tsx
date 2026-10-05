@@ -311,7 +311,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   // File fields are stored under `field:<id>` (the API checks required ones at submission).
   const fieldFiles = (id: string) => evidence(`field:${id}`);
   const missingFiles = connected ? fileFields.filter(q => q.required && !fieldFiles(q.id).length) : [];
-  const rate = draft?.commissionRate ?? grant.commissionRate;
+  const rate = grant.commissionRate;
   const deposit = computeBalances(ownTransactions(state)).deposit;
   // Signed in, a requirement counts as ready once a file for it is uploaded.
   const withEvidence = grant.requirements.filter(req => myDocs.some(d => d.applicationId === draftId && d.requirement === req)).join('\n');
@@ -428,7 +428,7 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
           <div className="fee-row"><span>If approved in full ({money(input.requestedAmount || 0)})</span><strong data-testid="text-commission-amount">{money(commissionFor(input.requestedAmount || 0, rate))}</strong></div>
           <div className="fee-row"><span>Deposit balance now</span><strong>{money(deposit)}</strong></div>
           <div className="fee-row"><span>Deposit balance after approval</span><strong data-testid="text-deposit-after">{money(deposit - commissionFor(input.requestedAmount || 0, rate))}</strong></div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Nothing is charged when you submit. If the grant is approved, the commission on the amount approved is taken from your deposit balance, even if that takes it below zero; a deposit clears it. The award itself goes to your grant balance.</p>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Nothing is charged when you submit. If the grant is approved, the plan's commission rate at that time, on the amount approved, is taken from your deposit balance, even if that takes it below zero; a deposit clears it. The award itself goes to your grant balance.</p>
         </>}
       </div>
       <div><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{form.purpose.trim()}</p></div>
@@ -460,7 +460,9 @@ function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: G
       <div className="fee-row"><span>Registration number</span><strong>{app.registrationNumber || 'Not provided'}</strong></div>
       {grant.requirements.length > 0 && <div className="fee-row"><span>Requirements ready</span><strong>{app.checklist.length} of {grant.requirements.length}</strong></div>}
       {grant.questions.filter(q => q.type !== 'file').map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong style={{ whiteSpace: 'pre-wrap' }}>{app.answers[q.id] || '—'}</strong></div>)}
-      {app.commissionRate !== null && <div className="fee-row"><span>Commission</span><strong data-testid="text-application-commission">{app.commissionRate > 0 ? `${app.commissionRate}%${app.awardedAmount !== null ? ` · ${money(commissionFor(app.awardedAmount, app.commissionRate))} taken from your deposit balance` : ' of the amount approved, if approved'}` : 'None'}</strong></div>}
+      {app.status === 'Approved'
+        ? app.commissionRate !== null && app.awardedAmount !== null && <div className="fee-row"><span>Commission</span><strong data-testid="text-application-commission">{app.commissionRate > 0 ? `${app.commissionRate}% · ${money(commissionFor(app.awardedAmount, app.commissionRate))} taken from your deposit balance` : 'None'}</strong></div>
+        : app.status !== 'Declined' && <div className="fee-row"><span>Commission</span><strong data-testid="text-application-commission">{grant.commissionRate > 0 ? `${grant.commissionRate}% of the amount approved, if approved (the plan's rate at approval applies)` : 'None'}</strong></div>}
     </div>
     <div className="mt"><span className="field-label">Funding plan</span><p className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{app.purpose}</p></div>
     {connected && <div className="mt" data-testid="section-application-files"><span className="field-label">Files</span>{[...grant.requirements.map(r => ({ slot: r, label: r })), ...grant.questions.filter(q => q.type === 'file').map(q => ({ slot: `field:${q.id}`, label: q.label }))].map(e => <div key={e.slot} style={{ marginTop: 10 }}><strong style={{ fontSize: 11 }}>{e.label}</strong><DocumentFiles docs={files.filter(d => d.requirement === e.slot)} editable={false} onToast={onToast} empty="No file." /></div>)}</div>}

@@ -99,9 +99,12 @@ export function validateAward(state: DemoState, app: Application, amount: number
   return null;
 }
 
-/** The commission approving `app` for `amount` takes from the deposit balance (the rate fixed at submission). */
+/**
+ * The commission approving `app` for `amount` takes from the deposit balance: the plan's rate
+ * at approval (owner's rule, 5 Oct 2026). Once approved, the rate recorded on the application.
+ */
 export function commissionOn(state: DemoState, app: Application, amount: number): { rate: number; amount: number } {
-  const rate = app.commissionRate ?? findGrant(state, app.grantId)?.commissionRate ?? 0;
+  const rate = (app.status === 'Approved' ? app.commissionRate : null) ?? findGrant(state, app.grantId)?.commissionRate ?? 0;
   return { rate, amount: commissionFor(amount, rate) };
 }
 
@@ -122,7 +125,7 @@ export function approveApplication(state: DemoState, appId: string, expectedVers
   const commission = commissionOn(state, g.app, awardAmount);
   const commissionText = commission.amount > 0 ? ` A ${commission.rate}% commission (${usd(commission.amount)}) has been taken from your deposit balance.` : '';
   const note = `Approved for ${amountText}${partial ? ` (of $${g.app.requestedAmount.toLocaleString('en-US')} requested)` : ''}. The award has been added to your grant balance.${commissionText}`;
-  const approved = transition(state, g.app, 'Approved', reviewer, note, now, { awardedAmount: awardAmount });
+  const approved = transition(state, g.app, 'Approved', reviewer, note, now, { awardedAmount: awardAmount, commissionRate: commission.rate });
   const ids = nextIds(approved);
   const at = now.toISOString();
   const credit: Transaction = { id: ids.tx, applicantId: g.app.applicantId, type: 'Grant', description: `${grant.name} award (${appId})`, amount: awardAmount, status: 'Completed', createdAt: at };

@@ -838,11 +838,12 @@ describe("money", () => {
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
     const { application } = await json(await submitApp({ grantId: "creative", application: input }, "tok-maya"));
-    expect(application.commissionRate).toBe(5);
+    expect(application.commissionRate).toBeNull();
     expect((await mine()).transactions).toEqual([]);
     const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
     const approved = await json(await post(`/applications/${application.id}/approve`, { version: v, award: 3000 }));
     expect(approved.message).toMatch(/\$150\.00 commission taken from their deposit balance/);
+    expect(approved.application.commissionRate).toBe(5);
     const m = await mine();
     expect(m.transactions.map((t: { type: string; amount: number }) => [t.type, t.amount]).sort()).toEqual([["Commission", -150], ["Grant", 3000]]);
     expect(new Set(m.transactions.map((t: { id: string }) => t.id)).size).toBe(2);
@@ -1327,7 +1328,7 @@ describe("documents", () => {
     expect((await upload("tok-maya", `purpose=application&applicationId=${draft.id}&requirement=${encodeURIComponent("field:bank-statement")}`)).status).toBe(201);
     const ok = await submit();
     expect(ok.status).toBe(200);
-    expect((await json(ok)).application.commissionRate).toBe(2.5);
+    expect((await json(ok)).application.commissionRate).toBeNull();
   });
 
   it("refuses files carrying scripts, programs, hidden archives, or PDF actions", async () => {

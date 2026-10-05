@@ -57,13 +57,13 @@ describe('commission', () => {
     accept(V.startReview(s, 'APP-2101', app('APP-2101').updatedAt, 'Avery Taylor', now));
   };
 
-  it('charges nothing at submission and fixes the plan’s rate on the application', () => {
+  it('charges nothing at submission and fixes no rate until approval', () => {
     const before = s.transactions.length;
     const result = accept(R.submitApplication(s, 'green', complete(), now, 'APP-2101'));
     expect(result.message).not.toMatch(/fee|commission/);
     expect(s.transactions).toHaveLength(before);
-    expect(app('APP-2101').commissionRate).toBe(8);
-    expect(s.notifications[0]!.body).toMatch(/8% commission on the amount approved is taken from your deposit balance/);
+    expect(app('APP-2101').commissionRate).toBeNull();
+    expect(s.notifications[0]!.body).toMatch(/plan's commission on the amount approved \(currently 8%\) is taken from your deposit balance/);
   });
 
   it('takes the commission on the approved amount from the deposit balance on approval, even below zero', () => {
@@ -82,19 +82,35 @@ describe('commission', () => {
     expect(s.notifications[0]!.body).toMatch(/8% commission \(\$200\.00\) has been taken from your deposit balance/);
   });
 
-  it('uses the rate fixed at submission, not a later change to the plan', () => {
+  it('uses the plan’s rate at approval, not at submission, and records it on the application', () => {
     submitAndReview();
     s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 50 } : g) };
+    expect(V.commissionOn(s, app('APP-2101'), 1000)).toEqual({ rate: 50, amount: 500 });
     accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 1000, 'Avery Taylor', now));
-    expect(s.transactions[0]).toMatchObject({ type: 'Commission', amount: -80 });
+    expect(s.transactions[0]).toMatchObject({ type: 'Commission', amount: -500 });
+    expect(app('APP-2101').commissionRate).toBe(50);
+    // A later change to the plan doesn't rewrite what an approved application was charged.
+    s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 5 } : g) };
+    expect(V.commissionOn(s, app('APP-2101'), 1000)).toEqual({ rate: 50, amount: 500 });
   });
 
-  it('keeps the first rate through a resubmission', () => {
+  it('ignores a rate stored at submission by older versions', () => {
+    submitAndReview();
+    s = { ...s, applications: s.applications.map(a => a.id === 'APP-2101' ? { ...a, commissionRate: 0 } : a) };
+    accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 1000, 'Avery Taylor', now));
+    expect(s.transactions[0]).toMatchObject({ type: 'Commission', amount: -80 });
+    expect(app('APP-2101').commissionRate).toBe(8);
+  });
+
+  it('uses the rate at approval after a resubmission', () => {
     submitAndReview();
     accept(V.requestChanges(s, 'APP-2101', app('APP-2101').updatedAt, 'Please add the installer quote.', 'Avery Taylor', now));
     s = { ...s, grants: s.grants.map(g => g.id === 'green' ? { ...g, commissionRate: 20 } : g) };
     accept(R.submitApplication(s, 'green', complete(), now, 'APP-2101'));
-    expect(app('APP-2101').commissionRate).toBe(8);
+    expect(app('APP-2101').commissionRate).toBeNull();
+    accept(V.startReview(s, 'APP-2101', app('APP-2101').updatedAt, 'Avery Taylor', now));
+    accept(V.approveApplication(s, 'APP-2101', app('APP-2101').updatedAt, 1000, 'Avery Taylor', now));
+    expect(s.transactions[0]).toMatchObject({ type: 'Commission', amount: -200 });
   });
 
   it('adds no ledger entry when the plan takes no commission', () => {

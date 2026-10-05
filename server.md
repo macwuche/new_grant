@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Commission at the plan's rate at approval (5 Oct 2026) — not yet deployed
+
+No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: submit a test application on a plan with a commission, change the plan's commission, approve it, and confirm the `Commission` ledger entry uses the new rate and the application's detail page shows it.
+
 ### Identity checks for withdrawals only, and Active/Inactive plans (4 Oct 2026) — deployed as `96d6f31`
 
 - **No schema push** and no new environment variables: `git pull` + `deploy/build.sh` + restart.
