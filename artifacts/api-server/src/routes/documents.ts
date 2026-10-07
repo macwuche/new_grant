@@ -12,6 +12,9 @@ import type { Grant } from "@workspace/domain/model";
 import { auditContext, authLocals, requireStaff } from "../middlewares/auth";
 import { ownProfile } from "./profile";
 import { inspectUpload } from "../lib/uploadSafety";
+import { rebuildImage } from "../lib/imageRebuild";
+import type { MoneyRepo } from "../lib/moneyRepo";
+import { accountFileLimit } from "../lib/storageGuard";
 
 // Documents applicants upload: identity documents for the identity check, and
 // evidence for an application: a file for each of its program's requirements
@@ -75,9 +78,9 @@ export const evidenceSlots = (grant: Pick<Grant, "requirements" | "questions">) 
 export const missingEvidence = (grant: Pick<Grant, "requirements" | "questions">, docs: DocumentRecord[]) =>
   evidenceSlots(grant).filter(e => e.required && !docs.some(d => d.requirement === e.slot)).map(e => e.label);
 
-export type DocumentDeps = { documents: DocumentRepo; files: FileStore; profiles: ProfileRepo; applications: ApplicationRepo; programs: ProgramRepo };
+export type DocumentDeps = { documents: DocumentRepo; files: FileStore; profiles: ProfileRepo; applications: ApplicationRepo; programs: ProgramRepo; money: MoneyRepo };
 
-export function documentsRouter({ documents, files, profiles, applications, programs }: DocumentDeps): IRouter {
+export function documentsRouter({ documents, files, profiles, applications, programs, money }: DocumentDeps): IRouter {
   const router: IRouter = Router();
   const fail = (res: Response, status: number, error: string) => { res.status(status).json({ error }); };
 
@@ -107,12 +110,16 @@ export function documentsRouter({ documents, files, profiles, applications, prog
     const requirement = purpose === "application" && typeof req.query["requirement"] === "string" ? req.query["requirement"] : null;
     if (purpose === "application" && (!applicationId || !requirement)) return fail(res, 400, "Say which application and requirement the document supports. Save the application as a draft first.");
 
-    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!bytes.length) return fail(res, 400, "The file is empty.");
     const contentType = detectType(bytes);
     if (!contentType) return fail(res, 415, "Upload a PDF, JPEG, or PNG file.");
     const unsafe = inspectUpload(bytes, contentType);
     if (!unsafe.ok) return fail(res, 422, unsafe.reason);
+    // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+    const rebuilt = await rebuildImage(bytes, contentType);
+    if (!rebuilt.ok) return fail(res, 422, rebuilt.reason);
+    bytes = rebuilt.bytes;
 
     const locked = await evidenceLock(user.id, purpose, applicationId);
     if (locked) return fail(res, locked.includes("could not be found") ? 404 : 409, locked);
@@ -125,6 +132,8 @@ export function documentsRouter({ documents, files, profiles, applications, prog
       if (!grant || !evidenceSlots(grant).some(e => e.slot === requirement)) return fail(res, 400, "That isn't one of this program's requirements or file fields.");
       if (own.filter(d => d.applicationId === applicationId && d.requirement === requirement).length >= MAX_PER_REQUIREMENT) return fail(res, 409, `Upload at most ${MAX_PER_REQUIREMENT} files per requirement.`);
     }
+    const overTotal = await accountFileLimit(user.id, bytes.length, documents, money);
+    if (overTotal) return fail(res, 409, overTotal);
 
     const storageKey = newStorageKey(user.id);
     await files.put(storageKey, bytes);

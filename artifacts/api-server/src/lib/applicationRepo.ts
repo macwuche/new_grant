@@ -5,8 +5,8 @@ import type { ProgramRepo, WriteOutcome } from "./programRepo";
 // Storage for applications. Every change happens inside `withProgram`, which
 // holds a lock on one program for the duration: the rules see that program's
 // applications (all applicants) and nothing else can change them, or the
-// program itself, until the changes are stored. That keeps budgets, locked
-// criteria, and one-application-per-grant correct under concurrent requests.
+// program itself, until the changes are stored. That keeps locked criteria
+// and one-application-per-grant correct under concurrent requests.
 // The Drizzle implementation lives in ./applicationRepo.db.ts.
 
 export type ProgramScope = {

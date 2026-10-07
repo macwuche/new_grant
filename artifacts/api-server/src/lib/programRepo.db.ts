@@ -9,16 +9,21 @@ import type { ProgramRepo, WriteOutcome } from "./programRepo";
 // text, so rebuild nested objects with the domain's key order.
 export const toGrant = (row: ProgramRow): Grant => ({
   id: row.id, status: row.status, name: row.name, summary: row.summary, focus: row.focus,
-  maxFunding: row.maxFunding, minimumRequest: row.minimumRequest, budget: row.budget, deadline: row.deadline,
+  maxFunding: row.maxFunding, minimumRequest: row.minimumRequest, deadline: row.deadline,
   minimumTier: row.minimumTier as Tier, requirements: row.requirements, requiresRegistration: row.requiresRegistration,
   questions: row.questions.map(q => ({ id: q.id, label: q.label, type: q.type, required: q.required })),
   approvalDays: row.approvalDays, commissionRate: row.commissionRate,
   changeLog: row.changeLog.map(c => ({ at: c.at, by: c.by, summary: c.summary })), updatedAt: row.updatedAt.toISOString(),
 });
 
+// Plans have no budget (owner's decision, 7 Oct 2026). The old programs.budget
+// column stays in the database: updates leave existing values alone, and a new
+// plan stores 0 there (the column is NOT NULL). It is never read or sent.
+const RETIRED_BUDGET = { budget: 0 };
+
 export const toProgramRow = (g: Grant) => ({
   status: g.status, name: g.name, summary: g.summary, focus: g.focus,
-  maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline,
+  maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, deadline: g.deadline,
   minimumTier: g.minimumTier, requirements: g.requirements, requiresRegistration: g.requiresRegistration,
   questions: g.questions, approvalDays: g.approvalDays, commissionRate: g.commissionRate, changeLog: g.changeLog, updatedAt: new Date(g.updatedAt),
 });
@@ -43,7 +48,7 @@ export const dbProgramRepo: ProgramRepo = {
     return Number(rows[0]!.n);
   },
   insert: (grant, effects = NO_EFFECTS) => write(() => withEffects(effects, async tx =>
-    (await tx.insert(programsTable).values({ id: grant.id, ...toProgramRow(grant) }).returning({ id: programsTable.id })).length)),
+    (await tx.insert(programsTable).values({ id: grant.id, ...toProgramRow(grant), ...RETIRED_BUDGET }).returning({ id: programsTable.id })).length)),
   update: (grant, expectedVersion) => write(async () => (await db.update(programsTable).set(toProgramRow(grant))
     .where(and(eq(programsTable.id, grant.id), atVersion(expectedVersion))).returning({ id: programsTable.id })).length),
   remove: (id, expectedVersion) => write(async () => (await db.delete(programsTable)

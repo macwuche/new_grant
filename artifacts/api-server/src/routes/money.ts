@@ -36,8 +36,11 @@ import { newCards, type MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 import { cleanFileName, detectType } from "./documents";
+import type { DocumentRepo } from "../lib/documentRepo";
+import { accountFileLimit } from "../lib/storageGuard";
 import { detectImage, ownProfile } from "./profile";
 import { inspectUpload } from "../lib/uploadSafety";
+import { rebuildImage } from "../lib/imageRebuild";
 
 // Money: the ledger, deposits (with proof of payment), payouts, cards,
 // withdrawal and deposit methods, the money settings, and the lockdown. Every change runs the shared rules
@@ -72,7 +75,7 @@ export const proofKey = (applicantId: string, proofId: string) => `${applicantId
 /** Staff who process or approve deposits can open their proof of payment. */
 const PROOF_VIEWERS: Permission[] = ["payments.process", "payments.release"];
 
-export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: FileStore): IRouter {
+export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: FileStore, documents: DocumentRepo): IRouter {
   const router: IRouter = Router();
 
   // ---------- Applicant ----------
@@ -134,12 +137,18 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   router.put("/money/deposits/:id/proof", express.raw({ type: () => true, limit: MAX_PROOF_BYTES }), async (req: Request, res: Response) => {
     const tx = await ownDeposit(req, res);
     if (!tx) return;
-    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
     const contentType = detectType(bytes);
     if (!contentType) { res.status(415).json({ error: "Upload a PDF, JPG, or PNG file." }); return; }
     const unsafe = inspectUpload(bytes, contentType);
     if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+    const rebuilt = await rebuildImage(bytes, contentType);
+    if (!rebuilt.ok) { res.status(422).json({ error: rebuilt.reason }); return; }
+    bytes = rebuilt.bytes;
+    const overTotal = await accountFileLimit(tx.applicantId, bytes.length, documents, money);
+    if (overTotal) { res.status(409).json({ error: overTotal }); return; }
     const proof: DepositProof = {
       id: randomUUID(), fileName: cleanFileName(req.header("x-file-name")), contentType, sizeBytes: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex"), uploadedAt: new Date().toISOString(),
@@ -432,12 +441,16 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   router.put("/money/methods/:methodId/photo", requireStaff, requirePermission("treasury.manage"), express.raw({ type: () => true, limit: MAX_METHOD_PHOTO_BYTES }), async (req: Request, res: Response) => {
     const id = methodIdOf(req);
     if (!id || !(await money.settings()).treasury.channels.some(c => c.id === id)) { res.status(404).json({ error: "That withdrawal method no longer exists." }); return; }
-    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
     const contentType = detectImage(bytes);
     if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
     const unsafe = inspectUpload(bytes, contentType);
     if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+    const rebuilt = await rebuildImage(bytes, contentType);
+    if (!rebuilt.ok) { res.status(422).json({ error: rebuilt.reason }); return; }
+    bytes = rebuilt.bytes;
     const file: MethodPhotoFile = { key: `${METHOD_PHOTO_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex") };
     await files.put(file.key, bytes);
     const done = await asSystem(req, res, "Change withdrawal method photo", id, (s, by) => setMethodPhoto(s, id, "", file, by, new Date()));
@@ -501,12 +514,16 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   router.put("/money/deposit-methods/:methodId/photo", requireStaff, requirePermission("treasury.manage"), express.raw({ type: () => true, limit: MAX_METHOD_PHOTO_BYTES }), async (req: Request, res: Response) => {
     const id = await depositMethodIdOf(req);
     if (!id) { res.status(404).json({ error: DEPOSIT_GONE }); return; }
-    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
     const contentType = detectImage(bytes);
     if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
     const unsafe = inspectUpload(bytes, contentType);
     if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+    const rebuilt = await rebuildImage(bytes, contentType);
+    if (!rebuilt.ok) { res.status(422).json({ error: rebuilt.reason }); return; }
+    bytes = rebuilt.bytes;
     const file: MethodPhotoFile = { key: `${DEPOSIT_METHOD_PHOTO_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex") };
     await files.put(file.key, bytes);
     const done = await asSystem(req, res, "Change deposit method photo", id, (s, by) => setDepositMethodPhoto(s, id, "", file, by, new Date()));

@@ -1017,7 +1017,7 @@ paths:
       operationId: approveApplication
       tags: [applications]
       summary: Approve with an award
-      description: Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+      description: Requires applications.review. The award can't exceed the request or the program ceiling (plans have no overall budget); escalated applications can't be approved.
       requestBody:
         required: true
         content:
@@ -4646,7 +4646,7 @@ components:
           maxProperties: 20
           additionalProperties:
             type: string
-            maxLength: 1000
+            maxLength: 2000
       required: [businessName, requestedAmount, registrationNumber, purpose, checklist, answers]
       additionalProperties: false
     ApplicationSubmission:
@@ -4890,8 +4890,6 @@ components:
           type: number
         minimumRequest:
           type: number
-        budget:
-          type: number
         deadline:
           type: string
           maxLength: 10
@@ -4918,7 +4916,7 @@ components:
         commissionRate:
           type: number
           description: Percent of the approved amount taken from the deposit balance on approval
-      required: [name, summary, focus, maxFunding, minimumRequest, budget, deadline, minimumTier, requirements, requiresRegistration, questions, approvalDays, commissionRate]
+      required: [name, summary, focus, maxFunding, minimumRequest, deadline, minimumTier, requirements, requiresRegistration, questions, approvalDays, commissionRate]
       additionalProperties: false
     Program:
       allOf:

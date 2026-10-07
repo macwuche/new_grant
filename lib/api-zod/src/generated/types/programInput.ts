@@ -17,7 +17,6 @@ export interface ProgramInput {
   focus: string;
   maxFunding: number;
   minimumRequest: number;
-  budget: number;
   /**
      * ISO date (YYYY-MM-DD)
      * @maxLength 10

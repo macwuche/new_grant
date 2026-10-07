@@ -25,13 +25,9 @@ export function applicantName(state: DemoState, applicantId: string): string {
   return state.otherApplicants.find(p => p.id === applicantId)?.name ?? 'Unknown applicant';
 }
 
-export type ProgramBudget = { budget: number; awarded: number; remaining: number };
-
-export function programBudget(state: DemoState, grantId: string): ProgramBudget {
-  const grant = findGrant(state, grantId);
-  const awarded = roundCents(state.applications.filter(a => a.grantId === grantId && a.status === 'Approved').reduce((sum, a) => sum + (a.awardedAmount ?? 0), 0));
-  const budget = grant?.budget ?? 0;
-  return { budget, awarded, remaining: roundCents(budget - awarded) };
+/** Total awarded on a plan so far (staff only). Plans have no overall budget (owner's decision, 7 Oct 2026). */
+export function programAwarded(state: DemoState, grantId: string): number {
+  return roundCents(state.applications.filter(a => a.grantId === grantId && a.status === 'Approved').reduce((sum, a) => sum + (a.awardedAmount ?? 0), 0));
 }
 
 type Guard = { ok: true; app: Application } | { ok: false; result: Result };
@@ -94,8 +90,6 @@ export function validateAward(state: DemoState, app: Application, amount: number
   if (roundCents(amount) !== amount) return 'Use at most two decimal places.';
   if (amount > app.requestedAmount) return `The award can't exceed the $${app.requestedAmount.toLocaleString('en-US')} requested.`;
   if (amount > grant.maxFunding) return `The award can't exceed this program's $${grant.maxFunding.toLocaleString('en-US')} ceiling.`;
-  const { remaining } = programBudget(state, app.grantId);
-  if (amount > remaining) return `Only $${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })} remains in the ${grant.name} budget.`;
   return null;
 }
 

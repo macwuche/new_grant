@@ -73,20 +73,21 @@ describe('approval', () => {
     expect(V.approveApplication(s, 'APP-2050', version('APP-2050'), 100.001, REVIEWER, now).ok).toBe(false);
   });
 
-  it('credits the award to that applicant only and uses program budget', () => {
+  it('credits the award to that applicant only and adds it to the plan’s total awarded', () => {
     accept(V.approveApplication(s, 'APP-2050', version('APP-2050'), 10000, REVIEWER, later(1)));
     expect(app('APP-2050').awardedAmount).toBe(10000);
     expect(s.transactions.find(t => t.applicantId === 'APL-1045' && t.type === 'Grant')).toMatchObject({ amount: 10000, status: 'Completed' });
     expect(s.transactions.find(t => t.applicantId === 'APL-1045' && t.type === 'Commission')).toMatchObject({ amount: -800, status: 'Completed' }); // green: 8%
     expect(mine().grant).toBe(4075);
-    expect(V.programBudget(s, 'green')).toEqual({ budget: 200000, awarded: 10000, remaining: 190000 });
+    expect(V.programAwarded(s, 'green')).toBe(10000);
   });
 
-  it('caps approvals at the remaining program budget', () => {
-    s = { ...s, applications: [...s.applications, { ...app('APP-2049'), id: 'APP-9000', status: 'Approved', awardedAmount: 246000 }] };
-    const result = V.approveApplication(s, 'APP-2049', version('APP-2049'), 5000, REVIEWER, now);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/remains/);
+  it('has no overall plan budget: approvals are limited only by the request and the plan maximum (owner, 7 Oct 2026)', () => {
+    // Far more already awarded on the plan than any former budget.
+    s = { ...s, applications: [...s.applications, { ...app('APP-2049'), id: 'APP-9000', status: 'Approved', awardedAmount: 10_000_000 }] };
+    accept(V.approveApplication(s, 'APP-2049', version('APP-2049'), 5000, REVIEWER, now));
+    expect(app('APP-2049').awardedAmount).toBe(5000);
+    expect(V.validateAward(s, { ...app('APP-2049'), requestedAmount: 1_000_000 }, 999_999)).toMatch(/ceiling/);
   });
 });
 

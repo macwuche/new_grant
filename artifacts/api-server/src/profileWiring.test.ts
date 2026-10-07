@@ -22,6 +22,7 @@ import { memoryProfileRepo } from "./lib/profileRepo";
 import { memoryProgramRepo } from "./lib/programRepo";
 import { memorySignInRepo } from "./lib/signIns";
 import { memoryStaffRepo } from "./lib/staffRepo";
+import sharp from "sharp";
 
 // The profile center's wiring: the portal's own generated client (the same
 // functions ProfilePage.tsx calls, through the same customFetch) against the
@@ -52,7 +53,8 @@ const supabaseFetch = (async (url: string, init: RequestInit = {}) => {
 }) as unknown as typeof fetch;
 
 /** A real 1×1 PNG. */
-const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201a5f3a0e30000000049454e44ae426082", "hex");
+// A real picture: uploads are rebuilt from their pixels (lib/imageRebuild.ts).
+const PNG = await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 128, b: 255, alpha: 1 } } }).png().toBuffer();
 
 beforeEach(async () => {
   const outbox = memoryOutbox();

@@ -4,6 +4,7 @@ import type { ActivityRepo } from "../lib/activity";
 import type { ApplicationRepo } from "../lib/applicationRepo";
 import type { DocumentRepo } from "../lib/documentRepo";
 import type { FileStore } from "../lib/fileStore";
+import { storageFullHandler } from "../lib/storageGuard";
 import type { EmailOutbox } from "../lib/email";
 import type { EmailSettingsRepo } from "../lib/emailSettings";
 import type { InboxRepo } from "../lib/inbox";
@@ -74,10 +75,12 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.use(profileRouter({ repo: profileRepo, documents: documentRepo, activity: activityRepo, files: fileStore, passwordChecker }));
   router.use(applicantsRouter(profileRepo));
   router.use(applicationsRouter(applicationRepo, profileRepo, moneyRepo, documentRepo, fileStore));
-  router.use(documentsRouter({ documents: documentRepo, files: fileStore, profiles: profileRepo, applications: applicationRepo, programs: programRepo }));
-  router.use(moneyRouter(moneyRepo, profileRepo, fileStore));
+  router.use(documentsRouter({ documents: documentRepo, files: fileStore, profiles: profileRepo, applications: applicationRepo, programs: programRepo, money: moneyRepo }));
+  router.use(moneyRouter(moneyRepo, profileRepo, fileStore, documentRepo));
   router.use(activityRouter(activityRepo));
   router.use(emailRouter(email));
   router.use(brandingAdminRouter(emailSettings, fileStore));
+  // Uploads refused at the disk's free-space floor: 507, and a staff alert (../lib/storageGuard.ts).
+  router.use(storageFullHandler(documentRepo));
   return router;
 }

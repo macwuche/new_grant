@@ -12,8 +12,8 @@ const PM = 'Sam Rivera';
 
 let s: DemoState;
 const program = (id: string) => s.grants.find(g => g.id === id)!;
-const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, budget: g.budget, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration, questions: g.questions.map(q => ({ ...q })), approvalDays: g.approvalDays, commissionRate: g.commissionRate });
-const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, budget: 60000, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false, questions: [], approvalDays: 10, commissionRate: 7.5 };
+const inputOf = (g: Grant): GrantInput => ({ name: g.name, summary: g.summary, focus: g.focus, maxFunding: g.maxFunding, minimumRequest: g.minimumRequest, deadline: g.deadline, minimumTier: g.minimumTier, requirements: [...g.requirements], requiresRegistration: g.requiresRegistration, questions: g.questions.map(q => ({ ...q })), approvalDays: g.approvalDays, commissionRate: g.commissionRate });
+const valid: GrantInput = { name: 'Rural Broadband', summary: 'Connect small rural businesses to reliable internet.', focus: 'Rural business', maxFunding: 6000, minimumRequest: 500, deadline: '2027-03-31', minimumTier: 1, requirements: ['Installer quote', ' Proof of address '], requiresRegistration: false, questions: [], approvalDays: 10, commissionRate: 7.5 };
 function accept(result: Result): Result & { ok: true } {
   if (!result.ok) throw new Error(`expected success, got: ${result.error} ${JSON.stringify(result.fieldErrors ?? {})}`);
   s = result.state;
@@ -34,8 +34,8 @@ describe('create', () => {
   });
 
   it('validates every field', () => {
-    const errors = errorsOf(G.createProgram(s, { ...valid, name: 'x', summary: 'short', focus: '', minimumRequest: -1, maxFunding: 100.001, budget: 0, deadline: '2027-02-30', minimumTier: 4 as never, requirements: ['x'.repeat(81)], approvalDays: 2.5, commissionRate: 100.5 }, PM, now));
-    expect(Object.keys(errors).sort()).toEqual(['approvalDays', 'budget', 'commissionRate', 'deadline', 'focus', 'maxFunding', 'minimumRequest', 'minimumTier', 'name', 'requirements', 'summary']);
+    const errors = errorsOf(G.createProgram(s, { ...valid, name: 'x', summary: 'short', focus: '', minimumRequest: -1, maxFunding: 100.001, deadline: '2027-02-30', minimumTier: 4 as never, requirements: ['x'.repeat(81)], approvalDays: 2.5, commissionRate: 100.5 }, PM, now));
+    expect(Object.keys(errors).sort()).toEqual(['approvalDays', 'commissionRate', 'deadline', 'focus', 'maxFunding', 'minimumRequest', 'minimumTier', 'name', 'requirements', 'summary']);
   });
 
   it('keeps approval days and the commission rate, and allows a plan without requirements', () => {
@@ -61,7 +61,6 @@ describe('create', () => {
 
   it('checks amounts relate sensibly and names are unique', () => {
     expect(errorsOf(G.createProgram(s, { ...valid, maxFunding: 400 }, PM, now)).maxFunding).toMatch(/at least the minimum/);
-    expect(errorsOf(G.createProgram(s, { ...valid, budget: 5000 }, PM, now)).budget).toMatch(/at least one maximum award/);
     expect(errorsOf(G.createProgram(s, { ...valid, name: 'green transition' }, PM, now)).name).toMatch(/already uses/);
     expect(errorsOf(G.createProgram(s, { ...valid, requirements: ['A', 'a'] }, PM, now)).requirements).toMatch(/different/);
   });
@@ -121,8 +120,8 @@ describe('publish, close, reopen, delete', () => {
 
 describe('editing', () => {
   it('logs which fields changed', () => {
-    accept(G.updateProgram(s, 'space', program('space').updatedAt, { ...inputOf(program('space')), budget: 120000, summary: 'Updated summary for shared spaces.' }, PM, now));
-    expect(program('space').changeLog.at(-1)!.summary).toBe('Edited summary, budget.');
+    accept(G.updateProgram(s, 'space', program('space').updatedAt, { ...inputOf(program('space')), maxFunding: 15000, summary: 'Updated summary for shared spaces.' }, PM, now));
+    expect(program('space').changeLog.at(-1)!.summary).toBe('Edited summary, maximum award.');
   });
 
   it('rejects a save with no changes', () => {
@@ -140,11 +139,6 @@ describe('editing', () => {
   it('keeps criteria editable when only drafts exist', () => {
     s = { ...s, applications: s.applications.filter(a => a.grantId !== 'green' || a.status === 'Draft') };
     accept(G.updateProgram(s, 'green', program('green').updatedAt, { ...inputOf(program('green')), minimumTier: 1 }, PM, now));
-  });
-
-  it('never lowers the budget below what is awarded', () => {
-    const g = program('creative'); // 4,200 awarded in seed data
-    expect(errorsOf(G.updateProgram(s, 'creative', g.updatedAt, { ...inputOf(g), budget: 4000 }, PM, now)).budget).toBeDefined();
   });
 
   it('requires an open program’s deadline to stay in the future', () => {

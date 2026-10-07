@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, statfs } from "node:fs/promises";
 import path from "node:path";
 
 // Where uploaded document files live: the API server's own disk, never the
@@ -16,6 +16,29 @@ export interface FileStore {
 
 const KEY = /^[0-9a-f-]{36}\/[0-9a-f-]{36}$/;
 
+/**
+ * A write refused because it would leave the disk with less free space than
+ * the floor (MIN_FREE_DISK_MB). Upload routes answer 507 (see ../routes/index.ts).
+ */
+export class StorageFullError extends Error {
+  constructor(readonly freeBytes: number, readonly minFreeBytes: number) {
+    super(`storage floor reached: ${freeBytes} bytes free, ${minFreeBytes} kept free`);
+    this.name = "StorageFullError";
+  }
+}
+
+/** Free space to keep on the documents disk: MIN_FREE_DISK_MB, default 2,048 MB (0 turns the check off). */
+export function minFreeDiskBytes(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env["MIN_FREE_DISK_MB"]?.trim();
+  const mb = raw ? Number(raw) : NaN;
+  return (Number.isFinite(mb) && mb >= 0 ? mb : 2048) * 1024 * 1024;
+}
+
+/** Refuses a write of `size` bytes that would leave less than `minFree` bytes free. */
+function checkSpace(free: number | null, size: number, minFree: number) {
+  if (minFree > 0 && free !== null && free - size < minFree) throw new StorageFullError(free, minFree);
+}
+
 export const newStorageKey = (ownerId: string) => `${ownerId}/${randomUUID()}`;
 
 /**
@@ -23,7 +46,9 @@ export const newStorageKey = (ownerId: string) => `${ownerId}/${randomUUID()}`;
  * Writes go to a temporary file first and are renamed into place, so a crash
  * never leaves a half-written document behind its record.
  */
-export function diskFileStore(root: string): FileStore {
+export function diskFileStore(root: string, options: { minFreeBytes?: number; freeBytes?: (dir: string) => Promise<number> } = {}): FileStore {
+  const minFree = options.minFreeBytes ?? minFreeDiskBytes();
+  const measure = options.freeBytes ?? (async (dir: string) => { const s = await statfs(dir); return s.bavail * s.bsize; });
   const resolve = (key: string) => {
     if (!KEY.test(key)) throw new Error(`invalid storage key: ${key}`);
     return path.join(root, key);
@@ -32,6 +57,8 @@ export function diskFileStore(root: string): FileStore {
     put: async (key, bytes) => {
       const target = resolve(key);
       await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+      // If the free space can't be measured, the write goes ahead (and fails on its own if the disk is full).
+      checkSpace(minFree > 0 ? await measure(root).catch(() => null) : null, bytes.length, minFree);
       const temp = `${target}.${randomUUID()}.part`;
       const handle = await open(temp, "wx", 0o600);
       try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
@@ -42,12 +69,15 @@ export function diskFileStore(root: string): FileStore {
   };
 }
 
-/** In-memory files for tests. */
-export function memoryFileStore(): FileStore & { files: Map<string, Buffer> } {
+/** In-memory files for tests; `freeBytes` stands in for the disk's free space (unlimited by default). */
+export function memoryFileStore(options: { freeBytes?: () => number; minFreeBytes?: number } = {}): FileStore & { files: Map<string, Buffer> } {
   const files = new Map<string, Buffer>();
   return {
     files,
-    put: async (key, bytes) => { files.set(key, Buffer.from(bytes)); },
+    put: async (key, bytes) => {
+      if (options.freeBytes) checkSpace(options.freeBytes(), bytes.length, options.minFreeBytes ?? 0);
+      files.set(key, Buffer.from(bytes));
+    },
     get: async key => files.get(key) ?? null,
     remove: async key => { files.delete(key); },
   };

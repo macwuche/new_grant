@@ -1,7 +1,6 @@
 import type { DemoState, Grant, GrantInput, ProgramQuestion, ProgramStatus, Result, Tier } from './model';
 import { fail, nextIds, roundCents } from './rules';
 import { notify } from './notifications';
-import { programBudget } from './review';
 
 // Grant program management. Pure, like the other rule modules. There is no
 // staff authorization yet: whoever opens /admin acts as the demo program manager.
@@ -21,7 +20,7 @@ export const LOCKED_WHEN_SUBMITTED: (keyof GrantInput)[] = ['minimumTier', 'requ
 
 const FIELD_LABELS: Record<keyof GrantInput, string> = {
   name: 'name', summary: 'summary', focus: 'focus', maxFunding: 'maximum award', minimumRequest: 'minimum request',
-  budget: 'budget', deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'application form',
+  deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'application form',
   approvalDays: 'approval days', commissionRate: 'commission',
 };
 
@@ -72,12 +71,6 @@ export function validateProgram(state: DemoState, raw: GrantInput, now: Date, ex
   if (!isMoney(input.minimumRequest)) errors.minimumRequest = 'Enter a positive amount (max two decimals).';
   if (!isMoney(input.maxFunding)) errors.maxFunding = 'Enter a positive amount (max two decimals).';
   else if (!errors.minimumRequest && input.maxFunding < input.minimumRequest) errors.maxFunding = 'Must be at least the minimum request.';
-  if (!isMoney(input.budget)) errors.budget = 'Enter a positive amount (max two decimals).';
-  else if (!errors.maxFunding && input.budget < input.maxFunding) errors.budget = 'Must cover at least one maximum award.';
-  else if (existing) {
-    const { awarded } = programBudget(state, existing.id);
-    if (input.budget < awarded) errors.budget = `$${awarded.toLocaleString('en-US')} is already awarded; the budget can't go below that.`;
-  }
 
   if (!isIsoDate(input.deadline)) errors.deadline = 'Enter a valid date.';
   else if (existing?.status === 'Open' && input.deadline < todayIso(now)) errors.deadline = 'An active program needs a deadline today or later. Make it inactive instead.';
@@ -182,5 +175,5 @@ export function deleteProgram(state: DemoState, id: string, expectedVersion: str
 
 export const emptyProgram = (now: Date): GrantInput => {
   const deadline = new Date(now.getTime() + 90 * 86_400_000);
-  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, budget: 100000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [], requiresRegistration: false, questions: [], approvalDays: 7, commissionRate: 0 };
+  return { name: '', summary: '', focus: '', maxFunding: 10000, minimumRequest: 1000, deadline: todayIso(deadline), minimumTier: 1 as Tier, requirements: [], requiresRegistration: false, questions: [], approvalDays: 7, commissionRate: 0 };
 };

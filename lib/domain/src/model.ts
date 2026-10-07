@@ -26,8 +26,6 @@ export type Grant = {
   focus: string;
   maxFunding: number;
   minimumRequest: number;
-  /** Total funds the program can award this cycle. */
-  budget: number;
   /** ISO date (inclusive, end of day local time). */
   deadline: string;
   minimumTier: Tier;
@@ -47,7 +45,7 @@ export type Grant = {
 };
 
 /** Fields a program manager edits directly. */
-export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'budget' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration' | 'questions' | 'approvalDays' | 'commissionRate'>;
+export type GrantInput = Pick<Grant, 'name' | 'summary' | 'focus' | 'maxFunding' | 'minimumRequest' | 'deadline' | 'minimumTier' | 'requirements' | 'requiresRegistration' | 'questions' | 'approvalDays' | 'commissionRate'>;
 
 /** In-app message for an applicant. Created by review and payout rules. */
 export type Notification = {

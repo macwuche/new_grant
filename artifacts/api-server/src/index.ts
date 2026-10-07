@@ -11,7 +11,7 @@ import { dbApplicationRepo } from "./lib/applicationRepo.db";
 import { dbActivityRepo } from "./lib/activity.db";
 import { dbMoneyRepo, ensureSettings } from "./lib/moneyRepo.db";
 import { dbDocumentRepo } from "./lib/documentRepo.db";
-import { diskFileStore, documentsDir } from "./lib/fileStore";
+import { diskFileStore, documentsDir, minFreeDiskBytes } from "./lib/fileStore";
 import { mailerFor, setAppUrlOverride, startEmailWorker } from "./lib/email";
 import { applyBranding } from "./routes/branding";
 import { effectiveConfig } from "./lib/emailSettings";
@@ -50,7 +50,7 @@ const seeded = await ensureSeedPrograms(dbProgramRepo, seedGrants());
 if (seeded) logger.info({ count: seeded }, "sample grant programs added to the empty programs table");
 
 const docsDir = documentsDir();
-logger.info({ dir: docsDir }, "document files are stored on this server's disk");
+logger.info({ dir: docsDir, minFreeMb: minFreeDiskBytes() / 1024 / 1024 }, "document files are stored on this server's disk; uploads pause below the free-space floor");
 
 // Email settings saved in the admin (secrets encrypted with the server's key) override the environment.
 const emailSettings = dbEmailSettingsRepo(serverCipher());

@@ -14,6 +14,7 @@ import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { requestOrigin, securityEvent } from "../lib/securityEvents";
 import { authLocals } from "../middlewares/auth";
 import { inspectUpload } from "../lib/uploadSafety";
+import { rebuildImage } from "../lib/imageRebuild";
 
 // The signed-in person's applicant profile. Ownership comes only from the
 // verified token: there is no way to name another user's profile.
@@ -167,12 +168,16 @@ export function profileRouter({ repo, documents, activity, files, passwordChecke
   router.put("/profile/avatar", express.raw({ type: () => true, limit: MAX_AVATAR_BYTES }), async (req: Request, res: Response) => {
     const { user } = authLocals(res);
     const current = await ownProfile(repo, user);
-    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
     const contentType = detectImage(bytes);
     if (!contentType) { res.status(415).json({ error: "Upload a JPG, PNG, or WEBP image." }); return; }
     const unsafe = inspectUpload(bytes, contentType);
     if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+    // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+    const rebuilt = await rebuildImage(bytes, contentType);
+    if (!rebuilt.ok) { res.status(422).json({ error: rebuilt.reason }); return; }
+    bytes = rebuilt.bytes;
     const key = newStorageKey(user.id);
     await files.put(key, bytes);
     let saved: ProfileRecord;

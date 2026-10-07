@@ -8,6 +8,7 @@ import type { EmailSettingsRepo, StoredEmailSettings } from "../lib/emailSetting
 import type { FileStore } from "../lib/fileStore";
 import { logger } from "../lib/logger";
 import { inspectUpload } from "../lib/uploadSafety";
+import { rebuildImage } from "../lib/imageRebuild";
 import { auditContext, authLocals, requirePermission } from "../middlewares/auth";
 import { detectImage } from "./profile";
 
@@ -108,12 +109,16 @@ export function brandingAdminRouter(settings: EmailSettingsRepo, files: FileStor
     const path = `/branding/${PATH[kind]}`;
     const label = BRAND_IMAGE_LABELS[kind];
     router.put(path, admin, express.raw({ type: () => true, limit: MAX_BRAND_IMAGE_BYTES[kind] }), async (req: Request, res: Response) => {
-      const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       if (!bytes.length) { res.status(400).json({ error: "The file is empty." }); return; }
       const contentType = detectImage(bytes);
       if (!contentType) { res.status(415).json({ error: "Upload a PNG, JPG, or WEBP image." }); return; }
       const unsafe = inspectUpload(bytes, contentType);
       if (!unsafe.ok) { res.status(422).json({ error: unsafe.reason }); return; }
+      // Pictures are stored as a copy rebuilt from their pixels; PDFs as they are (../lib/imageRebuild.ts).
+      const rebuilt = await rebuildImage(bytes, contentType);
+      if (!rebuilt.ok) { res.status(422).json({ error: rebuilt.reason }); return; }
+      bytes = rebuilt.bytes;
       const file: BrandImageJson = { key: `${BRAND_IMAGE_OWNER}/${randomUUID()}`, contentType, sha256: createHash("sha256").update(bytes).digest("hex"), updatedAt: new Date().toISOString() };
       const previous = (await settings.get()).branding[kind];
       await files.put(file.key, bytes);

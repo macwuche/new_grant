@@ -429,6 +429,28 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Application text limits, upload disk protections, image rebuilding, and plans without a budget (7 Oct 2026) — committed 7 Oct 2026, not yet deployed
+
+No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. The build's `pnpm install` fetches the new `sharp` image library (prebuilt for Linux x64; nothing to install with apt). Before restarting, check it loads: `cd /var/www/novabridgegrant/artifacts/api-server && sudo -u novabridgegrant /opt/novabridgegrant-node/bin/node -e "import('sharp').then(s => console.log('sharp', s.default.versions.sharp))"` should print `sharp 0.35.5`. Then upload a phone photo as a profile picture and confirm it shows the right way up. Plans no longer have a Total budget (no schema push: the `programs.budget` column stays, unused); check that Admin → Grants shows "Awarded so far" and the plan form has no budget field. Optional: set `MIN_FREE_DISK_MB` in `/etc/novabridgegrant/api.env` (default 2048, i.e. uploads pause when less than 2 GB would be left; `0` turns the check off); the startup log line "document files are stored on this server's disk" shows the floor in use. Check: (1) on a plan with a long-text field, an answer of about 1,500 characters saves and submits (this failed before); (2) the long-text box stops at 2,000 characters and shows a count; (3) `curl -s http://127.0.0.1:3100/api/healthz` is ok. Details: `work.md` §6, "7 Oct 2026".
+
+## Disk space
+
+Uploaded files (application and identity documents, deposit receipts, profile photos, method photos, brand images) are on this server's disk under `/var/lib/novabridgegrant/documents`; the database is in Supabase. Two limits protect the disk (since the 7 Oct 2026 change):
+
+- Each applicant keeps at most **200 MB** of documents and deposit receipts; past it, their upload is refused with a message.
+- When a write would leave less than `MIN_FREE_DISK_MB` (default 2,048 MB) free, **every upload pauses** (507, "Uploads are paused because the server is low on storage") and staff get a highlighted **"Server storage is low: uploads are paused"** item in the team activity feed (at most once an hour). Everything else keeps working.
+
+If that alert appears:
+
+```bash
+df -h /var/lib/novabridgegrant                                   # free space on the disk
+du -sh /var/lib/novabridgegrant/documents                        # all uploaded files
+du -sh /var/lib/novabridgegrant/documents/* | sort -h | tail -10 # the largest accounts (folder = account id)
+journalctl --disk-usage                                          # system logs; shrink with: journalctl --vacuum-size=500M
+```
+
+Then free space (old logs, `apt clean`, unused files outside the documents folder) or add disk in the IONOS panel. Never delete files inside the documents folder by hand: their records stay in the database and opening them reports "the stored file is missing". Uploads resume on their own as soon as there's room; no restart is needed.
+
 ### Shared branding: logo, favicon, colours, email look (5 Oct 2026) — deployed as `1ee502b`
 
 **Schema change: push before restarting** (new `email_settings.branding` column; the API reads it at startup, so the old schema would stop it starting). `git pull`, schema push (Step 7 / the commented line above), `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Logos and the favicon are stored in `DOCUMENTS_DIR` like documents (back them up with it). Check: as the super admin, Settings → App branding: upload a logo and a favicon, pick and save a colour, pick an email colour and see the preview; open the portal in a private window (sign-in page shows the logo and the tab icon); send a test email (Settings → Email) and see the logo and colour. Emails need the portal address set (Settings → Email or `APP_URL`) to show the logo.

@@ -14,6 +14,9 @@ export { fail, nextIds, roundCents };
 export const MIN_PURPOSE_LENGTH = 30;
 export const MAX_ANSWER_LENGTH = 500;
 export const MAX_LONG_ANSWER_LENGTH = 2000;
+export const MAX_BUSINESS_NAME_LENGTH = 200;
+export const MAX_REGISTRATION_LENGTH = 80;
+export const MAX_PURPOSE_LENGTH = 5000;
 
 /** Form fields answered by typing (file fields are answered by uploads, checked by the API). */
 const typedQuestions = (grant: Grant) => grant.questions.filter(q => q.type !== 'file');
@@ -92,13 +95,16 @@ export function validateApplication(input: ApplicationInput, grant: Grant, upToS
   const errors: Record<string, string> = {};
   if (upToStep >= 1) {
     if (input.businessName.trim().length < 2) errors.businessName = 'Enter your business or project name.';
+    else if (input.businessName.trim().length > MAX_BUSINESS_NAME_LENGTH) errors.businessName = `Use at most ${MAX_BUSINESS_NAME_LENGTH} characters.`;
     const amount = input.requestedAmount;
     if (!Number.isFinite(amount) || amount <= 0) errors.requestedAmount = 'Enter the amount you are requesting.';
     else if (roundCents(amount) !== amount) errors.requestedAmount = 'Use at most two decimal places.';
     else if (amount < grant.minimumRequest) errors.requestedAmount = `The minimum request for this grant is $${grant.minimumRequest.toLocaleString('en-US')}.`;
     else if (amount > grant.maxFunding) errors.requestedAmount = `This grant awards up to $${grant.maxFunding.toLocaleString('en-US')}.`;
     if (grant.requiresRegistration && !input.registrationNumber.trim()) errors.registrationNumber = 'A registration number is required for this grant.';
+    else if (input.registrationNumber.trim().length > MAX_REGISTRATION_LENGTH) errors.registrationNumber = `Use at most ${MAX_REGISTRATION_LENGTH} characters.`;
     if (input.purpose.trim().length < MIN_PURPOSE_LENGTH) errors.purpose = `Describe your plan in at least ${MIN_PURPOSE_LENGTH} characters.`;
+    else if (input.purpose.trim().length > MAX_PURPOSE_LENGTH) errors.purpose = `Keep the description to ${MAX_PURPOSE_LENGTH.toLocaleString('en-US')} characters or fewer.`;
   }
   if (upToStep >= 2) {
     const missing = grant.requirements.filter(r => !input.checklist.includes(r));
@@ -110,7 +116,7 @@ export function validateApplication(input: ApplicationInput, grant: Grant, upToS
       if (!value) { if (q.required) errors[key] = 'Answer this question.'; continue; }
       if (q.type === 'number' && !/^\d+(\.\d{1,2})?$/.test(value.replace(/,/g, ''))) errors[key] = 'Enter a number (digits only).';
       else if (q.type === 'yesno' && value !== 'Yes' && value !== 'No') errors[key] = 'Choose yes or no.';
-      else if (value.length > limit) errors[key] = `Keep answers under ${limit} characters.`;
+      else if (value.length > limit) errors[key] = `Keep this answer to ${limit.toLocaleString('en-US')} characters or fewer.`;
     }
   }
   return errors;

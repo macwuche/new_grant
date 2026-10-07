@@ -21,6 +21,7 @@ export const programsTable = pgTable("programs", {
   focus: text("focus").notNull(),
   maxFunding: money("max_funding"),
   minimumRequest: money("minimum_request"),
+  // Retired 7 Oct 2026 (plans have no budget): kept so existing rows and older API versions still work; new plans store 0, never read.
   budget: money("budget"),
   deadline: date("deadline", { mode: "string" }).notNull(),
   minimumTier: smallint("minimum_tier").notNull(),

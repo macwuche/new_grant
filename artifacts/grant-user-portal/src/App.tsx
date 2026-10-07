@@ -36,6 +36,7 @@ import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
   saveDraft, submitApplication, validateApplication, type ApplicationStep,
+  MAX_ANSWER_LENGTH, MAX_BUSINESS_NAME_LENGTH, MAX_LONG_ANSWER_LENGTH, MAX_PURPOSE_LENGTH, MAX_REGISTRATION_LENGTH,
 } from '@workspace/domain/rules';
 import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
@@ -338,7 +339,10 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       ? await remote(() => saveApplicationDraft({ grantId: grant.id, ...(draftId ? { draftId } : {}), application: draftInput }))
       : run(s => saveDraft(s, grant.id, draftInput, new Date(), draftId));
     if (result.ok) { setDraftId(result.id); if (!quiet) onToast(result.message); }
-    else onToast(result.error);
+    else {
+      onToast(result.error);
+      if (result.fieldErrors) { setErrors(result.fieldErrors); setStep(Object.keys(result.fieldErrors).some(k => STEP_ONE_FIELDS.includes(k)) ? 1 : 2); }
+    }
     return result.ok;
   };
   const next = async () => {
@@ -377,10 +381,10 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
     {changeRequest && <div className="notice mb" role="note" data-testid="notice-change-request"><Info size={16} /><div><strong>The reviewer asked for changes:</strong> {changeRequest}</div></div>}
     <div className="stepper">{['Basics', 'Requirements', 'Review'].map((label, i) => <div className={`step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'complete' : ''}`} key={label}><span className="step-num">{step > i + 1 ? <Check size={12} /> : i + 1}</span><span className="step-label">{label}</span></div>)}</div>
     {step === 1 && <div className="field-grid">
-      <div className="field field-full"><label className="field-label" htmlFor="business">Business or project name</label><input id="business" className="input" value={form.businessName} onChange={e => setField('businessName', e.target.value)} placeholder="e.g. Morgan Studio" data-testid="input-business-name" {...invalid('businessName')} /><FieldError id="businessName-error" message={errors.businessName} /></div>
+      <div className="field field-full"><label className="field-label" htmlFor="business">Business or project name</label><input id="business" className="input" value={form.businessName} onChange={e => setField('businessName', e.target.value)} maxLength={MAX_BUSINESS_NAME_LENGTH} placeholder="e.g. Morgan Studio" data-testid="input-business-name" {...invalid('businessName')} /><FieldError id="businessName-error" message={errors.businessName} /></div>
       <div className="field"><label className="field-label" htmlFor="amount">Requested amount (USD)</label><input id="amount" className="input" type="number" inputMode="decimal" min={grant.minimumRequest} max={grant.maxFunding} step="0.01" value={form.amount} onChange={e => setField('amount', e.target.value)} data-testid="input-requested-amount" {...invalid('requestedAmount')} />{errors.requestedAmount ? <FieldError id="requestedAmount-error" message={errors.requestedAmount} /> : <span className="field-hint">{money(grant.minimumRequest)} – {money(grant.maxFunding)}</span>}</div>
-      <div className="field"><label className="field-label" htmlFor="registration">Registration number{grant.requiresRegistration ? '' : ' (optional)'}</label><input id="registration" className="input" value={form.registrationNumber} onChange={e => setField('registrationNumber', e.target.value)} placeholder="e.g. CA-5521904" data-testid="input-registration-number" {...invalid('registrationNumber')} /><FieldError id="registrationNumber-error" message={errors.registrationNumber} /></div>
-      <div className="field field-full"><label className="field-label" htmlFor="purpose">What would this funding unlock?</label><textarea id="purpose" className="textarea" value={form.purpose} onChange={e => setField('purpose', e.target.value)} placeholder="Share a few sentences about your plan..." data-testid="textarea-funding-purpose" {...invalid('purpose')} />{errors.purpose ? <FieldError id="purpose-error" message={errors.purpose} /> : <span className="field-hint">{form.purpose.trim().length} characters · at least 30</span>}</div>
+      <div className="field"><label className="field-label" htmlFor="registration">Registration number{grant.requiresRegistration ? '' : ' (optional)'}</label><input id="registration" className="input" value={form.registrationNumber} onChange={e => setField('registrationNumber', e.target.value)} maxLength={MAX_REGISTRATION_LENGTH} placeholder="e.g. CA-5521904" data-testid="input-registration-number" {...invalid('registrationNumber')} /><FieldError id="registrationNumber-error" message={errors.registrationNumber} /></div>
+      <div className="field field-full"><label className="field-label" htmlFor="purpose">What would this funding unlock?</label><textarea id="purpose" className="textarea" value={form.purpose} onChange={e => setField('purpose', e.target.value)} maxLength={MAX_PURPOSE_LENGTH} placeholder="Share a few sentences about your plan..." data-testid="textarea-funding-purpose" {...invalid('purpose')} />{errors.purpose ? <FieldError id="purpose-error" message={errors.purpose} /> : <span className="field-hint">{form.purpose.trim().length.toLocaleString('en-US')} / {MAX_PURPOSE_LENGTH.toLocaleString('en-US')} characters · at least 30</span>}</div>
     </div>}
     {step === 2 && <div className="stack" style={{ gap: 13 }}>
       {grant.requirements.length > 0 && (connected ? <><div className="notice"><Info size={16} />Upload a file for each requirement: PDF, JPEG, or PNG, up to 10 MB each. Only the grant team can open them.</div>
@@ -402,10 +406,10 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
         return <div className="field" key={q.id}>
         <label className="field-label" htmlFor={id}>{q.label}{q.required ? '' : ' (optional)'}</label>
         {q.type === 'textarea'
-          ? <textarea id={id} className="textarea" value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`textarea-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />
+          ? <><textarea id={id} className="textarea" value={value} onChange={e => setAnswer(q.id, e.target.value)} maxLength={MAX_LONG_ANSWER_LENGTH} data-testid={`textarea-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : `${id}-count`} />{!err && <span className="field-hint" id={`${id}-count`}>{value.length.toLocaleString('en-US')} / {MAX_LONG_ANSWER_LENGTH.toLocaleString('en-US')} characters</span>}</>
           : q.type === 'yesno'
           ? <select id={id} className="select" value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`select-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined}><option value="">Choose…</option><option>Yes</option><option>No</option></select>
-          : <input id={id} className="input" inputMode={q.type === 'number' ? 'decimal' : undefined} value={value} onChange={e => setAnswer(q.id, e.target.value)} data-testid={`input-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />}
+          : <input id={id} className="input" inputMode={q.type === 'number' ? 'decimal' : undefined} value={value} onChange={e => setAnswer(q.id, e.target.value)} maxLength={MAX_ANSWER_LENGTH} data-testid={`input-answer-${q.id}`} aria-invalid={!!err} aria-describedby={err ? `${id}-error` : undefined} />}
         <FieldError id={`${id}-error`} message={err} />
       </div>; })}</div>}
     </div>}

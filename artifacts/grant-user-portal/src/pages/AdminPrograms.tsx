@@ -7,7 +7,7 @@ import {
   closeProgram, commissionFor, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@workspace/domain/programs';
-import { programBudget } from '@workspace/domain/review';
+import { programAwarded } from '@workspace/domain/review';
 import { PROGRAM_STATUS_LABELS } from '@workspace/domain/rules';
 import { adoptServerProgram, dropServerProgram } from '@workspace/domain/sync';
 import { apiError, useServerData } from '@/lib/serverData';
@@ -34,12 +34,11 @@ export function AdminPrograms() {
     <div className="admin-toolbar"><span className="admin-count" data-testid="text-admin-grants-count">{visible.length} of {all.length} programs</span><div className="admin-toolbar-left" style={{ flex: '0 1 auto' }}><select className="admin-filter" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter grant programs by status" data-testid="select-admin-filter-grants"><option>All programs</option><option value="Open">Active</option><option>Draft</option><option value="Closed">Inactive</option></select><button type="button" className="admin-btn primary" onClick={() => setEditing('new')} data-testid="button-admin-new-program"><Plus size={14} style={{ verticalAlign: '-2px' }} /> New program</button></div></div>
     <div className="admin-program-grid">{visible.map(grant => {
       const Icon = icons[grant.id] ?? FolderOpen;
-      const budget = programBudget(state, grant.id);
       const count = state.applications.filter(a => a.grantId === grant.id && a.status !== 'Draft').length;
       return <article className="admin-program-card" key={grant.id} data-testid={`card-admin-grant-${grant.id}`}>
         <div className="admin-program-top"><span className="admin-program-icon"><Icon size={19} /></span><span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid={`status-admin-program-${grant.id}`}>{PROGRAM_STATUS_LABELS[grant.status]}</span></div>
         <h2>{grant.name}</h2><p>{grant.summary}</p>
-        <div className="admin-program-meta"><div><span>Award range</span><strong>{usd(grant.minimumRequest)} – {usd(grant.maxFunding)}</strong></div><div><span>Commission</span><strong>{grant.commissionRate}%</strong></div><div><span>Approval time</span><strong>{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</strong></div><div><span>Budget left</span><strong>{usd(budget.remaining)} of {usd(budget.budget)}</strong></div><div><span>Deadline</span><strong>{day(grant.deadline)}</strong></div><div><span>Submitted</span><strong>{count} application{count === 1 ? '' : 's'}</strong></div></div>
+        <div className="admin-program-meta"><div><span>Award range</span><strong>{usd(grant.minimumRequest)} – {usd(grant.maxFunding)}</strong></div><div><span>Commission</span><strong>{grant.commissionRate}%</strong></div><div><span>Approval time</span><strong>{grant.approvalDays} day{grant.approvalDays === 1 ? '' : 's'}</strong></div><div><span>Awarded so far</span><strong>{usd(programAwarded(state, grant.id))}</strong></div><div><span>Deadline</span><strong>{day(grant.deadline)}</strong></div><div><span>Submitted</span><strong>{count} application{count === 1 ? '' : 's'}</strong></div></div>
         <button type="button" onClick={() => setEditing(grant.id)} aria-label={`Manage ${grant.name}`} data-testid={`button-manage-admin-grant-${grant.id}`}>Manage program <ArrowRight size={14} /></button>
       </article>;
     })}</div>
@@ -57,11 +56,11 @@ function commissionHint(f: Form): string {
 
 type Outcome = { ok: true; message: string; program?: Grant } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; budget: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[]; approvalDays: string; commissionRate: string };
+type Form = { name: string; summary: string; focus: string; minimumRequest: string; maxFunding: string; deadline: string; minimumTier: string; requiresRegistration: boolean; requirements: string[]; questions: ProgramQuestion[]; approvalDays: string; commissionRate: string };
 
-const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), budget: String(g.budget), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: [...g.requirements], questions: g.questions.map(q => ({ ...q })), approvalDays: String(g.approvalDays), commissionRate: String(g.commissionRate) });
+const toForm = (g: GrantInput): Form => ({ name: g.name, summary: g.summary, focus: g.focus, minimumRequest: String(g.minimumRequest), maxFunding: String(g.maxFunding), deadline: g.deadline, minimumTier: String(g.minimumTier), requiresRegistration: g.requiresRegistration, requirements: [...g.requirements], questions: g.questions.map(q => ({ ...q })), approvalDays: String(g.approvalDays), commissionRate: String(g.commissionRate) });
 const num = (value: string) => value.trim() === '' ? NaN : Number(value);
-const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), budget: num(f.budget), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements, questions: f.questions, approvalDays: num(f.approvalDays), commissionRate: num(f.commissionRate) });
+const toInput = (f: Form): GrantInput => ({ name: f.name, summary: f.summary, focus: f.focus, minimumRequest: num(f.minimumRequest), maxFunding: num(f.maxFunding), deadline: f.deadline, minimumTier: Number(f.minimumTier) as Tier, requiresRegistration: f.requiresRegistration, requirements: f.requirements, questions: f.questions, approvalDays: num(f.approvalDays), commissionRate: num(f.commissionRate) });
 
 function ProgramPanel({ programId, onClose, onCreated }: { programId: string | null; onClose: () => void; onCreated: (id: string) => void }) {
   const { state } = useDemoStore();
@@ -109,7 +108,6 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   const locked = grant && hasSubmissions(state, grant.id) ? new Set<string>(LOCKED_WHEN_SUBMITTED) : new Set<string>();
   const stale = !!grant && grant.updatedAt !== seenVersion;
   const dirty = JSON.stringify(toInput(form)) !== JSON.stringify(toInput(toForm(grant ?? emptyProgram(new Date()))));
-  const budget = grant ? programBudget(state, grant.id) : null;
   const apps = grant ? state.applications.filter(a => a.grantId === grant.id && a.status !== 'Draft') : [];
   const drafts = grant ? state.applications.filter(a => a.grantId === grant.id && a.status === 'Draft').length : 0;
 
@@ -141,7 +139,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
     {input}
     {errors[key] ? <small className="admin-field-error">{errors[key]}</small> : hint ? <small>{hint}</small> : null}
   </label>;
-  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'budget' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
+  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={grant ? `${grant.id} / Program` : 'New program'}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{PROGRAM_STATUS_LABELS[grant.status]}</span>}</div>
@@ -151,8 +149,8 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
     {stale && <div className="admin-review-stale" role="alert" data-testid="notice-admin-program-stale"><span>This program changed since you opened it.</span><button type="button" onClick={() => { setSeenVersion(grant!.updatedAt); setForm(toForm(grant!)); setErrors({}); setFlash(null); }} data-testid="button-admin-program-load-latest">Load latest</button></div>}
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-program-flash">{flash.text}</div>}
 
-    {grant && budget && <dl className="admin-detail-fields">
-      <div className="admin-detail-field"><dt>Budget awarded</dt><dd>{usd(budget.awarded)} of {usd(budget.budget)}</dd></div>
+    {grant && <dl className="admin-detail-fields">
+      <div className="admin-detail-field"><dt>Awarded so far</dt><dd>{usd(programAwarded(state, grant.id))}</dd></div>
       <div className="admin-detail-field"><dt>Submitted applications</dt><dd>{apps.length}{apps.length ? ` (${apps.filter(a => a.status === 'Submitted' || a.status === 'Under review').length} awaiting a decision)` : ''}</dd></div>
       <div className="admin-detail-field"><dt>Applicant drafts</dt><dd>{drafts}</dd></div>
     </dl>}
@@ -183,7 +181,6 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
         {field('maxFunding', 'Maximum award (USD)', text('maxFunding', 'number'))}
       </div>
       <div className="admin-form-row">
-        {field('budget', 'Total budget (USD)', text('budget', 'number'), budget ? `${usd(budget.awarded)} already awarded` : undefined)}
         {field('deadline', 'Application deadline', text('deadline', 'date'))}
       </div>
       <div className="admin-form-row">
@@ -222,7 +219,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
     {grant && <section className="admin-review-section"><h3>Change log</h3><ol className="admin-review-history">{[...grant.changeLog].reverse().map(c => <li key={`${c.at}-${c.summary}`}><strong>{c.summary}</strong><span>{when(c.at)} · {c.by}</span></li>)}</ol></section>}
 
     <div className="admin-detail-note"><Info size={17} /><span>{connected
-      ? 'Programs are saved on the server and shown to every applicant. Until applications move to the server, locked criteria and the awarded budget are checked in this browser only.'
+      ? 'Programs are saved on the server and shown to every applicant.'
       : 'Preview program management. Changes are saved in this browser only and apply to the applicant preview here. Changes are role-checked and audited, but there is no real staff sign-in yet.'}</span></div>
   </ReviewFrame>;
 }

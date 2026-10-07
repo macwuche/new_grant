@@ -4,7 +4,7 @@ import { differenceInDays, format } from 'date-fns';
 import { findGrant } from '@workspace/domain/rules';
 import {
   addInternalNote, applicantName, approveApplication, clearEscalation, declineApplication, escalateApplication, MAX_NOTE_LENGTH,
-  commissionOn, MIN_MESSAGE_LENGTH, programBudget, requestChanges, startReview, validateAward,
+  commissionOn, MIN_MESSAGE_LENGTH, requestChanges, startReview, validateAward,
 } from '@workspace/domain/review';
 import { findApplicant } from '@workspace/domain/applicants';
 import { assessRisk } from '@workspace/domain/risk';
@@ -54,13 +54,12 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   }, [onClose]);
 
   const grant = app && findGrant(state, app.grantId);
-  const budget = app ? programBudget(state, app.grantId) : null;
   useEffect(() => {
-    if (app && grant && budget) setAward(String(Math.max(0, Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))));
+    if (app && grant) setAward(String(Math.max(0, Math.min(app.requestedAmount, grant.maxFunding))));
     // Reset the suggested award only when a different version is being reviewed.
   }, [appId, seenVersion]);
 
-  if (!app || !grant || !budget || app.status === 'Draft') {
+  if (!app || !grant || app.status === 'Draft') {
     return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={appId}><h2 id="admin-detail-title">Not in the queue</h2><p className="admin-detail-lead">This application no longer exists or has not been submitted.</p></ReviewFrame>;
   }
 
@@ -141,7 +140,6 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
       <Field label="Submitted" value={app.submittedAt ? when(app.submittedAt) : '—'} />
       <Field label="Registration" value={app.registrationNumber || 'Not provided'} />
       <Field label="Reviewer" value={app.reviewer ?? 'Unassigned'} />
-      <Field label="Program budget left" value={`${usd(budget.remaining)} of ${usd(budget.budget)}`} />
       {person && <Field label="Account" value={`Tier ${person.tier} · ${person.identityVerified ? 'identity verified' : 'identity not verified'} · ${differenceInDays(new Date(), new Date(`${person.joined}T00:00:00`))} days old${person.account.status === 'Locked' ? ' · LOCKED' : ''}`} />}
       <div className="admin-detail-field"><dt>Fraud risk</dt><dd data-testid="text-admin-detail-risk"><RiskBadge risk={risk} />{risk.factors.length > 0 && <span className="admin-risk-factors">{risk.factors.map(f => `${f.label} (+${f.points})`).join(' · ')}</span>}</dd></div>
     </dl>
@@ -164,7 +162,7 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
       {app.status === 'Submitted' && <><p className="admin-review-hint">Start the review to assign it to yourself and unlock decisions. The applicant will see it is under review.</p><button type="button" className="admin-btn primary" disabled={stale || !canReview || busy} onClick={() => void act(() => review('Start review', (s, actor) => startReview(s, app.id, seenVersion, actor.name, now())), () => api.startReview(app.id, { version: seenVersion }))} data-testid="button-admin-start-review">Start review</button></>}
       {app.status === 'Under review' && <>
         <div className="admin-segment" role="tablist" aria-label="Decision type">{([['approve', 'Approve'], ['changes', 'Request changes'], ['decline', 'Decline']] as const).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={decision === key} className={decision === key ? 'active' : ''} onClick={() => pickDecision(key)} data-testid={`tab-admin-decision-${key}`}>{label}</button>)}</div>
-        {decision === 'approve' ? <label className="admin-review-field"><span>Award amount (USD)</span><input className="admin-input" type="number" inputMode="decimal" step="0.01" min="0" value={award} onChange={e => { setAward(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors.award} data-testid="input-admin-award" /><small className={errors.award ? 'admin-field-error' : ''}>{errors.award ?? `Up to ${usd(Math.min(app.requestedAmount, grant.maxFunding, budget.remaining))}. Approval credits the applicant's grant balance immediately${commission.rate > 0 ? ` and takes a ${commission.rate}% commission (${usd(commission.amount)}) from their deposit balance, even below zero` : ''}.`}</small></label>
+        {decision === 'approve' ? <label className="admin-review-field"><span>Award amount (USD)</span><input className="admin-input" type="number" inputMode="decimal" step="0.01" min="0" value={award} onChange={e => { setAward(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors.award} data-testid="input-admin-award" /><small className={errors.award ? 'admin-field-error' : ''}>{errors.award ?? `Up to ${usd(Math.min(app.requestedAmount, grant.maxFunding))}. Approval credits the applicant's grant balance immediately${commission.rate > 0 ? ` and takes a ${commission.rate}% commission (${usd(commission.amount)}) from their deposit balance, even below zero` : ''}.`}</small></label>
           : <label className="admin-review-field"><span>{decision === 'decline' ? 'Reason for declining (sent to applicant)' : 'What should the applicant change? (sent to applicant)'}</span><textarea className="admin-input" rows={4} value={message} onChange={e => { setMessage(e.target.value); setConfirming(false); setErrors({}); }} aria-invalid={!!errors[messageKey]} data-testid="textarea-admin-decision-message" /><small className={errors[messageKey] ? 'admin-field-error' : ''}>{errors[messageKey] ?? `At least ${MIN_MESSAGE_LENGTH} characters.`}</small></label>}
         <div className="admin-review-buttons">
           {confirming && <button type="button" className="admin-btn" onClick={() => setConfirming(false)} data-testid="button-admin-cancel-decision">Cancel</button>}

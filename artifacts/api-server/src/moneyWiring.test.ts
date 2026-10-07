@@ -24,6 +24,7 @@ import { memoryProfileRepo } from "./lib/profileRepo";
 import { memoryProgramRepo } from "./lib/programRepo";
 import { memorySignInRepo } from "./lib/signIns";
 import { memoryStaffRepo, type StaffRecord } from "./lib/staffRepo";
+import sharp from "sharp";
 
 // Withdrawal and deposit methods' wiring: the portal's own generated client
 // (the functions the admin, withdrawal, and Add funds pages call, through the
@@ -39,7 +40,8 @@ const STAFF: StaffRecord[] = [{ id: "aaaaaaaa-0000-4000-8000-000000000002", emai
 const verifier: TokenVerifier = async token => USERS[token] ?? null;
 
 /** A real 1×1 PNG. */
-const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201a5f3a0e30000000049454e44ae426082", "hex");
+// A real picture: uploads are rebuilt from their pixels (lib/imageRebuild.ts).
+const PNG = await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 128, b: 255, alpha: 1 } } }).png().toBuffer();
 
 let server: Server;
 let port = 0;

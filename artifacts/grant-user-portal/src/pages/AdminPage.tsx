@@ -30,7 +30,7 @@ import { computeBalances } from '@workspace/domain/rules';
 import { pendingDepositTotal } from '@workspace/domain/deposits';
 import { pendingPayoutTotal } from '@workspace/domain/payouts';
 import { findGrant } from '@workspace/domain/rules';
-import { applicantName, awaitingAction, openEscalations, programBudget, reviewQueue } from '@workspace/domain/review';
+import { applicantName, awaitingAction, openEscalations, programAwarded, reviewQueue } from '@workspace/domain/review';
 import { useDemoStore } from '@/lib/store';
 import type { Application as DomainApplication, DemoState } from '@workspace/domain/model';
 import { format } from 'date-fns';
@@ -146,7 +146,7 @@ function Overview({ openReview }: { openReview: (id: string) => void }) {
     <RecentActivity />
     <div className="admin-overview-bottom">
       <section className="admin-panel"><SectionHead title="Recently joined" subtitle="The newest user accounts." href="/admin/applicants" link="View users" />{applicants.slice(0, 3).map(person => <div className="admin-simple-row" key={person.id}><strong>{person.name}</strong><span>{person.sector}</span></div>)}</section>
-      <section className="admin-panel"><SectionHead title="Program landscape" subtitle="Budget remaining in active programs." href="/admin/grants" link="View programs" />{state.grants.filter(g => g.status === 'Open').slice(0, 4).map(grant => <div className="admin-simple-row" key={grant.id}><strong>{grant.name}</strong><span>{money(programBudget(state, grant.id).remaining)} left</span></div>)}</section>
+      <section className="admin-panel"><SectionHead title="Program landscape" subtitle="Awarded so far in active programs." href="/admin/grants" link="View programs" />{state.grants.filter(g => g.status === 'Open').slice(0, 4).map(grant => <div className="admin-simple-row" key={grant.id}><strong>{grant.name}</strong><span>{money(programAwarded(state, grant.id))} awarded</span></div>)}</section>
     </div>
   </>;
 }

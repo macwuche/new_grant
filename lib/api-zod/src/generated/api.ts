@@ -137,7 +137,6 @@ export const ListProgramsResponseItem = zod.object({
   "focus": zod.string().max(listProgramsResponseOneFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(listProgramsResponseOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(listProgramsResponseOneRequirementsItemMax)).max(listProgramsResponseOneRequirementsMax),
@@ -193,7 +192,6 @@ export const CreateProgramBody = zod.object({
   "focus": zod.string().max(createProgramBodyFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(createProgramBodyDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(createProgramBodyRequirementsItemMax)).max(createProgramBodyRequirementsMax),
@@ -235,7 +233,6 @@ export const CreateProgramResponse = zod.object({
   "focus": zod.string().max(createProgramResponseProgramOneFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(createProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(createProgramResponseProgramOneRequirementsItemMax)).max(createProgramResponseProgramOneRequirementsMax),
@@ -303,7 +300,6 @@ export const UpdateProgramBody = zod.object({
   "focus": zod.string().max(updateProgramBodyProgramFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(updateProgramBodyProgramDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(updateProgramBodyProgramRequirementsItemMax)).max(updateProgramBodyProgramRequirementsMax),
@@ -346,7 +342,6 @@ export const UpdateProgramResponse = zod.object({
   "focus": zod.string().max(updateProgramResponseProgramOneFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(updateProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(updateProgramResponseProgramOneRequirementsItemMax)).max(updateProgramResponseProgramOneRequirementsMax),
@@ -443,7 +438,6 @@ export const PublishProgramResponse = zod.object({
   "focus": zod.string().max(publishProgramResponseProgramOneFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(publishProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(publishProgramResponseProgramOneRequirementsItemMax)).max(publishProgramResponseProgramOneRequirementsMax),
@@ -516,7 +510,6 @@ export const CloseProgramResponse = zod.object({
   "focus": zod.string().max(closeProgramResponseProgramOneFocusMax),
   "maxFunding": zod.number(),
   "minimumRequest": zod.number(),
-  "budget": zod.number(),
   "deadline": zod.string().max(closeProgramResponseProgramOneDeadlineMax).describe('ISO date (YYYY-MM-DD)'),
   "minimumTier": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
   "requirements": zod.array(zod.string().max(closeProgramResponseProgramOneRequirementsItemMax)).max(closeProgramResponseProgramOneRequirementsMax),
@@ -1874,7 +1867,7 @@ export const saveApplicationDraftBodyApplicationChecklistItemMax = 200;
 
 export const saveApplicationDraftBodyApplicationChecklistMax = 20;
 
-export const saveApplicationDraftBodyApplicationAnswersMaxOne = 1000;
+export const saveApplicationDraftBodyApplicationAnswersMaxOne = 2000;
 
 
 
@@ -1952,7 +1945,7 @@ export const submitApplicationBodyApplicationChecklistItemMax = 200;
 
 export const submitApplicationBodyApplicationChecklistMax = 20;
 
-export const submitApplicationBodyApplicationAnswersMaxOne = 1000;
+export const submitApplicationBodyApplicationAnswersMaxOne = 2000;
 
 
 
@@ -2091,7 +2084,7 @@ export const StartReviewResponse = zod.object({
 
 
 /**
- * Requires applications.review. The award can't exceed the request, the program ceiling, or what's left of the budget; escalated applications can't be approved.
+ * Requires applications.review. The award can't exceed the request or the program ceiling (plans have no overall budget); escalated applications can't be approved.
  * @summary Approve with an award
  */
 export const approveApplicationPathIdRegExp = new RegExp('^[A-Za-z0-9-]{1,40}$');

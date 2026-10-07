@@ -89,6 +89,24 @@ describe('application validation', () => {
     expect(R.validateApplication({ ...base, registrationNumber: '' }, grant('creative'), 1).registrationNumber).toBeUndefined();
   });
 
+  it('limits the length of the name, registration number, and description, at the limit included', () => {
+    const at = { ...base, businessName: 'n'.repeat(R.MAX_BUSINESS_NAME_LENGTH), registrationNumber: 'r'.repeat(R.MAX_REGISTRATION_LENGTH), purpose: 'p'.repeat(R.MAX_PURPOSE_LENGTH) };
+    expect(R.validateApplication(at, grant('green'), 1)).toEqual({});
+    const over = R.validateApplication({ ...at, businessName: `${at.businessName}n`, registrationNumber: `${at.registrationNumber}r`, purpose: `${at.purpose}p` }, grant('green'), 1);
+    expect(over.businessName).toMatch(/at most 200/);
+    expect(over.registrationNumber).toMatch(/at most 80/);
+    expect(over.purpose).toMatch(/5,000 characters or fewer/);
+  });
+
+  it('accepts long-text answers up to 2,000 characters and short ones up to 500', () => {
+    const g = { ...grant('creative'), requirements: [], questions: [{ id: 'plan', label: 'Your plan', type: 'textarea' as const, required: true }, { id: 'site', label: 'Website', type: 'text' as const, required: false }] };
+    const with_ = (plan: string, site = '') => R.validateApplication({ ...base, answers: { plan, site } }, g, 2);
+    expect(with_('a'.repeat(1500))).toEqual({});
+    expect(with_('a'.repeat(R.MAX_LONG_ANSWER_LENGTH))).toEqual({});
+    expect(with_('a'.repeat(R.MAX_LONG_ANSWER_LENGTH + 1))['answers.plan']).toMatch(/2,000 characters or fewer/);
+    expect(with_('ok', 's'.repeat(R.MAX_ANSWER_LENGTH + 1))['answers.site']).toMatch(/500 characters or fewer/);
+  });
+
   it('requires every requirement to be confirmed from step 2', () => {
     expect(R.validateApplication(base, grant('green'), 1).checklist).toBeUndefined();
     expect(R.validateApplication(base, grant('green'), 2).checklist).toMatch(/3 remaining/);

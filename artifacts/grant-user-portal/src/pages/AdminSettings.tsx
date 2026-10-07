@@ -62,7 +62,7 @@ function AppInfoPage() {
       <div className="admin-setting-item"><ShieldCheck size={18} /><div><strong>Policy documents</strong><p>Future home for eligibility guidance, terms, and privacy documents. No policy is uploaded or published yet.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><Users size={18} /><div><strong>Applicant sectors</strong><p>Future controls for the sector options applicants can choose when building a profile.</p></div><span>NOT CONNECTED</span></div>
       <div className="admin-setting-item"><ClipboardList size={18} /><div><strong>Review stages</strong><p>The review flow is fixed for now: Submitted → Under review → Approved, Declined, or Changes requested (back to the applicant).</p></div><span>FIXED</span></div>
-      <div className="admin-setting-item"><FileText size={18} /><div><strong>Program criteria</strong><p>Award range, budget, deadline, tier, requirements, and custom questions are edited per program under Grant programs.</p></div><span>PER PROGRAM</span></div>
+      <div className="admin-setting-item"><FileText size={18} /><div><strong>Program criteria</strong><p>Award range, deadline, tier, requirements, and custom questions are edited per program under Grant programs.</p></div><span>PER PROGRAM</span></div>
     </section>
     <div className="admin-grid">
       <section className="admin-panel"><div className="admin-panel-head"><div><h2>Example sectors</h2><p>Illustrative labels, not live choices.</p></div></div><div className="admin-sector-list"><span>Creative industries</span><span>Retail</span><span>Community</span><span>Climate</span><span>Food &amp; beverage</span></div></section>

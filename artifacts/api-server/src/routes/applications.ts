@@ -38,6 +38,26 @@ type Failure = { status: 400 | 403 | 404 | 409; body: { error: string; fieldErro
 type Outcome = { failure: Failure } | { message: string; saved?: Application };
 const refused = (result: Result & { ok: false }): Failure => ({ status: 400, body: { error: result.error, ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}) } });
 
+const FIELD_NAMES: Record<string, string> = { businessName: "name", registrationNumber: "registration number", purpose: "description", requestedAmount: "amount" };
+
+/**
+ * Field errors for an application the API contract refused (e.g. text past its
+ * length limit), keyed like the rules' errors (`purpose`, `answers.<id>`) so the
+ * form highlights the field. Empty when the problem isn't in one field.
+ */
+export function contractFieldErrors(issues: { path: PropertyKey[]; code: string; maximum?: unknown }[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of issues) {
+    const [root, field, id] = issue.path.map(String);
+    if (root !== "application" || !field) continue;
+    const key = field === "answers" && id ? `answers.${id}` : field;
+    if (key in errors || !(key in FIELD_NAMES || key.startsWith("answers."))) continue;
+    const max = typeof issue.maximum === "number" || typeof issue.maximum === "bigint" ? Number(issue.maximum).toLocaleString("en-US") : null;
+    errors[key] = issue.code === "too_big" && max ? `Keep this to ${max} characters or fewer.` : `Check the ${FIELD_NAMES[key] ?? "answer"}.`;
+  }
+  return errors;
+}
+
 /** Stores every application the rule added, changed, or removed. */
 async function storeChanges(scope: ProgramScope, before: Application[], after: Application[]) {
   const previous = new Map(before.map(a => [a.id, JSON.stringify(a)]));
@@ -78,7 +98,13 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
   for (const path of ["save", "submit"] as const) {
     router.post(`/applications/${path}`, async (req, res) => {
       const body = (path === "save" ? SaveApplicationDraftBody : SubmitApplicationBody).safeParse(req.body);
-      if (!body.success) { res.status(400).json({ error: "Send the program id and your application." }); return; }
+      if (!body.success) {
+        const fieldErrors = contractFieldErrors(body.error.issues);
+        res.status(400).json(Object.keys(fieldErrors).length
+          ? { error: "Fix the highlighted fields and try again.", fieldErrors }
+          : { error: "Send the program id and your application." });
+        return;
+      }
       const { grantId, draftId, application } = body.data;
       if (path === "save") { await asApplicant(res, grantId, !draftId, s => saveDraft(s, grantId, application as ApplicationInput, new Date(), draftId)); return; }
       // Server-only rule: every requirement and required file field needs an uploaded file, attached to the saved draft.

@@ -6,7 +6,7 @@ import { programsTable } from "./programs";
 // @workspace/domain/rules and /review decide every change. `updated_at` is the
 // record version the review rules check (internal notes and escalations
 // deliberately don't change it). Every write runs in a transaction holding a
-// lock on the program, so budgets and locked criteria can't be raced.
+// lock on the program, so locked criteria and one application per plan can't be raced.
 // Row-level security is on with no policies (see ./staff.ts).
 
 export const applicationStatusEnum = pgEnum("application_status", ["Draft", "Submitted", "Under review", "Changes requested", "Approved", "Declined"]);
