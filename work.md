@@ -1,7 +1,7 @@
 # arc.fund — project brief and implementation handoff
 
 **Status:** Working application in two modes. **Signed in** (Supabase configured): every record — programs, profiles, account controls, applications, reviews, notifications, team activity, the audit log, and money — lives on the server behind an authorized API. **Without sign-in configured:** the original browser-only demo on fictional data. Not a live financial system: no payment provider or card network is connected. Outgoing email and the team inbox are built on Resend but haven't been tried with a real Resend account.
-**Last reviewed:** 5 October 2026 (commission charged at the plan's rate at approval; shared branding: logo, favicon, colours, email look; before that grant plans with commission, approval days, and a form builder; before that deposit methods, the applicant profile center at `/profile`; before that the admin applicant directory and profile, balance adjustments, permission switches)
+**Last reviewed:** 8 October 2026 (`f7e58e1` deployed: application text limits, upload disk protections, image rebuilding, plans without a budget; before that 5 October 2026: commission charged at the plan's rate at approval; shared branding: logo, favicon, colours, email look; before that grant plans with commission, approval days, and a form builder; before that deposit methods, the applicant profile center at `/profile`; before that the admin applicant directory and profile, balance adjustments, permission switches)
 **Audience:** Product designers, frontend/backend developers, QA, and security reviewers
 
 ## 1. Purpose and product boundary
@@ -263,7 +263,7 @@ Not used, on purpose: online scanners such as VirusTotal (uploaded files can be 
 
 **Next, in order:**
 
-0. Now (5 Oct 2026 order): (a) the owner sets up branding in Settings → App branding; (b) the server and security chores, walked through step by step: reset the Supabase database password, the Send Email hook secret, and the VPS root password (all typed into chat), backups (Step 13), Supabase URL configuration, the Resend webhook, the leftover super admin, optional SSH keys and DMARC (`server.md` → Status → "Still to do"); (c) the live admin setup: real deposit receiving details and USDT wallet in Settings → Deposit methods, approval days and commission on each live plan; (d) the smoke tests below. Open decisions: the Supabase service-role key (recovery codes, removing a lost authenticator); virus scanning (postponed: 4 GB RAM and refuse-while-down questions); whether to charge APP-5001's commission. Live since 5 Oct: `1ee502b`.
+0. Now (5 Oct 2026 order): (a) the owner sets up branding in Settings → App branding; (b) the server and security chores, walked through step by step: reset the Supabase database password, the Send Email hook secret, and the VPS root password (all typed into chat), backups (Step 13), Supabase URL configuration, the Resend webhook, the leftover super admin, optional SSH keys and DMARC (`server.md` → Status → "Still to do"); (c) the live admin setup: real deposit receiving details and USDT wallet in Settings → Deposit methods, approval days and commission on each live plan; (d) the smoke tests below. Open decisions: the Supabase service-role key (recovery codes, removing a lost authenticator); virus scanning (postponed: 4 GB RAM and refuse-while-down questions); whether to charge APP-5001's commission. Live since 8 Oct 2026 (~06:07 UTC): `f7e58e1` (application text limits, upload disk protections, image rebuilding, plans without a budget); before it `1ee502b` (5 Oct).
 
 1. Smoke-test the 29 Sep deploy (`91074ee`, live since ~21:09 UTC; schema pushed first): the admin withdrawal methods, the profile's password, email, and sign-out-others flows, and a withdrawal end to end with a real applicant and finance account (`server.md`, "New VPS, 29 Sep 2026").
 2. The live check, now on https://access.novabridgegrant.org (the super admin sign-in is done): one full pass through an application, a review, a deposit, and a payout, and a look at the audit log's IP addresses.
@@ -275,7 +275,7 @@ Not used, on purpose: online scanners such as VirusTotal (uploaded files can be 
 
 `BUILD_STATUS.md` is the short phase checklist kept in sync with this brief; this brief is the detailed source of truth.
 
-### 7 Oct 2026: application text limits and upload disk protections (owner's request; built, tested, and committed 7 Oct 2026; not yet deployed)
+### 7 Oct 2026: application text limits and upload disk protections (owner's request; built, tested, and committed 7 Oct 2026; deployed 8 Oct 2026 ~06:07 UTC as `f7e58e1`, no schema push)
 
 From the 7 Oct review of grant applications and their uploads (rules, ownership, locking, upload checks, storage, and access were found solid; 50 application and upload tests pass). Two slices, built in this order.
 
@@ -301,7 +301,7 @@ No schema change in either slice.
 - Tests: 222 rule tests (2 new), 165 API tests (6 new: long answers saved and submitted with field errors past a limit; the 200 MB total counting documents and receipts; 507 on document, receipt, and method-photo uploads with one staff alert; `lib/fileStore.test.ts` for the floor, an unmeasurable disk, and `MIN_FREE_DISK_MB` parsing); typecheck and production builds pass; `.unlazy/grant-plans/browser-check.mjs flow` extended (input limits, both counters, a 1,500-character answer reaching the summary) and passes.
 - Not done: the per-account total isn't enforced under a lock, so two uploads at the same moment can overshoot by one file (rate-limited); profile photos and staff uploads don't count toward it; virus scanning is still postponed.
 
-### 7 Oct 2026: image rebuilding for every uploaded picture (owner's request; built, tested, and committed 7 Oct 2026; not yet deployed)
+### 7 Oct 2026: image rebuilding for every uploaded picture (owner's request; built, tested, and committed 7 Oct 2026; deployed 8 Oct 2026 ~06:07 UTC as `f7e58e1`, no schema push)
 
 **Why.** Uploads are typed from their first bytes and checked for hidden content, but a real image header followed by plain JavaScript (no `<script>` tag) is accepted today. It can't run (files are served with their image type, `nosniff`, as downloads, under a sandboxing CSP), but it is stored. A virus scanner wouldn't catch it either (custom code has no known signature). Rebuilding each picture from its pixels ("content disarm and reconstruction") keeps only the image and drops everything else: appended or embedded code, unusual chunks, and the photo's metadata (GPS location, phone model, timestamps). Free (the `sharp` library, libvips), no server service to run, low memory. ClamAV stays the later layer for PDFs (postponed, see the 4 Oct plan).
 
@@ -322,7 +322,7 @@ No schema change in either slice.
 - Tests: 5 unit tests (`lib/imageRebuild.test.ts`: code after a real PNG/JPEG/WEBP gone with the picture intact, GPS and camera details stripped and the photo turned upright from EXIF orientation 6, one frame of an animated WEBP, header-only/mismatched/SVG/over-the-pixel-limit refused, PDFs untouched) and 1 API test (your 7 Oct scenario: plain JavaScript after a real PNG is stored without it, and the download passes its SHA-256 check; an avatar's GPS details are gone; a header followed by code is refused with 422). Test pictures are now real images made with `sharp`. 222 rule tests and 171 API tests, typecheck, and production builds pass.
 - Not done: files stored before this change aren't rebuilt; PDFs are only checked, not rebuilt (ClamAV later).
 
-### 7 Oct 2026: grant plans without a total budget (owner's decision; built, tested, and committed 7 Oct 2026; not yet deployed)
+### 7 Oct 2026: grant plans without a total budget (owner's decision; built, tested, and committed 7 Oct 2026; deployed 8 Oct 2026 ~06:07 UTC as `f7e58e1`, no schema push)
 
 **Decision (owner, 7 Oct 2026):** remove the plan's **Total budget (USD)** completely. Plans have no overall spending cap any more: an award is limited only by the amount requested and the plan's maximum award (plus the existing escalation and status rules). Applicants never see or receive the budget.
 
