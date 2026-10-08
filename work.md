@@ -1,7 +1,7 @@
 # arc.fund — project brief and implementation handoff
 
 **Status:** Working application in two modes. **Signed in** (Supabase configured): every record — programs, profiles, account controls, applications, reviews, notifications, team activity, the audit log, and money — lives on the server behind an authorized API. **Without sign-in configured:** the original browser-only demo on fictional data. Not a live financial system: no payment provider or card network is connected. Outgoing email and the team inbox are built on Resend but haven't been tried with a real Resend account.
-**Last reviewed:** 8 October 2026 (`f7e58e1` deployed: application text limits, upload disk protections, image rebuilding, plans without a budget; before that 5 October 2026: commission charged at the plan's rate at approval; shared branding: logo, favicon, colours, email look; before that grant plans with commission, approval days, and a form builder; before that deposit methods, the applicant profile center at `/profile`; before that the admin applicant directory and profile, balance adjustments, permission switches)
+**Last reviewed:** 8 October 2026 (`c32619e` deployed: the dashboard's eligible amount set per account tier; before that `f7e58e1`: application text limits, upload disk protections, image rebuilding, plans without a budget; before that 5 October 2026: commission charged at the plan's rate at approval; shared branding: logo, favicon, colours, email look; before that grant plans with commission, approval days, and a form builder; before that deposit methods, the applicant profile center at `/profile`; before that the admin applicant directory and profile, balance adjustments, permission switches)
 **Audience:** Product designers, frontend/backend developers, QA, and security reviewers
 
 ## 1. Purpose and product boundary
@@ -338,7 +338,7 @@ No schema change in either slice.
 
 **Built (7 Oct 2026), as planned.** The admin overview's program list reads "Awarded so far in active programs" with "$X awarded" per plan; the Settings → Program criteria line no longer mentions a budget. In `programRepo.db.ts` only inserts write `budget = 0` (`RETIRED_BUDGET`); updates leave the old value, and nothing reads it. Tests: 221 rule tests (budget tests replaced by "approvals are limited only by the request and the plan maximum"), 172 API tests (new: no `budget` in `GET /programs` for applicants or staff, and a `budget` sent by an older portal is accepted and dropped; the concurrent-approval test now expects both approvals to succeed, and a repeat with the old version to get 409); typecheck and production builds pass; `.unlazy/grant-plans/browser-check.mjs flow` now also checks that the plan form, plan card, overview, review panel, and the applicant's plans page show no budget, and passes.
 
-### 8 Oct 2026: eligible amount by account tier (owner's request; built and tested 8 Oct 2026, not yet committed or deployed; no schema push)
+### 8 Oct 2026: eligible amount by account tier (owner's request; built and tested 8 Oct 2026; committed as `c32619e` and deployed 8 Oct 2026 ~21:20 UTC, no schema push; `/api/healthz` ok)
 
 **Decision (owner, 8 Oct 2026):** the dashboard's **Eligible amount** is tied to the account tier: staff set one amount per tier, and it's **display only** (it doesn't limit requests; each plan's maximum award still does, and it can't be withdrawn).
 

@@ -429,9 +429,11 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Eligible amount by tier (8 Oct 2026) — not yet deployed
+### Eligible amount by tier (8 Oct 2026) — deployed 8 Oct 2026 as `c32619e`
 
 No schema change (the amounts live in the existing `system_settings.treasury` JSON): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Until finance sets them every tier is 0 (not set), so dashboards keep showing the largest open award. Check: as the super admin, Admin → Settings → Money → **Eligible amount by tier**, enter the three amounts and save (the change log names the tiers); as an applicant, the dashboard's Eligible amount shows their tier's figure with "Your Tier N amount". Details: `work.md` §6, "8 Oct 2026".
+
+Deployed 8 Oct 2026 (~21:20 UTC): `git pull --ff-only` (`f7e58e1..c32619e`), `sh deploy/build.sh` (Build OK), restart; `/api/healthz` → ok. Still to do: finance enters the three amounts, and the dashboard check above.
 
 ### Application text limits, upload disk protections, image rebuilding, and plans without a budget (7 Oct 2026) — deployed 8 Oct 2026 as `f7e58e1`
 
