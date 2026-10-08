@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { applicantProfilesTable, db, ledgerEntriesTable, ledgerNumberSeq, systemSettingsTable, type LedgerRow, type TreasuryJson } from "@workspace/db";
 import type { Lockdown, SavedPayoutDetails, Transaction, Treasury } from "@workspace/domain/model";
-import { builtinDepositMethods, normalizeDepositMethod } from "@workspace/domain/depositMethods";
+import { builtinDepositMethods, normalizeDepositMethod, normalizeTierAmounts } from "@workspace/domain/depositMethods";
 import { normalizeMethod } from "@workspace/domain/withdrawalMethods";
 import { seedTreasury } from "@workspace/domain/seed";
 import { writeEffects } from "./activity.db";
@@ -16,13 +16,15 @@ const SETTINGS_ID = 1;
 // 29 Sep 2026 (fixed channels) get the method fields they lack (normalizeMethod). Settings saved
 // before 30 Sep 2026 had one deposit minimum and maximum: they get the built-in deposit methods
 // with those limits, and the deposit two-person threshold starts at the payout one. The application
-// fee (removed 3 Oct 2026) is dropped from older rows.
+// fee (removed 3 Oct 2026) is dropped from older rows. Rows from before 8 Oct 2026 have no tier
+// eligible amounts (none set).
 const toTreasury = (t: TreasuryJson): Treasury => ({
   channels: t.channels.map(c => normalizeMethod(c as Parameters<typeof normalizeMethod>[0])),
   physicalCardFee: t.physicalCardFee, cardDeliveryFee: t.cardDeliveryFee,
   depositMethods: t.depositMethods ? t.depositMethods.map(normalizeDepositMethod) : builtinDepositMethods({ min: t.minDeposit ?? 20, max: t.maxDeposit ?? 25000 }),
   depositThreshold: t.depositThreshold, highValueDeposit: t.highValueDeposit, dualControlThreshold: t.dualControlThreshold,
   depositDualControlThreshold: t.depositDualControlThreshold ?? t.dualControlThreshold,
+  tierEligibleAmounts: normalizeTierAmounts(t.tierEligibleAmounts),
   updatedAt: t.updatedAt, changeLog: t.changeLog.map(c => ({ at: c.at, by: c.by, summary: c.summary })),
 });
 /** Remembered payout answers; older rows hold masked labels (strings), which can't pre-fill a form and are dropped. */

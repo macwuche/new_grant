@@ -189,6 +189,7 @@ export * from './staffMemberUpdate';
 export * from './staffRole';
 export * from './staleResponse';
 export * from './testEmailInput';
+export * from './tierAmounts';
 export * from './tierChange';
 export * from './tierChangeTier';
 export * from './treasury';

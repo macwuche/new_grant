@@ -268,9 +268,14 @@ export type Treasury = {
   dualControlThreshold: number;
   /** Deposits at or above this amount need two different staff members (approval + confirmation); 0 for never. */
   depositDualControlThreshold: number;
+  /** The dashboard's "Eligible amount" for each account tier (display only); 0 for not set (./treasury, eligibleAmountFor). */
+  tierEligibleAmounts: TierAmounts;
   updatedAt: string;
   changeLog: ProgramChange[];
 };
+
+/** An amount per account tier. */
+export type TierAmounts = { tier1: number; tier2: number; tier3: number };
 
 /** Money settings as finance edits them on Settings → Money; methods are managed on their own (./withdrawalMethods, ./depositMethods). */
 export type TreasuryInput = Omit<Treasury, 'updatedAt' | 'changeLog' | 'channels' | 'depositMethods'>;

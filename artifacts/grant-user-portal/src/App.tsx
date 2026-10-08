@@ -32,6 +32,7 @@ import { accountLockReason, accountOf } from '@workspace/domain/applicants';
 import { KYC_DOCUMENT_TYPES, submitKyc, type KycInput } from '@workspace/domain/accounts';
 import { lockdownMessage } from '@workspace/domain/security';
 import { commissionFor } from '@workspace/domain/core';
+import { eligibleAmountFor } from '@workspace/domain/treasury';
 import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
@@ -187,10 +188,12 @@ function Dashboard({ onToast }: { onToast: Toast }) {
   const recentApps = [...mine].sort(byNewest(a => a.updatedAt)).slice(0, 3);
   const recentTx = ownTransactions(state).sort(byNewest(t => t.createdAt)).slice(0, 3);
   const virtual = state.cards.virtual;
+  // The amount finance set for the applicant's tier; when it isn't set, the largest award they can apply for now.
+  const tierAmount = eligibleAmountFor(state.treasury.tierEligibleAmounts, state.profile.tier);
   return <div className="stack">
     <section className="hero-card card"><div className="hero-copy"><div className="kicker">A clearer way forward</div><h2>Keep your next move well funded.</h2><p>Track grant decisions, understand your available funds, and keep every account detail in one calm workspace.</p><Link className="btn btn-primary" href="/grants" style={{ marginTop: 22 }} data-testid="link-explore-grants">Explore grants <ArrowRight size={15} /></Link></div><div className="hero-visual"><div className="hero-stamp">YOUR<br />MOMENTUM<br />MATTERS</div></div></section>
     <section className="grid-4">
-      <Metric label="Eligible amount" value={money(maxEligibleAward(state.grants, state.profile, mine, now))} helper={`Largest open award at Tier ${state.profile.tier}`} className="lime" />
+      <Metric label="Eligible amount" value={money(tierAmount ?? maxEligibleAward(state.grants, state.profile, mine, now))} helper={tierAmount !== null ? `Your Tier ${state.profile.tier} amount` : `Largest open award at Tier ${state.profile.tier}`} className="lime" />
       <Metric label="Grant balance" value={money(balances.grant)} helper={balances.pendingWithdrawals > 0 ? `${money(balances.pendingWithdrawals)} held for pending payouts` : `${approved} approved award${approved === 1 ? '' : 's'}`} className="dark" 
         action={<Link href="/withdrawals" className="metric-action" data-testid="link-dashboard-withdraw"><ArrowUpRight size={13} aria-hidden="true" />Withdraw</Link>} />
       <Metric label="Successful deposit" value={money(balances.deposit)} helper={balances.deposit < 0 ? 'Below zero: a deposit clears it' : balances.pendingDeposits > 0 ? `${money(balances.pendingDeposits)} awaiting confirmation` : 'Covers card fees and commissions'}

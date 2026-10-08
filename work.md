@@ -338,6 +338,21 @@ No schema change in either slice.
 
 **Built (7 Oct 2026), as planned.** The admin overview's program list reads "Awarded so far in active programs" with "$X awarded" per plan; the Settings → Program criteria line no longer mentions a budget. In `programRepo.db.ts` only inserts write `budget = 0` (`RETIRED_BUDGET`); updates leave the old value, and nothing reads it. Tests: 221 rule tests (budget tests replaced by "approvals are limited only by the request and the plan maximum"), 172 API tests (new: no `budget` in `GET /programs` for applicants or staff, and a `budget` sent by an older portal is accepted and dropped; the concurrent-approval test now expects both approvals to succeed, and a repeat with the old version to get 409); typecheck and production builds pass; `.unlazy/grant-plans/browser-check.mjs flow` now also checks that the plan form, plan card, overview, review panel, and the applicant's plans page show no budget, and passes.
 
+### 8 Oct 2026: eligible amount by account tier (owner's request; built and tested 8 Oct 2026, not yet committed or deployed; no schema push)
+
+**Decision (owner, 8 Oct 2026):** the dashboard's **Eligible amount** is tied to the account tier: staff set one amount per tier, and it's **display only** (it doesn't limit requests; each plan's maximum award still does, and it can't be withdrawn).
+
+**Before:** the card showed the largest maximum award among the plans the applicant could apply for now (published and active, before the deadline, the plan's minimum tier met, no open application on it) — `maxEligibleAward`, "Largest open award at Tier N".
+
+**Built:**
+1. Rules (`lib/domain`): `Treasury.tierEligibleAmounts` (`{ tier1, tier2, tier3 }`, USD; 0 means not set). `validateTreasury` checks each is 0 or more with at most two decimals (field errors `tierEligibleAmounts.tier1` …); the change log names the tiers changed ("tier 2 eligible amount"); `eligibleAmountFor(amounts, tier)` returns the amount or null. Settings saved before this have none set (`normalizeTierAmounts`, used by `normalizeTreasury` and the API's `toTreasury`).
+2. API contract: `TierAmounts`, required in `TreasuryInput` (`PUT /money/settings`, `treasury.manage`); applicants receive it with their money settings (`GET /money/mine`). Regenerated.
+3. Database: **no schema change** — it lives in the existing `system_settings.treasury` JSON (`TreasuryJson.tierEligibleAmounts` optional for older rows).
+4. Admin: **Settings → Money → Eligible amount by tier** (Tier 1, 2, 3 fields; saved and audited with the other money settings).
+5. Dashboard: shows the applicant's tier amount ("Your Tier N amount"); when that tier isn't set (0), the previous figure ("Largest open award at Tier N"), so live applicants don't see $0 before finance fills it in. The Grants page's "largest award you can apply for now" snapshot is unchanged (it's that figure by name).
+
+**Tests:** 225 rule tests (4 new), 173 API tests (1 new: finance saves, a negative or incomplete value is refused, the applicant receives the amounts), typecheck, production builds, and a new signed-in headless-browser check (`.unlazy/tier-amounts/browser-check.mjs`: field error, save, change log, dashboard amount and wording, fallback after unsetting, no sideways scroll at 1280px and 375px) pass.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

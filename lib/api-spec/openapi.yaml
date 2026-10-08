@@ -4005,6 +4005,18 @@ components:
           type: boolean
       required: [enabled]
       additionalProperties: false
+    TierAmounts:
+      type: object
+      description: The dashboard's eligible amount for each account tier (display only); 0 for not set
+      properties:
+        tier1:
+          type: number
+        tier2:
+          type: number
+        tier3:
+          type: number
+      required: [tier1, tier2, tier3]
+      additionalProperties: false
     TreasuryInput:
       type: object
       description: Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
@@ -4022,7 +4034,9 @@ components:
         depositDualControlThreshold:
           type: number
           description: Deposits at or above this need a second staff member's approval before confirming; 0 for never
-      required: [physicalCardFee, cardDeliveryFee, depositThreshold, highValueDeposit, dualControlThreshold, depositDualControlThreshold]
+        tierEligibleAmounts:
+          $ref: "#/components/schemas/TierAmounts"
+      required: [physicalCardFee, cardDeliveryFee, depositThreshold, highValueDeposit, dualControlThreshold, depositDualControlThreshold, tierEligibleAmounts]
       additionalProperties: false
     Treasury:
       allOf:

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TierAmounts } from './tierAmounts';
 
 /**
  * Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
@@ -17,4 +18,5 @@ export interface TreasuryInput {
   dualControlThreshold: number;
   /** Deposits at or above this need a second staff member's approval before confirming; 0 for never */
   depositDualControlThreshold: number;
+  tierEligibleAmounts: TierAmounts;
 }

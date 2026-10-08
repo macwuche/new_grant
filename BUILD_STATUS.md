@@ -28,6 +28,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **7 Oct 2026: plans without a total budget (owner's decision; built, tested, and committed 7 Oct 2026; deployed 8 Oct 2026 ~06:07 UTC as `f7e58e1`, no schema push; details in `work.md` §6, "grant plans without a total budget").** The plan's Total budget is removed everywhere: no budget field, no "budget left", and no overall cap on approvals (awards stay limited by the request and the plan's maximum award); applicants no longer receive it from the API. No schema change (the column stays, unused). Staff see "Awarded so far" per plan instead. 221 rule tests, 172 API tests, typecheck, builds, and the grant-plans browser check pass.
 
+**8 Oct 2026: eligible amount by account tier (owner's request; built and tested 8 Oct 2026, not yet committed or deployed; no schema push; details in `work.md` §6, "eligible amount by account tier").** Staff set the dashboard's **Eligible amount** for each tier in Settings → Money (Tier 1, 2, 3; stored in the money settings JSON, audited in their change log). It's display only: requests are still limited by each plan's maximum award. The dashboard shows the applicant's tier amount; a tier left at 0 (not set, the starting value) shows the previous figure, the largest award they can apply for now. 225 rule tests (4 new), 173 API tests (1 new), typecheck, builds, and a signed-in browser check (`.unlazy/tier-amounts/browser-check.mjs`) pass.
+
 ## Build plan
 
 1. **Applicant UI prototype — Complete**

@@ -80,7 +80,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'email', title: 'Email', icon: Mail, access: 'Super admin', Status: EmailStatus, Page: EmailPage,
     description: 'Resend connection, sender and team mailbox, sending domain and DNS, webhook, sign-up verification, and delivery status.' },
   { id: 'money', title: 'Money', icon: Banknote, access: 'Finance', Status: MoneyStatus, Page: AdminTreasurySettings,
-    description: 'Card fees, the deposit reserve, and the two-person thresholds for payouts and deposits. Commission is set on each grant program.' },
+    description: 'Card fees, the deposit reserve, the two-person thresholds for payouts and deposits, and the dashboard\'s eligible amount for each tier. Commission is set on each grant program.' },
   { id: 'deposit-methods', title: 'Deposit methods', icon: Landmark, access: 'Finance', Status: DepositMethodsStatus, Page: AdminDepositMethods,
     description: 'How users add funds: where to send the money, each method\'s photo, limits, charges, processing time, instructions, proof of payment, and the form users fill in.' },
   { id: 'withdrawal-methods', title: 'Withdrawal methods', icon: WalletCards, access: 'Finance', Status: MethodsStatus, Page: AdminWithdrawalMethods,

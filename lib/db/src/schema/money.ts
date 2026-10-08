@@ -82,7 +82,8 @@ export type TreasuryJson = {
   channels: WithdrawalMethodJson[];
   depositMethods?: DepositMethodJson[];
   physicalCardFee: number; cardDeliveryFee: number; minDeposit?: number; maxDeposit?: number; depositThreshold: number;
-  highValueDeposit: number; dualControlThreshold: number; depositDualControlThreshold?: number; /** Removed 3 Oct 2026; older rows still have it and the API ignores it. */ applicationFee?: number;
+  highValueDeposit: number; dualControlThreshold: number; depositDualControlThreshold?: number;
+  /** Added 8 Oct 2026; older rows don't have it (none set). */ tierEligibleAmounts?: { tier1?: number; tier2?: number; tier3?: number }; /** Removed 3 Oct 2026; older rows still have it and the API ignores it. */ applicationFee?: number;
   updatedAt: string; changeLog: { at: string; by: string; summary: string }[];
 };
 export type LockdownJson = { since: string; by: string; reason: string };

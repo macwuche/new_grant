@@ -641,6 +641,15 @@ export interface MethodAvailability {
 }
 
 /**
+ * The dashboard's eligible amount for each account tier (display only); 0 for not set
+ */
+export interface TierAmounts {
+  tier1: number;
+  tier2: number;
+  tier3: number;
+}
+
+/**
  * Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints
  */
 export interface TreasuryInput {
@@ -651,6 +660,7 @@ export interface TreasuryInput {
   dualControlThreshold: number;
   /** Deposits at or above this need a second staff member's approval before confirming; 0 for never */
   depositDualControlThreshold: number;
+  tierEligibleAmounts: TierAmounts;
 }
 
 export interface ProgramChange {

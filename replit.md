@@ -70,6 +70,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 - Every uploaded picture (JPEG/PNG/WEBP) is rebuilt from its pixels with `sharp` before storing (`artifacts/api-server/src/lib/imageRebuild.ts`): hidden code and photo metadata are dropped, non-pictures refused. A new upload route must call `rebuildImage` after `inspectUpload`, and tests must upload real pictures (made with `sharp`), not made-up bytes behind an image header.
 - Plans have no budget (owner, 7 Oct 2026): `programs.budget` stays in the database only because it's NOT NULL; new plans write 0 and nothing reads it. Don't reintroduce it in the contract or screens.
 - Application text limits live in `lib/domain/src/rules.ts` (`MAX_*`) and must match `ApplicationInput` in the OpenAPI spec; the API turns a contract refusal into field errors (`contractFieldErrors` in `routes/applications.ts`).
+- The dashboard's **Eligible amount** is set per tier by staff (`treasury.tierEligibleAmounts`, Settings → Money; owner, 8 Oct 2026) and is display only; 0 means not set and falls back to `maxEligibleAward` (the largest award the applicant can apply for now). Don't use it to cap requests without the owner's say.
 - Production reaches Supabase through the session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`); the direct `db.<ref>.supabase.co` host is IPv6-only.
 
 ## Pointers

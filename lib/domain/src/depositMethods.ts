@@ -1,4 +1,4 @@
-import type { DemoState, DepositMethod, DepositMethodId, MethodField, MethodPhotoFile, ProofRule, ReceivingDetail, Result, Treasury } from './model';
+import type { DemoState, DepositMethod, DepositMethodId, MethodField, MethodPhotoFile, ProofRule, ReceivingDetail, Result, TierAmounts, Treasury } from './model';
 import { fail } from './core';
 import { LIMITS, normalizeMethod, photoError, slug, validateForm, validateLimitsAndCharges, withFieldIds, type MethodInput } from './withdrawalMethods';
 
@@ -76,9 +76,11 @@ export function normalizeDepositMethod(raw: Partial<DepositMethod> & Pick<Deposi
 }
 
 /** Stored money settings from before deposit methods (29 Sep 2026) had one deposit minimum and maximum for all methods. */
-export type StoredTreasury = Omit<Treasury, 'depositMethods' | 'depositDualControlThreshold'> & {
+export type StoredTreasury = Omit<Treasury, 'depositMethods' | 'depositDualControlThreshold' | 'tierEligibleAmounts'> & {
   depositMethods?: (Partial<DepositMethod> & Pick<DepositMethod, 'id' | 'name'>)[];
   depositDualControlThreshold?: number;
+  /** Added 8 Oct 2026; older settings have none set. */
+  tierEligibleAmounts?: Partial<TierAmounts>;
   minDeposit?: number;
   maxDeposit?: number;
   /** Removed 3 Oct 2026 (commission per program replaced it); dropped when read. */
@@ -89,17 +91,23 @@ export type StoredTreasury = Omit<Treasury, 'depositMethods' | 'depositDualContr
  * Money settings in today's shape, whatever version they were saved in:
  * withdrawal methods get the fields they lack, and settings without deposit
  * methods get the built-in ones with the old deposit limits. The deposit
- * two-person threshold starts at the payout one.
+ * two-person threshold starts at the payout one. Tier eligible amounts start
+ * unset (0).
  */
 export function normalizeTreasury(t: StoredTreasury): Treasury {
-  const { minDeposit, maxDeposit, depositMethods, depositDualControlThreshold, applicationFee: _removed, ...rest } = t;
+  const { minDeposit, maxDeposit, depositMethods, depositDualControlThreshold, tierEligibleAmounts, applicationFee: _removed, ...rest } = t;
   return {
     ...rest,
     channels: t.channels.map(normalizeMethod),
     depositMethods: depositMethods ? depositMethods.map(normalizeDepositMethod) : builtinDepositMethods({ min: minDeposit ?? 20, max: maxDeposit ?? 25000 }),
     depositDualControlThreshold: depositDualControlThreshold ?? t.dualControlThreshold,
+    tierEligibleAmounts: normalizeTierAmounts(tierEligibleAmounts),
   };
 }
+
+/** Tier eligible amounts in today's shape; a missing tier is not set (0). */
+export const normalizeTierAmounts = (t: Partial<TierAmounts> | undefined): TierAmounts =>
+  ({ tier1: t?.tier1 ?? 0, tier2: t?.tier2 ?? 0, tier3: t?.tier3 ?? 0 });
 
 // ---------- Validation ----------
 

@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Eligible amount by tier (8 Oct 2026) — not yet deployed
+
+No schema change (the amounts live in the existing `system_settings.treasury` JSON): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Until finance sets them every tier is 0 (not set), so dashboards keep showing the largest open award. Check: as the super admin, Admin → Settings → Money → **Eligible amount by tier**, enter the three amounts and save (the change log names the tiers); as an applicant, the dashboard's Eligible amount shows their tier's figure with "Your Tier N amount". Details: `work.md` §6, "8 Oct 2026".
+
 ### Application text limits, upload disk protections, image rebuilding, and plans without a budget (7 Oct 2026) — deployed 8 Oct 2026 as `f7e58e1`
 
 No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. The build's `pnpm install` fetches the new `sharp` image library (prebuilt for Linux x64; nothing to install with apt). Before restarting, check it loads: `cd /var/www/novabridgegrant/artifacts/api-server && sudo -u novabridgegrant /opt/novabridgegrant-node/bin/node -e "import('sharp').then(s => console.log('sharp', s.default.versions.sharp))"` should print `sharp 0.35.5`. Then upload a phone photo as a profile picture and confirm it shows the right way up. Plans no longer have a Total budget (no schema push: the `programs.budget` column stays, unused); check that Admin → Grants shows "Awarded so far" and the plan form has no budget field. Optional: set `MIN_FREE_DISK_MB` in `/etc/novabridgegrant/api.env` (default 2048, i.e. uploads pause when less than 2 GB would be left; `0` turns the check off); the startup log line "document files are stored on this server's disk" shows the floor in use. Check: (1) on a plan with a long-text field, an answer of about 1,500 characters saves and submits (this failed before); (2) the long-text box stops at 2,000 characters and shows a count; (3) `curl -s http://127.0.0.1:3100/api/healthz` is ok. Details: `work.md` §6, "7 Oct 2026".

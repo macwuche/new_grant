@@ -2780,7 +2780,12 @@ export const GetMyMoneyResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(getMyMoneyResponseTreasuryTwoChannelsItemOneNameMax),
@@ -3090,7 +3095,12 @@ export const RequestDepositResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(requestDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -3399,7 +3409,12 @@ export const CancelDepositResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(cancelDepositResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -3713,7 +3728,12 @@ export const RequestWithdrawalResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(requestWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -4022,7 +4042,12 @@ export const CancelWithdrawalResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(cancelWithdrawalResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -4328,7 +4353,12 @@ export const ToggleCardFreezeResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(toggleCardFreezeResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -4635,7 +4665,12 @@ export const SetCardLimitResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(setCardLimitResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -4937,7 +4972,12 @@ export const CreateVirtualCardResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(createVirtualCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -5244,7 +5284,12 @@ export const FundCardResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(fundCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -5572,7 +5617,12 @@ export const RequestPhysicalCardResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(requestPhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -5882,7 +5932,12 @@ export const ActivatePhysicalCardResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(activatePhysicalCardResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -7115,7 +7170,12 @@ export const CreateWithdrawalMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(createWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -7367,7 +7427,12 @@ export const UpdateWithdrawalMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(updateWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -7568,7 +7633,12 @@ export const SetWithdrawalMethodAvailabilityResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(setWithdrawalMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -7765,7 +7835,12 @@ export const DeleteWithdrawalMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(deleteWithdrawalMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -7962,7 +8037,12 @@ export const UploadWithdrawalMethodPhotoResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(uploadWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -8159,7 +8239,12 @@ export const RemoveWithdrawalMethodPhotoResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(removeWithdrawalMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -8428,7 +8513,12 @@ export const CreateDepositMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(createDepositMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -8690,7 +8780,12 @@ export const UpdateDepositMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(updateDepositMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -8891,7 +8986,12 @@ export const SetDepositMethodAvailabilityResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(setDepositMethodAvailabilityResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -9088,7 +9188,12 @@ export const DeleteDepositMethodResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(deleteDepositMethodResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -9285,7 +9390,12 @@ export const UploadDepositMethodPhotoResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(uploadDepositMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -9482,7 +9592,12 @@ export const RemoveDepositMethodPhotoResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(removeDepositMethodPhotoResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -9747,7 +9862,12 @@ export const GetMoneySettingsResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(getMoneySettingsResponseTreasuryTwoChannelsItemOneNameMax),
@@ -9856,7 +9976,12 @@ export const UpdateMoneySettingsBody = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints')
 })
 
@@ -9950,7 +10075,12 @@ export const UpdateMoneySettingsResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(updateMoneySettingsResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -10148,7 +10278,12 @@ export const StartLockdownResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(startLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -10338,7 +10473,12 @@ export const EndLockdownResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(endLockdownResponseSettingsTreasuryTwoChannelsItemOneNameMax),
@@ -10801,7 +10941,12 @@ export const UploadDepositProofResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(uploadDepositProofResponseMoneyTreasuryTwoChannelsItemOneNameMax),
@@ -11126,7 +11271,12 @@ export const RemoveDepositProofResponse = zod.object({
   "depositThreshold": zod.number(),
   "highValueDeposit": zod.number(),
   "dualControlThreshold": zod.number(),
-  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never')
+  "depositDualControlThreshold": zod.number().describe('Deposits at or above this need a second staff member\'s approval before confirming; 0 for never'),
+  "tierEligibleAmounts": zod.object({
+  "tier1": zod.number(),
+  "tier2": zod.number(),
+  "tier3": zod.number()
+}).describe('The dashboard\'s eligible amount for each account tier (display only); 0 for not set')
 }).describe('Money settings as finance edits them on Settings - Money; withdrawal and deposit methods (with their limits) have their own endpoints').and(zod.object({
   "channels": zod.array(zod.object({
   "name": zod.string().max(removeDepositProofResponseMoneyTreasuryTwoChannelsItemOneNameMax),

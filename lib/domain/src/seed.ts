@@ -92,6 +92,7 @@ export function seedTreasury(): Treasury {
     highValueDeposit: 1000,
     dualControlThreshold: 2500,
     depositDualControlThreshold: 2500,
+    tierEligibleAmounts: { tier1: 0, tier2: 0, tier3: 0 },
     updatedAt: TREASURY_CREATED,
     changeLog: [{ at: TREASURY_CREATED, by: DEMO_FINANCE, summary: 'Initial money settings.' }],
   };

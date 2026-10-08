@@ -845,6 +845,18 @@ describe("money", () => {
     expect((await put("/money/settings", { version: updatedAt, treasury: { ...treasury, physicalCardFee: 20 } }, "tok-finance")).status).toBe(409);
   });
 
+  it("lets finance set the eligible amount for each tier, which applicants receive with their money settings", async () => {
+    const { channels: _c, depositMethods: _d, updatedAt, changeLog: _l, ...rest } = (await json(await call("/money/settings", "tok-finance"))).treasury;
+    expect(rest.tierEligibleAmounts).toEqual({ tier1: 0, tier2: 0, tier3: 0 });
+    const bad = await put("/money/settings", { version: updatedAt, treasury: { ...rest, tierEligibleAmounts: { tier1: -5, tier2: 0, tier3: 0 } } }, "tok-finance");
+    expect(bad.status).toBe(400);
+    expect(Object.keys((await json(bad)).fieldErrors)).toEqual(["tierEligibleAmounts.tier1"]);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...rest, tierEligibleAmounts: { tier1: 5000, tier2: 15000 } } }, "tok-finance")).status).toBe(400);
+    expect((await put("/money/settings", { version: updatedAt, treasury: { ...rest, tierEligibleAmounts: { tier1: 5000, tier2: 15000, tier3: 0 } } }, "tok-finance")).status).toBe(200);
+    const mine = await json(await call("/money/mine", "tok-applicant"));
+    expect(mine.treasury.tierEligibleAmounts).toEqual({ tier1: 5000, tier2: 15000, tier3: 0 });
+  });
+
   it("charges nothing at submission, then takes the plan's commission from the deposit balance on approval, below zero if need be", async () => {
     await call("/profile", "tok-maya");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
