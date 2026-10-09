@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Per-applicant payout switches (9 Oct 2026) — pushed as `e14c6ee`, not yet deployed
+
+No schema change (the switches live in the existing `applicant_profiles.permissions` JSON; missing means on): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: as the super admin, open an applicant's profile (Admin → Applicants → the applicant) → **Feature toggles**: **Identity check for payouts** and **Two staff sign-offs for large payouts** show, both On. Turn two sign-offs Off for the applicant with the $10,000 payout, then Admin → Payments → Payouts: the approver can now mark it paid. Details: `work.md` §6, "9 Oct 2026".
+
 ### Eligible amount by tier (8 Oct 2026) — deployed 8 Oct 2026 as `c32619e`
 
 No schema change (the amounts live in the existing `system_settings.treasury` JSON): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Until finance sets them every tier is 0 (not set), so dashboards keep showing the largest open award. Check: as the super admin, Admin → Settings → Money → **Eligible amount by tier**, enter the three amounts and save (the change log names the tiers); as an applicant, the dashboard's Eligible amount shows their tier's figure with "Your Tier N amount". Details: `work.md` §6, "8 Oct 2026".
