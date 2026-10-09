@@ -30,7 +30,7 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **8 Oct 2026: eligible amount by account tier (owner's request; built and tested 8 Oct 2026; committed and deployed 8 Oct 2026 ~21:20 UTC as `c32619e`, no schema push, `/api/healthz` ok; details in `work.md` §6, "eligible amount by account tier").** Staff set the dashboard's **Eligible amount** for each tier in Settings → Money (Tier 1, 2, 3; stored in the money settings JSON, audited in their change log). It's display only: requests are still limited by each plan's maximum award. The dashboard shows the applicant's tier amount; a tier left at 0 (not set, the starting value) shows the previous figure, the largest award they can apply for now. 225 rule tests (4 new), 173 API tests (1 new), typecheck, builds, and a signed-in browser check (`.unlazy/tier-amounts/browser-check.mjs`) pass.
 
-**9 Oct 2026: per-applicant payout switches (owner's request; built and tested 9 Oct 2026; not yet committed or deployed; no schema push; details: `work.md` §6):** two new Feature toggles on the admin applicant profile, both on by default: **Identity check for payouts** and **Two staff sign-offs for large payouts**. Turning two sign-offs off also applies to that applicant's payouts already pending.
+**9 Oct 2026: per-applicant payout switches (owner's request; built and tested 9 Oct 2026; committed as `e14c6ee` and deployed 9 Oct 2026 ~07:56 as `4390116`, no schema push; details: `work.md` §6):** two new Feature toggles on the admin applicant profile, both on by default: **Identity check for payouts** and **Two staff sign-offs for large payouts**. Turning two sign-offs off also applies to that applicant's payouts already pending.
 
 ## Build plan
 

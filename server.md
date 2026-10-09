@@ -429,9 +429,11 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Per-applicant payout switches (9 Oct 2026) — pushed as `e14c6ee`, not yet deployed
+### Per-applicant payout switches (9 Oct 2026) — deployed 9 Oct 2026 as `4390116` (`e14c6ee` + server notes)
 
 No schema change (the switches live in the existing `applicant_profiles.permissions` JSON; missing means on): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: as the super admin, open an applicant's profile (Admin → Applicants → the applicant) → **Feature toggles**: **Identity check for payouts** and **Two staff sign-offs for large payouts** show, both On. Turn two sign-offs Off for the applicant with the $10,000 payout, then Admin → Payments → Payouts: the approver can now mark it paid. Details: `work.md` §6, "9 Oct 2026".
+
+Deployed 9 Oct 2026 (~07:56, server clock): `git pull --ff-only` (`c32619e..4390116`), `sh deploy/build.sh` (Build OK), restart; `/api/healthz` → ok. Still to do: the Feature toggles check above.
 
 ### Eligible amount by tier (8 Oct 2026) — deployed 8 Oct 2026 as `c32619e`
 

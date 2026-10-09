@@ -353,7 +353,7 @@ No schema change in either slice.
 
 **Tests:** 225 rule tests (4 new), 173 API tests (1 new: finance saves, a negative or incomplete value is refused, the applicant receives the amounts), typecheck, production builds, and a new signed-in headless-browser check (`.unlazy/tier-amounts/browser-check.mjs`: field error, save, change log, dashboard amount and wording, fallback after unsetting, no sideways scroll at 1280px and 375px) pass.
 
-### 9 Oct 2026: per-applicant switches for the payout identity check and two sign-offs (owner's request; built and tested 9 Oct 2026; not yet committed or deployed; no schema push)
+### 9 Oct 2026: per-applicant switches for the payout identity check and two sign-offs (owner's request; built and tested 9 Oct 2026; committed as `e14c6ee` and deployed 9 Oct 2026 ~07:56 as `4390116`, no schema push; `/api/healthz` ok)
 
 **Why it showed:** a payout of $10,000 is at or above the payout two-person threshold (**Settings → Money**, $2,500 in the seed), so it needs a release approval (compliance or a super admin) and then a *different* staff member to mark it paid; the super admin who approved it can't also mark it paid. Separately, since 3 Oct 2026 every payout needed a verified identity ("Verify your identity (Settings → Identity check) before requesting a payout").
 
