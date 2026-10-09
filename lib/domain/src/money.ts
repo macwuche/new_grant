@@ -100,7 +100,7 @@ export function requestWithdrawal(state: DemoState, input: WithdrawalInput, now:
     id: ids.tx, applicantId: CURRENT_APPLICANT_ID, type: 'Withdrawal', description: `Payout to ${channel.name}`, amount: -amount, status: 'Pending',
     createdAt: now.toISOString(), method: channel.id, fee: channelFee(channel, amount), destination: destinationSummary(channel.name, checked.details),
     source, payoutDetails: checked.details,
-    ...(amount >= state.treasury.dualControlThreshold ? { dualControl: true } : {}),
+    ...(amount >= state.treasury.dualControlThreshold && permissionsOf(state).payoutTwoSignOffs ? { dualControl: true } : {}),
   };
   // The answers are remembered for next time; changing them is a fraud signal (staff are told; risk rises for 7 days).
   const remembered = Object.fromEntries(checked.details.map(d => [d.fieldId, d.value]));

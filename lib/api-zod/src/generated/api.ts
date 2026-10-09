@@ -577,7 +577,9 @@ export const GetProfileResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -654,7 +656,9 @@ export const UpdateProfileResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -720,7 +724,9 @@ export const SubmitIdentityCheckResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -781,7 +787,9 @@ export const UploadAvatarResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -835,7 +843,9 @@ export const RemoveAvatarResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -894,7 +904,9 @@ export const SetPrivacyResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1007,7 +1019,9 @@ export const ReportPasswordChangedResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1065,7 +1079,9 @@ export const CompleteCredentialResetResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1121,7 +1137,9 @@ export const ListApplicantsResponseItem = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1193,7 +1211,9 @@ export const SetApplicantTierResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1262,7 +1282,9 @@ export const SetCardSettingsResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1287,7 +1309,7 @@ export const SetAccountPermissionParams = zod.object({
 })
 
 export const SetAccountPermissionBody = zod.object({
-  "key": zod.enum(['depositKyc', 'emailNotifications', 'cardApplications', 'grantApplications', 'clearBalanceForPayouts']),
+  "key": zod.enum(['depositKyc', 'emailNotifications', 'cardApplications', 'grantApplications', 'clearBalanceForPayouts', 'payoutIdentityCheck', 'payoutTwoSignOffs']),
   "value": zod.boolean()
 })
 
@@ -1331,7 +1353,9 @@ export const SetAccountPermissionResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1403,7 +1427,9 @@ export const LockApplicantResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1467,7 +1493,9 @@ export const UnlockApplicantResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1535,7 +1563,9 @@ export const RequireCredentialResetResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1599,7 +1629,9 @@ export const ApproveIdentityCheckResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1671,7 +1703,9 @@ export const RejectIdentityCheckResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),
@@ -1743,7 +1777,9 @@ export const RequestReverificationResponse = zod.object({
   "emailNotifications": zod.boolean(),
   "cardApplications": zod.boolean(),
   "grantApplications": zod.boolean(),
-  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared')
+  "clearBalanceForPayouts": zod.boolean().describe('Grant payouts wait until a negative deposit balance is cleared'),
+  "payoutIdentityCheck": zod.boolean().describe('Payouts need a verified identity'),
+  "payoutTwoSignOffs": zod.boolean().describe('Payouts at or above the dual-control threshold need two staff sign-offs')
 }).optional()
 }).describe('Staff-managed controls on an applicant account'),
   "displayName": zod.string().describe('Shown as the profile\'s @handle; empty when not added'),

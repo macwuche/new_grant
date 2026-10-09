@@ -6,6 +6,7 @@ import * as Rv from './review';
 import * as Sec from './security';
 import * as Risk from './risk';
 import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
+import { setAccountPermission } from './accounts';
 
 const now = new Date('2026-09-25T12:00:00Z');
 let s: DemoState;
@@ -46,6 +47,33 @@ describe('dual-control payouts', () => {
     expect(P.markPayoutPaid(s, id, 'Jordan Lee', now).ok).toBe(false);
     expect(P.approvePayoutRelease(s, 'TX-84077', 'Riley Chen', now).ok).toBe(false);
     accept(P.markPayoutPaid(s, 'TX-84077', 'Jordan Lee', now));
+  });
+});
+
+describe('two sign-offs switched off for one applicant', () => {
+  const off = () => accept(setAccountPermission(s, CURRENT_APPLICANT_ID, 'payoutTwoSignOffs', false, now));
+
+  it("doesn't flag new large payouts, and one person can mark them paid", () => {
+    off();
+    const id = accept(M.requestWithdrawal(s, { amount: 3000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
+    expect(tx(id).dualControl).toBeUndefined();
+    expect(P.needsSecondSignOff(s, tx(id))).toBe(false);
+    expect(P.approvePayoutRelease(s, id, 'Riley Chen', now).ok).toBe(false);
+    accept(P.markPayoutPaid(s, id, 'Jordan Lee', now));
+  });
+
+  it('also releases payouts already waiting for a second sign-off, including from the approver', () => {
+    const id = accept(M.requestWithdrawal(s, { amount: 4000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
+    accept(P.approvePayoutRelease(s, id, 'Riley Chen', now));
+    expect(P.markPayoutPaid(s, id, 'Riley Chen', now).ok).toBe(false);
+    off();
+    accept(P.markPayoutPaid(s, id, 'Riley Chen', now));
+  });
+
+  it("leaves other applicants' payouts needing two sign-offs", () => {
+    accept(setAccountPermission(s, 'APL-1043', 'payoutTwoSignOffs', false, now));
+    const id = accept(M.requestWithdrawal(s, { amount: 3000, method: 'bank', details: s.savedPayoutDetails['bank'] }, now)).id!;
+    expect(P.markPayoutPaid(s, id, 'Jordan Lee', now).ok).toBe(false);
   });
 });
 

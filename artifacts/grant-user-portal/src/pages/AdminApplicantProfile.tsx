@@ -478,6 +478,8 @@ function PermissionSwitches({ applicantId, onFlash }: { applicantId: string; onF
     emailNotifications: 'Email copies of notifications. Security notices are always emailed. The applicant can change this in Settings too.',
     cardApplications: 'Off: the applicant can’t create a card or apply for a physical one. Staff can still issue cards.',
     grantApplications: 'Off: the applicant can’t submit new applications. Resubmitting requested changes still works.',
+    payoutIdentityCheck: 'On (default): payouts need a verified identity. Off: this applicant can request payouts before their identity check is approved.',
+    payoutTwoSignOffs: 'On (default): payouts at or above the two-person threshold (Settings → Money) need a release approval and a different person to mark them paid. Off: one person with payment rights can mark this applicant’s payouts paid, including ones already pending.',
     clearBalanceForPayouts: 'On: payouts from the grant balance wait until a negative deposit balance (e.g. an unpaid commission) is back at $0 or more. Off: grant payouts never wait for the deposit balance.',
   };
   return <section className="aup-card" aria-labelledby="aup-switches-title" data-testid="section-admin-permission-switches">

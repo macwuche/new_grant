@@ -2,6 +2,7 @@ import type { DemoState, Result, Transaction } from './model';
 import { fail, roundCents } from './rules';
 import { usd } from './core';
 import { notify } from './notifications';
+import { permissionsOf } from './applicants';
 
 // Finance payout processing. Pure, like ./rules and ./review. No payment
 // provider is connected: "paid" only records that finance says the transfer
@@ -30,8 +31,10 @@ export function pendingPayoutTotal(state: DemoState): number {
   return roundCents(state.transactions.filter(t => isWithdrawal(t) && t.status === 'Pending').reduce((sum, t) => sum + payoutAmounts(t).gross, 0));
 }
 
-/** Four-eyes rule: large payouts need a release approval from someone other than whoever marks them paid. */
-export const needsSecondSignOff = (state: DemoState, tx: Transaction) => !!tx.dualControl || payoutAmounts(tx).gross >= state.treasury.dualControlThreshold;
+/** Four-eyes rule: large payouts need a release approval from someone other than whoever marks them paid,
+ * unless staff turned two sign-offs off for this applicant (checked when acting, so it also covers pending payouts). */
+export const needsSecondSignOff = (state: DemoState, tx: Transaction) =>
+  permissionsOf(state, tx.applicantId).payoutTwoSignOffs && (!!tx.dualControl || payoutAmounts(tx).gross >= state.treasury.dualControlThreshold);
 
 const LOCKDOWN_ERROR = 'Payouts are frozen during the system lockdown. A super admin must lift it first.';
 
@@ -52,7 +55,9 @@ export function approvePayoutRelease(state: DemoState, txId: string, approver: s
   if (state.lockdown) return fail(LOCKDOWN_ERROR);
   const loaded = loadPending(state, txId);
   if (!loaded.ok) return loaded.result;
-  if (!needsSecondSignOff(state, loaded.tx)) return fail(`${txId} is below the ${usd(state.treasury.dualControlThreshold)} dual-control threshold, so no second sign-off is needed.`);
+  if (!needsSecondSignOff(state, loaded.tx)) return fail(permissionsOf(state, loaded.tx.applicantId).payoutTwoSignOffs
+    ? `${txId} is below the ${usd(state.treasury.dualControlThreshold)} dual-control threshold, so no second sign-off is needed.`
+    : `Two sign-offs are turned off for this applicant, so ${txId} needs no second sign-off.`);
   if (loaded.tx.releaseApproval) return fail(`${txId} was already approved for release by ${loaded.tx.releaseApproval.by}.`);
   const tx: Transaction = { ...loaded.tx, releaseApproval: { by: approver, at: now.toISOString() } };
   return { ok: true, id: txId, message: `${txId} approved for release. A different staff member with payment rights can now mark it paid.`, state: update(state, tx) };

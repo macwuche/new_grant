@@ -397,7 +397,7 @@ describe("account controls and identity checks", () => {
 
   it("starts every applicant active, unverified, and at Tier 1", async () => {
     expect((await maya()).account).toEqual({ status: "Active", passwordResetRequired: false, twoFactorResetRequired: false, kyc: { status: "Not submitted" },
-      permissions: { depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false } });
+      permissions: { depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false, payoutIdentityCheck: true, payoutTwoSignOffs: true } });
   });
 
   it("keeps only the last four characters of the document number", async () => {
@@ -820,6 +820,18 @@ describe("money", () => {
     expect((await entry(w.id)).releaseApproval).toMatchObject({ by: "Sam Rivera", byId: SEED[0]!.id });
     expect((await json(await post(`/money/withdrawals/${w.id}/paid`, {}))).error).toMatch(/different staff member/);
     expect((await post(`/money/withdrawals/${w.id}/paid`, {}, "tok-finance")).status).toBe(200);
+  });
+
+  it("lets one person mark a large payout paid when two sign-offs are off for that applicant", async () => {
+    await fund(3000);
+    const w = (await json(await withdraw(2600))).money.transactions.find((t: { type: string }) => t.type === "Withdrawal");
+    expect((await post(`/money/withdrawals/${w.id}/release`, {})).status).toBe(200);
+    expect((await json(await post(`/money/withdrawals/${w.id}/paid`, {}))).error).toMatch(/different staff member/);
+    expect((await post(`/applicants/${MAYA}/permissions`, { key: "payoutTwoSignOffs", value: false }, "tok-finance")).status).toBe(403);
+    expect((await post(`/applicants/${MAYA}/permissions`, { key: "payoutTwoSignOffs", value: false })).status).toBe(200);
+    expect((await post(`/money/withdrawals/${w.id}/paid`, {})).status).toBe(200);
+    const next = (await json(await withdraw(300))).money.transactions.find((t: { type: string; status: string }) => t.type === "Withdrawal" && t.status === "Pending");
+    expect(next.dualControl).toBeUndefined();
   });
 
   it("freezes payouts during a lockdown, but still lets finance mark them failed", async () => {

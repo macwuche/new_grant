@@ -7,7 +7,7 @@ import { createSeedState, CURRENT_APPLICANT_ID } from './seed';
  * Rules read and return whole states, so the server passes in what it loaded
  * and stores what changed.
  */
-type Loaded = Partial<Pick<DemoState, 'grants' | 'applications' | 'notifications' | 'transactions' | 'treasury' | 'lockdown' | 'nextId'>>;
+type Loaded = Partial<Pick<DemoState, 'grants' | 'applications' | 'notifications' | 'transactions' | 'treasury' | 'lockdown' | 'nextId' | 'accounts'>>;
 
 export function serverState(loaded: Loaded): DemoState {
   const base = createSeedState();

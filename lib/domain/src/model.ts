@@ -368,6 +368,10 @@ export type AccountPermissions = {
   grantApplications: boolean;
   /** Grant payouts wait until a negative deposit balance (e.g. an unpaid commission) is cleared. Off: they never wait. */
   clearBalanceForPayouts: boolean;
+  /** Payouts need a verified identity (on by default). Off: this applicant can request payouts unverified. */
+  payoutIdentityCheck: boolean;
+  /** Payouts at or above the dual-control threshold need two staff sign-offs (on by default). Off: one person with payment rights can mark them paid. */
+  payoutTwoSignOffs: boolean;
 };
 
 /** Which balances an applicant may move onto their card themselves (staff can use either). */

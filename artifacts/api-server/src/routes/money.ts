@@ -21,7 +21,7 @@ import {
 } from "@workspace/domain/deposits";
 import { cancelWithdrawal, requestPhysicalCard, requestWithdrawal, setCardLimit, toggleCardFreeze } from "@workspace/domain/money";
 import type { DemoState, DepositProof, MethodPhotoFile, Result, Transaction, Treasury, TreasuryInput } from "@workspace/domain/model";
-import { approvePayoutRelease, markPayoutFailed, markPayoutPaid } from "@workspace/domain/payouts";
+import { approvePayoutRelease, markPayoutFailed, markPayoutPaid, needsSecondSignOff } from "@workspace/domain/payouts";
 import { endLockdown, startLockdown } from "@workspace/domain/security";
 import { applicantState, readApplicantSlot, serverState } from "@workspace/domain/server";
 import { CURRENT_APPLICANT_ID as SLOT } from "@workspace/domain/seed";
@@ -258,7 +258,8 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
       const actor = authLocals(res).staff!;
       const outcome = await money.withApplicant(found.applicantId, async (scope): Promise<{ saved: Transaction; message: string } | { failure: Failure }> => {
         const current = scope.transactions.find(t => t.id === found.id)!;
-        const before = serverState({ transactions: scope.transactions, treasury: scope.treasury, lockdown: scope.lockdown });
+        // The applicant's account goes in too: per-applicant switches (e.g. two sign-offs for payouts) apply to staff actions.
+        const before = serverState({ transactions: scope.transactions, treasury: scope.treasury, lockdown: scope.lockdown, accounts: { [found.applicantId]: slotApplicant(scope.applicant).account } });
         const result = parsed.command(before, actor, current);
         if (!result.ok) return { failure: refused(result) };
         let after = result.state.transactions;
@@ -288,8 +289,8 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
   txAction("deposits/:id/reject", "payments.process", "Reject deposit", reason(text => (s, a, tx) => rejectDeposit(s, tx.id, text, a.name, new Date()), "Explain why the deposit was rejected."));
   txAction("withdrawals/:id/release", "payments.release", "Approve payout release", none((s, a, tx) => approvePayoutRelease(s, tx.id, a.name, new Date())));
   txAction("withdrawals/:id/paid", "payments.process", "Mark payout paid", none((s, a, tx) => {
-    // Two different people: the rule compares names, the server also compares staff ids.
-    if (tx.releaseApproval?.byId === a.id) return { ok: false, error: `You approved the release of ${tx.id}, so a different staff member must mark it paid.` };
+    // Two different people: the rule compares names, the server also compares staff ids (unless two sign-offs are off for this applicant).
+    if (needsSecondSignOff(s, tx) && tx.releaseApproval?.byId === a.id) return { ok: false, error: `You approved the release of ${tx.id}, so a different staff member must mark it paid.` };
     return markPayoutPaid(s, tx.id, a.name, new Date());
   }));
   txAction("withdrawals/:id/failed", "payments.process", "Mark payout failed", reason(text => (s, a, tx) => markPayoutFailed(s, tx.id, text, a.name, new Date()), "Explain why the payout failed."));

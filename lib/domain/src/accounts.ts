@@ -27,6 +27,8 @@ export const PERMISSION_SWITCHES: { key: keyof AccountPermissions; label: string
   { key: 'emailNotifications', label: 'Email copies of notifications', on: 'Notifications will also be emailed to you.', off: "Notifications will no longer be emailed to you (security notices still are)." },
   { key: 'cardApplications', label: 'Card applications', on: 'You can create and apply for cards again.', off: 'Card applications are turned off for your account.' },
   { key: 'grantApplications', label: 'New grant applications', on: 'You can submit new grant applications again.', off: 'New grant applications are turned off for your account.' },
+  { key: 'payoutIdentityCheck', label: 'Identity check for payouts', on: 'Payouts now need a verified identity.', off: 'Payouts no longer need an identity check.' },
+  { key: 'payoutTwoSignOffs', label: 'Two staff sign-offs for large payouts', on: 'Large payouts are checked by two members of the grant team before they are sent.', off: 'Large payouts can be sent after one team member checks them.' },
   { key: 'clearBalanceForPayouts', label: 'Clear a negative deposit balance before grant payouts', on: 'Payouts from your grant balance now wait until your deposit balance is $0 or more.', off: 'Payouts from your grant balance no longer wait for your deposit balance.' },
 ];
 

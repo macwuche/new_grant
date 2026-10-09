@@ -22,8 +22,9 @@ export type CardsJson = {
 };
 
 /** Mirrors `AccountPermissions` in @workspace/domain, without `emailNotifications` (its own column). */
-/** `payoutKyc` was retired on 3 Oct 2026 (payouts always need a verified identity); older rows may still have it and it's ignored. */
-export type AccountPermissionsJson = { depositKyc: boolean; cardApplications: boolean; grantApplications: boolean; /** Added 3 Oct 2026; missing means off. */ clearBalanceForPayouts?: boolean };
+/** `payoutKyc` was retired on 3 Oct 2026; older rows may still have it and it's ignored. Its replacement (9 Oct 2026) is `payoutIdentityCheck`. */
+export type AccountPermissionsJson = { depositKyc: boolean; cardApplications: boolean; grantApplications: boolean; /** Added 3 Oct 2026; missing means off. */ clearBalanceForPayouts?: boolean;
+  /** Added 9 Oct 2026; missing means on. */ payoutIdentityCheck?: boolean; payoutTwoSignOffs?: boolean };
 
 export const accountStatusEnum = pgEnum("account_status", ["Active", "Locked"]);
 

@@ -958,6 +958,10 @@ export interface AccountPermissions {
   grantApplications: boolean;
   /** Grant payouts wait until a negative deposit balance is cleared */
   clearBalanceForPayouts: boolean;
+  /** Payouts need a verified identity */
+  payoutIdentityCheck: boolean;
+  /** Payouts at or above the dual-control threshold need two staff sign-offs */
+  payoutTwoSignOffs: boolean;
 }
 
 export type AccountPermissionChangeKey = typeof AccountPermissionChangeKey[keyof typeof AccountPermissionChangeKey];
@@ -969,6 +973,8 @@ export const AccountPermissionChangeKey = {
   cardApplications: 'cardApplications',
   grantApplications: 'grantApplications',
   clearBalanceForPayouts: 'clearBalanceForPayouts',
+  payoutIdentityCheck: 'payoutIdentityCheck',
+  payoutTwoSignOffs: 'payoutTwoSignOffs',
 } as const;
 
 export interface AccountPermissionChange {

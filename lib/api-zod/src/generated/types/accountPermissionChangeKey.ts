@@ -15,4 +15,6 @@ export const AccountPermissionChangeKey = {
   cardApplications: 'cardApplications',
   grantApplications: 'grantApplications',
   clearBalanceForPayouts: 'clearBalanceForPayouts',
+  payoutIdentityCheck: 'payoutIdentityCheck',
+  payoutTwoSignOffs: 'payoutTwoSignOffs',
 } as const;

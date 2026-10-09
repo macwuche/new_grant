@@ -6,6 +6,7 @@ import * as api from '@workspace/api-client-react';
 import type { PayoutBalance, Transaction, TransactionStatus, WithdrawalMethod } from '@workspace/domain/model';
 import { availableFor, cancelWithdrawal, channelFee, enabledChannels, grantPayoutHold, payoutBlocker, requestWithdrawal, validateWithdrawal, withdrawalBalance } from '@workspace/domain/money';
 import { computeBalances, ownTransactions } from '@workspace/domain/rules';
+import { permissionsOf } from '@workspace/domain/applicants';
 import { answerLimit, BALANCE_LABELS, chargesLabel, checkAnswers, methodBalances } from '@workspace/domain/withdrawalMethods';
 import { MethodBadge } from '@/components/MethodBadge';
 import { useMoneyAction, useServerData } from '@/lib/serverData';
@@ -242,7 +243,7 @@ function NewWithdrawal({ onToast }: { onToast: Toast }) {
         <div><dt>Processing time</dt><dd>{method.processingTime}</dd></div>
         {method.fields.filter(f => (answers[f.id] ?? '').trim()).map(f => <div key={f.id}><dt>{f.label}</dt><dd className="wd-answer" data-testid={`text-review-detail-${f.id}`}>{answers[f.id]!.trim()}</dd></div>)}
       </dl>
-      {value >= state.treasury.dualControlThreshold && <p className="dp-note"><ShieldCheck size={14} aria-hidden="true" /> Requests of {usd(state.treasury.dualControlThreshold)} or more need two members of the finance team to sign off, so they can take longer.</p>}
+      {value >= state.treasury.dualControlThreshold && permissionsOf(state).payoutTwoSignOffs && <p className="dp-note"><ShieldCheck size={14} aria-hidden="true" /> Requests of {usd(state.treasury.dualControlThreshold)} or more need two members of the finance team to sign off, so they can take longer.</p>}
       <p className="dp-note"><FileText size={14} aria-hidden="true" /> The amount is held from your {BALANCE_LABELS[chosen].toLowerCase()} until finance sends it. You can cancel while it's pending.</p>
       <div className="dp-actions split"><button type="button" className="dp-btn ghost" onClick={() => go(method.fields.length ? 'details' : 'amount')} disabled={busy} data-testid="button-withdraw-back"><ArrowLeft size={14} /> Back</button>
         <button type="submit" className="dp-btn primary" disabled={busy || !!blocker} data-testid="button-submit-withdrawal">{busy ? <LoaderCircle size={14} className="dp-spin" /> : <Receipt size={14} />} Request withdrawal</button></div>

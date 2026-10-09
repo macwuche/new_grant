@@ -62,17 +62,18 @@ export function accountLockReason(state: DemoState): string | null {
 
 // ---------- Permissions staff switch per applicant ----------
 
-export const DEFAULT_PERMISSIONS: AccountPermissions = { depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false };
-/** Only the known switches: older saved data may still carry retired ones (e.g. `payoutKyc`, removed 3 Oct 2026). */
+export const DEFAULT_PERMISSIONS: AccountPermissions = { depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false, payoutIdentityCheck: true, payoutTwoSignOffs: true };
+/** Only the known switches: older saved data may still carry retired ones (e.g. `payoutKyc`, removed 3 Oct 2026; its
+ * replacement `payoutIdentityCheck` has a new name so old `payoutKyc: false` values don't come back). */
 export const knownPermissions = (stored: Partial<AccountPermissions> | null | undefined): AccountPermissions =>
   Object.fromEntries((Object.keys(DEFAULT_PERMISSIONS) as (keyof AccountPermissions)[]).map(k => [k, typeof stored?.[k] === 'boolean' ? stored[k] : DEFAULT_PERMISSIONS[k]])) as AccountPermissions;
 export const permissionsOf = (state: DemoState, applicantId = CURRENT_APPLICANT_ID): AccountPermissions => knownPermissions(accountOf(state, applicantId).permissions);
 
 /** Why the demo applicant can't do `what` because of a switch staff set, or null.
- * Payouts always need a verified identity (owner's rule, 3 Oct 2026); applying for grants doesn't. */
+ * Payouts need a verified identity unless staff turn that off for the applicant (owner, 9 Oct 2026); applying for grants doesn't. */
 export function permissionBlocker(state: DemoState, what: 'payout' | 'deposit' | 'card' | 'application'): string | null {
   const p = permissionsOf(state);
-  if (what === 'payout' && !state.profile.identityVerified) return 'Verify your identity (Settings → Identity check) before requesting a payout.';
+  if (what === 'payout' && p.payoutIdentityCheck && !state.profile.identityVerified) return 'Verify your identity (Settings → Identity check) before requesting a payout.';
   if (what === 'deposit' && p.depositKyc && !state.profile.identityVerified) return 'Verify your identity (Settings → Identity check) before adding funds.';
   if (what === 'card' && !p.cardApplications) return 'Card applications are turned off for your account. Contact support if you need a card.';
   if (what === 'application' && !p.grantApplications) return 'New grant applications are turned off for your account. Contact support to find out why.';

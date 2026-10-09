@@ -69,12 +69,22 @@ describe('balance adjustments', () => {
 
 describe('permission switches', () => {
   it('defaults everything open and refuses a no-op change', () => {
-    expect(permissionsOf(s)).toEqual({ depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false });
+    expect(permissionsOf(s)).toEqual({ depositKyc: false, emailNotifications: true, cardApplications: true, grantApplications: true, clearBalanceForPayouts: false, payoutIdentityCheck: true, payoutTwoSignOffs: true });
     refuse(setAccountPermission(s, CURRENT_APPLICANT_ID, 'cardApplications', true, now), /already on/);
     refuse(setAccountPermission(s, 'APL-nobody', 'cardApplications', false, now), /could not be found/);
   });
 
-  it('always requires a verified identity for payouts, and for deposits when switched on', () => {
+  it('lets staff turn the payout identity check off for one applicant', () => {
+    unverified();
+    turn('payoutIdentityCheck', false);
+    expect(s.notifications[0]).toMatchObject({ applicantId: CURRENT_APPLICANT_ID, body: 'Payouts no longer need an identity check.' });
+    expect(M.payoutBlocker(s)).toBeNull();
+    accept(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: s.savedPayoutDetails['bank'] }, now));
+    turn('payoutIdentityCheck', true);
+    expect(M.payoutBlocker(s)).toMatch(/Verify your identity .* payout/);
+  });
+
+  it('requires a verified identity for payouts by default, and for deposits when switched on', () => {
     unverified();
     expect(M.payoutBlocker(s)).toMatch(/Verify your identity .* payout/);
     refuse(M.requestWithdrawal(s, { amount: 20, method: 'bank', details: s.savedPayoutDetails['bank'] }, now), /Verify your identity .* payout/);

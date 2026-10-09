@@ -4374,13 +4374,19 @@ components:
         clearBalanceForPayouts:
           type: boolean
           description: Grant payouts wait until a negative deposit balance is cleared
-      required: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
+        payoutIdentityCheck:
+          type: boolean
+          description: Payouts need a verified identity
+        payoutTwoSignOffs:
+          type: boolean
+          description: Payouts at or above the dual-control threshold need two staff sign-offs
+      required: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts, payoutIdentityCheck, payoutTwoSignOffs]
     AccountPermissionChange:
       type: object
       properties:
         key:
           type: string
-          enum: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts]
+          enum: [depositKyc, emailNotifications, cardApplications, grantApplications, clearBalanceForPayouts, payoutIdentityCheck, payoutTwoSignOffs]
         value:
           type: boolean
       required: [key, value]
