@@ -429,9 +429,11 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Grant plans editable after submissions (10 Oct 2026) — `410c60a`, not yet deployed
+### Grant plans editable after submissions (10 Oct 2026) — deployed 10 Oct 2026 as `4841d82` (`410c60a` + server notes)
 
 No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: as the super admin, Admin → Grants → a plan with submitted applications (e.g. Celebrity Fan Funding): no field shows a lock, a note says how many applications were submitted, and changing the application form or minimum tier saves. Open a submitted application whose field was removed: its answer shows "(no longer on the form)". Details: `work.md` §6, "10 Oct 2026".
+
+Deployed 10 Oct 2026 (~14:32, server clock): `git pull --ff-only` (`4390116..4841d82`), `sh deploy/build.sh` (Build OK, bundle `index-b4f-kQL9.js`), restart; `/api/healthz` → ok. The login banner says "System restart required" (pending Ubuntu updates); reboot at a quiet time. Still to do: the editor check above.
 
 ### Per-applicant payout switches (9 Oct 2026) — deployed 9 Oct 2026 as `4390116` (`e14c6ee` + server notes)
 
@@ -711,3 +713,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-05 — Deployed `4f99dad` (commission charged at the plan's rate at approval; no schema push): pull, `sh deploy/build.sh` (Build OK), restart (the first attempt was typed during the build and swallowed; rerun on its own), `/api/healthz` ok locally and from outside, bundle `index-BrZDvpP_.js` served. Tip recorded: paste one command at a time and wait for the prompt.
 - 2026-10-05 — Deployed `1ee502b` (shared branding: logo, dark logo, favicon, app colour for everyone, email colour with preview): pull, **schema push** (`email_settings.branding`; "Changes applied", no prompts), `sh deploy/build.sh` (Build OK), restart, `/api/healthz` ok locally and from outside; bundle `index-Cggam0We.js`; `/api/branding` returns the new fields. The application name is already "Nova Bridge Grant". Next: the owner uploads the logo and favicon and picks the colours in Settings → App branding.
 - 2026-10-08 — Deployed `f7e58e1` (application text limits, upload disk protections, image rebuilding with `sharp`, plans without a total budget; no schema push: the two schema files changed only in comments). Server was clean on `1ee502b`; `git pull --ff-only` (fast-forward `1ee502b..f7e58e1`), `sh deploy/build.sh` (+5 packages for `sharp`; Build OK ~06:03 UTC), `sharp 0.35.5` loads as `novabridgegrant`, API restarted 06:06:56 UTC, `active (running)`, `/api/healthz` ok. Disk: 51 GB free of 58 GB (11% used), well above the 2,048 MB upload floor (`MIN_FREE_DISK_MB` not set, default in use). Owner's browser checks all passed: "Awarded so far" on plan cards and the overview with no budget field, a 1,500-character long answer saves and submits, the 2,000 limit with counters, a phone photo as profile picture shows upright. Next: the owner sets up Settings → App branding (now stored as rebuilt images).
+- 2026-10-10 — Deployed `4841d82` (grant plans editable after submissions; no schema push): `git pull --ff-only` (`4390116..4841d82`), `sh deploy/build.sh` (Build OK; bundle `index-b4f-kQL9.js`), restart, `/api/healthz` ok. Server asks for a reboot ("System restart required") after package updates; not done yet.

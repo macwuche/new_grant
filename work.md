@@ -367,7 +367,7 @@ No schema change in either slice.
 
 **Tests:** 229 rule tests (4 new), 174 API tests (1 new: finance can't switch it off, a super admin can, then the approver can mark the payout paid, and later large payouts aren't flagged), typecheck. No headless-browser check yet.
 
-### 10 Oct 2026: grant plans editable after submissions (owner's request; built and tested 10 Oct 2026; not yet committed or deployed, no schema push)
+### 10 Oct 2026: grant plans editable after submissions (owner's request; built and tested 10 Oct 2026; committed as `410c60a` and deployed 10 Oct 2026 ~14:32 as `4841d82`, no schema push; `/api/healthz` ok)
 
 **Before:** once anyone submitted an application, a plan's minimum tier, minimum request, registration requirement, required documents, and application form were locked, and the maximum award could only go up. Name, summary, focus, deadline, approval days, and commission stayed editable.
 
