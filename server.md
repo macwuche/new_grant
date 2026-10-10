@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Grant plans editable after submissions (10 Oct 2026) — `410c60a`, not yet deployed
+
+No schema change: `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: as the super admin, Admin → Grants → a plan with submitted applications (e.g. Celebrity Fan Funding): no field shows a lock, a note says how many applications were submitted, and changing the application form or minimum tier saves. Open a submitted application whose field was removed: its answer shows "(no longer on the form)". Details: `work.md` §6, "10 Oct 2026".
+
 ### Per-applicant payout switches (9 Oct 2026) — deployed 9 Oct 2026 as `4390116` (`e14c6ee` + server notes)
 
 No schema change (the switches live in the existing `applicant_profiles.permissions` JSON; missing means on): `git pull`, `sh deploy/build.sh`, `systemctl restart novabridgegrant-api`. Check: as the super admin, open an applicant's profile (Admin → Applicants → the applicant) → **Feature toggles**: **Identity check for payouts** and **Two staff sign-offs for large payouts** show, both On. Turn two sign-offs Off for the applicant with the $10,000 payout, then Admin → Payments → Payouts: the approver can now mark it paid. Details: `work.md` §6, "9 Oct 2026".
