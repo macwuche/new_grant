@@ -24,6 +24,14 @@ type Outcome = { ok: true; message: string; version?: string } | { ok: false; er
 const usd = (value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm');
 const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+/** A readable label for a form field id ("how-many-people" → "How many people"). */
+const fieldLabel = (id: string) => { const words = id.replace(/-\d+$/, '').replace(/-/g, ' ').trim(); return words ? words[0].toUpperCase() + words.slice(1) : id; };
+/** File slots with uploads that no longer match a requirement or document field on the plan. */
+const earlierSlots = (docs: { requirement?: string | null }[], current: { slot: string }[]) => {
+  const known = new Set(current.map(c => c.slot));
+  const extra = [...new Set(docs.map(d => d.requirement).filter((r): r is string => !!r && !known.has(r)))];
+  return extra.map(slot => ({ slot, label: `${slot.startsWith('field:') ? fieldLabel(slot.slice(6)) : slot} (no longer on the plan)` }));
+};
 
 export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: () => void }) {
   const { state, run } = useDemoStore();
@@ -113,6 +121,11 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   const canReview = can('applications.review');
   const person = findApplicant(state, app.applicantId);
   const risk = assessRisk(state, app.applicantId, new Date());
+  // Plans stay editable after submissions, so show answers and files sent for
+  // fields or requirements that have since been removed or renamed.
+  const currentSlots = [...grant.requirements.map(r => ({ slot: r, label: r })), ...grant.questions.filter(q => q.type === 'file').map(q => ({ slot: `field:${q.id}`, label: `${q.label}${q.required ? '' : ' (optional)'}` }))];
+  const typedIds = new Set(grant.questions.filter(q => q.type !== 'file').map(q => q.id));
+  const earlierAnswers = Object.entries(app.answers).filter(([id, value]) => !typedIds.has(id) && value);
   const escalation = app.escalation;
   const escalationOpen = escalation?.status === 'Open';
   const canEscalate = can('applications.escalate') && ['Submitted', 'Under review', 'Changes requested'].includes(app.status) && !escalationOpen;
@@ -150,10 +163,10 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
         {!mayOpenEvidence ? <p className="admin-review-hint">Your role can't open application files.</p>
           : evidence.error ? <p className="admin-field-error">{evidence.error}</p>
           : evidence.docs === null ? <p className="admin-review-hint">Loading…</p>
-          : [...grant.requirements.map(r => ({ slot: r, label: r })), ...grant.questions.filter(q => q.type === 'file').map(q => ({ slot: `field:${q.id}`, label: `${q.label}${q.required ? '' : ' (optional)'}` }))].map(({ slot, label }) => { const files = evidence.docs!.filter(d => d.requirement === slot); return <div key={slot}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{label}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
+          : [...currentSlots, ...earlierSlots(evidence.docs, currentSlots)].map(({ slot, label }) => { const files = evidence.docs!.filter(d => d.requirement === slot); return <div key={slot}><p className={`admin-review-req ${files.length ? 'ok' : 'missing'}`}>{files.length ? <Check size={13} /> : <X size={13} />}{label}</p><DocumentFiles docs={files} editable={false} buttonClass="admin-btn" onToast={text => setFlash({ tone: 'error', text })} empty="No file." /></div>; })}
         <p className="admin-review-hint">Opening a file is recorded in the audit log.</p></section>
       : <section className="admin-review-section"><h3>Requirements confirmed</h3><ul className="admin-review-checklist">{grant.requirements.map(req => { const ok = app.checklist.includes(req); return <li key={req} className={ok ? 'ok' : 'missing'}>{ok ? <Check size={13} /> : <X size={13} />}{req}</li>; })}</ul><p className="admin-review-hint">Preview: applicants confirm readiness only; no files are uploaded.</p></section>}
-    {grant.questions.some(q => q.type !== 'file') && <section className="admin-review-section"><h3>Application form</h3><dl className="admin-detail-fields">{grant.questions.filter(q => q.type !== 'file').map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}</dl></section>}
+    {(grant.questions.some(q => q.type !== 'file') || earlierAnswers.length > 0) && <section className="admin-review-section"><h3>Application form</h3><dl className="admin-detail-fields">{grant.questions.filter(q => q.type !== 'file').map(q => <div className="admin-detail-field" key={q.id}><dt>{q.label}</dt><dd data-testid={`text-admin-answer-${q.id}`}>{app.answers[q.id] || <span className="admin-table-muted">Not answered</span>}</dd></div>)}{earlierAnswers.map(([id, value]) => <div className="admin-detail-field" key={id}><dt>{fieldLabel(id)} <span className="admin-table-muted">(no longer on the form)</span></dt><dd data-testid={`text-admin-answer-${id}`}>{value}</dd></div>)}</dl></section>}
 
     <section className="admin-review-section admin-review-actions" aria-label="Decision">
       <h3>Decision</h3>

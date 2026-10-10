@@ -35,11 +35,11 @@ describe('program questions', () => {
     expect(app('APP-2101').answers).toEqual({ savings: '1200' });
   });
 
-  it('lets staff add questions with generated ids, and locks them after submissions', () => {
+  it('lets staff add questions with generated ids, even after submissions', () => {
     const creative = grant('creative');
     const { updatedAt: _u, changeLog: _c, status: _s, id: _i, ...input } = creative;
     const questions = [{ id: '', label: 'Link to your portfolio', type: 'text' as const, required: true }];
-    expect(G.updateProgram(s, 'creative', creative.updatedAt, { ...input, questions }, 'Sam Rivera', now).ok).toBe(false); // creative has submissions
+    expect(G.updateProgram(s, 'creative', creative.updatedAt, { ...input, questions }, 'Sam Rivera', now).ok).toBe(true); // creative has submissions
     const space = grant('space');
     const { updatedAt: _u2, changeLog: _c2, status: _s2, id: _i2, ...draftInput } = space;
     expect(G.validateProgram(s, { ...draftInput, questions: [...questions, { id: '', label: 'link to your portfolio', type: 'number', required: false }] }, now, space).questions).toMatch(/different label/);

@@ -613,15 +613,17 @@ describe("applications and review", () => {
     expect((await decide(application.id, "approve", { version: v, award: 1000 })).status).toBe(200);
   });
 
-  it("locks criteria after the first submission", async () => {
+  it("keeps a plan editable after applications are submitted", async () => {
     await verify("tok-maya", MAYA);
     const { application } = await json(await submit({ grantId: "creative", application: creative }));
     const v = (await json(await decide(application.id, "start-review", { version: application.updatedAt }))).application.updatedAt;
     await decide(application.id, "approve", { version: v, award: 4000 });
     const grant = await program("creative");
     const { id: _id, status: _status, updatedAt, changeLog: _log, ...input } = grant;
-    const tier = await json(await put("/programs/creative", { version: updatedAt, program: { ...input, minimumTier: 2 } }));
-    expect(tier.fieldErrors.minimumTier).toMatch(/Locked/);
+    const res = await put("/programs/creative", { version: updatedAt, program: { ...input, minimumTier: 2, minimumRequest: input.minimumRequest + 1, maxFunding: input.maxFunding - 1, requirements: [], questions: [] } });
+    expect(res.status).toBe(200);
+    const saved = await program("creative");
+    expect([saved.minimumTier, saved.minimumRequest, saved.maxFunding, saved.requirements, saved.questions]).toEqual([2, input.minimumRequest + 1, input.maxFunding - 1, [], []]);
   });
 
   it("has no overall budget: two simultaneous approvals both succeed, limited only by each request and the plan maximum", async () => {

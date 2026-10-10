@@ -13,8 +13,8 @@ import { auditContext, authLocals, requirePermission } from "../middlewares/auth
 // (@workspace/domain/programs) against the programs loaded from the database,
 // then stores the one program that changed, conditional on its version.
 // Changes to an existing program run inside that program's lock with its
-// applications loaded, so criteria lock after the first submission, even under
-// concurrent requests. Plans have no overall budget (owner's decision, 7 Oct 2026).
+// applications loaded. Every field stays editable after submissions (owner's
+// decision, 10 Oct 2026). Plans have no overall budget (owner's decision, 7 Oct 2026).
 // Each change is audited, and closing a program notifies applicants holding
 // drafts, in the same transaction.
 

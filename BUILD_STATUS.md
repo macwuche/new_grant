@@ -32,6 +32,8 @@ The application logic was built client-side first (decision of 25 Sep 2026), the
 
 **9 Oct 2026: per-applicant payout switches (owner's request; built and tested 9 Oct 2026; committed as `e14c6ee` and deployed 9 Oct 2026 ~07:56 as `4390116`, no schema push; details: `work.md` §6):** two new Feature toggles on the admin applicant profile, both on by default: **Identity check for payouts** and **Two staff sign-offs for large payouts**. Turning two sign-offs off also applies to that applicant's payouts already pending.
 
+**10 Oct 2026: grant plans editable after submissions (owner's request; built and tested, not yet committed or deployed, no schema push; details: `work.md` §6):** the lock on a plan's tier, minimum request, registration, required documents, and form after the first submission is removed, as is the rule that the maximum award can only go up. The editor notes how many applications were submitted; the review panel still shows answers and files for fields removed since. 228 rule tests, 174 API tests, typecheck pass.
+
 ## Build plan
 
 1. **Applicant UI prototype — Complete**

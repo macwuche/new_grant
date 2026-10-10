@@ -72,6 +72,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 - Application text limits live in `lib/domain/src/rules.ts` (`MAX_*`) and must match `ApplicationInput` in the OpenAPI spec; the API turns a contract refusal into field errors (`contractFieldErrors` in `routes/applications.ts`).
 - The dashboard's **Eligible amount** is set per tier by staff (`treasury.tierEligibleAmounts`, Settings → Money; owner, 8 Oct 2026) and is display only; 0 means not set and falls back to `maxEligibleAward` (the largest award the applicant can apply for now). Don't use it to cap requests without the owner's say.
 - Payout identity check and two sign-offs can be switched off per applicant (`payoutIdentityCheck`, `payoutTwoSignOffs` in `AccountPermissions`; owner, 9 Oct 2026). Both default on. Staff payout routes must load the applicant's account into the rule state (`accounts` in `serverState`) or these switches are ignored.
+- Grant plans stay fully editable after applications are submitted (owner, 10 Oct 2026); don't reintroduce a lock. The review panel shows answers and files for fields no longer on the plan.
 - Production reaches Supabase through the session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`); the direct `db.<ref>.supabase.co` host is IPv6-only.
 
 ## Pointers

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Building2, FolderOpen, Info, Leaf, Lock, Palette, Plus, Store, Trash2, X } from 'lucide-react';
+import { ArrowRight, Building2, FolderOpen, Info, Leaf, Palette, Plus, Store, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import * as api from '@workspace/api-client-react';
 import type { DemoState, Grant, GrantInput, ProgramQuestion, Result, Tier } from '@workspace/domain/model';
 import {
-  closeProgram, commissionFor, createProgram, deleteProgram, emptyProgram, hasSubmissions, LOCKED_WHEN_SUBMITTED,
+  closeProgram, commissionFor, createProgram, deleteProgram, emptyProgram,
   MAX_QUESTIONS, MAX_REQUIREMENTS, publishProgram, QUESTION_TYPES, updateProgram,
 } from '@workspace/domain/programs';
 import { programAwarded } from '@workspace/domain/review';
@@ -105,7 +105,6 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
 
   if (programId && !grant) return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow="Program"><h2 id="admin-detail-title">Program not found</h2><p className="admin-detail-lead">It may have been deleted.</p></ReviewFrame>;
 
-  const locked = grant && hasSubmissions(state, grant.id) ? new Set<string>(LOCKED_WHEN_SUBMITTED) : new Set<string>();
   const stale = !!grant && grant.updatedAt !== seenVersion;
   const dirty = JSON.stringify(toInput(form)) !== JSON.stringify(toInput(toForm(grant ?? emptyProgram(new Date()))));
   const apps = grant ? state.applications.filter(a => a.grantId === grant.id && a.status !== 'Draft') : [];
@@ -135,11 +134,11 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
   const setQuestion = (i: number, patch: Partial<ProgramQuestion>) => set('questions', form.questions.map((q, j) => j === i ? { ...q, ...patch } : q));
 
   const field = (key: keyof Form, label: string, input: React.ReactNode, hint?: string) => <label className="admin-review-field" key={key}>
-    <span>{label}{locked.has(key) && <Lock size={11} style={{ marginLeft: 5, verticalAlign: '-1px' }} aria-label="Locked" />}</span>
+    <span>{label}</span>
     {input}
     {errors[key] ? <small className="admin-field-error">{errors[key]}</small> : hint ? <small>{hint}</small> : null}
   </label>;
-  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} disabled={locked.has(key)} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
+  const text = (key: 'name' | 'focus' | 'minimumRequest' | 'maxFunding' | 'deadline' | 'approvalDays' | 'commissionRate', type = 'text', step = '0.01') => <input className="admin-input" type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? step : undefined} value={form[key]} onChange={e => set(key, e.target.value)} aria-invalid={!!errors[key]} data-testid={`input-admin-program-${key}`} />;
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={grant ? `${grant.id} / Program` : 'New program'}>
     <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{grant ? grant.name : 'New program'}</h2>{grant && <span className={`admin-badge ${grant.status.toLowerCase()}`} data-testid="status-admin-program">{PROGRAM_STATUS_LABELS[grant.status]}</span>}</div>
@@ -172,7 +171,7 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
 
     <section className="admin-review-section" aria-label="Program details">
       <h3>Details</h3>
-      {locked.size > 0 && <p className="admin-review-hint"><Lock size={11} style={{ verticalAlign: '-1px' }} /> Eligibility criteria are locked because applications have been submitted. The maximum award can only go up.</p>}
+      {apps.length > 0 && <p className="admin-review-hint" data-testid="text-admin-program-edit-note"><Info size={11} style={{ verticalAlign: '-1px' }} /> {apps.length} application{apps.length === 1 ? ' has' : 's have'} been submitted. They keep what was sent; your changes apply to new submissions and resubmissions, and the maximum award and commission apply when an application is approved.</p>}
       {field('name', 'Program name', text('name'))}
       {field('focus', 'Focus (staff label)', text('focus'), 'e.g. Small businesses')}
       {field('summary', 'Summary (shown to applicants)', <textarea className="admin-input" rows={3} value={form.summary} onChange={e => set('summary', e.target.value)} aria-invalid={!!errors.summary} data-testid="input-admin-program-summary" />)}
@@ -188,18 +187,18 @@ function ProgramPanel({ programId, onClose, onCreated }: { programId: string | n
         {field('commissionRate', 'Commission (% of the amount approved)', text('commissionRate', 'number'), commissionHint(form))}
       </div>
       <div className="admin-form-row">
-        {field('minimumTier', 'Minimum account tier', <select className="admin-input" value={form.minimumTier} disabled={locked.has('minimumTier')} onChange={e => set('minimumTier', e.target.value)} data-testid="select-admin-program-tier"><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option></select>)}
-        <label className="admin-review-field admin-check"><span>Registration number {locked.has('requiresRegistration') && <Lock size={11} aria-label="Locked" />}</span><span className="admin-check-row"><input type="checkbox" checked={form.requiresRegistration} disabled={locked.has('requiresRegistration')} onChange={e => set('requiresRegistration', e.target.checked)} data-testid="checkbox-admin-program-registration" /> Required</span>{errors.requiresRegistration && <small className="admin-field-error">{errors.requiresRegistration}</small>}</label>
+        {field('minimumTier', 'Minimum account tier', <select className="admin-input" value={form.minimumTier} onChange={e => set('minimumTier', e.target.value)} data-testid="select-admin-program-tier"><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option></select>)}
+        <label className="admin-review-field admin-check"><span>Registration number</span><span className="admin-check-row"><input type="checkbox" checked={form.requiresRegistration} onChange={e => set('requiresRegistration', e.target.checked)} data-testid="checkbox-admin-program-registration" /> Required</span>{errors.requiresRegistration && <small className="admin-field-error">{errors.requiresRegistration}</small>}</label>
       </div>
-      <fieldset className="admin-review-field admin-requirements" disabled={locked.has('requirements')}>
-        <legend>Required documents {locked.has('requirements') && <Lock size={11} aria-label="Locked" />}</legend>
+      <fieldset className="admin-review-field admin-requirements">
+        <legend>Required documents</legend>
         <small>Optional. Each one needs an uploaded file before the applicant can submit. You can also add document fields to the application form below.</small>
         {form.requirements.map((req, i) => <div className="admin-requirement" key={i}><input className="admin-input" value={req} onChange={e => set('requirements', form.requirements.map((r, j) => j === i ? e.target.value : r))} aria-label={`Requirement ${i + 1}`} data-testid={`input-admin-program-requirement-${i}`} /><button type="button" className="admin-icon-button" onClick={() => set('requirements', form.requirements.filter((_, j) => j !== i))} aria-label={`Remove requirement ${i + 1}`} data-testid={`button-admin-program-remove-requirement-${i}`}><X size={14} /></button></div>)}
         {form.requirements.length < MAX_REQUIREMENTS && <button type="button" className="admin-btn" onClick={() => set('requirements', [...form.requirements, ''])} data-testid="button-admin-program-add-requirement"><Plus size={13} style={{ verticalAlign: '-2px' }} /> Add requirement</button>}
         {errors.requirements && <small className="admin-field-error">{errors.requirements}</small>}
       </fieldset>
-      <fieldset className="admin-review-field admin-requirements" disabled={locked.has('questions')} data-testid="fieldset-admin-program-questions">
-        <legend>Application form {locked.has('questions') && <Lock size={11} aria-label="Locked" />}</legend>
+      <fieldset className="admin-review-field admin-requirements" data-testid="fieldset-admin-program-questions">
+        <legend>Application form</legend>
         <small>The fields applicants fill in after the basics: text, numbers, yes/no, or a document upload (PDF, JPEG, or PNG, checked for hidden content). Up to {MAX_QUESTIONS}; blank ones are dropped.</small>
         {form.questions.map((q, i) => <div className="admin-question" key={q.id || `new-${i}`}>
           <input className="admin-input" value={q.label} placeholder={q.type === 'file' ? 'e.g. Latest bank statement' : 'e.g. How many people will this help?'} onChange={e => setQuestion(i, { label: e.target.value })} aria-label={`Field ${i + 1}`} data-testid={`input-admin-program-question-${i}`} />

@@ -15,9 +15,6 @@ export const MAX_APPROVAL_DAYS = 365;
 export const MAX_COMMISSION_RATE = 100;
 export { commissionFor } from './core';
 
-/** Eligibility criteria that can't change once someone has submitted, so in-flight applications stay valid. */
-export const LOCKED_WHEN_SUBMITTED: (keyof GrantInput)[] = ['minimumTier', 'requirements', 'requiresRegistration', 'minimumRequest', 'questions'];
-
 const FIELD_LABELS: Record<keyof GrantInput, string> = {
   name: 'name', summary: 'summary', focus: 'focus', maxFunding: 'maximum award', minimumRequest: 'minimum request',
   deadline: 'deadline', minimumTier: 'minimum tier', requirements: 'requirements', requiresRegistration: 'registration requirement', questions: 'application form',
@@ -30,9 +27,6 @@ const todayIso = (now: Date) => {
 };
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime()) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
 const isMoney = (value: number) => Number.isFinite(value) && value > 0 && roundCents(value) === value;
-
-/** True once any application for the program has left draft. */
-export const hasSubmissions = (state: DemoState, grantId: string) => state.applications.some(a => a.grantId === grantId && a.status !== 'Draft');
 
 /** Blank questions are dropped; new ones get a stable id derived from their label. */
 function normalizeQuestions(questions: ProgramQuestion[]): ProgramQuestion[] {
@@ -89,13 +83,9 @@ export function validateProgram(state: DemoState, raw: GrantInput, now: Date, ex
 
   if (!Number.isInteger(input.approvalDays) || input.approvalDays < 1 || input.approvalDays > MAX_APPROVAL_DAYS) errors.approvalDays = `Enter whole days, 1–${MAX_APPROVAL_DAYS}.`;
   if (!Number.isFinite(input.commissionRate) || input.commissionRate < 0 || input.commissionRate > MAX_COMMISSION_RATE || roundCents(input.commissionRate) !== input.commissionRate) errors.commissionRate = `Enter a percentage from 0 to ${MAX_COMMISSION_RATE} (max two decimals).`;
-
-  if (existing && hasSubmissions(state, existing.id)) {
-    for (const key of LOCKED_WHEN_SUBMITTED) {
-      if (JSON.stringify(input[key]) !== JSON.stringify(existing[key])) errors[key] = 'Locked: applications have already been submitted against this criterion.';
-    }
-    if (!errors.maxFunding && input.maxFunding < existing.maxFunding) errors.maxFunding = "Can't be lowered after applications have been submitted.";
-  }
+  // Every field stays editable after applications are submitted (owner, 10 Oct 2026).
+  // Submitted applications keep what was sent; edits apply to new submissions,
+  // resubmissions, and the award ceiling and commission at approval.
   return errors;
 }
 

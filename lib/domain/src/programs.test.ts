@@ -128,17 +128,14 @@ describe('editing', () => {
     expect(G.updateProgram(s, 'space', program('space').updatedAt, inputOf(program('space')), PM, now).ok).toBe(false);
   });
 
-  it('locks eligibility criteria once applications are submitted', () => {
+  it('keeps every field editable after applications are submitted', () => {
     const g = program('momentum');
-    const errors = errorsOf(G.updateProgram(s, 'momentum', g.updatedAt, { ...inputOf(g), minimumTier: 1, requirements: ['Anything'], requiresRegistration: false, minimumRequest: 10, maxFunding: 12000 }, PM, now));
-    expect(Object.keys(errors).sort()).toEqual(['maxFunding', 'minimumRequest', 'minimumTier', 'requirements', 'requiresRegistration']);
-    accept(G.updateProgram(s, 'momentum', g.updatedAt, { ...inputOf(g), maxFunding: 15000, deadline: '2026-12-31' }, PM, now));
-    expect(program('momentum').maxFunding).toBe(15000);
-  });
-
-  it('keeps criteria editable when only drafts exist', () => {
-    s = { ...s, applications: s.applications.filter(a => a.grantId !== 'green' || a.status === 'Draft') };
-    accept(G.updateProgram(s, 'green', program('green').updatedAt, { ...inputOf(program('green')), minimumTier: 1 }, PM, now));
+    expect(s.applications.some(a => a.grantId === 'momentum' && a.status !== 'Draft')).toBe(true);
+    const questions = [{ id: 'team-size', label: 'Team size', type: 'number' as const, required: true }];
+    accept(G.updateProgram(s, 'momentum', g.updatedAt, { ...inputOf(g), minimumTier: 1, requirements: ['Anything'], requiresRegistration: false, minimumRequest: 10, maxFunding: 12000, questions, commissionRate: 4.5 }, PM, now));
+    const saved = program('momentum');
+    expect([saved.minimumTier, saved.requirements, saved.requiresRegistration, saved.minimumRequest, saved.maxFunding, saved.commissionRate]).toEqual([1, ['Anything'], false, 10, 12000, 4.5]);
+    expect(saved.questions.map(q => q.id)).toEqual(['team-size']);
   });
 
   it('requires an open program’s deadline to stay in the future', () => {
