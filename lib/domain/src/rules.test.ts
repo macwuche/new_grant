@@ -76,7 +76,7 @@ describe('eligibility', () => {
 });
 
 describe('application validation', () => {
-  const base: ApplicationInput = { businessName: 'Morgan Studio', requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: [], answers: {} };
+  const base: ApplicationInput = { requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: [], answers: {} };
 
   it('enforces the grant amount range', () => {
     expect(R.validateApplication({ ...base, requestedAmount: 100 }, grant('green'), 1).requestedAmount).toMatch(/minimum/);
@@ -89,11 +89,10 @@ describe('application validation', () => {
     expect(R.validateApplication({ ...base, registrationNumber: '' }, grant('creative'), 1).registrationNumber).toBeUndefined();
   });
 
-  it('limits the length of the name, registration number, and description, at the limit included', () => {
-    const at = { ...base, businessName: 'n'.repeat(R.MAX_BUSINESS_NAME_LENGTH), registrationNumber: 'r'.repeat(R.MAX_REGISTRATION_LENGTH), purpose: 'p'.repeat(R.MAX_PURPOSE_LENGTH) };
+  it('limits the length of the registration number and description, at the limit included', () => {
+    const at = { ...base, registrationNumber: 'r'.repeat(R.MAX_REGISTRATION_LENGTH), purpose: 'p'.repeat(R.MAX_PURPOSE_LENGTH) };
     expect(R.validateApplication(at, grant('green'), 1)).toEqual({});
-    const over = R.validateApplication({ ...at, businessName: `${at.businessName}n`, registrationNumber: `${at.registrationNumber}r`, purpose: `${at.purpose}p` }, grant('green'), 1);
-    expect(over.businessName).toMatch(/at most 200/);
+    const over = R.validateApplication({ ...at, registrationNumber: `${at.registrationNumber}r`, purpose: `${at.purpose}p` }, grant('green'), 1);
     expect(over.registrationNumber).toMatch(/at most 80/);
     expect(over.purpose).toMatch(/5,000 characters or fewer/);
   });
@@ -134,9 +133,15 @@ describe('drafts and submission', () => {
   });
 
   it('saving a new draft for a grant with an existing draft updates that draft', () => {
-    const result = accept(R.saveDraft(s, 'green', { ...app('APP-2101'), businessName: 'Renamed' }, now));
+    const result = accept(R.saveDraft(s, 'green', { ...app('APP-2101'), requestedAmount: 9000 }, now));
     expect(result.id).toBe('APP-2101');
-    expect(app('APP-2101').businessName).toBe('Renamed');
+    expect(app('APP-2101').requestedAmount).toBe(9000);
+  });
+
+  it('no longer asks for or keeps a business or project name (removed 11 Oct 2026)', () => {
+    expect(R.validateApplication(complete(app('APP-2101')), grant('green'), 1)).toEqual({});
+    accept(R.saveDraft(s, 'green', { ...app('APP-2101'), businessName: 'From an older portal' } as ApplicationInput, now));
+    expect(app('APP-2101')).not.toHaveProperty('businessName');
   });
 
   it('creates new drafts with unique ids owned by the applicant', () => {

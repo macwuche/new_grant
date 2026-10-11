@@ -140,8 +140,8 @@ export function AdminReviewPanel({ appId, onClose }: { appId: string; onClose: (
   const messageKey = decision === 'decline' ? 'reason' : 'message';
 
   return <ReviewFrame closeRef={closeRef} onClose={onClose} eyebrow={`${app.id} / Review`}>
-    <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{app.businessName}</h2><span className="admin-review-badges">{escalationOpen && <span className="admin-badge declined" data-testid="status-admin-escalated">Escalated</span>}<span className={`admin-badge ${app.status === 'Under review' ? 'review' : slug(app.status)}`} data-testid="status-admin-review">{app.status}</span></span></div>
-    <p className="admin-detail-lead">{applicantName(state, app.applicantId)} · {grant.name}</p>
+    <div className="admin-review-title"><h2 id="admin-detail-title" data-testid="text-admin-detail-title">{applicantName(state, app.applicantId)}</h2><span className="admin-review-badges">{escalationOpen && <span className="admin-badge declined" data-testid="status-admin-escalated">Escalated</span>}<span className={`admin-badge ${app.status === 'Under review' ? 'review' : slug(app.status)}`} data-testid="status-admin-review">{app.status}</span></span></div>
+    <p className="admin-detail-lead">{grant.name}</p>
 
     {stale && <div className="admin-review-stale" role="alert" data-testid="notice-admin-stale"><span>This application changed since you opened it{app.history[app.history.length - 1]!.actor === 'Applicant' ? ' — the applicant updated it' : ''}.</span><button type="button" onClick={() => { setSeenVersion(app.updatedAt); setConfirming(false); setFlash(null); }} data-testid="button-admin-load-latest"><RefreshCw size={13} /> Load latest</button></div>}
     {flash && <div className={`admin-review-flash ${flash.tone}`} role="status" data-testid="status-admin-review-flash">{flash.text}</div>}

@@ -8,8 +8,6 @@
 import type { ApplicationInputAnswers } from './applicationInputAnswers';
 
 export interface ApplicationInput {
-  /** @maxLength 200 */
-  businessName: string;
   requestedAmount: number;
   /** @maxLength 80 */
   registrationNumber: string;

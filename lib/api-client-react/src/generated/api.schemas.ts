@@ -1188,8 +1188,6 @@ export const ApplicationStatus = {
 export type ApplicationInputAnswers = {[key: string]: string};
 
 export interface ApplicationInput {
-  /** @maxLength 200 */
-  businessName: string;
   requestedAmount: number;
   /** @maxLength 80 */
   registrationNumber: string;
@@ -1260,7 +1258,6 @@ export interface Application {
   applicantId: string;
   grantId: string;
   status: ApplicationStatus;
-  businessName: string;
   requestedAmount: number;
   registrationNumber: string;
   purpose: string;

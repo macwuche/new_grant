@@ -20,6 +20,7 @@ export const applicationsTable = pgTable("applications", {
   applicantId: uuid("applicant_id").notNull().references(() => applicantProfilesTable.authUserId),
   grantId: text("grant_id").notNull().references(() => programsTable.id),
   status: applicationStatusEnum("status").notNull(),
+  // Retired 11 Oct 2026 (applications no longer ask for a business or project name): kept so existing rows and older API versions still work; new rows store "", never read.
   businessName: text("business_name").notNull(),
   requestedAmount: numeric("requested_amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
   registrationNumber: text("registration_number").notNull(),

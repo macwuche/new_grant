@@ -4644,9 +4644,6 @@ components:
     ApplicationInput:
       type: object
       properties:
-        businessName:
-          type: string
-          maxLength: 200
         requestedAmount:
           type: number
         registrationNumber:
@@ -4667,7 +4664,7 @@ components:
           additionalProperties:
             type: string
             maxLength: 2000
-      required: [businessName, requestedAmount, registrationNumber, purpose, checklist, answers]
+      required: [requestedAmount, registrationNumber, purpose, checklist, answers]
       additionalProperties: false
     ApplicationSubmission:
       type: object
@@ -4736,8 +4733,6 @@ components:
           type: string
         status:
           $ref: "#/components/schemas/ApplicationStatus"
-        businessName:
-          type: string
         requestedAmount:
           type: number
         registrationNumber:
@@ -4782,7 +4777,7 @@ components:
           allOf:
             - $ref: "#/components/schemas/Escalation"
           nullable: true
-      required: [id, applicantId, grantId, status, businessName, requestedAmount, registrationNumber, purpose, checklist, answers, createdAt, updatedAt, submittedAt, reviewer, awardedAmount, commissionRate, history, internalNotes, escalation]
+      required: [id, applicantId, grantId, status, requestedAmount, registrationNumber, purpose, checklist, answers, createdAt, updatedAt, submittedAt, reviewer, awardedAmount, commissionRate, history, internalNotes, escalation]
     ApplicationResult:
       type: object
       properties:

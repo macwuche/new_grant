@@ -49,7 +49,7 @@ export function AdminSecurity({ openApplicant, openReview }: { openApplicant: (i
       <section className="admin-panel" data-testid="panel-admin-escalations"><div className="admin-panel-head"><div><h2>Escalated applications</h2><p>Sent to compliance by a reviewer. Clear them from the review panel.</p></div></div>
         {escalations.length ? <div className="admin-list">{escalations.map(a => <div className="admin-list-item" key={a.id} data-testid={`item-admin-escalation-${a.id}`}>
           <span className="admin-list-icon"><ShieldAlert size={17} /></span>
-          <span className="admin-list-copy"><strong>{a.businessName} · {a.id}</strong><small>{applicantName(state, a.applicantId)} · {findGrant(state, a.grantId)?.name} · by {a.escalation!.by}: {a.escalation!.reason}</small></span>
+          <span className="admin-list-copy"><strong>{applicantName(state, a.applicantId)} · {a.id}</strong><small>{findGrant(state, a.grantId)?.name} · by {a.escalation!.by}: {a.escalation!.reason}</small></span>
           <button type="button" className="admin-icon-button" onClick={() => openReview(a.id)} aria-label={`Open escalated application ${a.id}`} data-testid={`button-admin-open-escalation-${a.id}`}><ArrowRight size={15} /></button>
         </div>)}</div> : <p className="admin-review-hint">No open escalations.</p>}
       </section>

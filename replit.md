@@ -73,6 +73,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 - The dashboard's **Eligible amount** is set per tier by staff (`treasury.tierEligibleAmounts`, Settings → Money; owner, 8 Oct 2026) and is display only; 0 means not set and falls back to `maxEligibleAward` (the largest award the applicant can apply for now). Don't use it to cap requests without the owner's say.
 - Payout identity check and two sign-offs can be switched off per applicant (`payoutIdentityCheck`, `payoutTwoSignOffs` in `AccountPermissions`; owner, 9 Oct 2026). Both default on. Staff payout routes must load the applicant's account into the rule state (`accounts` in `serverState`) or these switches are ignored.
 - Grant plans stay fully editable after applications are submitted (owner, 10 Oct 2026); don't reintroduce a lock. The review panel shows answers and files for fields no longer on the plan.
+- Applications don't ask for a business or project name (owner, 11 Oct 2026): `applications.business_name` stays in the database only because it's NOT NULL; new rows store "", existing rows keep theirs, and nothing reads it. Staff screens title an application by the applicant's name. Don't reintroduce it in the contract or screens.
 - Production reaches Supabase through the session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`); the direct `db.<ref>.supabase.co` host is IPv6-only.
 
 ## Pointers

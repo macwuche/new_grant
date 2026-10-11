@@ -1804,7 +1804,6 @@ export const ListMyApplicationsResponseItem = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -1849,7 +1848,6 @@ export const ListApplicationsResponseItem = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -1893,8 +1891,6 @@ export const saveApplicationDraftBodyGrantIdMax = 40;
 
 export const saveApplicationDraftBodyDraftIdMax = 40;
 
-export const saveApplicationDraftBodyApplicationBusinessNameMax = 200;
-
 export const saveApplicationDraftBodyApplicationRegistrationNumberMax = 80;
 
 export const saveApplicationDraftBodyApplicationPurposeMax = 5000;
@@ -1911,7 +1907,6 @@ export const SaveApplicationDraftBody = zod.object({
   "grantId": zod.string().max(saveApplicationDraftBodyGrantIdMax),
   "draftId": zod.string().max(saveApplicationDraftBodyDraftIdMax).optional().describe('Your existing draft (or application with changes requested), if any'),
   "application": zod.object({
-  "businessName": zod.string().max(saveApplicationDraftBodyApplicationBusinessNameMax),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string().max(saveApplicationDraftBodyApplicationRegistrationNumberMax),
   "purpose": zod.string().max(saveApplicationDraftBodyApplicationPurposeMax),
@@ -1926,7 +1921,6 @@ export const SaveApplicationDraftResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -1971,8 +1965,6 @@ export const submitApplicationBodyGrantIdMax = 40;
 
 export const submitApplicationBodyDraftIdMax = 40;
 
-export const submitApplicationBodyApplicationBusinessNameMax = 200;
-
 export const submitApplicationBodyApplicationRegistrationNumberMax = 80;
 
 export const submitApplicationBodyApplicationPurposeMax = 5000;
@@ -1989,7 +1981,6 @@ export const SubmitApplicationBody = zod.object({
   "grantId": zod.string().max(submitApplicationBodyGrantIdMax),
   "draftId": zod.string().max(submitApplicationBodyDraftIdMax).optional().describe('Your existing draft (or application with changes requested), if any'),
   "application": zod.object({
-  "businessName": zod.string().max(submitApplicationBodyApplicationBusinessNameMax),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string().max(submitApplicationBodyApplicationRegistrationNumberMax),
   "purpose": zod.string().max(submitApplicationBodyApplicationPurposeMax),
@@ -2004,7 +1995,6 @@ export const SubmitApplicationResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2082,7 +2072,6 @@ export const StartReviewResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2145,7 +2134,6 @@ export const ApproveApplicationResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2210,7 +2198,6 @@ export const RequestApplicationChangesResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2275,7 +2262,6 @@ export const DeclineApplicationResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2337,7 +2323,6 @@ export const AddInternalNoteResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2399,7 +2384,6 @@ export const EscalateApplicationResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),
@@ -2461,7 +2445,6 @@ export const ClearEscalationResponse = zod.object({
   "applicantId": zod.string(),
   "grantId": zod.string(),
   "status": zod.enum(['Draft', 'Submitted', 'Under review', 'Changes requested', 'Approved', 'Declined']),
-  "businessName": zod.string(),
   "requestedAmount": zod.number(),
   "registrationNumber": zod.string(),
   "purpose": zod.string(),

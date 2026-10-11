@@ -9,7 +9,7 @@ import { toGrant, toProgramRow } from "./programRepo.db";
 // jsonb doesn't keep object key order; rebuild nested objects in the domain's order.
 const toApplication = (r: ApplicationRow): Application => ({
   id: r.id, applicantId: r.applicantId, grantId: r.grantId, status: r.status,
-  businessName: r.businessName, requestedAmount: r.requestedAmount, registrationNumber: r.registrationNumber, purpose: r.purpose,
+  requestedAmount: r.requestedAmount, registrationNumber: r.registrationNumber, purpose: r.purpose,
   checklist: r.checklist, answers: r.answers, commissionRate: r.commissionRate,
   createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), submittedAt: r.submittedAt?.toISOString() ?? null,
   reviewer: r.reviewer, awardedAmount: r.awardedAmount,
@@ -25,7 +25,7 @@ const toApplication = (r: ApplicationRow): Application => ({
 
 const toRow = (a: Application) => ({
   id: a.id, applicantId: a.applicantId, grantId: a.grantId, status: a.status,
-  businessName: a.businessName, requestedAmount: a.requestedAmount, registrationNumber: a.registrationNumber, purpose: a.purpose,
+  requestedAmount: a.requestedAmount, registrationNumber: a.registrationNumber, purpose: a.purpose,
   checklist: a.checklist, answers: a.answers, commissionRate: a.commissionRate,
   createdAt: new Date(a.createdAt), updatedAt: new Date(a.updatedAt), submittedAt: a.submittedAt ? new Date(a.submittedAt) : null,
   reviewer: a.reviewer, awardedAmount: a.awardedAmount, history: a.history, internalNotes: a.internalNotes, escalation: a.escalation,
@@ -46,7 +46,8 @@ export const dbApplicationRepo: ApplicationRepo = {
       grants, applications,
       saveApplication: async app => {
         const row = toRow(app);
-        await tx.insert(applicationsTable).values(row).onConflictDoUpdate({ target: applicationsTable.id, set: row });
+        // business_name is retired (11 Oct 2026): new rows store "", existing rows keep theirs.
+        await tx.insert(applicationsTable).values({ ...row, businessName: "" }).onConflictDoUpdate({ target: applicationsTable.id, set: row });
       },
       removeApplication: async id => { await tx.delete(applicationsTable).where(eq(applicationsTable.id, id)); },
       saveGrant: async (grant, version) => {

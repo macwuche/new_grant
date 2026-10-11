@@ -101,7 +101,7 @@ export function seedTreasury(): Treasury {
 const ev = (status: ApplicationEvent['status'], at: string, note: string, actor: ApplicationEvent['actor'] = status === 'Draft' || status === 'Submitted' ? 'Applicant' : 'Reviewer'): ApplicationEvent => ({ status, at, actor, note });
 const allRequirements = (grantId: string) => catalog.find(g => g.id === grantId)!.requirements;
 
-function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' | 'status' | 'businessName' | 'requestedAmount' | 'purpose' | 'history'> & Partial<Application>): Application {
+function application(fields: Pick<Application, 'id' | 'applicantId' | 'grantId' | 'status' | 'requestedAmount' | 'purpose' | 'history'> & Partial<Application>): Application {
   const first = fields.history[0]!.at;
   const last = fields.history[fields.history.length - 1]!.at;
   return {
@@ -132,43 +132,43 @@ export function createSeedState(): DemoState {
     applications: [
       // The demo applicant's own records.
       application({
-        id: 'APP-2048', applicantId: me, grantId: 'momentum', status: 'Under review', businessName: 'Morgan Studio', requestedAmount: 7800, registrationNumber: 'CA-5521904', reviewer: DEMO_REVIEWER, answers: { employees: '2', trading: 'Yes' },
+        id: 'APP-2048', applicantId: me, grantId: 'momentum', status: 'Under review', requestedAmount: 7800, registrationNumber: 'CA-5521904', reviewer: DEMO_REVIEWER, answers: { employees: '2', trading: 'Yes' },
         purpose: 'Stock up on materials ahead of the holiday season and cover a part-time assistant for three months.',
         history: [ev('Draft', '2026-08-28T10:12:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-02T09:30:00.000Z', 'Application submitted.'), ev('Under review', '2026-09-11T15:40:00.000Z', 'A reviewer has started reviewing your application.')],
       }),
       application({
-        id: 'APP-1932', applicantId: me, grantId: 'creative', status: 'Approved', businessName: 'Morgan Studio', requestedAmount: 4200, awardedAmount: 4200, reviewer: DEMO_REVIEWER,
+        id: 'APP-1932', applicantId: me, grantId: 'creative', status: 'Approved', requestedAmount: 4200, awardedAmount: 4200, reviewer: DEMO_REVIEWER,
         purpose: 'Fund a limited ceramics series and a booth at two regional craft fairs.',
         history: [ev('Draft', '2026-07-20T12:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-07-24T08:15:00.000Z', 'Application submitted.'), ev('Under review', '2026-07-30T10:00:00.000Z', 'A reviewer has started reviewing your application.'), ev('Approved', '2026-08-14T11:05:00.000Z', 'Approved for $4,200.00. The award has been added to your grant balance.')],
       }),
       application({
-        id: 'APP-2101', applicantId: me, grantId: 'green', status: 'Draft', businessName: 'Morgan Studio', requestedAmount: 12000, registrationNumber: 'CA-5521904', purpose: '',
+        id: 'APP-2101', applicantId: me, grantId: 'green', status: 'Draft', requestedAmount: 12000, registrationNumber: 'CA-5521904', purpose: '',
         history: [ev('Draft', '2026-09-18T16:20:00.000Z', 'Draft started.')],
       }),
       // Other applicants' submitted work for the review queue. Their drafts are private and never seeded.
       application({
-        id: 'APP-2051', applicantId: 'APL-1042', grantId: 'creative', status: 'Under review', businessName: 'Okafor Print Studio', requestedAmount: 7400, reviewer: DEMO_REVIEWER,
+        id: 'APP-2051', applicantId: 'APL-1042', grantId: 'creative', status: 'Under review', requestedAmount: 7400, reviewer: DEMO_REVIEWER,
         purpose: 'Equipment and workshop materials for a shared neighborhood print studio.',
         history: [ev('Draft', '2026-09-10T09:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-14T10:20:00.000Z', 'Application submitted.'), ev('Under review', '2026-09-21T13:00:00.000Z', 'A reviewer has started reviewing your application.')],
         internalNotes: [{ at: '2026-09-21T13:05:00.000Z', author: DEMO_REVIEWER, text: 'Portfolio is strong. Waiting to confirm the press quote matches the budget.' }],
       }),
       application({
-        id: 'APP-2050', applicantId: 'APL-1045', grantId: 'green', status: 'Submitted', businessName: 'Haddad Grocers', requestedAmount: 12800, registrationNumber: 'GB-09921733', answers: { savings: '3400' },
+        id: 'APP-2050', applicantId: 'APL-1045', grantId: 'green', status: 'Submitted', requestedAmount: 12800, registrationNumber: 'GB-09921733', answers: { savings: '3400' },
         purpose: 'Practical energy upgrades across a small independent storefront: LED lighting, efficient refrigeration, and insulation.',
         history: [ev('Draft', '2026-09-12T08:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-20T16:45:00.000Z', 'Application submitted.')],
       }),
       application({
-        id: 'APP-2049', applicantId: 'APL-1044', grantId: 'community', status: 'Under review', businessName: 'Eastside Community Kitchen', requestedAmount: 16250, registrationNumber: 'CA-NP-44120', reviewer: DEMO_REVIEWER, answers: { residents: '1200' },
+        id: 'APP-2049', applicantId: 'APL-1044', grantId: 'community', status: 'Under review', requestedAmount: 16250, registrationNumber: 'CA-NP-44120', reviewer: DEMO_REVIEWER, answers: { residents: '1200' },
         purpose: 'Additional kitchen capacity for local food programming, including a second prep line and cold storage.',
         history: [ev('Draft', '2026-09-01T11:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-08T09:10:00.000Z', 'Application submitted.'), ev('Under review', '2026-09-16T14:30:00.000Z', 'A reviewer has started reviewing your application.')],
       }),
       application({
-        id: 'APP-2052', applicantId: 'APL-1043', grantId: 'momentum', status: 'Changes requested', businessName: 'Navarro Corner Shop', requestedAmount: 7800, registrationNumber: 'US-TX-7781', reviewer: DEMO_REVIEWER, answers: { employees: '1', trading: 'No' },
+        id: 'APP-2052', applicantId: 'APL-1043', grantId: 'momentum', status: 'Changes requested', requestedAmount: 7800, registrationNumber: 'US-TX-7781', reviewer: DEMO_REVIEWER, answers: { employees: '1', trading: 'No' },
         purpose: 'Inventory and equipment to support a second year of trading.',
         history: [ev('Draft', '2026-09-03T10:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-06T12:00:00.000Z', 'Application submitted.'), ev('Under review', '2026-09-12T09:30:00.000Z', 'A reviewer has started reviewing your application.'), ev('Changes requested', '2026-09-15T15:00:00.000Z', 'Please add a breakdown of equipment costs to your use-of-funds plan.')],
       }),
       application({
-        id: 'APP-2047', applicantId: 'APL-1047', grantId: 'creative', status: 'Submitted', businessName: 'Shah Ceramics', requestedAmount: 4950,
+        id: 'APP-2047', applicantId: 'APL-1047', grantId: 'creative', status: 'Submitted', requestedAmount: 4950,
         purpose: 'Portable tools and materials for accessible ceramics sessions in libraries and community centers.',
         history: [ev('Draft', '2026-09-15T15:00:00.000Z', 'Draft started.'), ev('Submitted', '2026-09-22T11:30:00.000Z', 'Application submitted.')],
       }),

@@ -38,7 +38,7 @@ type Failure = { status: 400 | 403 | 404 | 409; body: { error: string; fieldErro
 type Outcome = { failure: Failure } | { message: string; saved?: Application };
 const refused = (result: Result & { ok: false }): Failure => ({ status: 400, body: { error: result.error, ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}) } });
 
-const FIELD_NAMES: Record<string, string> = { businessName: "name", registrationNumber: "registration number", purpose: "description", requestedAmount: "amount" };
+const FIELD_NAMES: Record<string, string> = { registrationNumber: "registration number", purpose: "description", requestedAmount: "amount" };
 
 /**
  * Field errors for an application the API contract refused (e.g. text past its

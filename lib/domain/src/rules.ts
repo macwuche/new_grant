@@ -14,7 +14,6 @@ export { fail, nextIds, roundCents };
 export const MIN_PURPOSE_LENGTH = 30;
 export const MAX_ANSWER_LENGTH = 500;
 export const MAX_LONG_ANSWER_LENGTH = 2000;
-export const MAX_BUSINESS_NAME_LENGTH = 200;
 export const MAX_REGISTRATION_LENGTH = 80;
 export const MAX_PURPOSE_LENGTH = 5000;
 
@@ -94,8 +93,6 @@ export type ApplicationStep = 1 | 2 | 3;
 export function validateApplication(input: ApplicationInput, grant: Grant, upToStep: ApplicationStep): Record<string, string> {
   const errors: Record<string, string> = {};
   if (upToStep >= 1) {
-    if (input.businessName.trim().length < 2) errors.businessName = 'Enter your business or project name.';
-    else if (input.businessName.trim().length > MAX_BUSINESS_NAME_LENGTH) errors.businessName = `Use at most ${MAX_BUSINESS_NAME_LENGTH} characters.`;
     const amount = input.requestedAmount;
     if (!Number.isFinite(amount) || amount <= 0) errors.requestedAmount = 'Enter the amount you are requesting.';
     else if (roundCents(amount) !== amount) errors.requestedAmount = 'Use at most two decimal places.';
@@ -124,7 +121,6 @@ export function validateApplication(input: ApplicationInput, grant: Grant, upToS
 
 function normalizeInput(input: ApplicationInput, grant: Grant): ApplicationInput {
   return {
-    businessName: input.businessName.trim(),
     requestedAmount: input.requestedAmount,
     registrationNumber: input.registrationNumber.trim(),
     purpose: input.purpose.trim(),

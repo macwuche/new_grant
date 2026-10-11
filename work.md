@@ -382,6 +382,16 @@ No schema change in either slice.
 
 **Tests:** 228 rule tests and 174 API tests (lock tests replaced by "every field editable after submissions"), typecheck pass. No browser check yet.
 
+### 11 Oct 2026: business or project name removed (owner's request; built, tested, and committed 11 Oct 2026; not yet deployed; no schema push)
+
+The owner couldn't find where to edit the "Business or project name" field and asked for it to be removed from the app entirely. It was a fixed field on step 1 of every application (required, 2–200 characters), not part of the plan's form builder.
+
+- **Removed:** the field on the application form, the "Project or business" rows on the review step and on the applicant's application page, the rule and its limit (`MAX_BUSINESS_NAME_LENGTH`), `businessName` on `Application` / `ApplicationInput` in `lib/domain` and in the OpenAPI contract (clients regenerated), and the sample names in the seed data.
+- **Staff screens:** applications are titled by the applicant's name: the review queue (first column renamed **Applicant**, second line the application id), the overview's review list (second line the plan), the review panel (heading the applicant, lead line the plan), and the security page's escalations.
+- **Database:** no schema change. `applications.business_name` stays (NOT NULL): new rows store `""`, updates leave the column alone, so names on existing applications remain in the database but are never read or shown.
+- **Compatibility:** an older portal still sending `businessName` is accepted; the API's validator drops it (API test added). Demo data saved in a browser may still carry the old property; nothing reads it.
+- **Tests:** 229 rule tests (1 new), 175 API tests (1 new), typecheck, and `.unlazy/grant-plans/browser-check.mjs flow` (now also checks the field is gone) pass.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

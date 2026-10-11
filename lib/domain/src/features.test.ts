@@ -22,7 +22,7 @@ beforeEach(() => { s = createSeedState(); });
 
 describe('program questions', () => {
   it('validates required, number, and yes/no answers on step 2', () => {
-    const input = { businessName: 'Morgan Studio', requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: grant('momentum').requirements, answers: { employees: 'three', trading: 'Maybe' } };
+    const input = { requestedAmount: 5000, registrationNumber: 'CA-1', purpose: 'x'.repeat(40), checklist: grant('momentum').requirements, answers: { employees: 'three', trading: 'Maybe' } };
     expect(R.validateApplication(input, grant('momentum'), 1)).toEqual({});
     expect(R.validateApplication(input, grant('momentum'), 2)).toEqual({ 'answers.employees': 'Enter a number (digits only).', 'answers.trading': 'Choose yes or no.' });
     expect(R.validateApplication({ ...input, answers: {} }, grant('momentum'), 2)['answers.employees']).toBe('Answer this question.');

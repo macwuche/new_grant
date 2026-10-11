@@ -37,7 +37,7 @@ import { downloadText } from './lib/download';
 import {
   adoptSessionApplicant, checkEligibility, computeBalances, deleteDraft, findGrant, isEditable, isGrantOpen, maxEligibleAward, ownApplications, ownTransactions, visibleGrants,
   saveDraft, submitApplication, validateApplication, type ApplicationStep,
-  MAX_ANSWER_LENGTH, MAX_BUSINESS_NAME_LENGTH, MAX_LONG_ANSWER_LENGTH, MAX_PURPOSE_LENGTH, MAX_REGISTRATION_LENGTH,
+  MAX_ANSWER_LENGTH, MAX_LONG_ANSWER_LENGTH, MAX_PURPOSE_LENGTH, MAX_REGISTRATION_LENGTH,
 } from '@workspace/domain/rules';
 import { DemoStoreProvider, useDemoStore } from '@/lib/store';
 import {
@@ -282,8 +282,8 @@ function MissingRecord({ title, text }: { title: string; text: string }) {
   return <div className="card card-pad empty-state"><div className="empty-icon"><FileText size={20} /></div><h3>{title}</h3><p>{text}</p><Link className="btn btn-primary" href="/applications" data-testid="link-missing-back">Go to applications</Link></div>;
 }
 
-type FormState = { businessName: string; amount: string; registrationNumber: string; purpose: string; checklist: string[]; answers: Record<string, string> };
-const STEP_ONE_FIELDS = ['businessName', 'requestedAmount', 'registrationNumber', 'purpose'];
+type FormState = { amount: string; registrationNumber: string; purpose: string; checklist: string[]; answers: Record<string, string> };
+const STEP_ONE_FIELDS = ['requestedAmount', 'registrationNumber', 'purpose'];
 
 type Outcome = { ok: true; message: string; id?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
@@ -298,14 +298,13 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState<FormState>(() => ({
-    businessName: draft?.businessName ?? '',
     amount: draft ? String(draft.requestedAmount) : '',
     registrationNumber: draft?.registrationNumber ?? '',
     purpose: draft?.purpose ?? '',
     checklist: draft?.checklist ?? [],
     answers: { ...(draft?.answers ?? {}) },
   }));
-  const input: ApplicationInput = { businessName: form.businessName, requestedAmount: form.amount.trim() === '' ? NaN : Number(form.amount), registrationNumber: form.registrationNumber, purpose: form.purpose, checklist: form.checklist, answers: form.answers };
+  const input: ApplicationInput = { requestedAmount: form.amount.trim() === '' ? NaN : Number(form.amount), registrationNumber: form.registrationNumber, purpose: form.purpose, checklist: form.checklist, answers: form.answers };
   const setAnswer = (id: string, value: string) => { setForm(v => ({ ...v, answers: { ...v.answers, [id]: value } })); setErrors(({ [`answers.${id}`]: _, ...rest }) => rest); };
   const setField = (key: Exclude<keyof FormState, 'checklist' | 'answers'>, value: string) => { setForm(v => ({ ...v, [key]: value })); setErrors(e => { const { [key === 'amount' ? 'requestedAmount' : key]: _, ...rest } = e; return rest; }); };
   const { docs: myDocs, refresh: refreshDocs } = useMyDocuments(connected);
@@ -384,7 +383,6 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
     {changeRequest && <div className="notice mb" role="note" data-testid="notice-change-request"><Info size={16} /><div><strong>The reviewer asked for changes:</strong> {changeRequest}</div></div>}
     <div className="stepper">{['Basics', 'Requirements', 'Review'].map((label, i) => <div className={`step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'complete' : ''}`} key={label}><span className="step-num">{step > i + 1 ? <Check size={12} /> : i + 1}</span><span className="step-label">{label}</span></div>)}</div>
     {step === 1 && <div className="field-grid">
-      <div className="field field-full"><label className="field-label" htmlFor="business">Business or project name</label><input id="business" className="input" value={form.businessName} onChange={e => setField('businessName', e.target.value)} maxLength={MAX_BUSINESS_NAME_LENGTH} placeholder="e.g. Morgan Studio" data-testid="input-business-name" {...invalid('businessName')} /><FieldError id="businessName-error" message={errors.businessName} /></div>
       <div className="field"><label className="field-label" htmlFor="amount">Requested amount (USD)</label><input id="amount" className="input" type="number" inputMode="decimal" min={grant.minimumRequest} max={grant.maxFunding} step="0.01" value={form.amount} onChange={e => setField('amount', e.target.value)} data-testid="input-requested-amount" {...invalid('requestedAmount')} />{errors.requestedAmount ? <FieldError id="requestedAmount-error" message={errors.requestedAmount} /> : <span className="field-hint">{money(grant.minimumRequest)} – {money(grant.maxFunding)}</span>}</div>
       <div className="field"><label className="field-label" htmlFor="registration">Registration number{grant.requiresRegistration ? '' : ' (optional)'}</label><input id="registration" className="input" value={form.registrationNumber} onChange={e => setField('registrationNumber', e.target.value)} maxLength={MAX_REGISTRATION_LENGTH} placeholder="e.g. CA-5521904" data-testid="input-registration-number" {...invalid('registrationNumber')} /><FieldError id="registrationNumber-error" message={errors.registrationNumber} /></div>
       <div className="field field-full"><label className="field-label" htmlFor="purpose">What would this funding unlock?</label><textarea id="purpose" className="textarea" value={form.purpose} onChange={e => setField('purpose', e.target.value)} maxLength={MAX_PURPOSE_LENGTH} placeholder="Share a few sentences about your plan..." data-testid="textarea-funding-purpose" {...invalid('purpose')} />{errors.purpose ? <FieldError id="purpose-error" message={errors.purpose} /> : <span className="field-hint">{form.purpose.trim().length.toLocaleString('en-US')} / {MAX_PURPOSE_LENGTH.toLocaleString('en-US')} characters · at least 30</span>}</div>
@@ -421,7 +419,6 @@ function ApplicationEditor({ grant, draft, onToast }: { grant: Grant; draft?: Ap
       <div className="card" style={{ padding: 16, background: 'hsl(var(--background))' }}>
         <div className="fee-row"><span>Grant category</span><strong>{grant.name}</strong></div>
         <div className="fee-row"><span>Requested amount</span><strong>{money(input.requestedAmount || 0)}</strong></div>
-        <div className="fee-row"><span>Project or business</span><strong>{form.businessName.trim()}</strong></div>
         <div className="fee-row"><span>Registration number</span><strong>{form.registrationNumber.trim() || 'Not provided'}</strong></div>
         {grant.requirements.length > 0 && <div className="fee-row"><span>{connected ? 'Requirements with files' : 'Requirements ready'}</span><strong>{form.checklist.length} of {grant.requirements.length}</strong></div>}
         {typedFields.map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong style={{ whiteSpace: 'pre-wrap' }}>{form.answers[q.id]?.trim() || '—'}</strong></div>)}
@@ -463,7 +460,6 @@ function ApplicationDetail({ app, grant, onToast }: { app: Application; grant: G
     <div className="card" style={{ padding: 16, background: 'hsl(var(--background))' }}>
       <div className="fee-row"><span>Requested amount</span><strong>{money(app.requestedAmount)}</strong></div>
       {app.awardedAmount !== null && <div className="fee-row"><span>Awarded</span><strong>{money(app.awardedAmount)}</strong></div>}
-      <div className="fee-row"><span>Project or business</span><strong>{app.businessName}</strong></div>
       <div className="fee-row"><span>Registration number</span><strong>{app.registrationNumber || 'Not provided'}</strong></div>
       {grant.requirements.length > 0 && <div className="fee-row"><span>Requirements ready</span><strong>{app.checklist.length} of {grant.requirements.length}</strong></div>}
       {grant.questions.filter(q => q.type !== 'file').map(q => <div className="fee-row" key={q.id}><span>{q.label}</span><strong style={{ whiteSpace: 'pre-wrap' }}>{app.answers[q.id] || '—'}</strong></div>)}

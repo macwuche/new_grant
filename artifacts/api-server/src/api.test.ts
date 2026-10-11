@@ -529,7 +529,7 @@ describe("account controls and identity checks", () => {
 describe("applications and review", () => {
   const MAYA = USERS["tok-maya"]!.id;
   const ALEX = USERS["tok-applicant"]!.id;
-  const creative = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const creative = { requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const verify = async (token: string, id: string) => {
     await call("/profile", token);
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Test Person" }, token);
@@ -670,11 +670,19 @@ describe("applications and review", () => {
   it("keeps the review queue to staff", async () => {
     expect((await call("/applications", "tok-applicant")).status).toBe(403);
   });
+
+  it("accepts an older portal's business name but neither keeps nor returns it (removed 11 Oct 2026)", async () => {
+    const old = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: [], answers: {} };
+    const res = await post("/applications/save", { grantId: "creative", application: old }, "tok-maya");
+    expect(res.status).toBe(200);
+    expect((await json(res)).application).not.toHaveProperty("businessName");
+    expect((await json(await call("/applications/mine", "tok-maya")))[0]).not.toHaveProperty("businessName");
+  });
 });
 
 describe("notifications, team activity, and the audit log", () => {
   const MAYA = USERS["tok-maya"]!.id;
-  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const input = { requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const verifyMaya = async () => {
     await call("/profile", "tok-maya");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
@@ -746,7 +754,7 @@ describe("notifications, team activity, and the audit log", () => {
 
 describe("money", () => {
   const MAYA = USERS["tok-maya"]!.id;
-  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const input = { requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const mine = async () => json(await call("/money/mine", "tok-maya"));
   const entry = async (id: string) => (await mine()).transactions.find((t: { id: string }) => t.id === id);
   const deposit = (amount: number) => post("/money/deposits", { amount, method: "bank" }, "tok-maya");
@@ -1059,7 +1067,7 @@ describe("withdrawal methods", () => {
     await call("/profile", "tok-maya");
     await identityCheck({ documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" }, "tok-maya");
     await post(`/applicants/${MAYA}/identity/approve`, {});
-    const app = { businessName: "Okafor Studio", requestedAmount: award, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+    const app = { requestedAmount: award, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
     const { application } = await json(await submitApp({ grantId: "creative", application: app }, "tok-maya"));
     const v = (await json(await post(`/applications/${application.id}/start-review`, { version: application.updatedAt }))).application.updatedAt;
     await post(`/applications/${application.id}/approve`, { version: v, award });
@@ -1362,7 +1370,7 @@ describe("deposit methods and proof of payment", () => {
 describe("documents", () => {
   const MAYA = USERS["tok-maya"]!.id;
   const identity = { documentType: "Passport", documentNumber: "AB12345678", nameOnDocument: "Maya Okafor" };
-  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const input = { requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
   const mineDocs = async (token = "tok-maya") => json(await call("/documents/mine", token));
   const file = (id: string, token: string) => call(`/documents/${id}/file`, token);
 
@@ -1570,7 +1578,7 @@ describe("documents", () => {
 
 describe("email", () => {
   const MAYA = USERS["tok-maya"]!.id;
-  const input = { businessName: "Okafor Studio", requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
+  const input = { requestedAmount: 4000, registrationNumber: "", purpose: "A kiln and a year of glaze materials for the studio.", checklist: ["Portfolio link", "Project budget", "Professional reference"], answers: {} };
 
   it("queues an email copy of each notification, in the same write, unless the applicant turned them off", async () => {
     await call("/profile", "tok-maya");

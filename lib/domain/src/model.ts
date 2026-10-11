@@ -77,7 +77,6 @@ export type Application = {
   applicantId: string;
   grantId: string;
   status: ApplicationStatus;
-  businessName: string;
   requestedAmount: number;
   registrationNumber: string;
   purpose: string;
@@ -98,7 +97,7 @@ export type Application = {
   escalation: Escalation | null;
 };
 
-export type ApplicationInput = Pick<Application, 'businessName' | 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
+export type ApplicationInput = Pick<Application, 'requestedAmount' | 'registrationNumber' | 'purpose' | 'checklist' | 'answers'>;
 
 /** 'Application fee' is historical (the global fee was removed on 3 Oct 2026); 'Commission' is taken on approval. */
 export type TransactionType = 'Grant' | 'Deposit' | 'Withdrawal' | 'Card fee' | 'Application fee' | 'Commission' | 'Card top-up' | 'Card deduction' | 'Grant adjustment' | 'Deposit adjustment';

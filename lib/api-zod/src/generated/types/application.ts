@@ -16,7 +16,6 @@ export interface Application {
   applicantId: string;
   grantId: string;
   status: ApplicationStatus;
-  businessName: string;
   requestedAmount: number;
   registrationNumber: string;
   purpose: string;
