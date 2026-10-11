@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### No built-in "arc.fund" name (11 Oct 2026) — not yet deployed
+
+No schema push. Redeploy as usual. Smoke test: open a transaction's receipt and download it; the file is named `nova-bridge-grant-receipt-<id>.txt`. The browser tab title shows "Nova Bridge Grant". A new deposit's reference starts with `DEP-` (older deposits keep `ARC-`).
+
 ### Business or project name removed (11 Oct 2026) — deployed 11 Oct 2026 as `deb8163`
 
 No schema push (`applications.business_name` stays and new rows store an empty value). Redeploy as usual: `git pull`, `sh deploy/build.sh`, restart. Smoke test: start an application on any plan; step 1 shows only the amount, registration number, and description; as staff, the review queue and the review panel show the applicant's name.

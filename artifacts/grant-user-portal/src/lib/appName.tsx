@@ -9,7 +9,8 @@ import { supabase } from './supabase';
 // emails. Demo mode: the name and colour are a preview saved in this browser
 // only; logos and the favicon need sign-in.
 
-export const DEFAULT_APP_NAME = 'arc.fund';
+// Shown only until a super admin saves a name (Settings → App branding); no brand name is built in.
+export const DEFAULT_APP_NAME = 'Grant portal';
 const DEMO_KEY = 'arc.fund.previewAppName';
 // The last name the server gave, so pages don't flash the default on load. It's public, not a record.
 const CACHE_KEY = 'arc.fund.appName';
@@ -95,13 +96,16 @@ export function AppNameProvider({ children }: { children: ReactNode }) {
 
 export const useAppName = () => useContext(AppNameContext);
 
-/** The name as a wordmark: the first "." is styled as the accent dot, as in arc.fund. */
+/** The name as a wordmark: the first "." is styled as the accent dot (e.g. "my.grants"). */
 export function Wordmark({ name }: { name?: string }) {
   const { name: current } = useAppName();
   const text = name ?? current;
   const dot = text.indexOf('.');
   return dot > 0 && dot < text.length - 1 ? <>{text.slice(0, dot)}<span>.</span>{text.slice(dot + 1)}</> : <>{text}</>;
 }
+
+/** The app name as a file-name prefix, e.g. "Nova Bridge Grant" → "nova-bridge-grant". */
+export const fileSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'export';
 
 /** The single letter in the square brand mark. */
 export const brandLetter = (name: string) => (name.trim()[0] ?? 'a').toLowerCase();
@@ -113,7 +117,8 @@ export function AppNameText() { return <>{useAppName().name}</>; }
 export function BrandLetter() { return <>{brandLetter(useAppName().name)}</>; }
 
 /** The name's first word (before any "." or space), for tight spots like the card face. */
-export function ShortAppName() { const { name } = useAppName(); return <>{name.split(/[.\s]/)[0] || name}</>; }
+export const shortAppName = (name: string) => name.split(/[.\s]/)[0] || name;
+export function ShortAppName() { return <>{shortAppName(useAppName().name)}</>; }
 
 /**
  * The brand as shown in headers: the uploaded logo, or the square letter mark and the

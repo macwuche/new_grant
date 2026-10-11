@@ -33,7 +33,7 @@ describe('requesting', () => {
   it('records a pending deposit with a reference that does not count yet', () => {
     const { id } = accept(D.requestDeposit(s, 200, 'mobile', now));
     expect(tx(id!)).toMatchObject({ type: 'Deposit', status: 'Pending', amount: 200, method: 'mobile' });
-    expect(tx(id!).reference).toMatch(/^ARC-\d+$/);
+    expect(tx(id!).reference).toMatch(/^DEP-\d+$/);
     expect(mine()).toMatchObject({ deposit: 441.5, pendingDeposits: 200 });
   });
 

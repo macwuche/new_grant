@@ -74,6 +74,7 @@ Applicants: sign up, verify identity (details plus an uploaded document, reviewe
 - Payout identity check and two sign-offs can be switched off per applicant (`payoutIdentityCheck`, `payoutTwoSignOffs` in `AccountPermissions`; owner, 9 Oct 2026). Both default on. Staff payout routes must load the applicant's account into the rule state (`accounts` in `serverState`) or these switches are ignored.
 - Grant plans stay fully editable after applications are submitted (owner, 10 Oct 2026); don't reintroduce a lock. The review panel shows answers and files for fields no longer on the plan.
 - Applications don't ask for a business or project name (owner, 11 Oct 2026): `applications.business_name` stays in the database only because it's NOT NULL; new rows store "", existing rows keep theirs, and nothing reads it. Staff screens title an application by the applicant's name. Don't reintroduce it in the contract or screens.
+- No brand name is built in (owner, 11 Oct 2026): use the saved app name (`useAppName()` in the portal, `appName()` on the server) for every visible name and download file name (`fileSlug`). The fallback `DEFAULT_APP_NAME` is the neutral "Grant portal". The `arc.fund.*` browser storage keys stay: renaming `arc.fund.deviceId` would trigger new-device emails for everyone. Deposit references are `DEP-<n>` (`lib/domain/src/core.ts`; `ARC-` before 11 Oct 2026, kept on old deposits).
 - Production reaches Supabase through the session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`); the direct `db.<ref>.supabase.co` host is IPv6-only.
 
 ## Pointers

@@ -124,7 +124,7 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
 
   router.post("/email/domain", admin, async (req, res) => {
     const name = typeof req.body?.name === "string" ? req.body.name.trim().toLowerCase() : "";
-    if (!DOMAIN.test(name)) { res.status(400).json({ error: "Enter a domain such as novabridgegrant.org.", fieldErrors: { name: "Enter a domain such as novabridgegrant.org." } }); return; }
+    if (!DOMAIN.test(name)) { res.status(400).json({ error: "Enter a domain such as yourdomain.org.", fieldErrors: { name: "Enter a domain such as yourdomain.org." } }); return; }
     const api = await domainKey(res); if (!api) return;
     // Reuse the domain if it's already in this Resend account.
     const existing = await api.listDomains();

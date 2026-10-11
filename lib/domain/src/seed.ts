@@ -175,8 +175,8 @@ export function createSeedState(): DemoState {
     ],
     transactions: [
       { id: 'TX-84019', applicantId: me, type: 'Grant', description: 'Creative Practice award (APP-1932)', amount: 4200, status: 'Completed', createdAt: '2026-08-14T11:05:00.000Z' },
-      { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Deposit via Bank transfer', amount: 450, status: 'Completed', createdAt: '2026-08-05T10:00:00.000Z', method: 'bank', reference: 'ARC-1990', processedAt: '2026-08-06T13:00:00.000Z', processedBy: DEMO_FINANCE },
-      { id: 'TX-82090', applicantId: 'APL-1042', type: 'Deposit', description: 'Deposit via Bank transfer', amount: 1500, status: 'Pending', createdAt: '2026-09-24T10:00:00.000Z', method: 'bank', reference: 'ARC-2090' },
+      { id: 'TX-84002', applicantId: me, type: 'Deposit', description: 'Deposit via Bank transfer', amount: 450, status: 'Completed', createdAt: '2026-08-05T10:00:00.000Z', method: 'bank', reference: 'DEP-1990', processedAt: '2026-08-06T13:00:00.000Z', processedBy: DEMO_FINANCE },
+      { id: 'TX-82090', applicantId: 'APL-1042', type: 'Deposit', description: 'Deposit via Bank transfer', amount: 1500, status: 'Pending', createdAt: '2026-09-24T10:00:00.000Z', method: 'bank', reference: 'DEP-2090' },
       { id: 'TX-83984', applicantId: me, type: 'Card fee', description: 'Virtual card issuance', amount: -8.5, status: 'Completed', createdAt: '2026-07-30T09:00:00.000Z' },
       { id: 'TX-84077', applicantId: me, type: 'Withdrawal', description: 'Payout to Bank transfer', amount: -125, status: 'Pending', createdAt: '2026-09-20T14:45:00.000Z', method: 'bank', fee: 1.56, destination: 'Bank transfer · Meridian Bank', source: 'grant',
         payoutDetails: [{ fieldId: 'bank-name', label: 'Bank name', value: 'Meridian Bank' }, { fieldId: 'account-name', label: 'Account holder name', value: 'Alex Morgan' }, { fieldId: 'account-number', label: 'Account number', value: '4403990842' }] },
@@ -204,7 +204,7 @@ function seedNotifications(me: string): Notification[] {
 
 function seedStaffFeed(): StaffEvent[] {
   return [
-    { id: 'FD-4', at: '2026-09-24T10:00:00.000Z', kind: 'deposit', title: 'High-value deposit announced: $1,500.00', body: 'Maya Okafor · Bank transfer · reference ARC-2090', href: '/admin/deposits', highlight: true, read: false },
+    { id: 'FD-4', at: '2026-09-24T10:00:00.000Z', kind: 'deposit', title: 'High-value deposit announced: $1,500.00', body: 'Maya Okafor · Bank transfer · reference DEP-2090', href: '/admin/deposits', highlight: true, read: false },
     { id: 'FD-3', at: '2026-09-22T11:30:00.000Z', kind: 'application', title: 'New application APP-2047', body: 'Priya Shah · Creative Practice · $4,950', href: '/admin/applications', highlight: false, read: false },
     { id: 'FD-2', at: '2026-09-20T16:45:00.000Z', kind: 'application', title: 'New application APP-2050', body: 'Samira Haddad · Green Transition · $12,800', href: '/admin/applications', highlight: false, read: true },
     { id: 'FD-1', at: '2026-09-20T14:45:00.000Z', kind: 'withdrawal', title: 'Payout request TX-84077', body: 'Alex Morgan · $125.00 via Bank transfer', href: '/admin/payouts', highlight: false, read: false },

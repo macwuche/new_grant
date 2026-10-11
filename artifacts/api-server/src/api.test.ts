@@ -783,7 +783,7 @@ describe("money", () => {
     await call("/profile", "tok-maya");
     expect((await deposit(1)).status).toBe(400);
     const d = (await json(await deposit(50))).money.transactions[0];
-    expect(d).toMatchObject({ type: "Deposit", status: "Pending", amount: 50, reference: expect.stringMatching(/^ARC-\d+$/) });
+    expect(d).toMatchObject({ type: "Deposit", status: "Pending", amount: 50, reference: expect.stringMatching(/^DEP-\d+$/) });
     await deposit(60); await deposit(70);
     expect((await json(await deposit(80))).error).toMatch(/3 deposits waiting/);
     expect((await post(`/money/deposits/${d.id}/confirm`, {}, "tok-applicant")).status).toBe(403);
@@ -1654,7 +1654,7 @@ describe("email", () => {
     await post("/staff", { email: "Casey@Example.org", name: "Casey <b>Brooks</b>", role: "reviewer" });
     const invite = outbox.rows.find(r => r.kind === "staff-invite")!;
     expect(invite).toMatchObject({ to: "casey@example.org", subject: expect.stringMatching(/grant team/) });
-    expect(invite.text).toContain("Sam Rivera added you to the arc.fund grant team as Grant reviewer");
+    expect(invite.text).toContain("Sam Rivera added you to the Grant portal grant team as Grant reviewer");
     expect(invite.html).toContain("Casey &lt;b&gt;Brooks&lt;/b&gt;");
     expect(invite.html).not.toContain("<b>Brooks");
   });
@@ -1690,10 +1690,10 @@ describe("email delivery", () => {
   it("sends through Resend with an idempotency key per outbox row", async () => {
     const box = memoryOutbox(); box.enqueue([email]);
     const resend = fakeResend([{ status: 200, body: { id: "re_123" } }]);
-    await deliverBatch(box, resendMailer("re_key", "arc.fund <grants@example.org>", undefined, resend.impl), new Date());
+    await deliverBatch(box, resendMailer("re_key", "Grants <grants@example.org>", undefined, resend.impl), new Date());
     expect(box.rows[0]).toMatchObject({ status: "sent", providerId: "re_123" });
     expect(resend.calls[0]!.headers).toMatchObject({ authorization: "Bearer re_key", "idempotency-key": "email-1" });
-    expect(resend.calls[0]!.body).toMatchObject({ from: "arc.fund <grants@example.org>", to: ["maya@example.com"], subject: "Hi" });
+    expect(resend.calls[0]!.body).toMatchObject({ from: "Grants <grants@example.org>", to: ["maya@example.com"], subject: "Hi" });
   });
 
   it("retries rate limits and server errors with backoff, and gives up on bad requests and after the last retry", async () => {
@@ -1847,7 +1847,7 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
   it("lets super admins rename the app for everyone, including emails and sign-in pages", async () => {
     const anon = await fetch(`${base}/branding`);
     expect(anon.status).toBe(200);
-    expect(await json(anon)).toEqual({ appName: "arc.fund", isDefault: true, brandColor: null, emailColor: null, logoUrl: null, logoDarkUrl: null, faviconUrl: null });
+    expect(await json(anon)).toEqual({ appName: "Grant portal", isDefault: true, brandColor: null, emailColor: null, logoUrl: null, logoDarkUrl: null, faviconUrl: null });
     expect((await put("/branding", { appName: "Nova Bridge" }, "tok-finance")).status).toBe(403);
     expect((await put("/branding", { appName: "<b>Nova</b>" })).status).toBe(400);
     expect((await put("/branding", { appName: "x".repeat(41) })).status).toBe(400);
@@ -1859,8 +1859,8 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect(invite.subject).toBe("You've been added to the Nova Bridge grant team");
     expect(invite.html).toContain(">Nova Bridge</div>");
     expect(hookEmails({ user: { email: "a@example.org" }, email_data: { email_action_type: "signup", token_hash: "h" } }, "https://ref.supabase.co")[0]!.subject).toBe("Confirm your Nova Bridge email");
-    expect(await json(await put("/branding", { appName: "" }))).toMatchObject({ appName: "arc.fund", isDefault: true });
-    expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).subject).toContain("arc.fund");
+    expect(await json(await put("/branding", { appName: "" }))).toMatchObject({ appName: "Grant portal", isDefault: true });
+    expect(staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", null).subject).toContain("Grant portal");
   });
 
   describe("brand colours, logos, and favicon", () => {
@@ -1914,7 +1914,7 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
       expect((await fetch(`${base}/branding/logo-dark`)).headers.get("content-type")).toBe("image/webp");
       // Emails show the (light-background) logo from the portal's address instead of the name.
       const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", "https://grants.example.org");
-      expect(invite.html).toContain(`<img src="${appUrl()}${saved.logoUrl}" alt="arc.fund"`);
+      expect(invite.html).toContain(`<img src="${appUrl()}${saved.logoUrl}" alt="Grant portal"`);
       const preview = await json(await post("/branding/email-preview", { emailColor: "#7c3aed" }));
       expect(preview).toMatchObject({ logoShown: true });
       expect(preview.html).toContain("border-top:6px solid #7C3AED");
@@ -2030,7 +2030,7 @@ describe("Supabase's Send Email Hook", () => {
     expect(res.status).toBe(200);
     const [email, ...rest] = sentEmails();
     expect(rest).toHaveLength(0);
-    expect(email).toMatchObject({ from: "Nova Bridge Grant <noreply@novabridgegrant.org>", to: ["maya@example.com"], reply_to: "info@novabridgegrant.org", subject: "Confirm your arc.fund email", key: "auth-hook_1-0" });
+    expect(email).toMatchObject({ from: "Nova Bridge Grant <noreply@novabridgegrant.org>", to: ["maya@example.com"], reply_to: "info@novabridgegrant.org", subject: "Confirm your Grant portal email", key: "auth-hook_1-0" });
     expect(email!.html).toContain("https://abcdefghijklmnop.supabase.co/auth/v1/verify?token=hash-abc&amp;type=signup&amp;redirect_to=https%3A%2F%2Fapp.example.org%2Flogin");
     expect(email!.html).not.toContain("supabase.io");
   });
@@ -2060,7 +2060,7 @@ describe("Supabase's Send Email Hook", () => {
     await send({ user: { email: "maya@example.com" }, email_data: { token_hash: "r1", email_action_type: "recovery", site_url: "https://app.example.org" } }, undefined);
     await send({ user: { email: "maya@example.com" }, email_data: { token: "654321", email_action_type: "reauthentication" } });
     const [reset, code] = sentEmails();
-    expect(reset).toMatchObject({ subject: "Reset your arc.fund password" });
+    expect(reset).toMatchObject({ subject: "Reset your Grant portal password" });
     expect(reset!.html).toContain("token=r1&amp;type=recovery");
     expect(code!.html).toContain("654321");
   });

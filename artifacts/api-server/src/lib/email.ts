@@ -35,11 +35,12 @@ let appUrlOverride: string | null | undefined;
 /** Set by the settings loader: the portal address saved in the admin settings (null clears it). */
 export const setAppUrlOverride = (url: string | null) => { appUrlOverride = url; };
 
-export const DEFAULT_APP_NAME = "arc.fund";
+// Used only until a super admin saves a name (Settings → App branding); no brand name is built in.
+export const DEFAULT_APP_NAME = "Grant portal";
 let appNameOverride: string | null = null;
 /** Set by the settings loader and the branding route: the application name saved by a super admin (null: the default). */
 export const setAppName = (name: string | null) => { appNameOverride = name; };
-/** The application's name, used in every email: the saved setting, else arc.fund. */
+/** The application's name, used in every email: the saved setting, else the neutral default. */
 export const appName = () => appNameOverride ?? DEFAULT_APP_NAME;
 
 /** The public address of the portal, for links in emails: the saved setting, APP_URL, else the Replit dev domain. */

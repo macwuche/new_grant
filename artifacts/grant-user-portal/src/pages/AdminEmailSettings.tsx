@@ -6,6 +6,7 @@ import {
   type EmailDomain, type EmailSettings, type EmailSettingsInput, type EmailStatus, type SignupEmailSetting,
 } from '@workspace/api-client-react';
 import { apiError } from '@/lib/serverData';
+import { useAppName } from '@/lib/appName';
 import { useCan } from './AdminStaff';
 import './AdminEmailSettings.css';
 
@@ -105,6 +106,7 @@ function SignupConfirmation({ tokenSet, sending, appUrl }: { tokenSet: boolean; 
 }
 
 function ConnectionForm({ settings, onSaved }: { settings: EmailSettings; onSaved: (s: EmailSettings) => void }) {
+  const { name: appName } = useAppName();
   const initial = { resendKey: '', fromAddress: settings.fromSource === 'settings' ? settings.from ?? '' : '', replyTo: settings.replyTo ?? '', appUrl: settings.appUrl ?? '', inboxAddress: settings.inboxAddress ?? '', webhookSecret: '', supabaseToken: '' };
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -138,10 +140,10 @@ function ConnectionForm({ settings, onSaved }: { settings: EmailSettings; onSave
       <small className={errors[key] ? 'admin-field-error' : ''}>{errors[key] ?? hint}</small></label>;
   return <form onSubmit={save} noValidate className="admin-email-form">
     {field('resendKey', 'Resend API key', settings.resendKey.source === 'environment' ? `Using the server's RESEND_API_KEY (…${settings.resendKey.last4}). Saving a key here overrides it.` : 'From Resend → API Keys. Use a key with full access so the domain can be set up from here.', { secret: true, placeholder: 're_…', saved: settings.resendKey.source === 'settings' ? settings.resendKey.last4 : null, clearable: settings.resendKey.source === 'settings' })}
-    {field('fromAddress', 'Sender', settings.fromSource === 'environment' ? `Using the server's EMAIL_FROM (${settings.from}).` : 'The name and address emails come from, on your verified domain.', { placeholder: 'Nova Bridge Grants <grants@novabridgegrant.org>' })}
-    {field('inboxAddress', 'Team mailbox address', 'Where applicants write to you (e.g. info@novabridgegrant.org). Mail to it arrives in the admin inbox; replies are sent from it.', { placeholder: 'info@novabridgegrant.org' })}
-    {field('replyTo', 'Reply-to (optional)', 'Where replies to notification emails go. Leave empty to use the sender.', { placeholder: 'info@novabridgegrant.org' })}
-    {field('appUrl', 'Portal address', 'Used for links in emails and the webhook address.', { placeholder: 'https://portal.novabridgegrant.org' })}
+    {field('fromAddress', 'Sender', settings.fromSource === 'environment' ? `Using the server's EMAIL_FROM (${settings.from}).` : 'The name and address emails come from, on your verified domain.', { placeholder: `${appName} <grants@yourdomain.org>` })}
+    {field('inboxAddress', 'Team mailbox address', 'Where applicants write to you (e.g. info@yourdomain.org). Mail to it arrives in the admin inbox; replies are sent from it.', { placeholder: 'info@yourdomain.org' })}
+    {field('replyTo', 'Reply-to (optional)', 'Where replies to notification emails go. Leave empty to use the sender.', { placeholder: 'info@yourdomain.org' })}
+    {field('appUrl', 'Portal address', 'Used for links in emails and the webhook address.', { placeholder: 'https://portal.yourdomain.org' })}
     {field('webhookSecret', 'Webhook signing secret', 'From Resend → Webhooks → your endpoint → Signing secret (starts with whsec_).', { secret: true, placeholder: 'whsec_…', saved: settings.webhook.secretSet ? '••••' : null, clearable: settings.webhook.secretSet })}
     {field('supabaseToken', 'Supabase access token', 'Lets this page check the Send Email hook and switch sign-up verification. Create one at supabase.com → Account → Access Tokens: a Project token for this project only, with Auth set to read & write and everything else None, expiring in 7 days. Remove it when you\'re done.', { secret: true, placeholder: 'Access token', saved: settings.supabaseToken.set ? '••••' : null, clearable: settings.supabaseToken.set })}
     <div className="admin-review-buttons" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -184,7 +186,7 @@ function DomainPanel({ settings, onChanged }: { settings: EmailSettings; onChang
       {domain && <span className="admin-email-settings-state" data-testid="status-email-domain">{domain.status.toUpperCase()}</span>}</div>
     {!settings.resendKey.set ? <p className="admin-review-hint">Save a Resend API key first.</p>
       : !settings.domain ? <form className="admin-form-row" style={{ alignItems: 'flex-end' }} onSubmit={add} noValidate>
-        <label className="admin-review-field" style={{ flex: 1 }}><span>Domain</span><input className="admin-input" value={name} onChange={e => setName(e.target.value)} placeholder="novabridgegrant.org" data-testid="input-email-domain" /></label>
+        <label className="admin-review-field" style={{ flex: 1 }}><span>Domain</span><input className="admin-input" value={name} onChange={e => setName(e.target.value)} placeholder="yourdomain.org" data-testid="input-email-domain" /></label>
         <label className="admin-review-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={receiving} onChange={e => setReceiving(e.target.checked)} data-testid="checkbox-email-receiving" /><span>Also receive email</span></label>
         <button type="submit" className="admin-btn primary" disabled={busy || !name.trim()} data-testid="button-add-email-domain">Add domain</button>
       </form>

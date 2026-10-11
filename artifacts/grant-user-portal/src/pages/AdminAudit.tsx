@@ -6,6 +6,7 @@ import { can, ROLE_LABELS } from '@workspace/domain/staff';
 import { useServerData } from '@/lib/serverData';
 import { useDemoStore } from '@/lib/store';
 import { downloadText } from '@/lib/download';
+import { fileSlug, useAppName } from '@/lib/appName';
 import { RoleNotice } from './AdminStaff';
 
 const when = (iso: string) => format(new Date(iso), 'dd MMM yyyy, HH:mm:ss');
@@ -29,12 +30,13 @@ export function AdminAudit() {
   const people = [...new Map(state.audit.map(e => [e.staffId, e.staffName])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const reset = () => { setQuery(''); setStaffId(''); setAction(''); setFrom(''); setTo(''); };
   const stamp = format(new Date(), 'yyyyMMdd-HHmm');
+  const { name: appName } = useAppName();
 
   return <section className="admin-panel" data-testid="panel-admin-audit">
     <div className="admin-panel-head"><div><h2>Audit trail</h2><p>{connected
       ? 'Every staff action, who took it under which role, from which address, the record it touched, and what changed. Entries are stored on the server and chained by hash, so any edit or deletion is detectable.'
       : 'Every staff action, who took it under which role, the record it touched, and what changed. Entries can\'t be edited or deleted from any role. IP addresses aren\'t captured because there is no server; resetting the sample data clears this browser\'s log.'}</p></div>
-      <div className="admin-review-buttons"><button type="button" className="admin-btn" disabled={!rows.length} onClick={() => downloadText(`arc-fund-audit-${stamp}.csv`, auditToCsv(rows), 'text/csv')} data-testid="button-admin-audit-csv"><Download size={13} /> CSV</button><button type="button" className="admin-btn" disabled={!rows.length} onClick={() => downloadText(`arc-fund-audit-${stamp}.json`, auditToJson(rows), 'application/json')} data-testid="button-admin-audit-json"><Download size={13} /> JSON</button></div></div>
+      <div className="admin-review-buttons"><button type="button" className="admin-btn" disabled={!rows.length} onClick={() => downloadText(`${fileSlug(appName)}-audit-${stamp}.csv`, auditToCsv(rows), 'text/csv')} data-testid="button-admin-audit-csv"><Download size={13} /> CSV</button><button type="button" className="admin-btn" disabled={!rows.length} onClick={() => downloadText(`${fileSlug(appName)}-audit-${stamp}.json`, auditToJson(rows), 'application/json')} data-testid="button-admin-audit-json"><Download size={13} /> JSON</button></div></div>
     {auditChain && <div className={`admin-review-flash ${auditChain.intact ? 'ok' : 'error'}`} role="status" data-testid="status-admin-audit-chain">{auditChain.intact
       ? `Integrity check passed: all ${auditChain.checked} entries match their hashes.`
       : `Integrity check failed at ${auditChain.brokenAt}: that entry or an earlier one was changed or removed outside the app. Treat the log as compromised and investigate.`}</div>}

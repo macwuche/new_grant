@@ -8,7 +8,7 @@ import { useCan } from './AdminStaff';
 import './BrandColorSettings.css';
 
 export const BRAND_PRESETS = [
-  { name: 'Arc lime', hex: DEFAULT_BRAND_COLOR },
+  { name: 'Lime', hex: DEFAULT_BRAND_COLOR },
   { name: 'Sea glass', hex: '#82D0C2' },
   { name: 'Apricot', hex: '#F5A86C' },
   { name: 'Periwinkle', hex: '#8EA7F1' },

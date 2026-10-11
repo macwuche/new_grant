@@ -1,3 +1,4 @@
+import { shortAppName, useAppName } from '@/lib/appName';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Archive, ArrowLeft, CornerUpLeft, FilePenLine, Inbox, Info, Mail, PenLine, Search, Send, Star, Trash2, X } from 'lucide-react';
@@ -24,6 +25,7 @@ const folders: Folder[] = ['Inbox', 'Sent', 'Drafts', 'Archive', 'Trash'];
 const blankDraft = (): Draft => ({ id: `draft-${Date.now()}`, to: '', subject: '', body: '' });
 
 export function AdminInbox() {
+  const { name: appName } = useAppName();
   const [messages, setMessages] = useState(seed);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [folder, setFolder] = useState<Folder>('Inbox');
@@ -86,7 +88,7 @@ export function AdminInbox() {
         <div className="admin-mail-folder-foot"><span>01 / SAMPLE ENVIRONMENT</span><p>Local changes reset when this page reloads.</p></div>
       </aside>
       <section className="admin-mail-list" aria-label={`${folder} messages`}>
-        <div className="admin-mail-list-heading"><div><span className="admin-mail-overline">FOLDER / {folder.toUpperCase()}</span><h2>{folder}</h2><p>{rows.length} {rows.length === 1 ? 'conversation' : 'conversations'} in view</p></div><span className="admin-mail-list-index">ARC—MAIL</span></div>
+        <div className="admin-mail-list-heading"><div><span className="admin-mail-overline">FOLDER / {folder.toUpperCase()}</span><h2>{folder}</h2><p>{rows.length} {rows.length === 1 ? 'conversation' : 'conversations'} in view</p></div><span className="admin-mail-list-index">{shortAppName(appName).toUpperCase()}—MAIL</span></div>
         <label className="admin-mail-search"><Search size={16} /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${folder.toLowerCase()}`} aria-label={`Search ${folder.toLowerCase()} messages`} data-testid="input-search-mail" /></label>
         <div className="admin-mail-list-scroll">{rows.length ? rows.map(message => <button key={message.id} type="button" className={`admin-mail-row ${selected === message.id ? 'selected' : ''} ${!message.read ? 'unread' : ''}`} onClick={() => chooseMessage(message.id)} aria-current={selected === message.id ? 'true' : undefined} data-testid={`button-mail-message-${message.id}`}><span className="admin-mail-row-top"><span className="admin-mail-sender">{!message.read && <i aria-label="Unread" />}{message.sender}</span><span className="admin-mail-row-date">{message.date.split(' · ')[0]}</span></span><strong>{message.subject}</strong><span className="admin-mail-snippet">{message.snippet}</span><span className="admin-mail-row-bottom"><span>{folder === 'Drafts' ? 'UNSENT DRAFT' : 'EXAMPLE.ORG'}</span>{message.starred && <Star size={13} fill="currentColor" aria-label="Starred" />}</span></button>) : <div className="admin-mail-empty"><Mail size={24} /><h3>{query ? 'No matching conversations' : `Nothing in ${folder.toLowerCase()}`}</h3><p>{query ? 'Try a different search term.' : 'This folder has no sample messages right now.'}</p>{query && <button type="button" onClick={() => setQuery('')} data-testid="button-clear-mail-search">Clear search</button>}</div>}</div>
       </section>

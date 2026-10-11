@@ -42,7 +42,7 @@ export function AppNameSettings() {
       <form onSubmit={onSubmit} noValidate>
         <label className="admin-review-field"><span>Name</span>
           <input className="admin-input" value={draft} maxLength={40} disabled={!editable || busy} onChange={e => { setDraft(e.target.value); setFeedback(null); }} placeholder={DEFAULT_APP_NAME} data-testid="input-app-name" />
-          <small>{editable ? 'Up to 40 characters. A "." is shown in the accent colour, as in arc.fund.' : 'Only a super admin can change this.'}</small></label>
+          <small>{editable ? 'Up to 40 characters. A "." is shown in the accent colour, e.g. my.grants.' : 'Only a super admin can change this.'}</small></label>
         {editable && <div className="admin-review-buttons" style={{ marginTop: 12, flexWrap: 'wrap' }}>
           <button type="submit" className="admin-btn primary" disabled={busy || preview === name} data-testid="button-save-app-name">{busy ? 'Saving…' : 'Save name'}</button>
           {!isDefault && <button type="button" className="admin-btn" disabled={busy} onClick={() => void submit('')} data-testid="button-reset-app-name">Restore {DEFAULT_APP_NAME}</button>}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppNameProvider, AppNameText, BrandLockup, ShortAppName, useAppName } from '@/lib/appName';
+import { AppNameProvider, AppNameText, BrandLockup, fileSlug, ShortAppName, useAppName } from '@/lib/appName';
 import { supabase } from '@/lib/supabase';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { format } from 'date-fns';
@@ -679,7 +679,7 @@ function exportCsv(rows: Transaction[], appName: string) {
     ['id', 'date', 'type', 'description', 'amount', 'status'].join(','),
     ...rows.map(t => [t.id, t.createdAt, t.type, t.description, t.amount.toFixed(2), t.status].map(escape).join(',')),
   ];
-  downloadText('arc-fund-activity.csv', lines.join('\n'), 'text/csv');
+  downloadText(`${fileSlug(appName)}-activity.csv`, lines.join('\n'), 'text/csv');
 }
 /** Receipt lines for one ledger entry (shared by the modal and the downloaded text). */
 function receiptLines(tx: Transaction, name: string): [string, string][] {
@@ -695,7 +695,7 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
   const { state } = useDemoStore();
   const { name: appName } = useAppName();
   const lines = receiptLines(tx, state.profile.name);
-  const download = () => downloadText(`arc-fund-receipt-${tx.id}.txt`, [`${appName} receipt — not proof of payment`, '', ...lines.map(([k, v]) => `${k}: ${v}`)].join('\n'));
+  const download = () => downloadText(`${fileSlug(appName)}-receipt-${tx.id}.txt`, [`${appName} receipt — not proof of payment`, '', ...lines.map(([k, v]) => `${k}: ${v}`)].join('\n'));
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [onClose]);
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="receipt-title" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><div className="modal" data-testid="modal-receipt"><div className="modal-head"><div><h2 id="receipt-title">Receipt</h2><p>Not proof of payment.</p></div><button className="icon-btn" onClick={onClose} aria-label="Close receipt" data-testid="button-close-receipt" autoFocus><X size={16} /></button></div>
     {lines.map(([k, v]) => <div className="fee-row" key={k}><span>{k}</span><strong>{v}</strong></div>)}
@@ -831,9 +831,11 @@ function RouterView({ onToast }: { onToast: Toast }) {
       '/admin/settings': 'Admin settings',
     };
     const title = titles[location] ?? (location.startsWith('/admin/settings/') ? 'Admin settings' : location.startsWith('/admin/applicants/') ? 'Admin user profile' : location.startsWith('/applications/new/') ? 'New application' : location.startsWith('/applications/') ? 'Application' : 'Page not found');
-    const description = location.startsWith('/admin')
-      ? `Explore the ${appName} admin UI preview. Sample records only; admin access and changes are not active.`
-      : `Explore the ${appName} grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.`;
+    const description = supabase
+      ? (location.startsWith('/admin') ? `The ${appName} staff workspace.` : `Apply for grants, track your applications, and manage your ${appName} account.`)
+      : location.startsWith('/admin')
+        ? `Explore the ${appName} admin UI preview. Sample records only; admin access and changes are not active.`
+        : `Explore the ${appName} grant applicant workspace. Preview data is saved in this browser only; sign-in, review, and payouts are not active.`;
     document.title = `${title} | ${appName}${supabase ? '' : ' preview'}`;
     for (const [selector, value] of [
       ['meta[name="description"]', description],
