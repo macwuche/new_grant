@@ -382,7 +382,7 @@ No schema change in either slice.
 
 **Tests:** 228 rule tests and 174 API tests (lock tests replaced by "every field editable after submissions"), typecheck pass. No browser check yet.
 
-### 11 Oct 2026: business or project name removed (owner's request; built, tested, and committed 11 Oct 2026; not yet deployed; no schema push)
+### 11 Oct 2026: business or project name removed (owner's request; built, tested, and committed 11 Oct 2026; deployed 11 Oct 2026 ~21:05 as `deb8163`, no schema push, `/api/healthz` ok, bundle `index-DYcZC9ZU.js`)
 
 The owner couldn't find where to edit the "Business or project name" field and asked for it to be removed from the app entirely. It was a fixed field on step 1 of every application (required, 2–200 characters), not part of the plan's form builder.
 

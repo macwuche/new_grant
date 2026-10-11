@@ -429,7 +429,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Business or project name removed (11 Oct 2026) — not yet deployed
+### Business or project name removed (11 Oct 2026) — deployed 11 Oct 2026 as `deb8163`
 
 No schema push (`applications.business_name` stays and new rows store an empty value). Redeploy as usual: `git pull`, `sh deploy/build.sh`, restart. Smoke test: start an application on any plan; step 1 shows only the amount, registration number, and description; as staff, the review queue and the review panel show the applicant's name.
 
@@ -719,3 +719,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-08 — Deployed `f7e58e1` (application text limits, upload disk protections, image rebuilding with `sharp`, plans without a total budget; no schema push: the two schema files changed only in comments). Server was clean on `1ee502b`; `git pull --ff-only` (fast-forward `1ee502b..f7e58e1`), `sh deploy/build.sh` (+5 packages for `sharp`; Build OK ~06:03 UTC), `sharp 0.35.5` loads as `novabridgegrant`, API restarted 06:06:56 UTC, `active (running)`, `/api/healthz` ok. Disk: 51 GB free of 58 GB (11% used), well above the 2,048 MB upload floor (`MIN_FREE_DISK_MB` not set, default in use). Owner's browser checks all passed: "Awarded so far" on plan cards and the overview with no budget field, a 1,500-character long answer saves and submits, the 2,000 limit with counters, a phone photo as profile picture shows upright. Next: the owner sets up Settings → App branding (now stored as rebuilt images).
 - 2026-10-10 — Deployed `4841d82` (grant plans editable after submissions; no schema push): `git pull --ff-only` (`4390116..4841d82`), `sh deploy/build.sh` (Build OK; bundle `index-b4f-kQL9.js`), restart, `/api/healthz` ok. Server asks for a reboot ("System restart required") after package updates; not done yet.
 - 2026-10-10 — Rebooted the VPS (~14:37 server clock) for pending Ubuntu updates ("System restart required"; up 8 days before). After boot: `novabridgegrant-api` and nginx `active`, `/api/healthz` ok.
+- 2026-10-11 — Deployed `deb8163` (business or project name removed from applications; no schema push): `git pull --ff-only` (`4841d82..deb8163`), `sh deploy/build.sh` (Build OK ~21:05; bundle `index-DYcZC9ZU.js`), restart, `/api/healthz` ok. Checked from outside: the served bundle no longer contains "Business or project name"; healthz ok through Cloudflare. Owner's browser check still to report.
