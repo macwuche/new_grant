@@ -153,18 +153,28 @@ button { cursor: pointer; }
 .primary-cell { font-weight: 700; }
 .secondary-cell { margin-top: 3px; color: hsl(var(--muted)); font-size: 10px; }
 .amount { font: 700 13px var(--app-font-display); letter-spacing: -.02em; }
-.card-visual { min-height: 184px; position: relative; overflow: hidden; border-radius: 18px; padding: 19px; background: hsl(var(--charcoal)); color: #fff; }
-.card-visual.lime-card { background: hsl(var(--lime)); color: var(--brand-accent-ink); }
-.card-visual:after { content: ''; width: 170px; height: 170px; position: absolute; right: -55px; bottom: -80px; border: 25px solid rgba(198,244,50,.14); border-radius: 50%; }
-.lime-card:after { border-color: rgba(24,27,24,.1); }
-.card-visual-top { display: flex; align-items: flex-start; justify-content: space-between; }
-.card-chip { width: 27px; height: 20px; border: 1px solid rgba(255,255,255,.35); border-radius: 5px; background: linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,.05)); }
-.lime-card .card-chip { border-color: rgba(24,27,24,.3); background: rgba(24,27,24,.1); }
-.card-number { margin-top: 35px; font: 600 18px var(--app-font-mono); letter-spacing: .12em; }
-.card-footer { display: flex; align-items: end; justify-content: space-between; margin-top: 14px; }
-.card-holder { font-size: 8px; letter-spacing: .12em; text-transform: uppercase; opacity: .65; }
-.card-name { margin-top: 3px; font-size: 11px; font-weight: 700; }
-.card-network { font: 700 italic 14px var(--app-font-display); letter-spacing: -.12em; }
+/* Card face (ATM-style prepaid card): sized by its own width, so every part scales with it (cqw). */
+.card-visual { position: relative; overflow: hidden; width: 100%; max-width: 480px; aspect-ratio: 1.6; container-type: inline-size; border-radius: 4.6% / 7.4%; color: #fff; background: radial-gradient(120% 140% at 0% 0%, #0f4a24 0%, #0a3a1b 45%, #062a12 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 28px rgba(6,42,18,.28); }
+.card-arcs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.card-visual > :not(.card-arcs) { position: absolute; }
+.card-brand { left: 9.5%; top: 10%; display: inline-grid; max-width: 58%; }
+.card-brand img { max-width: 100%; max-height: 13cqw; object-fit: contain; object-position: left; }
+.card-brand-name { font: 600 4.7cqw/1.05 var(--app-font-display); letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-brand-sub { display: flex; align-items: center; gap: 1.2cqw; margin-top: .6cqw; font-size: 2cqw; letter-spacing: .14em; }
+.card-brand-sub::after { content: ''; flex: 1; height: .25cqw; min-height: 1px; background: #7be13f; }
+.card-kind { right: 6.5%; top: 11%; font-size: 1.65cqw; letter-spacing: .26em; text-transform: uppercase; color: rgba(255,255,255,.78); }
+.card-chip { left: 9.7%; top: 34%; width: 13cqw; height: 10.2cqw; }
+.card-contactless { right: 7.3%; top: 38.5%; width: 5cqw; height: 7cqw; color: rgba(255,255,255,.88); }
+.card-number { left: 10%; right: 10%; top: 55%; display: flex; justify-content: space-between; font: 500 5.2cqw/1 var(--app-font-mono); letter-spacing: .1em; color: #eef2ee; text-shadow: 0 -1px 0 rgba(255,255,255,.35), 0 .3cqw .4cqw rgba(0,0,0,.6); }
+.card-number.card-label { justify-content: flex-start; font-size: 3.4cqw; letter-spacing: .18em; color: rgba(255,255,255,.8); }
+.card-holder-block { left: 10.5%; top: 74%; max-width: 44%; }
+.card-holder { font-size: 1.9cqw; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.72); }
+.card-name { margin-top: 1.4cqw; font-size: 3.3cqw; font-weight: 600; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 .3cqw .4cqw rgba(0,0,0,.45); }
+.card-expiry { left: 58%; top: 70.5%; display: flex; align-items: center; gap: 2.2cqw; }
+.card-expiry .card-holder { font-size: 1.55cqw; line-height: 1.35; }
+.card-expiry strong { font: 500 2.9cqw var(--app-font-mono); letter-spacing: .06em; }
+.card-network { right: 6%; bottom: 10%; max-width: 30%; overflow: hidden; font: 900 italic 4.6cqw/1 var(--app-font-display); letter-spacing: -.05em; white-space: nowrap; }
+.card-network span { color: #7be13f; }
 .quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .quick-action { display: flex; align-items: center; gap: 9px; padding: 11px; border: 1px solid hsl(var(--line)); border-radius: 13px; background: hsl(var(--surface)); font-size: 11px; font-weight: 700; transition: background .18s ease, transform .18s ease; }
 .quick-action:hover { background: hsl(var(--cream)); transform: translateY(-1px); }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppNameProvider, AppNameText, BrandLockup, fileSlug, ShortAppName, useAppName } from '@/lib/appName';
+import { AppNameProvider, AppNameText, BrandLockup, fileSlug, shortAppName, useAppName } from '@/lib/appName';
 import { supabase } from '@/lib/supabase';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { format } from 'date-fns';
@@ -205,7 +205,7 @@ function Dashboard({ onToast }: { onToast: Toast }) {
         {recentApps.length ? <div className="timeline">{recentApps.map(app => <TimelineRow key={app.id} title={grantName(state, app.grantId)} text={app.status === 'Draft' ? 'Continue where you left off when ready.' : app.status === 'Changes requested' ? `Action needed: ${app.history[app.history.length - 1]!.note}` : app.history[app.history.length - 1]!.note} status={app.status} current={app.status === 'Submitted' || app.status === 'Under review' || app.status === 'Changes requested'} done={app.status === 'Approved'} href={`/applications/${app.id}`} />)}</div>
           : <div className="empty-state"><h3>No applications yet</h3><p>Browse grant categories to start your first application.</p></div>}
       </div>
-      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your card</h2><p className="section-subtitle">{!virtual ? 'No card yet — create one from Cards.' : virtual.frozen ? 'Frozen — see Cards.' : `Card balance ${money(balances.card)}`}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">{virtual ? 'Manage' : 'Create'}</Link></div>{virtual ? <CardVisual name={state.profile.name} lastFour={virtual.lastFour} /> : <CardVisual name={state.profile.name} label="NO CARD YET" />}<div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><Link className="quick-action" href="/deposits" data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</Link></div></div>
+      <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Your card</h2><p className="section-subtitle">{!virtual ? 'No card yet — create one from Cards.' : virtual.frozen ? 'Frozen — see Cards.' : `Card balance ${money(balances.card)}`}</p></div><Link className="link-text" href="/cards" data-testid="link-view-cards">{virtual ? 'Manage' : 'Create'}</Link></div>{virtual ? <CardVisual name={state.profile.name} lastFour={virtual.lastFour} issuedAt={virtual.createdAt} /> : <CardVisual name={state.profile.name} label="NO CARD YET" />}<div className="quick-actions mt"><Link className="quick-action" href="/withdrawals" data-testid="link-quick-withdraw"><span className="action-icon"><ArrowUpRight size={15} /></span>Request payout</Link><Link className="quick-action" href="/deposits" data-testid="button-quick-deposit"><span className="action-icon"><ArrowDownLeft size={15} /></span>Add funds</Link></div></div>
     </section>
     <section className="card card-pad"><div className="section-head"><div><h2 className="section-title">Recent activity</h2><p className="section-subtitle">Latest entries in your ledger.</p></div><Link className="link-text" href="/transactions" data-testid="link-view-transactions">See activity</Link></div><TransactionTable rows={recentTx} /></section>
   </div>;
@@ -214,8 +214,49 @@ function TimelineRow({ title, text, status, current, done, href }: { title: stri
   const heading = href ? <Link href={href} className="link-text">{title}</Link> : title;
   return <div className="timeline-item"><div className={`timeline-dot ${current ? 'current' : done ? 'done' : ''}`} /><div style={{ flex: 1 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><h4>{heading}</h4>{status && <StatusBadge status={status} />}</div><p>{text}</p></div></div>;
 }
-function CardVisual({ name, lastFour, revealed = false, physical = false, label }: { name: string; lastFour?: string; revealed?: boolean; physical?: boolean; label?: string }) {
-  return <div className={`card-visual ${physical ? 'lime-card' : ''}`} data-testid={`card-visual-${physical ? 'physical' : 'virtual'}`}><div className="card-visual-top"><span style={{ font: '700 11px var(--app-font-display)' }}><AppNameText /></span><div className="card-chip" /></div><div className="card-number">{label ?? `••••  ••••  ••••  ${revealed ? lastFour : '••••'}`}</div><div className="card-footer"><div><div className="card-holder">Cardholder</div><div className="card-name">{name.toUpperCase()}</div></div><div className="card-network"><ShortAppName /></div></div></div>;
+/** "Nova Bridge Grant" → ["Nova Bridge", "Grant"]: the card face puts the last word on a small second line. */
+const cardBrandLines = (name: string): [string, string] => { const words = name.trim().split(/\s+/); return words.length > 1 ? [words.slice(0, -1).join(' '), words[words.length - 1]!] : [name, '']; };
+/** No issuer is connected, so the cards have no real expiry: show three years after the card was made. Display only. */
+function cardValidThru(iso?: string): string | null {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? `${String(d.getMonth() + 1).padStart(2, '0')}/${String((d.getFullYear() + 3) % 100).padStart(2, '0')}` : null;
+}
+function CardChip() {
+  return <svg className="card-chip" viewBox="0 0 130 102" aria-hidden="true"><defs><linearGradient id="card-chip-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#f6dc8e" /><stop offset=".45" stopColor="#d9ae54" /><stop offset="1" stopColor="#b98a35" /></linearGradient></defs>
+    <rect x="1" y="1" width="128" height="100" rx="14" fill="url(#card-chip-gold)" stroke="#a87a2c" strokeWidth="1.5" />
+    <path d="M1 34H38Q46 34 46 42V60Q46 68 38 68H1M129 34H92Q84 34 84 42V60Q84 68 92 68H129M46 51H84M56 1V24Q56 30 62 30H68Q74 30 74 24V1M56 101V78Q56 72 62 72H68Q74 72 74 78V101" fill="none" stroke="#9a6f27" strokeWidth="2" opacity=".75" /></svg>;
+}
+function CardContactless() {
+  return <svg className="card-contactless" viewBox="0 0 50 70" fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" aria-hidden="true"><path d="M8 26q5 9 0 18M19 19q9 16 0 32M30 12q13 23 0 46M41 5q17 30 0 60" /></svg>;
+}
+/** The card face, in the style of a prepaid ATM card. The brand comes from the saved app name or the logo for dark backgrounds. */
+function CardVisual({ name, lastFour, revealed = false, physical = false, label, issuedAt }: { name: string; lastFour?: string; revealed?: boolean; physical?: boolean; label?: string; issuedAt?: string }) {
+  const { name: appName, logoUrl, logoDarkUrl } = useAppName();
+  const [broken, setBroken] = useState<string | null>(null);
+  const logo = logoDarkUrl ?? logoUrl;
+  const [brand, brandSub] = cardBrandLines(appName);
+  const short = shortAppName(appName);
+  const expiry = label ? null : cardValidThru(issuedAt);
+  return <div className="card-visual" data-testid={`card-visual-${physical ? 'physical' : 'virtual'}`}>
+    <svg className="card-arcs" viewBox="0 0 1280 800" preserveAspectRatio="none" aria-hidden="true"><defs>
+      <linearGradient id="card-arc-outer" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#3fae2a" stopOpacity="0" /><stop offset=".55" stopColor="#4fc232" stopOpacity=".55" /><stop offset="1" stopColor="#8be84a" stopOpacity=".95" /></linearGradient>
+      <linearGradient id="card-arc-inner" x1="0" y1="1" x2=".8" y2="0"><stop offset="0" stopColor="#2f9a22" stopOpacity="0" /><stop offset="1" stopColor="#7fe043" stopOpacity=".85" /></linearGradient>
+      <radialGradient id="card-glow" cx=".78" cy=".35" r=".55"><stop offset="0" stopColor="#5fd33a" stopOpacity=".22" /><stop offset="1" stopColor="#5fd33a" stopOpacity="0" /></radialGradient></defs>
+      <rect width="1280" height="800" fill="url(#card-glow)" />
+      <path d="M420 800C570 470 860 235 1280 125V215C1000 265 740 440 575 800Z" fill="url(#card-arc-outer)" />
+      <path d="M1200 218L1280 205V425L1200 440Z" fill="#5cc935" opacity=".8" />
+      <path d="M605 800C700 560 860 385 1062 320V800H1040V352C880 405 750 560 660 800Z" fill="url(#card-arc-inner)" opacity=".8" />
+    </svg>
+    <div className="card-brand">{logo && broken !== logo ? <img src={logo} alt={appName} onError={() => setBroken(logo)} /> : <><span className="card-brand-name">{brand}</span>{brandSub && <span className="card-brand-sub">{brandSub}</span>}</>}</div>
+    <span className="card-kind">{physical ? 'Prepaid card' : 'Virtual card'}</span>
+    <CardChip />
+    <CardContactless />
+    {label ? <div className="card-number card-label">{label}</div>
+      : <div className="card-number" aria-label={revealed && lastFour ? `Card ending ${lastFour}` : 'Card number hidden'}>{['••••', '••••', '••••', revealed && lastFour ? lastFour : '••••'].map((g, n) => <span key={n}>{g}</span>)}</div>}
+    <div className="card-holder-block"><div className="card-holder">Cardholder</div><div className="card-name">{name.toUpperCase()}</div></div>
+    {expiry && <div className="card-expiry"><span className="card-holder">Valid<br />thru</span><strong>{expiry}</strong></div>}
+    <div className="card-network">{short.slice(0, -1)}<span>{short.slice(-1)}</span></div>
+  </div>;
 }
 
 function GrantCard({ grant, onToast }: { grant: Grant; onToast: Toast }) {
@@ -517,7 +558,7 @@ function CardsPage({ onToast }: { onToast: Toast }) {
     setFreezeNote(null); onToast(result.ok ? result.message : result.error);
   };
   return <div className="stack">{intro}<CardBalancePanel onToast={onToast} /><section className="grid-2">
-    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : staffFrozen ? 'Frozen by the grant team.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} />
+    <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Virtual card</h2><p className="section-subtitle">{locked ? 'Blocked while your account is locked.' : staffFrozen ? 'Frozen by the grant team.' : virtual.frozen ? 'Frozen — new spending is blocked.' : 'Available for spending.'}</p></div><StatusBadge status={locked ? 'Locked' : virtual.frozen ? 'Frozen' : 'Active'} tone={locked ? 'Failed' : virtual.frozen ? 'Pending' : 'Completed'} /></div><CardVisual name={state.profile.name} lastFour={virtual.lastFour} revealed={revealed} issuedAt={virtual.createdAt} />
       {freezeNote && <StaffFreezeNote text={freezeNote} />}
       <div className="quick-actions mt"><button className="quick-action" onClick={() => setRevealed(v => !v)} data-testid="button-reveal-card"><span className="action-icon"><LockKeyhole size={15} /></span>{revealed ? 'Hide number' : 'Reveal number'}</button><button className="quick-action" onClick={() => void toggle()} data-testid="button-freeze-card"><span className="action-icon"><ShieldCheck size={15} /></span>{virtual.frozen ? 'Unfreeze card' : 'Freeze card'}</button><button className="quick-action" onClick={() => setPinShown(v => !v)} data-testid="button-reveal-pin"><span className="action-icon"><LockKeyhole size={15} /></span>{pinShown ? <>PIN <strong className="mono" data-testid="text-card-pin">{virtual.pin}</strong></> : 'Reveal PIN'}</button></div>{pinShown && <p className="field-hint" style={{ marginTop: 8 }}>Sample PIN, hidden again after 10 seconds. A real PIN would come from the card provider and need a fresh sign-in.</p>}</div>
     <PhysicalCardPanel onToast={onToast} />
@@ -609,7 +650,7 @@ function PhysicalCardPanel({ onToast }: { onToast: Toast }) {
   ];
   const reason = physical.status === 'Declined' ? physical.declineReason : physical.status === 'Cancelled' ? physical.cancelReason : undefined;
   return <div className="card card-pad"><div className="section-head"><div><h2 className="section-title">Physical card</h2><p className="section-subtitle" data-testid="text-physical-card-status">{frozen ? (staffFrozen ? 'Frozen by the grant team.' : 'Frozen — new spending is blocked.') : copy.subtitle}</p></div>{copy.badge ? <StatusBadge status={frozen ? 'Frozen' : copy.badge} tone={frozen ? 'Pending' : copy.tone} /> : <CreditCard size={19} color="hsl(var(--muted))" />}</div>
-    <CardVisual name={state.profile.name} physical {...(active ? { lastFour: physical.lastFour, revealed: true } : { label: copy.label })} />
+    <CardVisual name={state.profile.name} physical {...(active ? { lastFour: physical.lastFour, revealed: true, issuedAt: physical.shippedAt } : { label: copy.label })} />
     {freezeNote && <StaffFreezeNote text={freezeNote} />}
     {reason && <p className="field-hint" style={{ marginTop: 10 }} data-testid="text-physical-card-reason">{physical.status === 'Declined' ? 'Declined' : 'Cancelled'}: {reason}</p>}
     {physical.status === 'Shipped' && physical.shippingMessage && <div className="notice mt" data-testid="text-physical-card-message"><Info size={16} /><span style={{ whiteSpace: 'pre-wrap' }}>{physical.shippingMessage}</span></div>}
