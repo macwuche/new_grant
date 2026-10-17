@@ -429,7 +429,11 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Team inbox slice 1: Cc/Bcc, Reply all, who can send (17 Oct 2026) — not yet deployed
+### Inbox page without its heading (17 Oct 2026) — not yet deployed
+
+Portal only; no schema push. Redeploy as usual. Check: `/admin/inbox` opens with the mailbox right under the top bar (no "The team inbox." heading); other admin pages still have theirs.
+
+### Team inbox slice 1: Cc/Bcc, Reply all, who can send (17 Oct 2026) — deployed 17 Oct 2026 as `c61cb78`
 
 **Schema push first** (new column `inbox_messages.bcc_addresses`, additive): after `git pull`, run the push (Step 7 / the line under "Redeploy an update"), then build and restart. Check: as a super admin, open a received message that had other people on it, **Reply all** fills To and Cc without the team address; send a test with yourself in Cc and Bcc and both arrive (the To person can't see the Bcc); as a Support user (if any), the inbox opens but Compose, Reply, Archive, and Trash are dimmed with "Read only".
 
@@ -748,3 +752,5 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-17 — Deployed `9d47f52` (team inbox: message actions pinned at the top, Forward; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`e59b9ee..9d47f52`), `sh deploy/build.sh` (Build OK ~14:59 server clock; bundle `index-CU7HYTHV.js`), restart. Checked from outside: `/api/healthz` ok and the served bundle has the inbox toolbar and Forward. Owner's browser check of `/admin/inbox` still to report.
 - 2026-10-17 — Deployed `aa18bd4` (switching tabs no longer resets the page; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`9d47f52..aa18bd4`), `sh deploy/build.sh` (Build OK ~16:18 server clock; bundle `index-CwQ2EZ48.js`), restart. Checked from outside: `/api/healthz` ok and the new bundle served. Owner's tab-switch check still to report.
 - 2026-10-17 — Deployed `891e241` (team inbox emails carry the logo; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`aa18bd4..891e241`), `sh deploy/build.sh` (Build OK ~17:10 server clock; bundle `index-CGNOj-97.js`), restart. Checked from outside: `/api/healthz` ok, the new bundle served, and the logo public at `/api/branding/logo` (200, image/png) for email clients. Owner's test email from `/admin/inbox` still to report.
+- 2026-10-17 — First attempt at slice 1 pulled only `087e7a0` (review and plan docs; slice 1 wasn't pushed yet): the schema push found nothing to change and the build reproduced the live bundle `index-CGNOj-97.js`, so nothing changed.
+- 2026-10-17 — Deployed `c61cb78` (team inbox slice 1: Cc/Bcc delivered, Reply all, `inbox.send`/`inbox.delete`): `sudo -u novabridgegrant git pull --ff-only` (`087e7a0..c61cb78`), **schema push** ("Changes applied": `inbox_messages.bcc_addresses`), `sh deploy/build.sh` (Build OK ~18:07 server clock; bundle `index-D82Aewso.js`), restart. Checked from outside: `/api/healthz` ok, the new bundle served with Reply all and the Bcc field, `POST /api/inbox/send` without sign-in answers 401. Owner's Reply all / Cc / Bcc test still to report.

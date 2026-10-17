@@ -6,7 +6,7 @@
 .admin-inbox-feedback { align-items: center; background: #f7f8ed; border-color: #dce4cb; }
 .admin-inbox-feedback span { flex: 1; }
 .admin-inbox-feedback button { background: transparent; border: 0; color: inherit; display: grid; place-items: center; }
-.admin-mailbox { display: grid; grid-template-columns: 190px minmax(230px, 32%) minmax(0, 1fr); min-height: 460px; height: min(750px, calc(100dvh - 110px)); border: 1px solid var(--admin-line); border-radius: 17px; overflow: hidden; background: var(--admin-panel); box-shadow: 0 15px 38px rgba(31,42,37,.035); }
+.admin-mailbox { display: grid; grid-template-columns: 190px minmax(230px, 32%) minmax(0, 1fr); min-height: 460px; height: min(1100px, calc(100dvh - 130px)); border: 1px solid var(--admin-line); border-radius: 17px; overflow: hidden; background: var(--admin-panel); box-shadow: 0 15px 38px rgba(31,42,37,.035); }
 .admin-mail-overline { display: block; color: #859184; font: 700 9px var(--app-font-mono, monospace); letter-spacing: .12em; }
 .admin-mail-folders { display: flex; flex-direction: column; min-width: 0; padding: 26px 12px 20px; background: #f0f3ea; border-right: 1px solid #dfe5d9; }
 .admin-mail-folders-heading { display: grid; gap: 9px; padding: 0 12px 25px; }
