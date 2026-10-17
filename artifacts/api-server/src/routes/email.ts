@@ -210,7 +210,7 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     res.json({ address: c.inboxAddress ?? (c.from ? addressOf(c.from) : null), receiving: !!c.webhookSecret, sending: !!c.resendKey && !!c.from, unread: await inbox.unreadCount(), messages: await inbox.list(folder) });
   });
 
-  router.post("/inbox/:id/update", requireStaff, async (req, res) => {
+  router.post("/inbox/:id/update", requireStaff, requirePermission("inbox.send"), async (req, res) => {
     const folder = req.body?.folder; const read = req.body?.read;
     if (folder !== undefined && !(FOLDERS as unknown[]).includes(folder)) { res.status(400).json({ error: "Unknown folder." }); return; }
     if (read !== undefined && typeof read !== "boolean") { res.status(400).json({ error: "Say read or unread." }); return; }
@@ -219,14 +219,18 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     res.json(updated);
   });
 
-  router.post("/inbox/send", requireStaff, async (req, res) => {
+  router.post("/inbox/send", requireStaff, requirePermission("inbox.send"), async (req, res) => {
     const list = (v: unknown) => (Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : []).map(x => String(x).trim()).filter(Boolean);
-    const to = list(req.body?.to), cc = list(req.body?.cc);
+    const to = list(req.body?.to), cc = list(req.body?.cc), bcc = list(req.body?.bcc);
+    // One key per message the composer opened: a double click or a retry after a lost answer sends once.
+    const key = typeof req.body?.idempotencyKey === "string" && /^[A-Za-z0-9-]{8,100}$/.test(req.body.idempotencyKey) ? req.body.idempotencyKey : null;
     const subject = typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
     const body = typeof req.body?.text === "string" ? req.body.text.trim() : "";
     const errors: Record<string, string> = {};
     if (!to.length || to.length > 20 || !to.every(a => EMAIL.test(a))) errors["to"] = "Enter one or more valid addresses, separated by commas.";
     if (cc.length > 20 || !cc.every(a => EMAIL.test(a))) errors["cc"] = "Enter valid addresses, separated by commas.";
+    if (bcc.length > 20 || !bcc.every(a => EMAIL.test(a))) errors["bcc"] = "Enter valid addresses, separated by commas.";
+    else if (to.length + cc.length + bcc.length > 50) errors["bcc"] = "Send to at most 50 people in all (To, Cc, and Bcc).";
     if (!subject || subject.length > 200) errors["subject"] = "Enter a subject (up to 200 characters).";
     if (!body || body.length > 20_000) errors["text"] = "Write a message (up to 20,000 characters).";
     if (Object.keys(errors).length) { res.status(400).json({ error: "Fix the highlighted fields.", fieldErrors: errors }); return; }
@@ -238,16 +242,20 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     const html = renderMessageEmail({ body, footer: `${appName()} · ${address}` });
     const staff = authLocals(res).staff!;
     const sent = await resendApi(c.resendKey, fetchImpl).send({
-      from, to, subject, text: body, html, replyTo: address,
+      from, to, cc, bcc, subject, text: body, html, replyTo: address,
       ...(original?.messageId ? { headers: { "In-Reply-To": original.messageId, References: original.messageId } } : {}),
-    });
+    }, key ? `inbox-${staff.id}-${key}` : undefined);
     if (!sent.ok) { res.status(502).json({ error: sent.error }); return; }
+    const at = new Date().toISOString();
     const saved = await inbox.addOutbound({
-      direction: "outbound", resendId: sent.data.id, messageId: null, inReplyTo: original?.id ?? null, from, to, cc, subject, text: body, html,
-      attachments: [], status: "sent", folder: "sent", sentBy: staff.name, at: new Date().toISOString(),
+      direction: "outbound", resendId: sent.data.id, messageId: null, inReplyTo: original?.id ?? null, from, to, cc, bcc, subject, text: body, html,
+      attachments: [], status: "sent", folder: "sent", sentBy: staff.name, at,
     });
+    // A repeat of a send Resend already accepted: same message, so no second audit entry.
+    if (saved.at !== at) { res.status(201).json(saved); return; }
     if (original && !original.read) await inbox.update(original.id, { read: true });
-    await settings.record(audit(req, res, "Send email", `Sent "${subject}" to ${to.join(", ")}.`, [{ field: "to", before: "—", after: to.join(", ") }, { field: "subject", before: "—", after: subject }]));
+    const recipients = [...to, ...cc.map(a => `${a} (cc)`), ...bcc.map(a => `${a} (bcc)`)].join(", ");
+    await settings.record(audit(req, res, "Send email", `Sent "${subject}" to ${recipients}.`, [{ field: "to", before: "—", after: recipients }, { field: "subject", before: "—", after: subject }]));
     res.status(201).json(saved);
   });
 
@@ -280,7 +288,7 @@ export function emailWebhookRouter({ outbox, settings, inbox, fetchImpl = fetch,
       if (full && !full.ok) logger.warn({ emailId, error: full.error }, "couldn't fetch a received email's content");
       const stored = await inbox.addInbound({
         direction: "inbound", resendId: emailId, messageId: m?.message_id ?? meta.message_id ?? null, inReplyTo: null,
-        from: m?.from ?? meta.from ?? "unknown", to: m?.to ?? meta.to ?? [], cc: m?.cc ?? meta.cc ?? [], subject: m?.subject ?? meta.subject ?? "(no subject)",
+        from: m?.from ?? meta.from ?? "unknown", to: m?.to ?? meta.to ?? [], cc: m?.cc ?? meta.cc ?? [], bcc: [], subject: m?.subject ?? meta.subject ?? "(no subject)",
         text: m?.text ?? null, html: m?.html ?? null,
         attachments: (m?.attachments ?? meta.attachments ?? []).map(a => ({ id: a.id, filename: a.filename, contentType: a.content_type, size: "size" in a && typeof a.size === "number" ? a.size : null })),
         status: null, folder: "inbox", sentBy: null, at: m?.created_at ?? meta.created_at ?? new Date().toISOString(),

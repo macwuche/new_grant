@@ -46,6 +46,8 @@ export const inboxMessagesTable = pgTable("inbox_messages", {
   fromAddress: text("from_address").notNull(),
   toAddresses: jsonb("to_addresses").$type<string[]>().notNull(),
   ccAddresses: jsonb("cc_addresses").$type<string[]>().notNull().default([]),
+  /** Outbound only: who was Bcc'd (never shown to recipients; received mail has none). */
+  bccAddresses: jsonb("bcc_addresses").$type<string[]>().notNull().default([]),
   subject: text("subject").notNull(),
   textBody: text("text_body"),
   htmlBody: text("html_body"),

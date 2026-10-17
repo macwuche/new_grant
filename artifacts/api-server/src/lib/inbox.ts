@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 export type InboxFolder = "inbox" | "sent" | "archive" | "trash";
 export type InboxMessage = {
   id: string; direction: "inbound" | "outbound"; resendId: string | null; messageId: string | null; inReplyTo: string | null;
-  from: string; to: string[]; cc: string[]; subject: string; text: string | null; html: string | null;
+  from: string; to: string[]; cc: string[]; bcc: string[]; subject: string; text: string | null; html: string | null;
   attachments: { id: string; filename: string; contentType: string; size: number | null }[];
   status: string | null; folder: InboxFolder; read: boolean; sentBy: string | null; at: string;
 };
@@ -17,6 +17,7 @@ export interface InboxRepo {
   get(id: string): Promise<InboxMessage | null>;
   /** Stores a received message once per Resend id; returns null if it was already stored. */
   addInbound(msg: NewInboxMessage): Promise<InboxMessage | null>;
+  /** Stores a sent message; a retry of a send Resend already accepted (same Resend id) returns the stored copy. */
   addOutbound(msg: NewInboxMessage): Promise<InboxMessage>;
   update(id: string, patch: Partial<Pick<InboxMessage, "folder" | "read">>): Promise<InboxMessage | null>;
   /** Delivery results for sent mail, by Resend id. */
@@ -39,7 +40,11 @@ export function memoryInboxRepo(): InboxRepo & { rows: InboxMessage[] } {
       const row: InboxMessage = { ...msg, id: randomUUID(), read: msg.read ?? false };
       rows.push(row); return copy(row);
     },
-    addOutbound: async msg => { const row: InboxMessage = { ...msg, id: randomUUID(), read: true }; rows.push(row); return copy(row); },
+    addOutbound: async msg => {
+      const existing = msg.resendId ? rows.find(r => r.direction === "outbound" && r.resendId === msg.resendId) : undefined;
+      if (existing) return copy(existing);
+      const row: InboxMessage = { ...msg, id: randomUUID(), read: true }; rows.push(row); return copy(row);
+    },
     update: async (id, patch) => { if (!isUuid(id)) return null; const m = rows.find(r => r.id === id); if (!m) return null; Object.assign(m, patch); return copy(m); },
     setStatusByResendId: async (resendId, status) => { for (const m of rows) if (m.direction === "outbound" && m.resendId === resendId) m.status = status; },
     unreadCount: async () => rows.filter(m => m.folder === "inbox" && !m.read).length,

@@ -4,7 +4,7 @@ import { INBOX_LIMIT, type InboxMessage, type InboxRepo } from "./inbox";
 
 const toMessage = (r: InboxMessageRow): InboxMessage => ({
   id: r.id, direction: r.direction, resendId: r.resendId, messageId: r.messageId, inReplyTo: r.inReplyTo,
-  from: r.fromAddress, to: r.toAddresses, cc: r.ccAddresses, subject: r.subject, text: r.textBody, html: r.htmlBody,
+  from: r.fromAddress, to: r.toAddresses, cc: r.ccAddresses, bcc: r.bccAddresses, subject: r.subject, text: r.textBody, html: r.htmlBody,
   attachments: r.attachments.map(a => ({ id: a.id, filename: a.filename, contentType: a.contentType, size: a.size })),
   status: r.status, folder: r.folder, read: r.read, sentBy: r.sentBy, at: r.at.toISOString(),
 });
@@ -13,7 +13,7 @@ const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 
 const values = (m: Omit<InboxMessage, "id">) => ({
   direction: m.direction, resendId: m.resendId, messageId: m.messageId, inReplyTo: m.inReplyTo, fromAddress: m.from, toAddresses: m.to,
-  ccAddresses: m.cc, subject: m.subject, textBody: m.text, htmlBody: m.html, attachments: m.attachments, status: m.status,
+  ccAddresses: m.cc, bccAddresses: m.bcc, subject: m.subject, textBody: m.text, htmlBody: m.html, attachments: m.attachments, status: m.status,
   folder: m.folder, read: m.read, sentBy: m.sentBy, at: new Date(m.at),
 });
 
@@ -30,7 +30,13 @@ export const dbInboxRepo: InboxRepo = {
     const [r] = await db.insert(inboxMessagesTable).values(values({ ...msg, read: msg.read ?? false })).onConflictDoNothing().returning();
     return r ? toMessage(r) : null;
   },
-  addOutbound: async msg => { const [r] = await db.insert(inboxMessagesTable).values(values({ ...msg, read: true })).returning(); return toMessage(r!); },
+  // Same unique index as received mail: a retried send that Resend already accepted keeps the first copy.
+  addOutbound: async msg => {
+    const [r] = await db.insert(inboxMessagesTable).values(values({ ...msg, read: true })).onConflictDoNothing().returning();
+    if (r) return toMessage(r);
+    const [existing] = await db.select().from(inboxMessagesTable).where(and(eq(inboxMessagesTable.direction, "outbound"), eq(inboxMessagesTable.resendId, msg.resendId!)));
+    return toMessage(existing!);
+  },
   update: async (id, patch) => {
     if (!isUuid(id)) return null;
     const [r] = await db.update(inboxMessagesTable).set(patch).where(eq(inboxMessagesTable.id, id)).returning();

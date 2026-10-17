@@ -139,7 +139,7 @@ describe("GET /me", () => {
   it("returns staff with their role's permissions", async () => {
     const body = await json(await call("/me", "tok-finance"));
     expect(body.staff).toMatchObject({ name: "Jordan Lee", role: "finance", linked: true });
-    expect(body.permissions).toEqual(["payments.process", "treasury.manage", "notes.add"]);
+    expect(body.permissions).toEqual(["payments.process", "treasury.manage", "notes.add", "inbox.send"]);
   });
 
   it("links a pending staff record only after the email is confirmed", async () => {
@@ -2007,6 +2007,41 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect((await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action)).toContain("Send email");
     expect((await post(`/inbox/${original.id}/update`, { folder: "archive" })).status).toBe(200);
     expect((await json(await call("/inbox?folder=archive", "tok-super"))).messages).toHaveLength(1);
+  });
+
+  it("sends Cc and Bcc, sends a repeated message once, and lets only roles with inbox.send send or file mail", async () => {
+    await configure();
+    providerReplies["GET /emails/receiving/in_3"] = { status: 200, body: { id: "in_3", from: "maya@example.com", to: ["info@novabridgegrant.org"], subject: "Hello", html: null, text: "Hi", created_at: "2026-09-26T10:00:00Z" } };
+    await hook({ type: "email.received", data: { email_id: "in_3" } });
+    const [received] = (await json(await call("/inbox", "tok-super"))).messages;
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_7" } };
+    const message = { to: "maya@example.com", cc: "riley@example.org, casey@example.org", bcc: "audit@example.org", subject: "Copies", text: "Hello all", idempotencyKey: "compose-1234-abcd" };
+    const first = await post("/inbox/send", message);
+    expect(first.status).toBe(201);
+    const sends = () => providerCalls.filter(c => c.method === "POST" && c.url.endsWith("/emails"));
+    expect(sends()[0]!.body).toMatchObject({ to: ["maya@example.com"], cc: ["riley@example.org", "casey@example.org"], bcc: ["audit@example.org"] });
+    expect(sends()[0]!.headers["idempotency-key"]).toBe("inbox-aaaaaaaa-0000-4000-8000-000000000001-compose-1234-abcd");
+    const saved = await json(first);
+    expect(saved).toMatchObject({ cc: ["riley@example.org", "casey@example.org"], bcc: ["audit@example.org"] });
+    // A retry with the same key: Resend answers with the same id, and the Sent folder keeps one copy and one audit entry.
+    const again = await json(await post("/inbox/send", message));
+    expect(again.id).toBe(saved.id);
+    expect((await json(await call("/inbox?folder=sent", "tok-super"))).messages).toHaveLength(1);
+    const audits = (await json(await call("/audit", "tok-super"))).events.filter((e: { action: string }) => e.action === "Send email");
+    expect(audits).toHaveLength(1);
+    expect(audits[0].summary ?? JSON.stringify(audits[0])).toContain("audit@example.org (bcc)");
+    expect((await post("/inbox/send", { ...message, bcc: Array.from({ length: 21 }, (_, i) => `p${i}@example.org`).join(",") })).status).toBe(400);
+    expect((await json(await post("/inbox/send", { ...message, bcc: "nope" }))).fieldErrors).toMatchObject({ bcc: expect.any(String) });
+    // Finance sends; Support reads but can't send, move, or mark read.
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_8" } };
+    expect((await post("/inbox/send", { ...message, idempotencyKey: "compose-5678-efgh" }, "tok-finance")).status).toBe(201);
+    expect((await patch("aaaaaaaa-0000-4000-8000-000000000002", { role: "support" })).status).toBe(200);
+    expect((await call("/inbox", "tok-finance")).status).toBe(200);
+    expect((await post("/inbox/send", { ...message, idempotencyKey: "compose-9999-ijkl" }, "tok-finance")).status).toBe(403);
+    expect((await post(`/inbox/${received.id}/update`, { folder: "trash" }, "tok-finance")).status).toBe(403);
+    expect((await post(`/inbox/${received.id}/update`, { read: true }, "tok-finance")).status).toBe(403);
+    expect((await json(await call("/me", "tok-finance"))).permissions).not.toContain("inbox.send");
+    expect(sends()).toHaveLength(3);
   });
 });
 

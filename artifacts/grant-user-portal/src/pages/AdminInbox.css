@@ -54,7 +54,10 @@
 .admin-mail-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; margin-left: auto; }
 /* The top bar is set in the mono face; the buttons use the body face (and beat `.admin-shell button { font: inherit }`). */
 .admin-mail-reader-top .admin-mail-toolbar button { min-height: 34px; padding: 0 12px; font: 800 11px/1 var(--app-font-sans); letter-spacing: normal; }
-.admin-mail-toolbar button:disabled, .admin-mail-form-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.admin-mail-toolbar button:disabled, .admin-mail-form-actions button:disabled, .admin-mail-compose:disabled { opacity: .45; cursor: not-allowed; }
+.admin-mail-compose:disabled:hover { background: var(--admin-night); }
+/* Archive and Trash are icon buttons (labelled for screen readers), as in most mail apps. */
+.admin-mail-reader-top .admin-mail-toolbar button[aria-label] { width: 34px; padding: 0; }
 .admin-mail-message, .admin-mail-compose-pane, .admin-mail-draft-view { width: 100%; max-width: 760px; margin: 0 auto; padding: 35px clamp(24px, 3vw, 52px) 30px; }
 .admin-mail-message h2, .admin-mail-compose-title h2, .admin-mail-draft-view h2 { margin: 10px 0 25px; overflow-wrap: anywhere; font: 700 clamp(20px, 1.7vw, 25px)/1.2 var(--app-font-display, sans-serif); letter-spacing: -.05em; }
 .admin-mail-message-meta { display: flex; align-items: flex-start; gap: 11px; padding-bottom: 23px; border-bottom: 1px solid #e6ebe4; }
@@ -81,6 +84,7 @@
 .admin-mail-form { display: grid; gap: 9px; }
 .admin-mail-form label { display: flex; justify-content: space-between; gap: 8px; margin-top: 7px; color: #52604f; font-size: 11px; font-weight: 800; }
 .admin-mail-form label span { color: #9aa69a; font-size: 10px; font-weight: 500; }
+.admin-mail-link { padding: 0; border: 0; background: transparent; color: #4f6a2c; font-size: 10px; font-weight: 800; text-decoration: underline; }
 .admin-mail-form input, .admin-mail-form textarea { width: 100%; border: 1px solid #dce3d9; border-radius: 9px; outline: none; background: #fbfcf8; color: var(--admin-ink); font-size: 12px; }
 .admin-mail-form input { min-height: 40px; padding: 0 12px; }
 .admin-mail-form textarea { min-height: 215px; padding: 12px; resize: vertical; line-height: 1.6; }
@@ -127,6 +131,7 @@
   .admin-mail-toolbar { justify-content: flex-start; margin-left: 0; width: 100%; }
   .admin-mail-toolbar { flex-wrap: nowrap; gap: 6px; }
   .admin-mail-reader-top .admin-mail-toolbar button { flex: 1 1 0; min-width: 0; gap: 5px; padding: 0 6px; }
+  .admin-mail-reader-top .admin-mail-toolbar button[aria-label] { flex: 0 0 40px; width: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .admin-mailbox * { transition-duration: .01ms !important; }

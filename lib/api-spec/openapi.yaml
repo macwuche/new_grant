@@ -3221,7 +3221,7 @@ paths:
       operationId: getInbox
       tags: [email]
       summary: The team mailbox (staff)
-      description: Any active staff member. Up to 200 messages in the folder, newest first.
+      description: Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
       parameters:
         - name: folder
           in: query
@@ -3247,7 +3247,7 @@ paths:
       operationId: sendInboxEmail
       tags: [email]
       summary: Send or reply from the team mailbox (staff)
-      description: Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+      description: Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
       requestBody:
         required: true
         content:
@@ -3274,7 +3274,7 @@ paths:
       operationId: updateInboxMessage
       tags: [email]
       summary: Move a message or mark it read (staff)
-      description: Folder inbox, sent, archive, or trash.
+      description: Needs inbox.send. Folder inbox, sent, archive, or trash.
       requestBody:
         required: true
         content:
@@ -3562,6 +3562,10 @@ components:
         from: { type: string }
         to: { type: array, items: { type: string } }
         cc: { type: array, items: { type: string } }
+        bcc:
+          type: array
+          items: { type: string }
+          description: Outbound only, who was Bcc'd; empty for received mail.
         subject: { type: string }
         text: { type: [string, "null"] }
         html: { type: [string, "null"] }
@@ -3580,7 +3584,7 @@ components:
         read: { type: boolean }
         sentBy: { type: [string, "null"] }
         at: { type: string }
-      required: [id, direction, resendId, messageId, inReplyTo, from, to, cc, subject, text, html, attachments, status, folder, read, sentBy, at]
+      required: [id, direction, resendId, messageId, inReplyTo, from, to, cc, bcc, subject, text, html, attachments, status, folder, read, sentBy, at]
     InboxView:
       type: object
       properties:
@@ -3598,9 +3602,13 @@ components:
       properties:
         to: { type: string }
         cc: { type: string }
+        bcc: { type: string }
         subject: { type: string }
         text: { type: string }
         inReplyTo: { type: string }
+        idempotencyKey:
+          type: string
+          description: One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message.
       required: [to, subject, text]
     InboxUpdateInput:
       type: object

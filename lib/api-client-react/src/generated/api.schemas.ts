@@ -233,6 +233,8 @@ export interface InboxMessage {
   from: string;
   to: string[];
   cc: string[];
+  /** Outbound only, who was Bcc'd; empty for received mail. */
+  bcc: string[];
   subject: string;
   /** @nullable */
   text: string | null;
@@ -260,9 +262,12 @@ export interface InboxView {
 export interface InboxSendInput {
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   text: string;
   inReplyTo?: string;
+  /** One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message. */
+  idempotencyKey?: string;
 }
 
 export type InboxUpdateInputFolder = typeof InboxUpdateInputFolder[keyof typeof InboxUpdateInputFolder];

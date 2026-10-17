@@ -12192,7 +12192,7 @@ export const PreviewBrandEmailResponse = zod.object({
 
 
 /**
- * Any active staff member. Up to 200 messages in the folder, newest first.
+ * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
  * @summary The team mailbox (staff)
  */
 export const GetInboxQueryParams = zod.object({
@@ -12213,6 +12213,7 @@ export const GetInboxResponse = zod.object({
   "from": zod.string(),
   "to": zod.array(zod.string()),
   "cc": zod.array(zod.string()),
+  "bcc": zod.array(zod.string()).describe('Outbound only, who was Bcc\'d; empty for received mail.'),
   "subject": zod.string(),
   "text": zod.string().nullable(),
   "html": zod.string().nullable(),
@@ -12232,15 +12233,17 @@ export const GetInboxResponse = zod.object({
 
 
 /**
- * Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+ * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
  * @summary Send or reply from the team mailbox (staff)
  */
 export const SendInboxEmailBody = zod.object({
   "to": zod.string(),
   "cc": zod.string().optional(),
+  "bcc": zod.string().optional(),
   "subject": zod.string(),
   "text": zod.string(),
-  "inReplyTo": zod.string().optional()
+  "inReplyTo": zod.string().optional(),
+  "idempotencyKey": zod.string().optional().describe('One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message.')
 })
 
 export const SendInboxEmailResponse = zod.object({
@@ -12252,6 +12255,7 @@ export const SendInboxEmailResponse = zod.object({
   "from": zod.string(),
   "to": zod.array(zod.string()),
   "cc": zod.array(zod.string()),
+  "bcc": zod.array(zod.string()).describe('Outbound only, who was Bcc\'d; empty for received mail.'),
   "subject": zod.string(),
   "text": zod.string().nullable(),
   "html": zod.string().nullable(),
@@ -12270,7 +12274,7 @@ export const SendInboxEmailResponse = zod.object({
 
 
 /**
- * Folder inbox, sent, archive, or trash.
+ * Needs inbox.send. Folder inbox, sent, archive, or trash.
  * @summary Move a message or mark it read (staff)
  */
 export const UpdateInboxMessageParams = zod.object({
@@ -12291,6 +12295,7 @@ export const UpdateInboxMessageResponse = zod.object({
   "from": zod.string(),
   "to": zod.array(zod.string()),
   "cc": zod.array(zod.string()),
+  "bcc": zod.array(zod.string()).describe('Outbound only, who was Bcc\'d; empty for received mail.'),
   "subject": zod.string(),
   "text": zod.string().nullable(),
   "html": zod.string().nullable(),

@@ -6,7 +6,8 @@ export type StaffRole = 'super' | 'reviewer' | 'finance' | 'compliance' | 'suppo
 export type Permission =
   | 'applications.review' | 'applications.escalate' | 'applications.clearEscalation' | 'notes.add'
   | 'programs.manage' | 'payments.process' | 'payments.release' | 'treasury.manage'
-  | 'kyc.review' | 'accounts.manage' | 'accounts.tier' | 'staff.manage' | 'security.lockdown' | 'audit.view';
+  | 'kyc.review' | 'accounts.manage' | 'accounts.tier' | 'staff.manage' | 'security.lockdown' | 'audit.view'
+  | 'inbox.send' | 'inbox.delete';
 
 export const STAFF_ROLES: StaffRole[] = ['super', 'reviewer', 'finance', 'compliance', 'support'];
 
@@ -29,13 +30,16 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'staff.manage': 'assign staff roles',
   'security.lockdown': 'start or end a system lockdown',
   'audit.view': 'view the audit log',
+  'inbox.send': 'send, reply, and file mail in the team inbox',
+  'inbox.delete': 'delete team inbox mail for good',
 };
 
 export const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   super: Object.keys(PERMISSION_LABELS) as Permission[],
-  reviewer: ['applications.review', 'applications.escalate', 'notes.add'],
-  finance: ['payments.process', 'treasury.manage', 'notes.add'],
-  compliance: ['applications.escalate', 'applications.clearEscalation', 'notes.add', 'payments.release', 'kyc.review', 'accounts.manage', 'accounts.tier', 'audit.view'],
+  // Team inbox (owner, 17 Oct 2026): every role but Support sends and files mail; only super admins delete it for good.
+  reviewer: ['applications.review', 'applications.escalate', 'notes.add', 'inbox.send'],
+  finance: ['payments.process', 'treasury.manage', 'notes.add', 'inbox.send'],
+  compliance: ['applications.escalate', 'applications.clearEscalation', 'notes.add', 'payments.release', 'kyc.review', 'accounts.manage', 'accounts.tier', 'audit.view', 'inbox.send'],
   support: [],
 };
 

@@ -11210,7 +11210,7 @@ export const getGetInboxUrl = (params?: GetInboxParams,) => {
 }
 
 /**
- * Any active staff member. Up to 200 messages in the folder, newest first.
+ * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
  * @summary The team mailbox (staff)
  */
 export const getInbox = async (params?: GetInboxParams, options?: Parameters<typeof customFetch>[1]): Promise<InboxView> => {
@@ -11288,7 +11288,7 @@ export const getSendInboxEmailUrl = () => {
 }
 
 /**
- * Sent through Resend from the team mailbox address; replies keep the thread headers. Audited.
+ * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
  * @summary Send or reply from the team mailbox (staff)
  */
 export const sendInboxEmail = async (inboxSendInput: InboxSendInput, options?: Parameters<typeof customFetch>[1]): Promise<InboxMessage> => {
@@ -11377,7 +11377,7 @@ export const getUpdateInboxMessageUrl = (id: string,) => {
 }
 
 /**
- * Folder inbox, sent, archive, or trash.
+ * Needs inbox.send. Folder inbox, sent, archive, or trash.
  * @summary Move a message or mark it read (staff)
  */
 export const updateInboxMessage = async (id: string,

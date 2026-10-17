@@ -38,10 +38,10 @@ export function resendApi(apiKey: string, fetchImpl: Fetch = fetch) {
     getDomain: (id: string) => call<ResendDomain>(fetchImpl, `${base}/domains/${encodeURIComponent(id)}`, { headers }, "Resend"),
     verifyDomain: (id: string) => call<{ id: string }>(fetchImpl, `${base}/domains/${encodeURIComponent(id)}/verify`, { method: "POST", headers }, "Resend"),
     getReceivedEmail: (id: string) => call<ReceivedEmail>(fetchImpl, `${base}/emails/receiving/${encodeURIComponent(id)}`, { headers }, "Resend"),
-    send: (email: { from: string; to: string[]; subject: string; text: string; html?: string; replyTo?: string; headers?: Record<string, string> }, idempotencyKey?: string) =>
+    send: (email: { from: string; to: string[]; cc?: string[]; bcc?: string[]; subject: string; text: string; html?: string; replyTo?: string; headers?: Record<string, string> }, idempotencyKey?: string) =>
       call<{ id: string }>(fetchImpl, `${base}/emails`, {
         method: "POST", headers: { ...headers, ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}) },
-        body: JSON.stringify({ from: email.from, to: email.to, subject: email.subject, text: email.text, ...(email.html ? { html: email.html } : {}), ...(email.replyTo ? { reply_to: email.replyTo } : {}), ...(email.headers ? { headers: email.headers } : {}) }),
+        body: JSON.stringify({ from: email.from, to: email.to, ...(email.cc?.length ? { cc: email.cc } : {}), ...(email.bcc?.length ? { bcc: email.bcc } : {}), subject: email.subject, text: email.text, ...(email.html ? { html: email.html } : {}), ...(email.replyTo ? { reply_to: email.replyTo } : {}), ...(email.headers ? { headers: email.headers } : {}) }),
       }, "Resend"),
   };
 }

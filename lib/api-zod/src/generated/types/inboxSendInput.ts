@@ -9,7 +9,10 @@
 export interface InboxSendInput {
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   text: string;
   inReplyTo?: string;
+  /** One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message. */
+  idempotencyKey?: string;
 }

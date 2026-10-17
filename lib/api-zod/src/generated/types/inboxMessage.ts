@@ -21,6 +21,8 @@ export interface InboxMessage {
   from: string;
   to: string[];
   cc: string[];
+  /** Outbound only, who was Bcc'd; empty for received mail. */
+  bcc: string[];
   subject: string;
   /** @nullable */
   text: string | null;

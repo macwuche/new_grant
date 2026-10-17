@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Team inbox slice 1: Cc/Bcc, Reply all, who can send (17 Oct 2026) — not yet deployed
+
+**Schema push first** (new column `inbox_messages.bcc_addresses`, additive): after `git pull`, run the push (Step 7 / the line under "Redeploy an update"), then build and restart. Check: as a super admin, open a received message that had other people on it, **Reply all** fills To and Cc without the team address; send a test with yourself in Cc and Bcc and both arrive (the To person can't see the Bcc); as a Support user (if any), the inbox opens but Compose, Reply, Archive, and Trash are dimmed with "Read only".
+
 ### Team inbox emails carry the logo (17 Oct 2026) — deployed 17 Oct 2026 as `891e241`
 
 API and portal; no schema push. Redeploy as usual. Check: send a test email from `/admin/inbox` to your own address; it arrives with the logo at the top, the colour bar, and the footer, and a reply's quoted text shows as a grey quote. The logo needs the portal address (Settings → Email or `APP_URL`), as for the other emails.
