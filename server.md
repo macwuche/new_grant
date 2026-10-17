@@ -429,7 +429,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Team inbox emails carry the logo (17 Oct 2026) — not yet deployed
+### Team inbox emails carry the logo (17 Oct 2026) — deployed 17 Oct 2026 as `891e241`
 
 API and portal; no schema push. Redeploy as usual. Check: send a test email from `/admin/inbox` to your own address; it arrives with the logo at the top, the colour bar, and the footer, and a reply's quoted text shows as a grey quote. The logo needs the portal address (Settings → Email or `APP_URL`), as for the other emails.
 
@@ -743,3 +743,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-14 — Deployed `e59b9ee` (card face redesign) together with `4064b4f` (no built-in "arc.fund" name; `DEP-` deposit references); no schema push. The first `git pull` was run as root and refused ("dubious ownership"), so that build rebuilt `4064b4f`, which the server already had; pulled again as the app user, `sudo -u novabridgegrant git pull --ff-only` (`4064b4f..e59b9ee`), `sh deploy/build.sh` (Build OK; bundle `index-2KJofLVt.js`), restart (typed during the build and swallowed; rerun on its own), `systemctl is-active` active, `/api/healthz` ok locally and from outside, and the new bundle served. Still to do: the `/cards` check and the "arc.fund" smoke test above (receipt file name, `DEP-` reference).
 - 2026-10-17 — Deployed `9d47f52` (team inbox: message actions pinned at the top, Forward; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`e59b9ee..9d47f52`), `sh deploy/build.sh` (Build OK ~14:59 server clock; bundle `index-CU7HYTHV.js`), restart. Checked from outside: `/api/healthz` ok and the served bundle has the inbox toolbar and Forward. Owner's browser check of `/admin/inbox` still to report.
 - 2026-10-17 — Deployed `aa18bd4` (switching tabs no longer resets the page; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`9d47f52..aa18bd4`), `sh deploy/build.sh` (Build OK ~16:18 server clock; bundle `index-CwQ2EZ48.js`), restart. Checked from outside: `/api/healthz` ok and the new bundle served. Owner's tab-switch check still to report.
+- 2026-10-17 — Deployed `891e241` (team inbox emails carry the logo; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`aa18bd4..891e241`), `sh deploy/build.sh` (Build OK ~17:10 server clock; bundle `index-CGNOj-97.js`), restart. Checked from outside: `/api/healthz` ok, the new bundle served, and the logo public at `/api/branding/logo` (200, image/png) for email clients. Owner's test email from `/admin/inbox` still to report.

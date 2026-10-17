@@ -410,13 +410,83 @@ The owner saw the page "refresh" whenever the browser was minimised or another t
 - **Not changed:** the 30-second and on-focus data refreshes (they update records in place).
 - **Tests:** `.unlazy/tab-return/browser-check.mjs` switches to a second tab and back twice (the page really becomes hidden) with a half-written inbox reply (staff) and an edited My profile field (applicant): fails on the previous build (loading screen, text lost), passes now. 229 rule tests, 175 API tests, typecheck, and the app-name, inbox, and branding checks pass.
 
-### 17 Oct 2026: team inbox emails carry the logo (owner's report; built and tested 17 Oct 2026; not yet committed or deployed; no schema push)
+### 17 Oct 2026: team inbox emails carry the logo (owner's report; built and tested 17 Oct 2026; committed and deployed 17 Oct 2026 as `891e241`, no schema push)
 
 Mail sent from `/admin/inbox` had no logo: `POST /api/inbox/send` wrapped the text in bare `<p>` tags instead of the branded layout every other email uses.
 
 - **Fix:** `renderMessageEmail({ body, footer })` in `lib/email.ts` shares the header (`emailHeader`: the logo from `appUrl()` + the saved logo path, else the app name) and the email colour bar with `renderEmail`; 600px wide; paragraphs from blank lines; runs of `>` lines become a grey `<blockquote>`; footer `<app name> · <team address>`. Text is escaped; the plain-text part is the message as typed.
 - **Mail view:** the sandboxed frame's policy now allows images from the portal's own origin (`img-src data: <origin>`), so our logo shows in Sent; other remote images stay blocked.
 - **Tests:** the inbox send test checks the frame, a paragraph, the quote (escaped), the footer, and the unchanged text; the logo test checks the inbox layout shows the logo. 175 API tests, 229 rule tests, typecheck, and `.unlazy/inbox/browser-check.mjs` pass.
+
+### 17 Oct 2026: team inbox review (owner's request: rate the admin email inbox on UI, security, and how standard email clients look and work)
+
+**Overall 5/10.** Reviewed from the code (`AdminInboxLive.tsx`, `AdminInbox.css`, `routes/email.ts`, `lib/inbox*.ts`, `lib/providers.ts`) and the owner's screenshots, after the same day's fixes (pinned toolbar, Forward, branded sent mail). A plan to fix every item follows separately.
+
+| Area | Score | In short |
+| --- | --- | --- |
+| Visual design | 7/10 | Clean three-pane layout in the admin's style; sizes and density need work |
+| Layout & responsiveness | 7/10 | Toolbar always visible, phone view works, Send pinned (fixed 17 Oct) |
+| Industry-standard features | 3/10 | Missing much of what Gmail or Outlook users expect |
+| Reading & writing mail | 5/10 | Reply and Forward work; plain text only, no attachments, no drafts |
+| Security | 6/10 | Strong handling of received mail; weak on who can send and on traceability |
+| Reliability & scale | 4/10 | Latest 200 messages per folder only, search covers only those, 30-second polling |
+
+**Done well**
+
+| Area | Strength |
+| --- | --- |
+| UI | Familiar three panes (folders, list, reading pane); unread dots and count, attachment clip, sender and date per row |
+| UI | Toolbar pinned at the top, Send pinned at the bottom; phone layout with list/message screens and one-row buttons |
+| UI | Empty, loading, and "mailbox not set up" states explain themselves; disabled buttons say why |
+| UI | Sent mail carries the logo, email colour bar, and footer |
+| Security | Received HTML in a sandboxed frame: no scripts, forms, or remote images (only the portal's own images), links open outside the app |
+| Security | Received mail only from Resend-signed webhooks (Svix HMAC, 5-minute window), stored once even if delivered twice |
+| Security | Every send audited; only signed-in active staff; rate limits; server-side checks (address format, at most 20 recipients, length limits) |
+| Operation | Replies carry `In-Reply-To`/`References`, so they thread in the recipient's mail app; delivery status (sent, delivered, bounced) from the webhook |
+
+**To work on**
+
+| # | Area | Issue | Industry standard | Priority |
+| --- | --- | --- | --- | --- |
+| 1 | Bug | Cc is accepted, stored, and shown, but never sent: `resendApi().send` (`lib/providers.ts`) has no `cc` field | Cc and Bcc delivered | High |
+| 2 | Security | Any active staff member, including Support (no permissions), can send as the organisation and archive or trash mail | Sending and deleting by role (e.g. an `inbox.send` permission) | High |
+| 3 | Security | Opening a message isn't audited, only sending | Shared mailboxes log who opened what (it can hold applicant data) | Medium |
+| 4 | Security | No warning when a sender fails SPF/DKIM/DMARC; outside links open without a prompt | "Be careful with this message" banner; outside-link warning | Medium |
+| 5 | Security | Trash is never emptied; no permanent delete; no retention period | Trash auto-empties (e.g. 30 days); "Delete forever" | Medium |
+| 6 | Operation | Latest 200 messages per folder (`INBOX_LIMIT`), no "load more"; search only covers what's loaded | Paging; server-side search across all mail | High |
+| 7 | Operation | No conversation view: every reply is its own row | Messages grouped into threads | Medium |
+| 8 | Operation | Attachments can't be opened or downloaded ("open them in Resend") and none can be added | Open, preview, download; attach files (checked like other uploads) | High |
+| 9 | Operation | No drafts: closing the composer loses the text | Drafts auto-save | High |
+| 10 | Operation | No Reply all, no Bcc | Standard | High |
+| 11 | Operation | No mark as unread, star/flag, multi-select, or bulk archive/delete | Standard | Medium |
+| 12 | Operation | No spam folder | Spam/Junk folder | Low |
+| 13 | Operation | New mail appears up to 30 seconds late, with no notice | Near-instant, with a "new mail" indicator | Low |
+| 14 | UI | Plain-text composer only: no bold, links, or lists; no signature | Basic formatting and a team signature | Medium |
+| 15 | UI | Remote images blocked with no "Show images", so newsletters show broken placeholders | "Images hidden – show images" | Medium |
+| 16 | UI | No keyboard shortcuts | Reply, archive, next/previous | Low |
+| 17 | UI | The message frame has a fixed height and scrolls inside the pane: two scroll areas | The message grows to full height; the pane scrolls | Medium |
+| 18 | UI | No undo after Send or Trash | Short undo window | Low |
+| 19 | UI | No "to me / cc" marker or attachment names in the list | Small markers in the list | Low |
+
+**Needs the owner's decision:** which roles may send (#2); how long Trash keeps mail (#5); whether staff can attach files when writing (#8; it raises the postponed virus-scanning question).
+
+### 17 Oct 2026: team inbox fix plan (planned, not started)
+
+Covers all 19 items of the review above, in five slices; each ships on its own (tests, a headless-browser check, docs, deploy). **Owner's decisions (17 Oct 2026):** Support reads the inbox but can't send; Trash empties itself after 30 days; staff may attach files, with our upload checks (no virus scanner yet); only super admins delete for good.
+
+**New permissions** (`lib/authz`): `inbox.send` (compose, reply, forward, drafts, archive, trash, mark read/unread, star) for super, reviewer, finance, compliance; `inbox.delete` (delete forever, empty Trash) for super only. Reading stays open to every active staff member, Support included.
+
+**Schema** (pushed to Supabase before each slice's API runs there): slice 1 adds `bcc_addresses` (jsonb) on `inbox_messages`, so the Sent copy shows who was Bcc'd; slice 2 adds `starred` (boolean), `trashed_at` (timestamp), `authentication` (jsonb: SPF/DKIM/DMARC from Resend), `thread_id` (uuid), and a `draft` folder value; attachments' JSON gains a file key for files we store; an index on (`folder`, `at`, `id`) for paging. Team signature in `email_settings`.
+
+| Slice | Items | What's built | Notes |
+| --- | --- | --- | --- |
+| 1. Quick fixes and who can do what | #1, #2, #10 | Cc and Bcc passed to Resend (`resendApi().send` gains `cc`, `bcc`); Bcc field (hidden behind "Cc/Bcc" like Gmail); **Reply all** (everyone on the message except the team address); `inbox.send` / `inbox.delete` enforced by the API on every inbox route and shown in the UI (Support sees "Read-only: your role can't send"); an idempotency key per send so a double click or retry never sends twice | Small schema push (`bcc_addresses`). API tests: Cc/Bcc reach Resend, Support gets 403 on send/move, Reply all recipients |
+| 2. Scale, list actions, Trash rules | #5, #6, #11, #19 | Server paging (newest first, "Load more" by cursor) and **server-side search** over all mail (subject, sender, recipients, text); **mark as unread**, **star** (with a Starred view), checkboxes with select-all and **bulk** archive / trash / read / unread (up to 100 at once); list markers (Cc'd, attachment names); Trash: `trashed_at`, banner "Messages in Trash are deleted after 30 days", **Delete forever** and **Empty Trash** (super admins, confirm step, audited), a daily job in the API deleting trashed mail older than 30 days (audited summary) | Needs the schema push. Per-folder unread counts |
+| 3. Reading safely | #3, #4, #8 (download), #15, #17 | **Attachments**: open or download through our API (`GET /inbox/{id}/attachments/{attId}`: the server gets Resend's signed link, which expires after about an hour, fetches the file, checks size, and sends it with `nosniff` and a download disposition; every download audited); pictures and PDFs open in a safe preview. **Sender checks**: store Resend's SPF/DKIM/DMARC results and show a red "This message failed sender checks" banner (or a grey "unverified sender" note); **outside-link warning** ("You're leaving for example.com"); **Show images** per message (remote images stay blocked until clicked, with a note that it tells the sender the email was opened); **one scroll area** (the frame grows to the message's height: `allow-same-origin` without `allow-scripts`, so scripts still never run); **audit "Open email"** once per person per message per day | Authentication is null for mail received before this ships |
+| 4. Writing | #8 (attach), #9, #14, #18 | **Drafts**: saved on the server every few seconds and on close, a Drafts folder, resume and discard; **attach files**: PDF, JPG, PNG, WEBP, TXT, CSV up to 10 MB in total, run through `inspectUpload` and `rebuildImage` like other uploads, stored under `DOCUMENTS_DIR`, sent to Resend, and downloadable from Sent; **formatting**: bold, italic, links, bulleted and numbered lists, written as a small Markdown subset and turned into HTML on the server (no HTML accepted from the browser); **team signature** (super admins set it in Settings → Email; added to new messages, editable before sending); **Undo** for 10 seconds after Send (the send waits) and after Trash/Archive | Office files (Word, Excel) are refused: they are zip files, and our upload checks reject archives. Allowing them needs a scanner first |
+| 5. Conversations, spam, live mail, shortcuts | #7, #12, #13, #16 | **Threads**: replies linked by `In-Reply-To`/`References` (and our own replies by `in_reply_to`), the list shows one row per conversation with a count, and the reading pane stacks the messages with older ones collapsed; **Spam** folder: mail failing DMARC goes there automatically, plus "Report spam" / "Not spam" (moves it and remembers the sender); **new mail**: a light unread check every 15 seconds while the tab is open, a "New email from …" item in the team activity bell, and the unread count in the tab title; **keyboard shortcuts** (j/k next/previous, r reply, a reply all, f forward, e archive, # trash, s star, / search, ? shows the list), off while typing | Live push (Supabase Realtime) stays out: tables have no row-level-security policies by design |
+
+**Order and size:** slice 1 is small (a day, no schema). Slices 2 and 3 are the biggest (paging, search, and attachments). Slice 4 needs the upload path for outgoing files. Slice 5 is polish. Each slice adds to `.unlazy/inbox/browser-check.mjs` and the API tests, and updates this section when it ships.
 
 ## 7. Testing and release gates
 
