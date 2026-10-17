@@ -392,6 +392,16 @@ The owner couldn't find where to edit the "Business or project name" field and a
 - **Compatibility:** an older portal still sending `businessName` is accepted; the API's validator drops it (API test added). Demo data saved in a browser may still carry the old property; nothing reads it.
 - **Tests:** 229 rule tests (1 new), 175 API tests (1 new), typecheck, and `.unlazy/grant-plans/browser-check.mjs flow` (now also checks the field is gone) pass.
 
+### 17 Oct 2026: team inbox message actions and Forward (owner's report; built and checked 17 Oct 2026; not yet committed or deployed; no schema push)
+
+The owner couldn't see Reply (or any other button) on `/admin/inbox` (screenshot at 1920×1080, 150% zoom). Cause: the actions were the last thing in the message, below the email's frame, and the mailbox had a 670px minimum height, taller than that window, so the bottom of the reading pane was off screen; Reply was also hidden whenever sending was off, and Forward didn't exist.
+
+- **Toolbar:** Reply, Forward, Archive, Trash (Move back in Archive/Trash) sit in the reading pane's top bar, which stays pinned while the message scrolls. With sending off, Reply and Forward are disabled with the reason as a tooltip and a note under the message.
+- **Forward:** an ordinary send (no API change, no `inReplyTo`): empty To, "Fwd:" subject, a "Forwarded message" header (from, date, subject, to, cc) and the message text. Attachments aren't forwarded; the composer says so when the original had any.
+- **Quoting:** an HTML-only email is turned into text (DOMParser, with style/script dropped and line and paragraph breaks kept) for Reply and Forward; before, it quoted nothing. Quotes are cut at 15,000 characters (the API refuses a message over 20,000).
+- **Layout:** the composer's Discard/Send row is pinned to the bottom; the mailbox fits the window (`min(750px, 100dvh − 110px)`, at least 460px) and scrolls into view when a message or the composer opens; on phones the reader scrolls on its own and the four buttons share one row; long subjects are slightly smaller. The browser-only preview inbox (`AdminInbox.tsx`) is unchanged.
+- **Tests:** `.unlazy/inbox/browser-check.mjs` (and `SENDING=0`), 229 rule tests, 175 API tests, typecheck, and the app-name check pass.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

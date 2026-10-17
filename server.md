@@ -429,7 +429,15 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### No built-in "arc.fund" name (11 Oct 2026) — not yet deployed
+### Team inbox actions and Forward (17 Oct 2026) — not yet deployed
+
+Portal only; no schema push. Redeploy as usual. Check: open `/admin/inbox`, open a long email: Reply, Forward, Archive, and Trash are in a bar at the top of the message and stay there while it scrolls; Forward opens the composer with "Fwd:" and the message text; Send is visible at the bottom. Ctrl+F5 if the old page is cached.
+
+### Card face redesign (14 Oct 2026) — deployed 14 Oct 2026 as `e59b9ee`
+
+Portal only; no schema push. Redeploy as usual. Check: `/cards` shows the green prepaid-style card (brand from the saved name, chip, contactless symbol, last four digits after "Show number"); Ctrl+F5 if the old card is cached.
+
+### No built-in "arc.fund" name (11 Oct 2026) — deployed 14 Oct 2026 with `e59b9ee`
 
 No schema push. Redeploy as usual. Smoke test: open a transaction's receipt and download it; the file is named `nova-bridge-grant-receipt-<id>.txt`. The browser tab title shows "Nova Bridge Grant". A new deposit's reference starts with `DEP-` (older deposits keep `ARC-`).
 
@@ -724,3 +732,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-10 — Deployed `4841d82` (grant plans editable after submissions; no schema push): `git pull --ff-only` (`4390116..4841d82`), `sh deploy/build.sh` (Build OK; bundle `index-b4f-kQL9.js`), restart, `/api/healthz` ok. Server asks for a reboot ("System restart required") after package updates; not done yet.
 - 2026-10-10 — Rebooted the VPS (~14:37 server clock) for pending Ubuntu updates ("System restart required"; up 8 days before). After boot: `novabridgegrant-api` and nginx `active`, `/api/healthz` ok.
 - 2026-10-11 — Deployed `deb8163` (business or project name removed from applications; no schema push): `git pull --ff-only` (`4841d82..deb8163`), `sh deploy/build.sh` (Build OK ~21:05; bundle `index-DYcZC9ZU.js`), restart, `/api/healthz` ok. Checked from outside: the served bundle no longer contains "Business or project name"; healthz ok through Cloudflare. Owner's browser check still to report.
+- 2026-10-14 — Deployed `e59b9ee` (card face redesign) together with `4064b4f` (no built-in "arc.fund" name; `DEP-` deposit references); no schema push. The first `git pull` was run as root and refused ("dubious ownership"), so that build rebuilt `4064b4f`, which the server already had; pulled again as the app user, `sudo -u novabridgegrant git pull --ff-only` (`4064b4f..e59b9ee`), `sh deploy/build.sh` (Build OK; bundle `index-2KJofLVt.js`), restart (typed during the build and swallowed; rerun on its own), `systemctl is-active` active, `/api/healthz` ok locally and from outside, and the new bundle served. Still to do: the `/cards` check and the "arc.fund" smoke test above (receipt file name, `DEP-` reference).
