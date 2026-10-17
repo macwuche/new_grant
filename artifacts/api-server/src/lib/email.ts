@@ -68,10 +68,7 @@ export function renderEmail(opts: { greeting: string; paragraphs: string[]; acti
   const text = [greeting, "", ...paragraphs.flatMap(p => [p, ""]), ...(action ? [`${action.label}: ${action.href}`, ""] : []), "—", footer].join("\n");
   const color = brand.color ?? DEFAULT_EMAIL_COLOR;
   const ink = inkFor(color);
-  const base = appUrl();
-  const header = brand.logoPath && base
-    ? `<img src="${escape(base + brand.logoPath)}" alt="${escape(appName())}" height="40" style="display:block;height:40px;width:auto;max-width:220px;border:0">`
-    : escape(appName());
+  const header = emailHeader(brand);
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;color:#1d1d1b">
 <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;border-top:6px solid ${color};padding:28px">
 <div style="margin:0 0 18px;font-weight:bold;font-size:15px">${header}</div>
@@ -81,6 +78,42 @@ ${action ? `<p style="margin:22px 0"><a href="${escape(action.href)}" style="dis
 <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#6b6b66">${escape(footer)}</p>
 </div></body></html>`;
   return { text, html };
+}
+
+/** The logo (or the app name) at the top of every email. */
+function emailHeader(brand: EmailBrand): string {
+  const base = appUrl();
+  return brand.logoPath && base
+    ? `<img src="${escape(base + brand.logoPath)}" alt="${escape(appName())}" height="40" style="display:block;height:40px;width:auto;max-width:220px;border:0">`
+    : escape(appName());
+}
+
+/**
+ * A message written in the team inbox, in the same frame as the app's own emails (colour bar, logo
+ * or name, footer). Blank lines separate paragraphs; lines starting with ">" (a quoted reply) are
+ * shown as a grey quote. The text part is sent unchanged.
+ */
+export function renderMessageEmail(opts: { body: string; footer: string }, brand: EmailBrand = emailBrand): string {
+  const color = brand.color ?? DEFAULT_EMAIL_COLOR;
+  const lines = (p: string) => escape(p).replace(/\n/g, "<br>");
+  // Each paragraph splits into runs of ordinary and quoted lines ("On … wrote:" sits right above its quote).
+  const blocks = opts.body.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).flatMap(p => {
+    const runs: { quoted: boolean; rows: string[] }[] = [];
+    for (const row of p.split("\n")) {
+      const quoted = row.startsWith(">");
+      const last = runs[runs.length - 1];
+      if (last && last.quoted === quoted) last.rows.push(quoted ? row.replace(/^> ?/, "") : row); else runs.push({ quoted, rows: [quoted ? row.replace(/^> ?/, "") : row] });
+    }
+    return runs.map(r => r.quoted
+      ? `<blockquote style="margin:0 0 14px;padding:2px 0 2px 12px;border-left:3px solid #d8d8d0;color:#6b6b66;font-size:13px;line-height:1.5">${lines(r.rows.join("\n"))}</blockquote>`
+      : `<p style="margin:0 0 ${runs.length > 1 ? 6 : 14}px;font-size:14px;line-height:1.5">${lines(r.rows.join("\n"))}</p>`);
+  });
+  return `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f4ef;font-family:Arial,Helvetica,sans-serif;color:#1d1d1b">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;border-top:6px solid ${color};padding:28px">
+<div style="margin:0 0 18px;font-weight:bold;font-size:15px">${emailHeader(brand)}</div>
+${blocks.join("\n")}
+<p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#6b6b66">${escape(opts.footer)}</p>
+</div></body></html>`;
 }
 
 /** The email copy of an in-app notification. */

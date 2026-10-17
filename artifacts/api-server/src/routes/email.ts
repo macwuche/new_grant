@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { auditEntry, type Effects } from "../lib/activity";
-import { appName, mailerFor, setAppUrlOverride, type EmailOutbox } from "../lib/email";
+import { appName, mailerFor, renderMessageEmail, setAppUrlOverride, type EmailOutbox } from "../lib/email";
 import { effectiveConfig, type EmailSettingsPatch, type EmailSettingsRepo } from "../lib/emailSettings";
 import type { InboxFolder, InboxRepo } from "../lib/inbox";
 import { logger } from "../lib/logger";
@@ -27,7 +27,6 @@ const FROM = /^(?:[^<>]{1,80}<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]
 const DOMAIN = /^(?=.{3,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
 const addressOf = (from: string) => /<([^>]+)>/.exec(from)?.[1] ?? from;
 const nameOf = (from: string) => /^([^<]+)</.exec(from)?.[1]?.trim() ?? null;
-const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = process.env }: EmailDeps): IRouter {
   const router: IRouter = Router();
@@ -236,7 +235,7 @@ export function emailRouter({ outbox, settings, inbox, fetchImpl = fetch, env = 
     const original = typeof req.body?.inReplyTo === "string" ? await inbox.get(req.body.inReplyTo) : null;
     const address = c.inboxAddress ?? addressOf(c.from);
     const from = c.inboxAddress ? `${nameOf(c.from) ?? appName()} <${c.inboxAddress}>` : c.from;
-    const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">${body.split(/\n{2,}/).map((p: string) => `<p>${escape(p).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+    const html = renderMessageEmail({ body, footer: `${appName()} · ${address}` });
     const staff = authLocals(res).staff!;
     const sent = await resendApi(c.resendKey, fetchImpl).send({
       from, to, subject, text: body, html, replyTo: address,

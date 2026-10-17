@@ -15,7 +15,7 @@ import { memoryActivity } from "./lib/activity";
 import { memoryDocumentRepo, type DocumentRepo } from "./lib/documentRepo";
 import { memoryFileStore, StorageFullError } from "./lib/fileStore";
 import { MAX_ACCOUNT_FILE_BYTES, STORAGE_FULL_MESSAGE } from "./lib/storageGuard";
-import { appUrl, deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, staffInviteEmail, unconfiguredMailer } from "./lib/email";
+import { appUrl, deliverBatch, memoryOutbox, resendMailer, RETRY_MINUTES, renderMessageEmail, staffInviteEmail, unconfiguredMailer } from "./lib/email";
 import { hookEmails } from "./lib/authEmails";
 import { memoryEmailSettingsRepo } from "./lib/emailSettings";
 import { memoryInboxRepo } from "./lib/inbox";
@@ -1915,6 +1915,8 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
       // Emails show the (light-background) logo from the portal's address instead of the name.
       const invite = staffInviteEmail({ email: "a@example.org", name: "A", roleLabel: "Finance" }, "Super", "https://grants.example.org");
       expect(invite.html).toContain(`<img src="${appUrl()}${saved.logoUrl}" alt="Grant portal"`);
+      // So do messages written in the team inbox.
+      expect(renderMessageEmail({ body: "Hello", footer: "Team" })).toContain(`<img src="${appUrl()}${saved.logoUrl}" alt="Grant portal"`);
       const preview = await json(await post("/branding/email-preview", { emailColor: "#7c3aed" }));
       expect(preview).toMatchObject({ logoShown: true });
       expect(preview.html).toContain("border-top:6px solid #7C3AED");
@@ -1985,9 +1987,17 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     const [original] = (await json(await call("/inbox", "tok-super"))).messages;
     expect((await post("/inbox/send", { to: "nope", subject: "", text: "" })).status).toBe(400);
     providerReplies["POST /emails"] = { status: 200, body: { id: "out_1" } };
-    const sent = await post("/inbox/send", { to: "maya@example.com", subject: "Re: Budget", text: "Yes, it is.\n\nThanks", inReplyTo: original.id });
+    const sent = await post("/inbox/send", { to: "maya@example.com", subject: "Re: Budget", text: "Yes, it is.\n\nThanks\n\nOn Friday, Maya wrote:\n> Is equipment <b>eligible</b>?\n> Maya", inReplyTo: original.id });
     expect(sent.status).toBe(201);
     const request = providerCalls.find(c => c.method === "POST" && c.url.endsWith("/emails"))!;
+    // Sent in the app's email frame (colour bar, logo or name, footer); the quoted reply as a quote; text unchanged.
+    const sentHtml = (request.body as { html: string; text: string }).html;
+    expect(sentHtml).toContain("border-top:6px solid");
+    expect(sentHtml).toContain("<p style=\"margin:0 0 14px;font-size:14px;line-height:1.5\">Yes, it is.</p>");
+    expect(sentHtml).toMatch(/<blockquote[^>]*>Is equipment &lt;b&gt;eligible&lt;\/b&gt;\?<br>Maya<\/blockquote>/);
+    expect(sentHtml).toContain("· info@novabridgegrant.org</p>");
+    expect(sentHtml).toContain(">On Friday, Maya wrote:</p>\n<blockquote");
+    expect((request.body as { text: string }).text).toBe("Yes, it is.\n\nThanks\n\nOn Friday, Maya wrote:\n> Is equipment <b>eligible</b>?\n> Maya");
     expect(request.body).toMatchObject({ from: "Nova Bridge <info@novabridgegrant.org>", to: ["maya@example.com"], reply_to: "info@novabridgegrant.org", headers: { "In-Reply-To": "<m2@example.com>" } });
     const sentBox = (await json(await call("/inbox?folder=sent", "tok-super"))).messages;
     expect(sentBox[0]).toMatchObject({ direction: "outbound", status: "sent", sentBy: "Sam Rivera", inReplyTo: original.id });

@@ -402,13 +402,21 @@ The owner couldn't see Reply (or any other button) on `/admin/inbox` (screenshot
 - **Layout:** the composer's Discard/Send row is pinned to the bottom; the mailbox fits the window (`min(750px, 100dvh − 110px)`, at least 460px) and scrolls into view when a message or the composer opens; on phones the reader scrolls on its own and the four buttons share one row; long subjects are slightly smaller. The browser-only preview inbox (`AdminInbox.tsx`) is unchanged.
 - **Tests:** `.unlazy/inbox/browser-check.mjs` (and `SENDING=0`), 229 rule tests, 175 API tests, typecheck, and the app-name check pass.
 
-### 17 Oct 2026: switching tabs no longer resets the page (owner's report; built and checked 17 Oct 2026; not yet committed or deployed; no schema push)
+### 17 Oct 2026: switching tabs no longer resets the page (owner's report; built and checked 17 Oct 2026; committed and deployed 17 Oct 2026 as `aa18bd4`, no schema push)
 
 The owner saw the page "refresh" whenever the browser was minimised or another tab was used. Cause: `@supabase/auth-js` (2.117) runs `_recoverAndRefresh` on every hidden → visible change and emits `SIGNED_IN` with the unchanged session; `SessionProvider` answered every such event by setting the status to `loading`, and both gates (`App.tsx`, `AdminLogin.tsx`) replace the whole app with their loading screen while loading, so every page was unmounted and rebuilt, losing open messages, drafts, and typed form values.
 
 - **Fix:** `loadMe` remembers which account is loaded; for the same account it re-checks `GET /api/me` in the background (no loading screen) and swaps in the result. A failed background check keeps the record on screen; a 401 still signs out. A new account, a sign-out, and the first load behave as before. The same applies to `MFA_CHALLENGE_VERIFIED` and `USER_UPDATED` for the signed-in account.
 - **Not changed:** the 30-second and on-focus data refreshes (they update records in place).
 - **Tests:** `.unlazy/tab-return/browser-check.mjs` switches to a second tab and back twice (the page really becomes hidden) with a half-written inbox reply (staff) and an edited My profile field (applicant): fails on the previous build (loading screen, text lost), passes now. 229 rule tests, 175 API tests, typecheck, and the app-name, inbox, and branding checks pass.
+
+### 17 Oct 2026: team inbox emails carry the logo (owner's report; built and tested 17 Oct 2026; not yet committed or deployed; no schema push)
+
+Mail sent from `/admin/inbox` had no logo: `POST /api/inbox/send` wrapped the text in bare `<p>` tags instead of the branded layout every other email uses.
+
+- **Fix:** `renderMessageEmail({ body, footer })` in `lib/email.ts` shares the header (`emailHeader`: the logo from `appUrl()` + the saved logo path, else the app name) and the email colour bar with `renderEmail`; 600px wide; paragraphs from blank lines; runs of `>` lines become a grey `<blockquote>`; footer `<app name> · <team address>`. Text is escaped; the plain-text part is the message as typed.
+- **Mail view:** the sandboxed frame's policy now allows images from the portal's own origin (`img-src data: <origin>`), so our logo shows in Sent; other remote images stay blocked.
+- **Tests:** the inbox send test checks the frame, a paragraph, the quote (escaped), the footer, and the unchanged text; the logo test checks the inbox layout shows the logo. 175 API tests, 229 rule tests, typecheck, and `.unlazy/inbox/browser-check.mjs` pass.
 
 ## 7. Testing and release gates
 

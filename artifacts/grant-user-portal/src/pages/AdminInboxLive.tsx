@@ -34,8 +34,8 @@ const QUOTE_LIMIT = 15_000;
 const clip = (text: string) => text.length > QUOTE_LIMIT ? `${text.slice(0, QUOTE_LIMIT)}\n[…]` : text;
 const withPrefix = (prefix: string, subject: string) => new RegExp(`^${prefix}:`, 'i').test(subject) ? subject : `${prefix}: ${subject}`;
 const snippet = (m: InboxMessage) => (m.text ?? m.html?.replace(/<[^>]+>/g, ' ') ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
-/** Received HTML, isolated: no scripts, no remote images or styles, links open outside. */
-const safeDoc = (html: string) => `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><base target="_blank"><style>body{font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;margin:0;padding:4px;color:#1d1d1b;word-wrap:break-word}img{max-width:100%}</style></head><body>${html}</body></html>`;
+/** Mail HTML, isolated: no scripts, no remote styles, links open outside; images only inline or from this portal (our logo in sent mail). */
+const safeDoc = (html: string) => `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: ${window.location.origin}; style-src 'unsafe-inline'"><base target="_blank"><style>body{font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;margin:0;padding:4px;color:#1d1d1b;word-wrap:break-word}img{max-width:100%}</style></head><body>${html}</body></html>`;
 
 export function AdminInboxLive() {
   const [folder, setFolder] = useState<Folder>('inbox');
