@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Switching tabs no longer resets the page (17 Oct 2026) — not yet deployed
+
+Portal only; no schema push. Redeploy as usual. Check: start a reply in `/admin/inbox` (or edit a field on `/profile`), switch to another tab or minimise the browser, come back: the text is still there and no "Checking your staff access…" / "Opening your workspace…" screen appears.
+
 ### Team inbox actions and Forward (17 Oct 2026) — deployed 17 Oct 2026 as `9d47f52`
 
 Portal only; no schema push. Redeploy as usual. Check: open `/admin/inbox`, open a long email: Reply, Forward, Archive, and Trash are in a bar at the top of the message and stay there while it scrolls; Forward opens the composer with "Fwd:" and the message text; Send is visible at the bottom. Ctrl+F5 if the old page is cached.

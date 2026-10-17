@@ -402,6 +402,14 @@ The owner couldn't see Reply (or any other button) on `/admin/inbox` (screenshot
 - **Layout:** the composer's Discard/Send row is pinned to the bottom; the mailbox fits the window (`min(750px, 100dvh − 110px)`, at least 460px) and scrolls into view when a message or the composer opens; on phones the reader scrolls on its own and the four buttons share one row; long subjects are slightly smaller. The browser-only preview inbox (`AdminInbox.tsx`) is unchanged.
 - **Tests:** `.unlazy/inbox/browser-check.mjs` (and `SENDING=0`), 229 rule tests, 175 API tests, typecheck, and the app-name check pass.
 
+### 17 Oct 2026: switching tabs no longer resets the page (owner's report; built and checked 17 Oct 2026; not yet committed or deployed; no schema push)
+
+The owner saw the page "refresh" whenever the browser was minimised or another tab was used. Cause: `@supabase/auth-js` (2.117) runs `_recoverAndRefresh` on every hidden → visible change and emits `SIGNED_IN` with the unchanged session; `SessionProvider` answered every such event by setting the status to `loading`, and both gates (`App.tsx`, `AdminLogin.tsx`) replace the whole app with their loading screen while loading, so every page was unmounted and rebuilt, losing open messages, drafts, and typed form values.
+
+- **Fix:** `loadMe` remembers which account is loaded; for the same account it re-checks `GET /api/me` in the background (no loading screen) and swaps in the result. A failed background check keeps the record on screen; a 401 still signs out. A new account, a sign-out, and the first load behave as before. The same applies to `MFA_CHALLENGE_VERIFIED` and `USER_UPDATED` for the signed-in account.
+- **Not changed:** the 30-second and on-focus data refreshes (they update records in place).
+- **Tests:** `.unlazy/tab-return/browser-check.mjs` switches to a second tab and back twice (the page really becomes hidden) with a half-written inbox reply (staff) and an edited My profile field (applicant): fails on the previous build (loading screen, text lost), passes now. 229 rule tests, 175 API tests, typecheck, and the app-name, inbox, and branding checks pass.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

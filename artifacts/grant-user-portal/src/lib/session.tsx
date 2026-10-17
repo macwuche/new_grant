@@ -104,6 +104,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [factors, setFactors] = useState<Session['factors']>([]);
   const token = useRef<string | null>(null);
   const request = useRef(0);
+  /** The account whose staff/applicant record is on screen (null until loaded, and after signing out). */
+  const loadedUser = useRef<string | null>(null);
 
   const loadMe = useCallback(async (session: AuthSession | null) => {
     const id = ++request.current;
@@ -112,17 +114,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAccountName(typeof fullName === 'string' && fullName.trim() ? fullName.trim() : null);
     setAccountEmail(session?.user.email ?? null);
     setFactors((session?.user.factors ?? []).filter(f => f.status === 'verified').map(f => ({ id: f.id, name: f.friendly_name ?? 'Authenticator app', createdAt: f.created_at })));
-    if (!session) { setMe(null); setMeError(null); setStatus('signedOut'); return; }
-    setStatus('loading');
+    if (!session) { loadedUser.current = null; setMe(null); setMeError(null); setStatus('signedOut'); return; }
+    // Supabase announces the same session again as SIGNED_IN whenever the tab becomes visible (and on
+    // MFA_CHALLENGE_VERIFIED, USER_UPDATED). For the account already on screen, re-check it in the
+    // background: showing the loading screen would unmount every page and lose what was open or typed.
+    const quiet = loadedUser.current === session.user.id;
+    if (!quiet) setStatus('loading');
     try {
       // Pass the token directly: calling back into supabase.auth here can deadlock inside onAuthStateChange.
       const result = await getMe({ headers: { authorization: `Bearer ${session.access_token}` } });
       if (id !== request.current) return;
+      loadedUser.current = session.user.id;
       setMe(result); setMeError(null); setStatus('signedIn');
       void reportSignInOnce(result, session.access_token);
     } catch (err) {
       if (id !== request.current) return;
       if ((err as { status?: number }).status === 401) { await supabase?.auth.signOut(); return; }
+      // A failed background re-check (e.g. a network blip) keeps the record already on screen.
+      if (quiet) return;
       setMe(null); setMeError(apiErrorMessage(err)); setStatus('signedIn');
     }
   }, []);
