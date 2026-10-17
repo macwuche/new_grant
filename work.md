@@ -392,7 +392,7 @@ The owner couldn't find where to edit the "Business or project name" field and a
 - **Compatibility:** an older portal still sending `businessName` is accepted; the API's validator drops it (API test added). Demo data saved in a browser may still carry the old property; nothing reads it.
 - **Tests:** 229 rule tests (1 new), 175 API tests (1 new), typecheck, and `.unlazy/grant-plans/browser-check.mjs flow` (now also checks the field is gone) pass.
 
-### 17 Oct 2026: team inbox message actions and Forward (owner's report; built and checked 17 Oct 2026; not yet committed or deployed; no schema push)
+### 17 Oct 2026: team inbox message actions and Forward (owner's report; built and checked 17 Oct 2026; committed and deployed 17 Oct 2026 as `9d47f52`, no schema push)
 
 The owner couldn't see Reply (or any other button) on `/admin/inbox` (screenshot at 1920×1080, 150% zoom). Cause: the actions were the last thing in the message, below the email's frame, and the mailbox had a 670px minimum height, taller than that window, so the bottom of the reading pane was off screen; Reply was also hidden whenever sending was off, and Forward didn't exist.
 

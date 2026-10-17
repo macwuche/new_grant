@@ -429,7 +429,7 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Team inbox actions and Forward (17 Oct 2026) — not yet deployed
+### Team inbox actions and Forward (17 Oct 2026) — deployed 17 Oct 2026 as `9d47f52`
 
 Portal only; no schema push. Redeploy as usual. Check: open `/admin/inbox`, open a long email: Reply, Forward, Archive, and Trash are in a bar at the top of the message and stay there while it scrolls; Forward opens the composer with "Fwd:" and the message text; Send is visible at the bottom. Ctrl+F5 if the old page is cached.
 
@@ -733,3 +733,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-10 — Rebooted the VPS (~14:37 server clock) for pending Ubuntu updates ("System restart required"; up 8 days before). After boot: `novabridgegrant-api` and nginx `active`, `/api/healthz` ok.
 - 2026-10-11 — Deployed `deb8163` (business or project name removed from applications; no schema push): `git pull --ff-only` (`4841d82..deb8163`), `sh deploy/build.sh` (Build OK ~21:05; bundle `index-DYcZC9ZU.js`), restart, `/api/healthz` ok. Checked from outside: the served bundle no longer contains "Business or project name"; healthz ok through Cloudflare. Owner's browser check still to report.
 - 2026-10-14 — Deployed `e59b9ee` (card face redesign) together with `4064b4f` (no built-in "arc.fund" name; `DEP-` deposit references); no schema push. The first `git pull` was run as root and refused ("dubious ownership"), so that build rebuilt `4064b4f`, which the server already had; pulled again as the app user, `sudo -u novabridgegrant git pull --ff-only` (`4064b4f..e59b9ee`), `sh deploy/build.sh` (Build OK; bundle `index-2KJofLVt.js`), restart (typed during the build and swallowed; rerun on its own), `systemctl is-active` active, `/api/healthz` ok locally and from outside, and the new bundle served. Still to do: the `/cards` check and the "arc.fund" smoke test above (receipt file name, `DEP-` reference).
+- 2026-10-17 — Deployed `9d47f52` (team inbox: message actions pinned at the top, Forward; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`e59b9ee..9d47f52`), `sh deploy/build.sh` (Build OK ~14:59 server clock; bundle `index-CU7HYTHV.js`), restart. Checked from outside: `/api/healthz` ok and the served bundle has the inbox toolbar and Forward. Owner's browser check of `/admin/inbox` still to report.
