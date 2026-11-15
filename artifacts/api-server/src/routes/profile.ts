@@ -12,7 +12,7 @@ import { newStorageKey, type FileStore } from "../lib/fileStore";
 import { logger } from "../lib/logger";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
 import { requestOrigin, securityEvent } from "../lib/securityEvents";
-import { authLocals } from "../middlewares/auth";
+import { applicantOnly, authLocals } from "../middlewares/auth";
 import { inspectUpload } from "../lib/uploadSafety";
 import { rebuildImage } from "../lib/imageRebuild";
 
@@ -120,6 +120,7 @@ export type ProfileDeps = { repo: ProfileRepo; documents: DocumentRepo; activity
 
 export function profileRouter({ repo, documents, activity, files, passwordChecker }: ProfileDeps): IRouter {
   const router: IRouter = Router();
+  router.use("/profile", applicantOnly);
 
   router.get("/profile", async (_req, res) => {
     res.json(toProfile(await ownProfile(repo, authLocals(res).user)));

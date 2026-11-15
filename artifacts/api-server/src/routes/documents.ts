@@ -9,7 +9,7 @@ import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
 import type { ProgramRepo } from "../lib/programRepo";
 import type { Grant } from "@workspace/domain/model";
-import { auditContext, authLocals, requireStaff } from "../middlewares/auth";
+import { applicantOnly, auditContext, authLocals, requireStaff } from "../middlewares/auth";
 import { ownProfile } from "./profile";
 import { inspectUpload } from "../lib/uploadSafety";
 import { rebuildImage } from "../lib/imageRebuild";
@@ -84,7 +84,7 @@ export function documentsRouter({ documents, files, profiles, applications, prog
   const router: IRouter = Router();
   const fail = (res: Response, status: number, error: string) => { res.status(status).json({ error }); };
 
-  router.get("/documents/mine", async (_req, res) => {
+  router.get("/documents/mine", applicantOnly, async (_req, res) => {
     res.json((await documents.listForOwner(authLocals(res).user.id)).map(toDocument));
   });
 
@@ -100,7 +100,7 @@ export function documentsRouter({ documents, files, profiles, applications, prog
     return EDITABLE.has(app.status) ? null : "This application has been submitted; its documents can't change unless the reviewer asks for changes.";
   }
 
-  router.post("/documents", express.raw({ type: () => true, limit: MAX_DOCUMENT_BYTES }), async (req: Request, res: Response) => {
+  router.post("/documents", applicantOnly, express.raw({ type: () => true, limit: MAX_DOCUMENT_BYTES }), async (req: Request, res: Response) => {
     const { user } = authLocals(res);
     const profile = await ownProfile(profiles, user);
     if (profile.account.status === "Locked") return fail(res, 403, "Your account is locked. Contact support.");
@@ -150,7 +150,7 @@ export function documentsRouter({ documents, files, profiles, applications, prog
     }
   });
 
-  router.post("/documents/:id/delete", async (req, res) => {
+  router.post("/documents/:id/delete", applicantOnly, async (req, res) => {
     const { user } = authLocals(res);
     const doc = await documents.get(String(req.params["id"]));
     if (!doc || doc.deletedAt || doc.ownerId !== user.id) return fail(res, 404, "That document could not be found.");

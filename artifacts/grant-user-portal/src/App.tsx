@@ -83,18 +83,28 @@ function ApplicantGate({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { run } = useDemoStore();
   const { accountName, accountEmail } = session;
+  const staffAccount = session.status === 'signedIn' && !!session.me?.staff;
   useEffect(() => {
-    if (session.status !== 'signedIn' || !accountEmail) return;
+    if (session.status !== 'signedIn' || !accountEmail || staffAccount) return;
     let current = true;
     getProfile()
       .then(profile => { if (current) run(adoptProfile(profile)); })
       // If the API is unreachable, at least show the account's own name and email.
       .catch(() => { if (current) run(s => adoptSessionApplicant(s, { name: accountName ?? '', email: accountEmail })); });
     return () => { current = false; };
-  }, [session.status, accountEmail, accountName, run]);
+  }, [session.status, accountEmail, accountName, run, staffAccount]);
   if (session.status === 'unconfigured') return <>{children}</>;
   if (session.status === 'signedOut') return <Redirect to={`/login?next=${encodeURIComponent(location)}`} replace />;
   if (session.status === 'loading') return <div className="gate-loading" role="status" data-testid="status-applicant-gate-loading"><LoaderCircle size={20} className="auth-spin" aria-hidden="true" /> Opening your workspace…</div>;
+  // Staff accounts (active, disabled, or still owing two-step) never use the applicant portal; the API refuses them too.
+  if (staffAccount) return <div className="gate-two-step" data-testid="panel-applicant-staff-account"><div className="card card-pad">
+    <h1 className="section-title" style={{ fontSize: 20 }}>This is a grant team account</h1>
+    <p className="section-subtitle" style={{ marginBottom: 14 }}>{accountEmail} is on the <AppNameText /> team, so it can't be used to apply for grants or hold money. Use the staff workspace, or sign out and use a different account.</p>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <Link href="/admin" className="btn btn-primary" data-testid="link-staff-workspace">Go to the staff workspace</Link>
+      <button type="button" className="btn btn-ghost" onClick={() => void session.signOut()} data-testid="button-staff-account-signout">Sign out</button>
+    </div>
+  </div></div>;
   if (session.me?.twoStep.enrolled && session.me.twoStep.level !== 'aal2') return <div className="gate-two-step" data-testid="panel-applicant-two-step"><div className="card card-pad">
     <h1 className="section-title" style={{ fontSize: 20 }}>Enter your two-step code</h1>
     <p className="section-subtitle" style={{ marginBottom: 14 }}>Open your authenticator app and enter the current code for <AppNameText />.</p>

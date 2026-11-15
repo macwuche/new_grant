@@ -41,8 +41,14 @@ export function memoryStaffRepo(seed: StaffRecord[] = [], activity?: { write(eff
   };
 }
 
-/** Creates the first super admin when no staff exist yet (from INITIAL_SUPER_ADMIN_EMAIL). */
-export async function ensureInitialSuperAdmin(repo: StaffRepo, email: string, name: string): Promise<StaffRecord | null> {
-  if ((await repo.list()).length) return null;
-  return repo.create({ email: email.toLowerCase(), name, role: "super" });
+/**
+ * Makes sure the main admin (INITIAL_SUPER_ADMIN_EMAIL) is an active super
+ * admin: adds them if missing, and restores the role or access if it was
+ * changed outside the app (the API refuses to change it).
+ */
+export async function ensureMainSuperAdmin(repo: StaffRepo, email: string, name: string): Promise<{ record: StaffRecord; change: "created" | "restored" } | null> {
+  const existing = await repo.findByEmail(email.trim().toLowerCase());
+  if (!existing) return { record: await repo.create({ email: email.trim().toLowerCase(), name, role: "super" }), change: "created" };
+  if (existing.role === "super" && existing.active) return null;
+  return { record: await repo.update(existing.id, { role: "super", active: true }), change: "restored" };
 }

@@ -39,9 +39,11 @@ export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; pr
   /** Staff access needs a two-step (aal2) session (STAFF_MFA_REQUIRED, on unless "false"). */
   staffMfa?: boolean;
   /** Supabase Auth, for checking an applicant's current password before they change it or their email. */
-  supabaseAuth?: { url: string; anonKey: string } | null };
+  supabaseAuth?: { url: string; anonKey: string } | null;
+  /** The main admin's email (INITIAL_SUPER_ADMIN_EMAIL): can't be demoted or disabled. */
+  mainAdminEmail?: string | null };
 
-export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, emailSettings, inbox, signIns, fetchImpl, limits = {}, staffMfa = true, supabaseAuth = null }: ApiDeps): IRouter {
+export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, emailSettings, inbox, signIns, fetchImpl, limits = {}, staffMfa = true, supabaseAuth = null, mainAdminEmail = null }: ApiDeps): IRouter {
   const router: IRouter = Router();
   const limit = { ...LIMITS, ...limits };
   const email = { outbox: emailOutbox, settings: emailSettings, inbox, ...(fetchImpl ? { fetchImpl } : {}) };
@@ -67,10 +69,10 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.put(["/branding/logo", "/branding/logo-dark", "/branding/favicon"], uploads);
   router.post("/profile/check-password", rateLimiter(limit.passwordChecks, byUser));
   router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
-  router.use(meRouter(staffMfa));
+  router.use(meRouter(staffMfa, mainAdminEmail));
   router.use(signInsRouter(signIns, profileRepo));
   const passwordChecker = supabaseAuth ? supabasePasswordChecker(supabaseAuth.url, supabaseAuth.anonKey, fetchImpl) : null;
-  router.use(staffRouter(staffRepo));
+  router.use(staffRouter(staffRepo, mainAdminEmail));
   router.use(programsRouter(programRepo, applicationRepo));
   router.use(profileRouter({ repo: profileRepo, documents: documentRepo, activity: activityRepo, files: fileStore, passwordChecker }));
   router.use(applicantsRouter(profileRepo));

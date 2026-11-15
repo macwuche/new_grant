@@ -33,7 +33,8 @@ export const GetMeResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['super', 'reviewer', 'finance', 'compliance', 'support']),
   "active": zod.boolean(),
-  "linked": zod.boolean().describe('Whether this member has signed in at least once')
+  "linked": zod.boolean().describe('Whether this member has signed in at least once'),
+  "main": zod.boolean().describe('The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin')
 }).nullable(),
   "permissions": zod.array(zod.string()).describe('Staff permissions for this user (empty for applicants, and for staff until two-step sign-in is done)'),
   "twoStep": zod.object({
@@ -54,7 +55,8 @@ export const ListStaffResponseItem = zod.object({
   "name": zod.string(),
   "role": zod.enum(['super', 'reviewer', 'finance', 'compliance', 'support']),
   "active": zod.boolean(),
-  "linked": zod.boolean().describe('Whether this member has signed in at least once')
+  "linked": zod.boolean().describe('Whether this member has signed in at least once'),
+  "main": zod.boolean().describe('The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin')
 })
 export const ListStaffResponse = zod.array(ListStaffResponseItem)
 
@@ -80,7 +82,8 @@ export const CreateStaffMemberResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['super', 'reviewer', 'finance', 'compliance', 'support']),
   "active": zod.boolean(),
-  "linked": zod.boolean().describe('Whether this member has signed in at least once')
+  "linked": zod.boolean().describe('Whether this member has signed in at least once'),
+  "main": zod.boolean().describe('The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin')
 })
 
 
@@ -103,7 +106,8 @@ export const UpdateStaffMemberResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['super', 'reviewer', 'finance', 'compliance', 'support']),
   "active": zod.boolean(),
-  "linked": zod.boolean().describe('Whether this member has signed in at least once')
+  "linked": zod.boolean().describe('Whether this member has signed in at least once'),
+  "main": zod.boolean().describe('The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin')
 })
 
 

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { MarkNotificationReadParams, MarkStaffFeedReadParams } from "@workspace/api-zod";
 import type { ActivityRepo } from "../lib/activity";
-import { authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { applicantOnly, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 
 // Notifications (each applicant's own), the staff activity feed (shared items,
 // read state per staff member), and the audit log (audit.view).
@@ -11,6 +11,7 @@ const seqOf = (id: string) => Number(id.slice(3));
 export function activityRouter(repo: ActivityRepo): IRouter {
   const router: IRouter = Router();
 
+  router.use("/notifications", applicantOnly);
   router.get("/notifications", async (_req, res) => {
     res.json(await repo.notificationsFor(authLocals(res).user.id));
   });

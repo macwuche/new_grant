@@ -429,7 +429,11 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Send always reachable on short windows (17 Oct 2026) — not yet deployed
+### Staff kept out of the applicant portal; main admin always super (15 Nov 2026) — not yet deployed
+
+API and portal; no schema push. Redeploy as usual. `INITIAL_SUPER_ADMIN_EMAIL` (`info@novabridgegrant.org`) is now the main admin: at startup the API restores it to an active super admin if needed (`journalctl -u novabridgegrant-api | grep -i "main admin"`), and Team & roles shows it as **Main admin** with its controls locked. Check: signed in as the super admin, open `https://access.novabridgegrant.org/dashboard`: "This is a grant team account" with **Go to the staff workspace**; a test applicant's dashboard works as before.
+
+### Send always reachable on short windows (17 Oct 2026) — deployed 17 Oct 2026 as `277a7f6`
 
 Portal only; no schema push. Redeploy as usual. Check: make the browser window short (or zoom to 150–175%), open `/admin/inbox`, click Compose: Discard and Send show at the bottom of the mailbox without scrolling the page.
 
@@ -759,3 +763,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-17 — First attempt at slice 1 pulled only `087e7a0` (review and plan docs; slice 1 wasn't pushed yet): the schema push found nothing to change and the build reproduced the live bundle `index-CGNOj-97.js`, so nothing changed.
 - 2026-10-17 — Deployed `c61cb78` (team inbox slice 1: Cc/Bcc delivered, Reply all, `inbox.send`/`inbox.delete`): `sudo -u novabridgegrant git pull --ff-only` (`087e7a0..c61cb78`), **schema push** ("Changes applied": `inbox_messages.bcc_addresses`), `sh deploy/build.sh` (Build OK ~18:07 server clock; bundle `index-D82Aewso.js`), restart. Checked from outside: `/api/healthz` ok, the new bundle served with Reply all and the Bcc field, `POST /api/inbox/send` without sign-in answers 401. Owner's Reply all / Cc / Bcc test still to report.
 - 2026-10-17 — Deployed `ad34021` (inbox page without its heading; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`c61cb78..ad34021`), `sh deploy/build.sh` (Build OK ~18:19 server clock; bundle `index-D1UDez6y.js`), restart. Checked from outside: `/api/healthz` ok and the new bundle served.
+- 2026-10-17 — Deployed `277a7f6` (Send always reachable on short windows; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`ad34021..277a7f6`), `sh deploy/build.sh` (Build OK ~18:36 server clock; bundle `index-CSiTAgB5.js`, styles `index-DqZObuTx.css`), restart. Checked from outside: `/api/healthz` ok and the new styles served (the mailbox's single-row rule is in them). Owner's Compose check on a short window still to report.

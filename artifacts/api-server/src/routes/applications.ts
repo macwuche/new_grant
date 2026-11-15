@@ -17,7 +17,7 @@ import { slotApplicant } from "../lib/applicantRules";
 import { logger } from "../lib/logger";
 import type { ProfileRepo } from "../lib/profileRepo";
 import { effectsOf } from "../lib/activity";
-import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { applicantOnly, auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 import { missingEvidence } from "./documents";
 import { ownProfile } from "./profile";
 
@@ -70,7 +70,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
 
   // ---------- Applicant ----------
 
-  router.get("/applications/mine", async (_req, res) => {
+  router.get("/applications/mine", applicantOnly, async (_req, res) => {
     res.json((await apps.listForApplicant(authLocals(res).user.id)).map(applicantView));
   });
 
@@ -96,7 +96,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
   }
 
   for (const path of ["save", "submit"] as const) {
-    router.post(`/applications/${path}`, async (req, res) => {
+    router.post(`/applications/${path}`, applicantOnly, async (req, res) => {
       const body = (path === "save" ? SaveApplicationDraftBody : SubmitApplicationBody).safeParse(req.body);
       if (!body.success) {
         const fieldErrors = contractFieldErrors(body.error.issues);
@@ -118,7 +118,7 @@ export function applicationsRouter(apps: ApplicationRepo, profiles: ProfileRepo,
     });
   }
 
-  router.post("/applications/:id/delete", async (req, res) => {
+  router.post("/applications/:id/delete", applicantOnly, async (req, res) => {
     const params = ApplicationIdParams.safeParse(req.params);
     const app = params.success ? await apps.get(params.data.id) : null;
     // Someone else's application reads as not found, never as forbidden.

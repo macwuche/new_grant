@@ -69,6 +69,8 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
   const activityRequest = useRef(0);
   const [auditChain, setAuditChain] = useState<ServerData['auditChain']>(null);
   const isStaff = connected && !!session.me?.staff?.active;
+  // Disabled staff, and staff still owing two-step, load nothing: the applicant side refuses staff accounts.
+  const blocked = connected && !!session.me?.staff && !isStaff;
   const canAudit = isStaff && !!session.me?.permissions.includes('audit.view');
   // Staff see drafts and applicants don't, so reload whenever the signed-in person changes.
   const who = connected ? `${session.accountEmail}|${session.me?.staff?.id ?? ''}` : '';
@@ -101,7 +103,7 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
 
   // Staff get the review queue; an applicant gets their own applications, moved into the portal's slot.
   const refreshApplications = useCallback(async () => {
-    if (!connected || !session.me) return;
+    if (!connected || !session.me || blocked) return;
     const id = ++applicationsRequest.current;
     try {
       const apps = (isStaff ? await listApplications() : await listMyApplications()) as Application[];
@@ -111,11 +113,11 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (id === applicationsRequest.current) setApplicationsError(apiError(err, "Couldn't load applications. Showing the last copy.").error);
     }
-  }, [connected, isStaff, ownId, run, session.me]);
+  }, [blocked, connected, isStaff, ownId, run, session.me]);
 
   // Applicants get their notifications; staff get the team feed and, with audit.view, the audit log.
   const refreshActivity = useCallback(async () => {
-    if (!connected || !session.me) return;
+    if (!connected || !session.me || blocked) return;
     const id = ++activityRequest.current;
     try {
       if (!isStaff) {
@@ -128,12 +130,12 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
       run(s => adoptServerActivity(s, { staffFeed: staffFeed as StaffEvent[], ...(audit ? { audit: audit.events as AuditEvent[] } : {}) }));
       setAuditChain(audit?.chain ?? null);
     } catch { /* keep the last copy; the next refresh tries again */ }
-  }, [canAudit, connected, isStaff, run, session.me]);
+  }, [blocked, canAudit, connected, isStaff, run, session.me]);
 
   // Applicants get their own ledger, cards, and destinations; staff get the whole ledger and the money settings.
   const moneyRequest = useRef(0);
   const refreshMoney = useCallback(async () => {
-    if (!connected || !session.me) return;
+    if (!connected || !session.me || blocked) return;
     const id = ++moneyRequest.current;
     try {
       if (isStaff) {
@@ -144,7 +146,7 @@ export function ServerDataProvider({ children }: { children: ReactNode }) {
         if (id === moneyRequest.current) run(s => adoptServerMoney(s, money as ServerMoney, ownId));
       }
     } catch { /* keep the last copy; the next refresh tries again */ }
-  }, [connected, isStaff, ownId, run, session.me]);
+  }, [blocked, connected, isStaff, ownId, run, session.me]);
 
   useEffect(() => { void refreshPrograms(); }, [refreshPrograms, who]);
   useEffect(() => {

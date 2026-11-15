@@ -34,7 +34,7 @@ import { storeLedgerChanges } from "../lib/ledger";
 import { logger } from "../lib/logger";
 import { newCards, type MoneyRepo } from "../lib/moneyRepo";
 import type { ProfileRecord, ProfileRepo } from "../lib/profileRepo";
-import { auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
+import { applicantOnly, auditContext, authLocals, requirePermission, requireStaff } from "../middlewares/auth";
 import { cleanFileName, detectType } from "./documents";
 import type { DocumentRepo } from "../lib/documentRepo";
 import { accountFileLimit } from "../lib/storageGuard";
@@ -85,7 +85,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     return { transactions, ...profile, treasury: forApplicants(settings.treasury), lockdown: settings.lockdown };
   }
 
-  router.get("/money/mine", async (_req, res) => {
+  router.get("/money/mine", applicantOnly, async (_req, res) => {
     const record = await ownProfile(profiles, authLocals(res).user);
     // Creates the fictional cards on first visit, inside the applicant's lock.
     if (!(await money.moneyProfile(record.authUserId))) await money.withApplicant(record.authUserId, async () => {});
@@ -118,7 +118,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
 
   const idOf = (req: Request) => { const p = LedgerIdParams.safeParse(req.params); return p.success ? p.data.id : null; };
 
-  router.post("/money/deposits", async (req, res) => {
+  router.post("/money/deposits", applicantOnly, async (req, res) => {
     const b = RequestDepositBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Send an amount, a deposit method, and the method's details." }); return; }
     await asApplicant(res, s => requestDeposit(s, b.data.amount, b.data.method, new Date(), b.data.details ?? {}));
@@ -134,7 +134,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     return tx;
   }
 
-  router.put("/money/deposits/:id/proof", express.raw({ type: () => true, limit: MAX_PROOF_BYTES }), async (req: Request, res: Response) => {
+  router.put("/money/deposits/:id/proof", applicantOnly, express.raw({ type: () => true, limit: MAX_PROOF_BYTES }), async (req: Request, res: Response) => {
     const tx = await ownDeposit(req, res);
     if (!tx) return;
     let bytes: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
@@ -163,7 +163,7 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     if (err?.type === "entity.too.large") { res.status(413).json({ error: `Files can be at most ${MAX_PROOF_BYTES / 1024 / 1024} MB.` }); return; }
     next(err);
   });
-  router.post("/money/deposits/:id/proof/:proofId/delete", async (req, res) => {
+  router.post("/money/deposits/:id/proof/:proofId/delete", applicantOnly, async (req, res) => {
     const p = GetDepositProofParams.safeParse(req.params);
     const tx = p.success ? await ownDeposit(req, res) : null;
     if (!p.success) { res.status(404).json({ error: "That file could not be found." }); return; }
@@ -198,22 +198,23 @@ export function moneyRouter(money: MoneyRepo, profiles: ProfileRepo, files: File
     });
     res.end(bytes);
   });
-  router.post("/money/deposits/:id/cancel", async (req, res) => {
+  router.post("/money/deposits/:id/cancel", applicantOnly, async (req, res) => {
     const id = idOf(req);
     if (!id) { res.status(404).json({ error: "That deposit could not be found." }); return; }
     await asApplicant(res, s => cancelDeposit(s, id, new Date()));
   });
-  router.post("/money/withdrawals", async (req, res) => {
+  router.post("/money/withdrawals", applicantOnly, async (req, res) => {
     const b = RequestWithdrawalBody.safeParse(req.body);
     if (!b.success) { res.status(400).json({ error: "Send an amount, a withdrawal method, and the method's details." }); return; }
     const { amount, channel, source, details } = b.data;
     await asApplicant(res, s => requestWithdrawal(s, { amount, method: channel, ...(source ? { source } : {}), details: details ?? {} }, new Date()));
   });
-  router.post("/money/withdrawals/:id/cancel", async (req, res) => {
+  router.post("/money/withdrawals/:id/cancel", applicantOnly, async (req, res) => {
     const id = idOf(req);
     if (!id) { res.status(404).json({ error: "That payout request could not be found." }); return; }
     await asApplicant(res, s => cancelWithdrawal(s, id, new Date()));
   });
+  router.use("/money/cards", applicantOnly);
   router.post("/money/cards/freeze", async (req, res) => {
     const b = ToggleCardFreezeBody.safeParse(req.body ?? {});
     if (!b.success) { res.status(400).json({ error: "Choose the virtual or physical card." }); return; }

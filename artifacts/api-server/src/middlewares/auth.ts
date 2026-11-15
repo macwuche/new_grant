@@ -90,6 +90,16 @@ export function requirePermission(permission: Permission) {
   };
 }
 
+/**
+ * The applicant side: refused to any login with a staff record (active,
+ * disabled, or still owing two-step), so staff never get an applicant account.
+ */
+export function applicantOnly(_req: Request, res: Response, next: NextFunction) {
+  const { staff, pendingStaff } = authLocals(res);
+  if (staff || pendingStaff) { res.status(403).json({ error: "This is a grant team account. Staff can't use the applicant portal.", code: "staff_account" }); return; }
+  next();
+}
+
 /** What someone with a pending staff-required reset may still do: see who they are, read notifications, and complete the reset. */
 const DURING_RESET = new Set(["GET /me", "GET /profile", "POST /profile/credential-reset", "GET /notifications", "GET /profile/email-preference"]);
 

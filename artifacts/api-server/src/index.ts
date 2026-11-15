@@ -2,7 +2,7 @@ import { createApp } from "./app";
 import { dbSignInRepo } from "./lib/signIns.db";
 import { supabaseVerifier } from "./lib/auth";
 import { logger } from "./lib/logger";
-import { ensureInitialSuperAdmin } from "./lib/staffRepo";
+import { ensureMainSuperAdmin } from "./lib/staffRepo";
 import { dbStaffRepo } from "./lib/staffRepo.db";
 import { ensureSeedPrograms } from "./lib/programRepo";
 import { dbProgramRepo } from "./lib/programRepo.db";
@@ -41,8 +41,9 @@ if (!supabaseUrl || !supabaseAnonKey) logger.warn("SUPABASE_URL / SUPABASE_ANON_
 
 const initialEmail = process.env["INITIAL_SUPER_ADMIN_EMAIL"];
 if (initialEmail) {
-  const created = await ensureInitialSuperAdmin(dbStaffRepo, initialEmail, process.env["INITIAL_SUPER_ADMIN_NAME"] ?? "Super admin");
-  if (created) logger.info({ email: created.email }, "initial super admin created");
+  const main = await ensureMainSuperAdmin(dbStaffRepo, initialEmail, process.env["INITIAL_SUPER_ADMIN_NAME"] ?? "Super admin");
+  if (main?.change === "created") logger.info({ email: main.record.email }, "main super admin created");
+  if (main?.change === "restored") logger.warn({ email: main.record.email }, "main admin was not an active super admin; restored");
 }
 
 if (await ensureSettings()) logger.info("default money settings created");
@@ -67,6 +68,7 @@ const app = createApp({
   documentRepo: dbDocumentRepo, fileStore: diskFileStore(docsDir), emailOutbox: dbEmailOutbox, emailSettings, inbox: dbInboxRepo, signIns: dbSignInRepo,
   staffMfa: process.env["STAFF_MFA_REQUIRED"] !== "false",
   supabaseAuth: supabaseUrl && supabaseAnonKey ? { url: supabaseUrl, anonKey: supabaseAnonKey } : null,
+  mainAdminEmail: initialEmail ?? null,
 });
 
 app.listen(port, (err) => {

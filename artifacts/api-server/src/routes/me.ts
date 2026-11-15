@@ -7,14 +7,14 @@ import { toStaffMember } from "./staff";
 // Who is signed in: the account, the staff record (also while two-step sign-in
 // is still needed, so the portal can ask for it), and the session's two-step state.
 
-export default function meRouter(staffMfa: boolean): IRouter {
+export default function meRouter(staffMfa: boolean, mainEmail: string | null): IRouter {
   const router: IRouter = Router();
   router.get("/me", (_req, res) => {
     const { user, staff, pendingStaff } = authLocals(res);
     const record = staff ?? pendingStaff ?? null;
     const permissions = staff?.active ? ROLE_PERMISSIONS[staff.role] : [];
     res.json(GetMeResponse.parse({
-      user, staff: record ? toStaffMember(record) : null, permissions,
+      user, staff: record ? toStaffMember(record, mainEmail) : null, permissions,
       twoStep: { level: user.aal ?? "aal1", enrolled: (user.factors?.length ?? 0) > 0, requiredForStaff: staffMfa },
     }));
   });

@@ -5234,7 +5234,10 @@ components:
         linked:
           type: boolean
           description: Whether this member has signed in at least once
-      required: [id, email, name, role, active, linked]
+        main:
+          type: boolean
+          description: The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin
+      required: [id, email, name, role, active, linked, main]
     StaffMemberCreate:
       type: object
       properties:

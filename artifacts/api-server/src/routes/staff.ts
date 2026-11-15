@@ -7,14 +7,17 @@ import { auditEntry } from "../lib/activity";
 import { appUrl, staffInviteEmail } from "../lib/email";
 import { auditContext, authLocals, requirePermission } from "../middlewares/auth";
 
-export const toStaffMember = (r: StaffRecord) => ({ id: r.id, email: r.email, name: r.name, role: r.role, active: r.active, linked: !!r.authUserId });
+/** The main admin (INITIAL_SUPER_ADMIN_EMAIL; owner, 15 Nov 2026) always stays an active super admin. */
+export const isMainAdmin = (r: Pick<StaffRecord, "email">, mainEmail: string | null) => !!mainEmail && r.email === mainEmail.trim().toLowerCase();
 
-export function staffRouter(repo: StaffRepo): IRouter {
+export const toStaffMember = (r: StaffRecord, mainEmail: string | null) => ({ id: r.id, email: r.email, name: r.name, role: r.role, active: r.active, linked: !!r.authUserId, main: isMainAdmin(r, mainEmail) });
+
+export function staffRouter(repo: StaffRepo, mainEmail: string | null): IRouter {
   const router: IRouter = Router();
   router.use("/staff", requirePermission("staff.manage"));
 
   router.get("/staff", async (_req, res) => {
-    res.json(ListStaffResponse.parse((await repo.list()).map(toStaffMember)));
+    res.json(ListStaffResponse.parse((await repo.list()).map(r => toStaffMember(r, mainEmail))));
   });
 
   router.post("/staff", async (req, res) => {
@@ -29,7 +32,7 @@ export function staffRouter(repo: StaffRepo): IRouter {
     const invite = staffInviteEmail({ email, name, roleLabel: ROLE_LABELS[body.data.role] }, authLocals(res).staff!.name, appUrl());
     const created = await repo.create({ email, name, role: body.data.role }, { notifications: [], staffEvents: [], audit: [audit], emails: [invite] });
     logger.info({ actor: authLocals(res).staff!.id, target: created.id, role: created.role }, "staff member added");
-    res.status(201).json(toStaffMember(created));
+    res.status(201).json(toStaffMember(created, mainEmail));
   });
 
   router.patch("/staff/:id", async (req, res) => {
@@ -43,6 +46,9 @@ export function staffRouter(repo: StaffRepo): IRouter {
     const error = staffChangeError(all, params.data.id, body.data, actor.id);
     if (error) { res.status(400).json({ error }); return; }
     const target = all.find(m => m.id === params.data.id)!;
+    if (isMainAdmin(target, mainEmail) && ((body.data.role !== undefined && body.data.role !== "super") || body.data.active === false)) {
+      res.status(400).json({ error: `${target.name} is the main admin and always stays an active super admin.` }); return;
+    }
     const changes = [
       ...(body.data.role !== undefined && body.data.role !== target.role ? [{ field: "role", before: target.role, after: body.data.role }] : []),
       ...(body.data.active !== undefined && body.data.active !== target.active ? [{ field: "active", before: String(target.active), after: String(body.data.active) }] : []),
@@ -50,7 +56,7 @@ export function staffRouter(repo: StaffRepo): IRouter {
     const audit = auditEntry(auditContext(req, res, "Change staff access", target.id), `${target.name}: ${changes.map(c => `${c.field} ${c.before} → ${c.after}`).join(", ")}.`, changes, new Date());
     const updated = await repo.update(params.data.id, body.data, { notifications: [], staffEvents: [], audit: [audit] });
     logger.info({ actor: actor.id, target: updated.id, change: body.data }, "staff member updated");
-    res.json(UpdateStaffMemberResponse.parse(toStaffMember(updated)));
+    res.json(UpdateStaffMemberResponse.parse(toStaffMember(updated, mainEmail)));
   });
 
   return router;

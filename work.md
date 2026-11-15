@@ -488,6 +488,21 @@ Covers all 19 items of the review above, in five slices; each ships on its own (
 
 **Order and size:** slice 1 is small (a day, no schema). Slices 2 and 3 are the biggest (paging, search, and attachments). Slice 4 needs the upload path for outgoing files. Slice 5 is polish. Each slice adds to `.unlazy/inbox/browser-check.mjs` and the API tests, and updates this section when it ships.
 
+### 15 Nov 2026: staff kept out of the applicant portal; the main admin always a super admin (owner's request; built and tested 15 Nov 2026; not yet committed or deployed; no schema push)
+
+**Owner's decisions (15 Nov 2026):** staff logins never use the applicant portal, including disabled staff; "the admin must always be a super admin" means the main account (`INITIAL_SUPER_ADMIN_EMAIL`) can never be demoted, disabled, or removed (other roles stay).
+
+**Before:** a staff member's login was an ordinary Supabase account; opening any applicant page created an applicant profile for it (`ownProfile`), so staff could hold balances and apply. Only a conflict-of-interest check stopped them acting on their own records. Any super admin could demote or disable the main admin as long as another super admin remained.
+
+**Built:**
+1. API: `applicantOnly` (`middlewares/auth.ts`) answers 403 `{ code: "staff_account" }` to any login with a staff record (active, disabled, or two-step still owed), on every applicant route (profile center, notifications, own applications, own documents and uploads, own money, deposits, withdrawals, cards). No applicant profile is created for staff any more. Shared routes are unchanged.
+2. Main admin: `mainAdminEmail` (from `INITIAL_SUPER_ADMIN_EMAIL`) in the API's deps; `PATCH /staff/{id}` refuses to change its role from super or disable it ("… is the main admin and always stays an active super admin."); `ensureMainSuperAdmin` (replaces `ensureInitialSuperAdmin`) adds it at startup when missing, even if other staff exist, and restores role and access if they were changed in the database. `StaffMember.main` in the contract (regenerated).
+3. Portal: `ApplicantGate` shows "This is a grant team account" for staff logins, with links to `/admin` and sign-out, and skips loading the profile; `ServerDataProvider` loads nothing for disabled or two-step-pending staff; Team & roles tags the main admin and locks their role and access controls.
+
+**Tests:** 229 rule tests, 177 API tests, typecheck, `.unlazy/staff-portal/browser-check.mjs`, and the app-name and tab-return checks pass.
+
+**Not done:** existing applicant records made by a staff login stay in the database (hidden); nothing removes them. A staff member who leaves keeps the staff record, so their login stays out of the applicant portal; to let them apply, delete their `staff_members` row in Supabase.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

@@ -1691,6 +1691,8 @@ export interface StaffMember {
   active: boolean;
   /** Whether this member has signed in at least once */
   linked: boolean;
+  /** The main admin (INITIAL_SUPER_ADMIN_EMAIL), who always stays an active super admin */
+  main: boolean;
 }
 
 export interface StaffMemberCreate {

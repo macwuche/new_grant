@@ -21,7 +21,7 @@ import { memoryEmailSettingsRepo } from "./lib/emailSettings";
 import { memoryInboxRepo } from "./lib/inbox";
 import { memoryMoneyRepo } from "./lib/moneyRepo";
 import { seedTreasury } from "@workspace/domain/seed";
-import { ensureInitialSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
+import { ensureMainSuperAdmin, memoryStaffRepo, type StaffRecord, type StaffRepo } from "./lib/staffRepo";
 
 // Tokens in these tests are fake: the stub verifier maps them to users.
 // Staff sign in with two-step (aal2 and a verified authenticator), as the API requires.
@@ -92,7 +92,7 @@ async function start(v: TokenVerifier | null = verifier, limits: ApiDeps["limits
   inbox = memoryInboxRepo();
   providerCalls = []; providerReplies = {};
   files = memoryFileStore();
-  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, limits, supabaseAuth: { url: "https://proj.supabase.co", anonKey: "anon-key" } }, ["https://app.example.org"]).listen(0);
+  server = createApp({ verifier: v, staffRepo: repo, programRepo: programs, profileRepo: profiles, applicationRepo: applications, activityRepo: activity, moneyRepo: money, documentRepo: documents, fileStore: files, emailOutbox: outbox, emailSettings, inbox, signIns: memorySignInRepo(activity), fetchImpl: providerFetch, limits, supabaseAuth: { url: "https://proj.supabase.co", anonKey: "anon-key" }, mainAdminEmail: "Owner@Example.org" }, ["https://app.example.org"]).listen(0);
   await new Promise(r => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 }
@@ -193,6 +193,20 @@ describe("staff management", () => {
     expect((await patch(SEED[0]!.id, { active: false })).status).toBe(400);
   });
 
+  it("keeps the main admin an active super admin", async () => {
+    const owner = await json(await call("/staff", "tok-super", { method: "POST", body: JSON.stringify({ email: "owner@example.org", name: "Owner", role: "super" }) }));
+    expect(owner.main).toBe(true);
+    expect((await json(await call("/staff", "tok-super"))).filter((m: { main: boolean }) => m.main).map((m: { email: string }) => m.email)).toEqual(["owner@example.org"]);
+    for (const change of [{ role: "finance" }, { active: false }, { role: "support", active: true }]) {
+      const res = await patch(owner.id, change);
+      expect(res.status).toBe(400);
+      expect((await json(res)).error).toMatch(/main admin and always stays an active super admin/);
+    }
+    expect((await json(await call("/staff", "tok-super"))).find((m: { id: string }) => m.id === owner.id)).toMatchObject({ role: "super", active: true });
+    // Other super admins can still be changed.
+    expect((await patch(SEED[0]!.id, { role: "finance" })).status).toBe(200);
+  });
+
   it("validates the id and body, and ignores client-supplied roles for the caller", async () => {
     expect((await patch("not-a-uuid", { role: "super" })).status).toBe(404);
     expect((await patch("aaaaaaaa-0000-4000-8000-000000000099", { role: "super" })).status).toBe(404);
@@ -211,11 +225,14 @@ describe("CORS", () => {
   });
 });
 
-describe("initial super admin", () => {
-  it("is created only when no staff exist", async () => {
-    const empty = memoryStaffRepo();
-    expect(await ensureInitialSuperAdmin(empty, "Owner@Example.org", "Owner")).toMatchObject({ email: "owner@example.org", role: "super" });
-    expect(await ensureInitialSuperAdmin(empty, "other@example.org", "Other")).toBeNull();
+describe("main super admin", () => {
+  it("is created when missing and restored at startup if demoted or disabled", async () => {
+    const staff = memoryStaffRepo();
+    expect(await ensureMainSuperAdmin(staff, "Owner@Example.org", "Owner")).toMatchObject({ change: "created", record: { email: "owner@example.org", role: "super" } });
+    expect(await ensureMainSuperAdmin(staff, "owner@example.org", "Owner")).toBeNull();
+    const owner = (await staff.findByEmail("owner@example.org"))!;
+    await staff.update(owner.id, { role: "support", active: false });
+    expect(await ensureMainSuperAdmin(staff, "owner@example.org", "Owner")).toMatchObject({ change: "restored", record: { role: "super", active: true } });
   });
 });
 
@@ -486,10 +503,23 @@ describe("account controls and identity checks", () => {
     expect((await json(res)).map((a: { id: string }) => a.id)).toContain(MAYA);
   });
 
-  it("refuses staff actions on their own applicant account", async () => {
-    await call("/profile", "tok-super");
-    const res = await post(`/applicants/${USERS["tok-super"]!.id}/tier`, { tier: 3, reason: "Promoting myself for testing." });
-    expect(res.status).toBe(403);
+  it("keeps staff out of the applicant portal, so they never get an applicant account", async () => {
+    // Active staff, staff still owing two-step, and disabled staff are all refused.
+    await repo.update(SEED[1]!.id, { active: false });
+    for (const token of ["tok-super", "tok-super-password-only", "tok-finance"]) {
+      for (const [path, init] of [["/profile", {}], ["/notifications", {}], ["/applications/mine", {}], ["/documents/mine", {}], ["/money/mine", {}],
+        ["/money/deposits", { method: "POST", body: JSON.stringify({ amount: 50, method: "bank" }) }], ["/money/cards/virtual", { method: "POST", body: "{}" }],
+        ["/applications/save", { method: "POST", body: "{}" }], ["/profile/privacy", { method: "PUT", body: "{}" }]] as const) {
+        const res = await call(path, token, init);
+        expect([path, res.status]).toEqual([path, 403]);
+        expect((await json(res)).code).toBe("staff_account");
+      }
+    }
+    expect(await profiles.get(USERS["tok-super"]!.id)).toBeNull();
+    expect((await post(`/applicants/${USERS["tok-super"]!.id}/tier`, { tier: 3, reason: "Promoting myself for testing." })).status).toBe(404);
+    // Staff pages keep working, and applicants are unaffected.
+    expect((await call("/applicants", "tok-super")).status).toBe(200);
+    expect((await call("/profile", "tok-applicant")).status).toBe(200);
   });
 
   it("answers 404 for unknown applicants", async () => {
@@ -1002,8 +1032,6 @@ describe("money", () => {
       const issued = await json(await post(`/money/card-holders/${MAYA}/physical`, { address, message }, "tok-finance"));
       expect(issued.holder.cards.physical).toMatchObject({ status: "Shipped", issuedBy: "Jordan Lee" });
       expect((await mine()).transactions.filter((t: { type: string }) => t.type === "Card fee")).toEqual([]);
-      await call("/profile", "tok-super");
-      expect((await post(`/money/card-holders/${USERS["tok-super"]!.id}/virtual`, {})).status).toBe(403);
       expect((await post("/money/card-holders/99999999-9999-4999-8999-999999999999/virtual", {})).status).toBe(404);
     });
   });
@@ -1032,14 +1060,12 @@ describe("money", () => {
     expect(entry.changes).toEqual(expect.arrayContaining([{ field: "balances.grant", before: "1000", after: "1250" }]));
   });
 
-  it("keeps each applicant to their own money, and staff off their own", async () => {
+  it("keeps each applicant to their own money, and staff out of it", async () => {
     await call("/profile", "tok-maya");
     const d = (await json(await deposit(50))).money.transactions[0];
     expect((await post(`/money/deposits/${d.id}/cancel`, {}, "tok-applicant")).status).toBe(400);
     expect(await entry(d.id)).toMatchObject({ status: "Pending" });
-    await call("/profile", "tok-super");
-    const own = (await json(await post("/money/deposits", { amount: 50, method: "bank" }, "tok-super"))).money.transactions[0];
-    expect((await post(`/money/deposits/${own.id}/confirm`, {})).status).toBe(403);
+    expect((await post("/money/deposits", { amount: 50, method: "bank" }, "tok-super")).status).toBe(403);
   });
 });
 
