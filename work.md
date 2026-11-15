@@ -503,6 +503,14 @@ Covers all 19 items of the review above, in five slices; each ships on its own (
 
 **Not done:** existing applicant records made by a staff login stay in the database (hidden); nothing removes them. A staff member who leaves keeps the staff record, so their login stays out of the applicant portal; to let them apply, delete their `staff_members` row in Supabase.
 
+### 15 Nov 2026: team inbox on phones (owner's report; built and checked 15 Nov 2026; not yet committed or deployed; no schema push)
+
+**Cause:** below 760px the reading pane was `height: calc(100dvh − 150px)` (at least 460px) inside a mailbox with `overflow: hidden` and a 610–620px minimum height, under a page that also scrolls; `reveal()` scrolled the page so the mailbox was "nearest", which on a phone moved the whole screen; and the fixed bottom menu (about 66px) covered the bottom of the pane, where the composer's pinned Discard/Send row was (stacked in two rows below 500px).
+
+**Fix (`AdminInbox.css` ≤760px, `AdminInboxLive.tsx`):** mailbox and reader at their natural height with `overflow: clip` (not a scroll container, so `position: sticky` works against the window): the reader's toolbar sticks to the top, the Send row to the bottom (above the menu, or at the very bottom while the menu is hidden with `.admin-shell:has(.admin-mail-compose-pane)`); Discard and Send on one row; the list scrolls with the page; `reveal()` scrolls the mailbox's top into view on phones. Still not done (slice 3): the received HTML frame keeps its own fixed height and scrolls inside the message.
+
+**Tests:** `.unlazy/inbox-phone/browser-check.mjs` (fails before, passes after), `.unlazy/inbox/browser-check.mjs` with sending on and off, typecheck.
+
 ## 7. Testing and release gates
 
 **Current evidence (3 Oct 2026):** `pnpm test` runs **215 rule tests** (19 files) and **156 API tests** (`api.test.ts`, the wiring tests, and `lib/uploadSafety.test.ts`); `pnpm run typecheck` passes; `.unlazy/grant-plans/browser-check.mjs flow` passes three runs in a row on a production build (the dev server stalled module loads after many reloads, so this check builds and runs `vite preview`).

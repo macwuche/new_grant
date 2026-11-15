@@ -429,6 +429,10 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
+### Team inbox on phones (15 Nov 2026) — not yet deployed
+
+Portal only; no schema push. Redeploy as usual. Check on a phone: `/admin/inbox` → Compose: Discard and Send sit on one row at the bottom of the screen and stay there while scrolling; the bottom menu is hidden while writing and returns after Discard or Send. Ctrl+F5 / reload if the old page is cached.
+
 ### Staff kept out of the applicant portal; main admin always super (15 Nov 2026) — not yet deployed
 
 API and portal; no schema push. Redeploy as usual. `INITIAL_SUPER_ADMIN_EMAIL` (`info@novabridgegrant.org`) is now the main admin: at startup the API restores it to an active super admin if needed (`journalctl -u novabridgegrant-api | grep -i "main admin"`), and Team & roles shows it as **Main admin** with its controls locked. Check: signed in as the super admin, open `https://access.novabridgegrant.org/dashboard`: "This is a grant team account" with **Go to the staff workspace**; a test applicant's dashboard works as before.

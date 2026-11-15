@@ -56,8 +56,11 @@ export function AdminInboxLive() {
   const mailboxRef = useRef<HTMLDivElement>(null);
   // Reading is open to every active staff member; sending and filing mail need inbox.send (not Support).
   const canSend = !!useSession().me?.permissions.includes('inbox.send');
-  /** Brings the whole mailbox into the window, so the message actions and Send are on screen. */
-  const reveal = () => window.requestAnimationFrame(() => mailboxRef.current?.scrollIntoView({ block: 'nearest' }));
+  /**
+   * Brings the mailbox into the window, so the message actions and Send are on screen. On phones the mailbox flows with
+   * the page, so its top goes to the top of the window (the reader's bar and the Send row stick there and at the bottom).
+   */
+  const reveal = () => window.requestAnimationFrame(() => mailboxRef.current?.scrollIntoView({ block: window.matchMedia('(max-width: 760px)').matches ? 'start' : 'nearest' }));
 
   const load = useCallback(async (f: Folder = folder) => {
     try { setView(await getInbox({ folder: f })); setError(null); } catch (err) { setError(apiError(err, "Couldn't load the mailbox.").error); }
@@ -163,7 +166,7 @@ export function AdminInboxLive() {
             <label htmlFor="mail-body">Message</label><textarea id="mail-body" value={draft.text} onChange={e => setDraft({ ...draft, text: e.target.value })} aria-invalid={!!fieldErrors.text} data-testid="textarea-mail-body" />{fieldErrors.text && <small className="admin-field-error">{fieldErrors.text}</small>}
             {draft.mode === 'forward' && (draft.attachments ?? 0) > 0 && <p className="admin-mail-form-hint"><Paperclip size={14} /> The original's attachments aren't forwarded; only its text is included. Open them in the Resend dashboard.</p>}
             <p className="admin-mail-form-hint"><Info size={14} /> Sent through Resend from the team address. Sending is recorded in the audit log.</p>
-            <div className="admin-mail-form-actions"><button type="button" className="admin-mail-secondary" onClick={() => setDraft(null)}>Discard</button><button type="submit" className="admin-mail-primary" disabled={busy} data-testid="button-send-mail"><Send size={15} /> {busy ? 'Sending…' : 'Send'}</button></div>
+            <div className="admin-mail-form-actions"><button type="button" className="admin-mail-secondary" onClick={() => setDraft(null)} data-testid="button-discard-mail">Discard</button><button type="submit" className="admin-mail-primary" disabled={busy} data-testid="button-send-mail"><Send size={15} /> {busy ? 'Sending…' : 'Send'}</button></div>
           </form>
         </div> : active ? <article className="admin-mail-message" data-testid="article-mail-message">
           <span className="admin-mail-overline">{active.direction === 'inbound' ? 'RECEIVED' : `SENT${active.sentBy ? ` BY ${active.sentBy.toUpperCase()}` : ''} · ${(active.status ?? 'sent').toUpperCase()}`}</span><h2>{active.subject}</h2>
