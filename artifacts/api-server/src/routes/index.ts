@@ -46,7 +46,7 @@ export type ApiDeps = { verifier: TokenVerifier | null; staffRepo: StaffRepo; pr
 export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, applicationRepo, activityRepo, moneyRepo, documentRepo, fileStore, emailOutbox, emailSettings, inbox, signIns, fetchImpl, limits = {}, staffMfa = true, supabaseAuth = null, mainAdminEmail = null }: ApiDeps): IRouter {
   const router: IRouter = Router();
   const limit = { ...LIMITS, ...limits };
-  const email = { outbox: emailOutbox, settings: emailSettings, inbox, ...(fetchImpl ? { fetchImpl } : {}) };
+  const email = { outbox: emailOutbox, settings: emailSettings, inbox, files: fileStore, ...(fetchImpl ? { fetchImpl } : {}) };
   router.use(healthRouter);
   // Resend's webhook signs its requests instead of signing in.
   router.use(emailWebhookRouter(email));
@@ -67,6 +67,8 @@ export function apiRouter({ verifier, staffRepo, programRepo, profileRepo, appli
   router.put("/money/deposit-methods/:methodId/photo", uploads);
   router.put("/money/deposits/:id/proof", uploads);
   router.put(["/branding/logo", "/branding/logo-dark", "/branding/favicon"], uploads);
+  // Mail or a draft saved in the team inbox with new files attached counts as an upload.
+  router.post(["/inbox/send", "/inbox/drafts"], (req, res, next) => Array.isArray(req.body?.attachments) && req.body.attachments.length ? uploads(req, res, next) : next());
   router.post("/profile/check-password", rateLimiter(limit.passwordChecks, byUser));
   router.use(loadStaff(staffRepo, staffMfa), resetGate(profileRepo));
   router.use(meRouter(staffMfa, mainAdminEmail));

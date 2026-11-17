@@ -33,7 +33,8 @@ export const emailSettingsTable = pgTable("email_settings", {
   updatedBy: text("updated_by"),
 }).enableRLS();
 
-export type InboxAttachmentJson = { id: string; filename: string; contentType: string; size: number | null };
+/** `key` and `sha256`: files attached in the team inbox (sent mail and drafts), kept on the API server's disk (received attachments stay at Resend). */
+export type InboxAttachmentJson = { id: string; filename: string; contentType: string; size: number | null; key?: string; sha256?: string };
 
 /** Messages in the team mailbox: received through the Resend webhook, or sent from the inbox. */
 export const inboxMessagesTable = pgTable("inbox_messages", {
@@ -54,7 +55,8 @@ export const inboxMessagesTable = pgTable("inbox_messages", {
   attachments: jsonb("attachments").$type<InboxAttachmentJson[]>().notNull().default([]),
   /** Outbound: sent, delivered, bounced, complained, delayed, failed. */
   status: text("status"),
-  folder: text("folder").$type<"inbox" | "sent" | "archive" | "trash">().notNull(),
+  /** `drafts` (since 17 Nov 2026): unsent mail; `sent_by` then holds the author's staff id. A text column, so no migration. */
+  folder: text("folder").$type<"inbox" | "sent" | "archive" | "trash" | "drafts">().notNull(),
   read: boolean("read").notNull().default(false),
   sentBy: text("sent_by"),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),

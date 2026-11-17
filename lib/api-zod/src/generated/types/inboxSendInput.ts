@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InboxAttachmentRefs } from './inboxAttachmentRefs';
+import type { InboxSendInputAttachmentsItem } from './inboxSendInputAttachmentsItem';
 
 export interface InboxSendInput {
   to: string;
@@ -13,6 +15,11 @@ export interface InboxSendInput {
   subject: string;
   text: string;
   inReplyTo?: string;
+  /** Up to 10 files, 10 MB in all (PDF, JPG, PNG, WEBP, TXT, CSV), checked like other uploads; pictures are rebuilt from their pixels. */
+  attachments?: InboxSendInputAttachmentsItem[];
+  existingAttachments?: InboxAttachmentRefs;
+  /** The draft being sent (the caller's own); removed once Resend accepts the message. */
+  draftId?: string;
   /** One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message. */
   idempotencyKey?: string;
 }

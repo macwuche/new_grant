@@ -63,6 +63,7 @@ import type {
   GetInboxParams,
   HealthStatus,
   IdentitySubmission,
+  InboxDraftInput,
   InboxMessage,
   InboxSendInput,
   InboxUpdateInput,
@@ -11210,7 +11211,7 @@ export const getGetInboxUrl = (params?: GetInboxParams,) => {
 }
 
 /**
- * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
+ * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first. Drafts lists only the caller's own drafts.
  * @summary The team mailbox (staff)
  */
 export const getInbox = async (params?: GetInboxParams, options?: Parameters<typeof customFetch>[1]): Promise<InboxView> => {
@@ -11288,7 +11289,7 @@ export const getSendInboxEmailUrl = () => {
 }
 
 /**
- * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
+ * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all) and optional attachments (up to 10 MB in all; a bad file answers 400 with an attachments field error; 507 when the server is low on storage); replies keep the thread headers. Files from other messages (forwarding) and a draft's own files come as existingAttachments; with draftId, the draft is removed once Resend accepts the message. Audited.
  * @summary Send or reply from the team mailbox (staff)
  */
 export const sendInboxEmail = async (inboxSendInput: InboxSendInput, options?: Parameters<typeof customFetch>[1]): Promise<InboxMessage> => {
@@ -11368,6 +11369,253 @@ export const useSendInboxEmail = <TError = ErrorType<InvalidResponse | Unauthori
       return useMutation(getSendInboxEmailMutationOptions(options));
     }
 
+export const getGetInboxAttachmentUrl = (id: string,
+    attachmentId: string,) => {
+
+
+
+
+  return `/api/inbox/${id}/attachments/${attachmentId}`
+}
+
+/**
+ * Any active staff member (another person's draft answers 404). Files attached here come from this server (checked against their SHA-256); received attachments are fetched from Resend through its signed link (503 without the Resend key, 502 if Resend fails), sent as a download, and never stored. Every download is audited.
+ * @summary Download an email attachment (staff)
+ */
+export const getInboxAttachment = async (id: string,
+    attachmentId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetInboxAttachmentUrl(id,attachmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInboxAttachmentQueryKey = (id: string,
+    attachmentId: string,) => {
+    return [
+    `/api/inbox/${id}/attachments/${attachmentId}`
+    ] as const;
+    }
+
+
+export const getGetInboxAttachmentQueryOptions = <TData = Awaited<ReturnType<typeof getInboxAttachment>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>>(id: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInboxAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInboxAttachmentQueryKey(id,attachmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInboxAttachment>>> = ({ signal }) => getInboxAttachment(id,attachmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && attachmentId !== null && attachmentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInboxAttachment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInboxAttachmentQueryResult = NonNullable<Awaited<ReturnType<typeof getInboxAttachment>>>
+export type GetInboxAttachmentQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+
+
+/**
+ * @summary Download an email attachment (staff)
+ */
+
+export function useGetInboxAttachment<TData = Awaited<ReturnType<typeof getInboxAttachment>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>>(
+ id: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInboxAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInboxAttachmentQueryOptions(id,attachmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveInboxDraftUrl = () => {
+
+
+
+
+  return `/api/inbox/drafts`
+}
+
+/**
+ * Needs inbox.send. Creates a draft (no id; 201) or replaces the caller's own draft (200; 404 if it was sent or discarded). Addresses may be incomplete. New files are checked like attachments on send; existingAttachments keeps the draft's own files or carries files from other messages. Files the draft no longer has are deleted. Seen only by its author; not audited.
+ * @summary Save a draft (staff)
+ */
+export const saveInboxDraft = async (inboxDraftInput: InboxDraftInput, options?: Parameters<typeof customFetch>[1]): Promise<InboxMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InboxMessage>(getSaveInboxDraftUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(inboxDraftInput)
+  }
+);}
+
+
+
+
+
+export const getSaveInboxDraftMutationKey = () => ['saveInboxDraft'] as const;
+
+export const getSaveInboxDraftMutationOptions = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveInboxDraft>>, TError,SaveInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveInboxDraft>>, TError,SaveInboxDraftMutationVariables, TContext> => {
+
+const mutationKey = getSaveInboxDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveInboxDraft>>, SaveInboxDraftMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveInboxDraft(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveInboxDraftMutationResult = NonNullable<Awaited<ReturnType<typeof saveInboxDraft>>>
+    export type SaveInboxDraftMutationBody = BodyType<InboxDraftInput>
+    export type SaveInboxDraftMutationError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type SaveInboxDraftMutationVariables = {data: BodyType<InboxDraftInput>}
+
+    /**
+ * @summary Save a draft (staff)
+ */
+export const useSaveInboxDraft = <TError = ErrorType<InvalidResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveInboxDraft>>, TError,SaveInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveInboxDraft>>,
+        TError,
+        SaveInboxDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveInboxDraftMutationOptions(options));
+    }
+
+export const getDeleteInboxDraftUrl = (id: string,) => {
+
+
+
+
+  return `/api/inbox/drafts/${id}/delete`
+}
+
+/**
+ * Needs inbox.send. Deletes the caller's own draft and its files for good.
+ * @summary Discard a draft (staff)
+ */
+export const deleteInboxDraft = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Message> => {
+
+  return customFetch<Message>(getDeleteInboxDraftUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteInboxDraftMutationKey = () => ['deleteInboxDraft'] as const;
+
+export const getDeleteInboxDraftMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInboxDraft>>, TError,DeleteInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteInboxDraft>>, TError,DeleteInboxDraftMutationVariables, TContext> => {
+
+const mutationKey = getDeleteInboxDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteInboxDraft>>, DeleteInboxDraftMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteInboxDraft(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteInboxDraftMutationResult = NonNullable<Awaited<ReturnType<typeof deleteInboxDraft>>>
+
+    export type DeleteInboxDraftMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeleteInboxDraftMutationVariables = {id: string}
+
+    /**
+ * @summary Discard a draft (staff)
+ */
+export const useDeleteInboxDraft = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInboxDraft>>, TError,DeleteInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteInboxDraft>>,
+        TError,
+        DeleteInboxDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteInboxDraftMutationOptions(options));
+    }
+
 export const getUpdateInboxMessageUrl = (id: string,) => {
 
 
@@ -11377,7 +11625,7 @@ export const getUpdateInboxMessageUrl = (id: string,) => {
 }
 
 /**
- * Needs inbox.send. Folder inbox, sent, archive, or trash.
+ * Needs inbox.send. Folder inbox, sent, archive, or trash. Drafts can't be moved (400).
  * @summary Move a message or mark it read (staff)
  */
 export const updateInboxMessage = async (id: string,

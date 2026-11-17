@@ -3221,14 +3221,14 @@ paths:
       operationId: getInbox
       tags: [email]
       summary: The team mailbox (staff)
-      description: Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
+      description: Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first. Drafts lists only the caller's own drafts.
       parameters:
         - name: folder
           in: query
           required: false
           schema:
             type: string
-            enum: [inbox, sent, archive, trash]
+            enum: [inbox, sent, archive, trash, drafts]
       responses:
         "200":
           description: OK
@@ -3247,7 +3247,7 @@ paths:
       operationId: sendInboxEmail
       tags: [email]
       summary: Send or reply from the team mailbox (staff)
-      description: Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
+      description: Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all) and optional attachments (up to 10 MB in all; a bad file answers 400 with an attachments field error; 507 when the server is low on storage); replies keep the thread headers. Files from other messages (forwarding) and a draft's own files come as existingAttachments; with draftId, the draft is removed once Resend accepts the message. Audited.
       requestBody:
         required: true
         content:
@@ -3267,6 +3267,87 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /inbox/{id}/attachments/{attachmentId}:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getInboxAttachment
+      tags: [email]
+      summary: Download an email attachment (staff)
+      description: Any active staff member (another person's draft answers 404). Files attached here come from this server (checked against their SHA-256); received attachments are fetched from Resend through its signed link (503 without the Resend key, 502 if Resend fails), sent as a download, and never stored. Every download is audited.
+      responses:
+        "200":
+          description: The file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /inbox/drafts:
+    post:
+      operationId: saveInboxDraft
+      tags: [email]
+      summary: Save a draft (staff)
+      description: Needs inbox.send. Creates a draft (no id; 201) or replaces the caller's own draft (200; 404 if it was sent or discarded). Addresses may be incomplete. New files are checked like attachments on send; existingAttachments keeps the draft's own files or carries files from other messages. Files the draft no longer has are deleted. Seen only by its author; not audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InboxDraftInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxMessage"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxMessage"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /inbox/drafts/{id}/delete:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    post:
+      operationId: deleteInboxDraft
+      tags: [email]
+      summary: Discard a draft (staff)
+      description: Needs inbox.send. Deletes the caller's own draft and its files for good.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /inbox/{id}/update:
     parameters:
       - $ref: "#/components/parameters/DocumentId"
@@ -3274,7 +3355,7 @@ paths:
       operationId: updateInboxMessage
       tags: [email]
       summary: Move a message or mark it read (staff)
-      description: Needs inbox.send. Folder inbox, sent, archive, or trash.
+      description: Needs inbox.send. Folder inbox, sent, archive, or trash. Drafts can't be moved (400).
       requestBody:
         required: true
         content:
@@ -3578,9 +3659,12 @@ components:
               filename: { type: string }
               contentType: { type: string }
               size: { type: [number, "null"] }
-            required: [id, filename, contentType, size]
+              downloadable:
+                type: boolean
+                description: True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds).
+            required: [id, filename, contentType, size, downloadable]
         status: { type: [string, "null"] }
-        folder: { type: string, enum: [inbox, sent, archive, trash] }
+        folder: { type: string, enum: [inbox, sent, archive, trash, drafts] }
         read: { type: boolean }
         sentBy: { type: [string, "null"] }
         at: { type: string }
@@ -3606,10 +3690,58 @@ components:
         subject: { type: string }
         text: { type: string }
         inReplyTo: { type: string }
+        attachments:
+          type: array
+          description: Up to 10 files, 10 MB in all (PDF, JPG, PNG, WEBP, TXT, CSV), checked like other uploads; pictures are rebuilt from their pixels.
+          items:
+            type: object
+            properties:
+              filename: { type: string }
+              content:
+                type: string
+                description: The file's bytes, base64-encoded.
+            required: [filename, content]
+        existingAttachments:
+          $ref: "#/components/schemas/InboxAttachmentRefs"
+        draftId:
+          type: string
+          description: The draft being sent (the caller's own); removed once Resend accepts the message.
         idempotencyKey:
           type: string
           description: One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message.
       required: [to, subject, text]
+    InboxAttachmentRefs:
+      type: array
+      description: Files already on a message, in the order shown. The draft's own files are kept as they are; files from other messages (forwarding; received files come from Resend) are checked and stored again like new attachments. They count toward the 10 files and 10 MB.
+      items:
+        type: object
+        properties:
+          messageId: { type: string }
+          attachmentId: { type: string }
+        required: [messageId, attachmentId]
+    InboxDraftInput:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The draft to replace; leave out to create one.
+        to: { type: string }
+        cc: { type: string }
+        bcc: { type: string }
+        subject: { type: string }
+        text: { type: string }
+        inReplyTo: { type: string }
+        attachments:
+          type: array
+          description: New files, as on send.
+          items:
+            type: object
+            properties:
+              filename: { type: string }
+              content: { type: string }
+            required: [filename, content]
+        existingAttachments:
+          $ref: "#/components/schemas/InboxAttachmentRefs"
     InboxUpdateInput:
       type: object
       properties:

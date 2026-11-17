@@ -5,7 +5,7 @@ import { INBOX_LIMIT, type InboxMessage, type InboxRepo } from "./inbox";
 const toMessage = (r: InboxMessageRow): InboxMessage => ({
   id: r.id, direction: r.direction, resendId: r.resendId, messageId: r.messageId, inReplyTo: r.inReplyTo,
   from: r.fromAddress, to: r.toAddresses, cc: r.ccAddresses, bcc: r.bccAddresses, subject: r.subject, text: r.textBody, html: r.htmlBody,
-  attachments: r.attachments.map(a => ({ id: a.id, filename: a.filename, contentType: a.contentType, size: a.size })),
+  attachments: r.attachments.map(a => ({ id: a.id, filename: a.filename, contentType: a.contentType, size: a.size, ...(a.key ? { key: a.key, sha256: a.sha256 } : {}) })),
   status: r.status, folder: r.folder, read: r.read, sentBy: r.sentBy, at: r.at.toISOString(),
 });
 
@@ -18,7 +18,8 @@ const values = (m: Omit<InboxMessage, "id">) => ({
 });
 
 export const dbInboxRepo: InboxRepo = {
-  list: async folder => (await db.select().from(inboxMessagesTable).where(eq(inboxMessagesTable.folder, folder))
+  list: async (folder, sentBy) => (await db.select().from(inboxMessagesTable)
+    .where(sentBy === undefined ? eq(inboxMessagesTable.folder, folder) : and(eq(inboxMessagesTable.folder, folder), eq(inboxMessagesTable.sentBy, sentBy)))
     .orderBy(desc(inboxMessagesTable.at)).limit(INBOX_LIMIT)).map(toMessage),
   get: async id => {
     if (!isUuid(id)) return null;
@@ -41,6 +42,17 @@ export const dbInboxRepo: InboxRepo = {
     if (!isUuid(id)) return null;
     const [r] = await db.update(inboxMessagesTable).set(patch).where(eq(inboxMessagesTable.id, id)).returning();
     return r ? toMessage(r) : null;
+  },
+  saveDraft: async (msg, id) => {
+    if (id === undefined) { const [r] = await db.insert(inboxMessagesTable).values(values({ ...msg, read: true })).returning(); return toMessage(r!); }
+    if (!isUuid(id)) return null;
+    const [r] = await db.update(inboxMessagesTable).set(values({ ...msg, read: true }))
+      .where(and(eq(inboxMessagesTable.id, id), eq(inboxMessagesTable.folder, "drafts"))).returning();
+    return r ? toMessage(r) : null;
+  },
+  removeDraft: async id => {
+    if (!isUuid(id)) return false;
+    return (await db.delete(inboxMessagesTable).where(and(eq(inboxMessagesTable.id, id), eq(inboxMessagesTable.folder, "drafts"))).returning({ id: inboxMessagesTable.id })).length > 0;
   },
   setStatusByResendId: async (resendId, status) => {
     await db.update(inboxMessagesTable).set({ status }).where(and(eq(inboxMessagesTable.direction, "outbound"), eq(inboxMessagesTable.resendId, resendId)));

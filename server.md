@@ -429,11 +429,21 @@ curl -s http://127.0.0.1:3100/api/healthz; echo
 
 (nginx doesn't need a reload for code updates.)
 
-### Team inbox on phones (15 Nov 2026) — not yet deployed
+### Attachments, received files, and drafts in the team inbox (17 Nov 2026) — not yet deployed
+
+API and portal; **no schema push**: attachment records live in the existing `inbox_messages.attachments` JSON, and drafts are `inbox_messages` rows with folder `drafts` (a text column). Redeploy as usual. Files attached to sent mail and to drafts are stored under `/var/lib/novabridgegrant/documents/00000000-0000-4000-8000-00000000ba11/`: include that folder in the documents backup. Received attachments aren't stored; the API fetches them from Resend when someone opens or forwards one, so the server needs outbound https to Resend's file links (as it already has to `api.resend.com`). nginx already allows 25 MB requests, enough for the 10 MB limit.
+
+Checks after deploying (signed in as a super admin, `/admin/inbox`):
+1. Compose → **Attach** a small PDF → Send to your own address: the email arrives with the PDF, and the Sent copy opens it; a `.docx` is refused with a message.
+2. Send yourself an email with a PDF to the team address; when it arrives, click the PDF in the message: it opens (or downloads). `journalctl -u novabridgegrant-api -n 50` shows no "couldn't get a received attachment's link" warning.
+3. **Forward** that message to your own address: the composer lists the PDF; the forwarded email arrives with it.
+4. Compose, type a subject, wait for "Saved to Drafts", reload the page: the message is under **Drafts**; open it, Send: it's sent and Drafts is empty.
+
+### Team inbox on phones (15 Nov 2026) — deployed 15 Nov 2026 as `26ade58`
 
 Portal only; no schema push. Redeploy as usual. Check on a phone: `/admin/inbox` → Compose: Discard and Send sit on one row at the bottom of the screen and stay there while scrolling; the bottom menu is hidden while writing and returns after Discard or Send. Ctrl+F5 / reload if the old page is cached.
 
-### Staff kept out of the applicant portal; main admin always super (15 Nov 2026) — not yet deployed
+### Staff kept out of the applicant portal; main admin always super (15 Nov 2026) — deployed 15 Nov 2026 with `26ade58` (`039f30d`)
 
 API and portal; no schema push. Redeploy as usual. `INITIAL_SUPER_ADMIN_EMAIL` (`info@novabridgegrant.org`) is now the main admin: at startup the API restores it to an active super admin if needed (`journalctl -u novabridgegrant-api | grep -i "main admin"`), and Team & roles shows it as **Main admin** with its controls locked. Check: signed in as the super admin, open `https://access.novabridgegrant.org/dashboard`: "This is a grant team account" with **Go to the staff workspace**; a test applicant's dashboard works as before.
 
@@ -768,3 +778,4 @@ Leftovers not worth touching: pnpm's download cache in root's `~/.npm` (shared w
 - 2026-10-17 — Deployed `c61cb78` (team inbox slice 1: Cc/Bcc delivered, Reply all, `inbox.send`/`inbox.delete`): `sudo -u novabridgegrant git pull --ff-only` (`087e7a0..c61cb78`), **schema push** ("Changes applied": `inbox_messages.bcc_addresses`), `sh deploy/build.sh` (Build OK ~18:07 server clock; bundle `index-D82Aewso.js`), restart. Checked from outside: `/api/healthz` ok, the new bundle served with Reply all and the Bcc field, `POST /api/inbox/send` without sign-in answers 401. Owner's Reply all / Cc / Bcc test still to report.
 - 2026-10-17 — Deployed `ad34021` (inbox page without its heading; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`c61cb78..ad34021`), `sh deploy/build.sh` (Build OK ~18:19 server clock; bundle `index-D1UDez6y.js`), restart. Checked from outside: `/api/healthz` ok and the new bundle served.
 - 2026-10-17 — Deployed `277a7f6` (Send always reachable on short windows; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`ad34021..277a7f6`), `sh deploy/build.sh` (Build OK ~18:36 server clock; bundle `index-CSiTAgB5.js`, styles `index-DqZObuTx.css`), restart. Checked from outside: `/api/healthz` ok and the new styles served (the mailbox's single-row rule is in them). Owner's Compose check on a short window still to report.
+- 2026-11-15 — Deployed `26ade58` (`039f30d`: staff kept out of the applicant portal, main admin always an active super admin; `26ade58`: team inbox on phones; no schema push): `sudo -u novabridgegrant git pull --ff-only` (`277a7f6..26ade58`), `sh deploy/build.sh` (Build OK ~19:47 server clock; bundle `index-CcFLe9OF.js`, styles `index-D7SATCug.css`), restart, `/api/healthz` ok. Checked from outside: healthz ok through Cloudflare, the served bundle has the staff-account screen and the Main admin tag, the styles have the phone composer rules, and `/api/profile` without sign-in answers 401. The server reports "System restart required" and 27 pending updates (not done). Owner's checks still to report: the staff-account screen, the locked Main admin row, Compose on a phone.

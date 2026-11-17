@@ -68,11 +68,14 @@ let inbox: ReturnType<typeof memoryInboxRepo>;
 /** Fake Resend and Supabase: tests set `providerReplies` (by "METHOD path") and read `providerCalls`. */
 let providerCalls: { method: string; url: string; headers: Record<string, string>; body: unknown }[] = [];
 let providerReplies: Record<string, { status: number; body: unknown }> = {};
+/** A reply with raw bytes (a file download) instead of JSON. */
+const fileReply = (bytes: Buffer) => ({ status: 200, body: bytes });
 const providerFetch = (async (url: string, init: RequestInit = {}) => {
   const method = init.method ?? "GET";
   providerCalls.push({ method, url, headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(String(init.body)) : null });
   const path = new URL(url).pathname;
   const reply = providerReplies[`${method} ${path}`] ?? { status: 404, body: { message: "not found" } };
+  if (Buffer.isBuffer(reply.body)) return new Response(new Uint8Array(reply.body), { status: reply.status, headers: { "content-type": "application/octet-stream" } });
   return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { "content-type": "application/json" } });
 }) as unknown as typeof fetch;
 
@@ -2068,6 +2071,189 @@ describe("email settings, domain, sign-up confirmation, webhook, and inbox", () 
     expect((await post(`/inbox/${received.id}/update`, { read: true }, "tok-finance")).status).toBe(403);
     expect((await json(await call("/me", "tok-finance"))).permissions).not.toContain("inbox.send");
     expect(sends()).toHaveLength(3);
+  });
+
+  it("sends attachments: checked and rebuilt like uploads, passed to Resend, kept for the Sent copy, and opened by staff (audited)", async () => {
+    await configure();
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_att" } };
+    const png = await sharp({ create: { width: 8, height: 6, channels: 3, background: { r: 51, g: 102, b: 204 } } }).png().withExif({ IFD0: { Make: "PhoneCo" } }).toBuffer();
+    const csv = Buffer.from("name,amount\nMaya,1200\n");
+    const b64 = (b: Buffer) => b.toString("base64");
+    const message = { to: "maya@example.com", subject: "Your papers", text: "Attached.", idempotencyKey: "compose-att-0001" };
+    const res = await post("/inbox/send", { ...message, attachments: [{ filename: "chart.png", content: b64(png) }, { filename: "../totals.csv", content: b64(csv) }] });
+    expect(res.status).toBe(201);
+    const saved = await json(res);
+    expect(saved.attachments).toEqual([
+      { id: expect.any(String), filename: "chart.png", contentType: "image/png", size: expect.any(Number), downloadable: true },
+      { id: expect.any(String), filename: "totals.csv", contentType: "text/csv", size: csv.length, downloadable: true },
+    ]);
+    // Resend gets the checked files; the picture was rebuilt (no metadata).
+    const sent = providerCalls.filter(c => c.method === "POST" && c.url.endsWith("/emails")).at(-1)!.body as { attachments: { filename: string; content: string }[] };
+    expect(sent.attachments.map(a => a.filename)).toEqual(["chart.png", "totals.csv"]);
+    expect((await sharp(Buffer.from(sent.attachments[0]!.content, "base64")).metadata()).exif).toBeUndefined();
+    expect(Buffer.from(sent.attachments[1]!.content, "base64").equals(csv)).toBe(true);
+    // Where the file is kept never leaves the server.
+    const listed = (await json(await call("/inbox?folder=sent", "tok-super"))).messages[0];
+    expect(JSON.stringify(listed)).not.toMatch(/"key"|sha256/);
+    expect(files.files.size).toBe(2);
+    // Staff open it; each download is audited; a changed file is refused.
+    const opened = await call(`/inbox/${saved.id}/attachments/${saved.attachments[1].id}`, "tok-super");
+    expect(opened.status).toBe(200);
+    expect(opened.headers.get("content-disposition")).toContain('filename="totals.csv"');
+    expect(Buffer.from(await opened.arrayBuffer()).equals(csv)).toBe(true);
+    expect((await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action)).toContain("Open email attachment");
+    expect((await call(`/inbox/${saved.id}/attachments/nope`, "tok-super")).status).toBe(404);
+    const [csvKey] = [...files.files.keys()].filter(k => files.files.get(k)!.equals(csv));
+    files.files.set(csvKey!, Buffer.from("tampered"));
+    expect((await call(`/inbox/${saved.id}/attachments/${saved.attachments[1].id}`, "tok-super")).status).toBe(500);
+    // A retry with the same key keeps one copy of the files.
+    expect((await json(await post("/inbox/send", { ...message, attachments: [{ filename: "chart.png", content: b64(png) }, { filename: "totals.csv", content: b64(csv) }] }))).id).toBe(saved.id);
+    expect(files.files.size).toBe(2);
+    // Refused: wrong types, archives, scripts in "text", too many, too large; nothing sent or stored.
+    const before = providerCalls.length;
+    const refused = async (attachments: unknown) => {
+      const r = await post("/inbox/send", { ...message, idempotencyKey: `compose-bad-${Math.random().toString(36).slice(2, 10)}`, attachments });
+      expect(r.status).toBe(400);
+      return (await json(r)).fieldErrors.attachments as string;
+    };
+    expect(await refused([{ filename: "report.docx", content: b64(Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 0x50, 0x4b, 0x05, 0x06])) }])).toContain("isn't a file type");
+    expect(await refused([{ filename: "notes.txt", content: b64(Buffer.from("hi <script>alert(1)</script>")) }])).toContain("script");
+    expect(await refused([{ filename: "binary.txt", content: b64(Buffer.from([0x68, 0x00, 0x69])) }])).toContain("isn't a file type");
+    expect(await refused([{ filename: "fake.png", content: b64(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("not really")])) }])).toContain("couldn't be read");
+    expect(await refused(Array.from({ length: 11 }, (_, i) => ({ filename: `f${i}.csv`, content: b64(csv) })))).toContain("at most 10");
+    expect(await refused([{ filename: "big.csv", content: b64(Buffer.alloc(10 * 1024 * 1024 + 1, 0x61)) }])).toContain("10 MB");
+    expect(await refused([{ filename: "x.csv", content: "***" }])).toContain("couldn't be read");
+    expect(providerCalls.length).toBe(before);
+    expect(files.files.size).toBe(2);
+    // A failed send leaves no files behind.
+    providerReplies["POST /emails"] = { status: 422, body: { message: "Invalid" } };
+    expect((await post("/inbox/send", { ...message, idempotencyKey: "compose-att-0002", attachments: [{ filename: "totals.csv", content: b64(csv) }] })).status).toBe(502);
+    expect(files.files.size).toBe(2);
+  });
+
+  it("opens received attachments from Resend (downloads only, audited) and forwards them, checked like new files", async () => {
+    await configure();
+    const docx = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 0x50, 0x4b, 0x05, 0x06]);
+    providerReplies["GET /emails/receiving/in_f"] = { status: 200, body: { id: "in_f", from: "maya@example.com", to: ["info@novabridgegrant.org"], subject: "Papers", html: null, text: "See attached", created_at: "2026-11-17T09:00:00Z", message_id: "<f@example.com>",
+      attachments: [{ id: "a1", filename: "plan.pdf", content_type: "application/pdf", size: PDF.length }, { id: "a2", filename: "budget.docx", content_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: docx.length }, { id: "a3", filename: "page.html", content_type: "text/html", size: 20 }] } };
+    await hook({ type: "email.received", data: { email_id: "in_f" } });
+    const [received] = (await json(await call("/inbox", "tok-super"))).messages;
+    expect(received.attachments.map((a: { downloadable: boolean }) => a.downloadable)).toEqual([true, true, true]);
+    const link = (id: string, url = `https://files.resend.test/in_f/${id}`) => { providerReplies[`GET /emails/receiving/in_f/attachments/${id}`] = { status: 200, body: { id, filename: id, content_type: "x", download_url: url, expires_at: "2026-11-17T10:00:00Z" } }; };
+    link("a1"); providerReplies["GET /in_f/a1"] = fileReply(PDF);
+    link("a2"); providerReplies["GET /in_f/a2"] = fileReply(docx);
+    link("a3"); providerReplies["GET /in_f/a3"] = fileReply(Buffer.from("<script>alert(1)</script>"));
+    // Opened through our API: the file Resend holds, as a download; any active staff member; audited.
+    const pdf = await call(`/inbox/${received.id}/attachments/a1`, "tok-finance");
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(pdf.headers.get("content-disposition")).toContain('attachment; filename="plan.pdf"');
+    expect(pdf.headers.get("content-security-policy")).toContain("sandbox");
+    expect(Buffer.from(await pdf.arrayBuffer()).equals(PDF)).toBe(true);
+    // Types a browser could run are sent as plain downloads.
+    const html = await call(`/inbox/${received.id}/attachments/a3`, "tok-super");
+    expect(html.headers.get("content-type")).toBe("application/octet-stream");
+    expect(html.headers.get("x-content-type-options")).toBe("nosniff");
+    const opened = (await json(await call("/audit", "tok-super"))).events.filter((e: { action: string }) => e.action === "Open email attachment");
+    expect(opened).toHaveLength(2);
+    expect(JSON.stringify(opened)).toContain("plan.pdf");
+    expect(files.files.size).toBe(0);
+    // Resend failing, a link that isn't https, or no Resend key: refused with a reason.
+    delete providerReplies["GET /in_f/a1"];
+    expect((await call(`/inbox/${received.id}/attachments/a1`, "tok-super")).status).toBe(502);
+    link("a1", "http://files.resend.test/in_f/a1"); providerReplies["GET /in_f/a1"] = fileReply(PDF);
+    expect((await call(`/inbox/${received.id}/attachments/a1`, "tok-super")).status).toBe(502);
+    link("a1");
+    // Forwarding: the received PDF goes with the message and is kept for the Sent copy; a Word file is refused by name.
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_fwd" } };
+    const forward = { to: "riley@example.org", subject: "Fwd: Papers", text: "FYI", idempotencyKey: "compose-fwd-0001" };
+    const refusedDocx = await post("/inbox/send", { ...forward, existingAttachments: [{ messageId: received.id, attachmentId: "a2" }] });
+    expect(refusedDocx.status).toBe(400);
+    expect((await json(refusedDocx)).fieldErrors.attachments).toContain("budget.docx isn't a file type");
+    expect((await json(await post("/inbox/send", { ...forward, existingAttachments: [{ messageId: received.id, attachmentId: "nope" }] }))).fieldErrors.attachments).toContain("no longer there");
+    const sent = await post("/inbox/send", { ...forward, existingAttachments: [{ messageId: received.id, attachmentId: "a1" }], attachments: [{ filename: "note.txt", content: Buffer.from("see the plan\n").toString("base64") }] });
+    expect(sent.status).toBe(201);
+    const saved = await json(sent);
+    expect(saved.attachments.map((a: { filename: string; downloadable: boolean }) => [a.filename, a.downloadable])).toEqual([["plan.pdf", true], ["note.txt", true]]);
+    const request = providerCalls.filter(c => c.method === "POST" && c.url.endsWith("/emails")).at(-1)!.body as { attachments: { filename: string; content: string }[] };
+    expect(request.attachments.map(a => a.filename)).toEqual(["plan.pdf", "note.txt"]);
+    expect(Buffer.from(request.attachments[0]!.content, "base64").equals(PDF)).toBe(true);
+    expect(files.files.size).toBe(2);
+    const fromSent = await call(`/inbox/${saved.id}/attachments/${saved.attachments[0].id}`, "tok-super");
+    expect(Buffer.from(await fromSent.arrayBuffer()).equals(PDF)).toBe(true);
+    // Without the Resend key, received files can't be fetched.
+    await put("/email/settings", { resendKey: "" });
+    expect((await call(`/inbox/${received.id}/attachments/a1`, "tok-super")).status).toBe(503);
+  });
+
+  it("saves drafts per person with their files, resumes, discards, and sends a draft (removing it)", async () => {
+    await configure();
+    const csv = Buffer.from("name,amount\nMaya,1200\n");
+    const b64 = (b: Buffer) => b.toString("base64");
+    // An incomplete message saves; only its author sees it.
+    const first = await post("/inbox/drafts", { to: "maya@", subject: "", text: "Half wri", attachments: [{ filename: "totals.csv", content: b64(csv) }] });
+    expect(first.status).toBe(201);
+    const draft = await json(first);
+    expect(draft).toMatchObject({ folder: "drafts", to: ["maya@"], text: "Half wri", status: null, attachments: [{ filename: "totals.csv", downloadable: true }] });
+    expect(files.files.size).toBe(1);
+    expect((await json(await call("/inbox?folder=drafts", "tok-super"))).messages.map((m: { id: string }) => m.id)).toEqual([draft.id]);
+    expect((await json(await call("/inbox?folder=drafts", "tok-finance"))).messages).toEqual([]);
+    expect((await call(`/inbox/${draft.id}/attachments/${draft.attachments[0].id}`, "tok-finance")).status).toBe(404);
+    expect((await post("/inbox/drafts", { id: draft.id, text: "mine now" }, "tok-finance")).status).toBe(404);
+    expect((await post(`/inbox/drafts/${draft.id}/delete`, {}, "tok-finance")).status).toBe(404);
+    expect((await post("/inbox/send", { to: "riley@example.org", subject: "Steal", text: "x", existingAttachments: [{ messageId: draft.id, attachmentId: draft.attachments[0].id }] }, "tok-finance")).status).toBe(400);
+    expect((await post(`/inbox/${draft.id}/update`, { folder: "archive" })).status).toBe(400);
+    expect((await json(await call("/inbox", "tok-super"))).unread).toBe(0);
+    // Saving again keeps its own file without storing it twice; a removed file is deleted.
+    const kept = await json(await post("/inbox/drafts", { id: draft.id, to: "maya@example.com", subject: "Totals", text: "Here are the totals.", existingAttachments: [{ messageId: draft.id, attachmentId: draft.attachments[0].id }], attachments: [{ filename: "more.csv", content: b64(csv) }] }));
+    expect(kept.id).toBe(draft.id);
+    expect(kept.attachments.map((a: { id: string; filename: string }) => a.filename)).toEqual(["totals.csv", "more.csv"]);
+    expect(kept.attachments[0].id).toBe(draft.attachments[0].id);
+    expect(files.files.size).toBe(2);
+    const trimmed = await json(await post("/inbox/drafts", { id: draft.id, to: "maya@example.com", subject: "Totals", text: "Here are the totals.", existingAttachments: [{ messageId: draft.id, attachmentId: kept.attachments[1].id }] }));
+    expect(trimmed.attachments.map((a: { filename: string }) => a.filename)).toEqual(["more.csv"]);
+    expect(files.files.size).toBe(1);
+    expect((await post("/inbox/drafts", { id: draft.id, text: "x".repeat(20_001) })).status).toBe(400);
+    // Sending it: its file goes as it is, the draft is removed, and the Sent copy keeps the file.
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_draft" } };
+    const sent = await post("/inbox/send", { draftId: draft.id, to: "maya@example.com", subject: "Totals", text: "Here are the totals.", existingAttachments: [{ messageId: draft.id, attachmentId: trimmed.attachments[0].id }], idempotencyKey: "compose-draft-001" });
+    expect(sent.status).toBe(201);
+    const message = await json(sent);
+    expect(message.attachments.map((a: { filename: string }) => a.filename)).toEqual(["more.csv"]);
+    const request = providerCalls.filter(c => c.method === "POST" && c.url.endsWith("/emails")).at(-1)!.body as { attachments: { content: string }[] };
+    expect(Buffer.from(request.attachments[0]!.content, "base64").equals(csv)).toBe(true);
+    expect((await json(await call("/inbox?folder=drafts", "tok-super"))).messages).toEqual([]);
+    expect(files.files.size).toBe(1);
+    expect(Buffer.from(await (await call(`/inbox/${message.id}/attachments/${message.attachments[0].id}`, "tok-super")).arrayBuffer()).equals(csv)).toBe(true);
+    expect((await post("/inbox/drafts", { id: draft.id, text: "late autosave" })).status).toBe(404);
+    // Discarding deletes the draft and its files; a failed send keeps the draft.
+    const other = await json(await post("/inbox/drafts", { to: "a@example.org", subject: "Later", text: "Not yet", attachments: [{ filename: "x.csv", content: b64(csv) }] }));
+    expect(files.files.size).toBe(2);
+    providerReplies["POST /emails"] = { status: 422, body: { message: "Invalid" } };
+    expect((await post("/inbox/send", { draftId: other.id, to: "a@example.org", subject: "Later", text: "Not yet", existingAttachments: [{ messageId: other.id, attachmentId: other.attachments[0].id }], idempotencyKey: "compose-draft-002" })).status).toBe(502);
+    expect((await json(await call("/inbox?folder=drafts", "tok-super"))).messages).toHaveLength(1);
+    expect(files.files.size).toBe(2);
+    expect((await post(`/inbox/drafts/${other.id}/delete`, {})).status).toBe(200);
+    expect((await json(await call("/inbox?folder=drafts", "tok-super"))).messages).toEqual([]);
+    expect(files.files.size).toBe(1);
+    // Support can read the inbox but has no drafts.
+    expect((await patch("aaaaaaaa-0000-4000-8000-000000000002", { role: "support" })).status).toBe(200);
+    expect((await post("/inbox/drafts", { text: "hi" }, "tok-finance")).status).toBe(403);
+    // Drafts aren't audited; sending is.
+    const actions = (await json(await call("/audit", "tok-super"))).events.map((e: { action: string }) => e.action);
+    expect(actions.filter((a: string) => a === "Send email")).toHaveLength(1);
+  });
+
+  it("refuses attachments when the server is low on storage, without sending", async () => {
+    await configure();
+    providerReplies["POST /emails"] = { status: 200, body: { id: "out_full" } };
+    const put = files.put;
+    files.put = async () => { throw new StorageFullError(1, 2); };
+    const before = providerCalls.length;
+    const res = await post("/inbox/send", { to: "maya@example.com", subject: "Full", text: "Hi", attachments: [{ filename: "a.csv", content: Buffer.from("a,b\n").toString("base64") }] });
+    files.put = put;
+    expect(res.status).toBe(507);
+    expect(providerCalls.length).toBe(before);
   });
 });
 

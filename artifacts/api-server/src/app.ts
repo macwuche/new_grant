@@ -1,3 +1,4 @@
+import { INBOX_SEND_JSON_LIMIT } from "./lib/inboxAttachments";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -49,6 +50,8 @@ export function createApp(deps: ApiDeps, origins: string[] = allowedOrigins()): 
   );
   app.use(securityHeaders);
   // Keep the raw body too: webhook signatures are computed over the exact bytes.
+  // Mail and drafts from the team inbox can carry up to 10 MB of attachments (as base64); every other JSON body keeps the 100 kB default.
+  app.use(["/api/inbox/send", "/api/inbox/drafts"], express.json({ limit: INBOX_SEND_JSON_LIMIT }));
   app.use(express.json({ verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; } }));
   app.use(express.urlencoded({ extended: true }));
 

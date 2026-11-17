@@ -14,4 +14,5 @@ export const GetInboxFolder = {
   sent: 'sent',
   archive: 'archive',
   trash: 'trash',
+  drafts: 'drafts',
 } as const;

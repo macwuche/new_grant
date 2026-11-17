@@ -209,6 +209,8 @@ export type InboxMessageAttachmentsItem = {
   contentType: string;
   /** @nullable */
   size: number | null;
+  /** True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds). */
+  downloadable: boolean;
 };
 
 export type InboxMessageFolder = typeof InboxMessageFolder[keyof typeof InboxMessageFolder];
@@ -219,6 +221,7 @@ export const InboxMessageFolder = {
   sent: 'sent',
   archive: 'archive',
   trash: 'trash',
+  drafts: 'drafts',
 } as const;
 
 export interface InboxMessage {
@@ -259,6 +262,22 @@ export interface InboxView {
   messages: InboxMessage[];
 }
 
+export type InboxSendInputAttachmentsItem = {
+  filename: string;
+  /** The file's bytes, base64-encoded. */
+  content: string;
+};
+
+export type InboxAttachmentRefsItem = {
+  messageId: string;
+  attachmentId: string;
+};
+
+/**
+ * Files already on a message, in the order shown. The draft's own files are kept as they are; files from other messages (forwarding; received files come from Resend) are checked and stored again like new attachments. They count toward the 10 files and 10 MB.
+ */
+export type InboxAttachmentRefs = InboxAttachmentRefsItem[];
+
 export interface InboxSendInput {
   to: string;
   cc?: string;
@@ -266,8 +285,32 @@ export interface InboxSendInput {
   subject: string;
   text: string;
   inReplyTo?: string;
+  /** Up to 10 files, 10 MB in all (PDF, JPG, PNG, WEBP, TXT, CSV), checked like other uploads; pictures are rebuilt from their pixels. */
+  attachments?: InboxSendInputAttachmentsItem[];
+  existingAttachments?: InboxAttachmentRefs;
+  /** The draft being sent (the caller's own); removed once Resend accepts the message. */
+  draftId?: string;
   /** One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message. */
   idempotencyKey?: string;
+}
+
+export type InboxDraftInputAttachmentsItem = {
+  filename: string;
+  content: string;
+};
+
+export interface InboxDraftInput {
+  /** The draft to replace; leave out to create one. */
+  id?: string;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  text?: string;
+  inReplyTo?: string;
+  /** New files, as on send. */
+  attachments?: InboxDraftInputAttachmentsItem[];
+  existingAttachments?: InboxAttachmentRefs;
 }
 
 export type InboxUpdateInputFolder = typeof InboxUpdateInputFolder[keyof typeof InboxUpdateInputFolder];
@@ -1799,5 +1842,6 @@ export const GetInboxFolder = {
   sent: 'sent',
   archive: 'archive',
   trash: 'trash',
+  drafts: 'drafts',
 } as const;
 

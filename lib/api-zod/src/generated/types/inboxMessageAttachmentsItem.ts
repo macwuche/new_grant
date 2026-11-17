@@ -12,4 +12,6 @@ export type InboxMessageAttachmentsItem = {
   contentType: string;
   /** @nullable */
   size: number | null;
+  /** True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds). */
+  downloadable: boolean;
 };

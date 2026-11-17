@@ -12196,11 +12196,11 @@ export const PreviewBrandEmailResponse = zod.object({
 
 
 /**
- * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first.
+ * Any active staff member (Support included; reading needs no permission). Up to 200 messages in the folder, newest first. Drafts lists only the caller's own drafts.
  * @summary The team mailbox (staff)
  */
 export const GetInboxQueryParams = zod.object({
-  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']).optional()
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash', 'drafts']).optional()
 })
 
 export const GetInboxResponse = zod.object({
@@ -12225,10 +12225,11 @@ export const GetInboxResponse = zod.object({
   "id": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().nullable()
+  "size": zod.number().nullable(),
+  "downloadable": zod.boolean().describe('True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds).')
 })),
   "status": zod.string().nullable(),
-  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash', 'drafts']),
   "read": zod.boolean(),
   "sentBy": zod.string().nullable(),
   "at": zod.string()
@@ -12237,7 +12238,7 @@ export const GetInboxResponse = zod.object({
 
 
 /**
- * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all); replies keep the thread headers. Audited.
+ * Needs inbox.send (every role but Support). Sent through Resend from the team mailbox address with To, Cc, and Bcc (at most 50 in all) and optional attachments (up to 10 MB in all; a bad file answers 400 with an attachments field error; 507 when the server is low on storage); replies keep the thread headers. Files from other messages (forwarding) and a draft's own files come as existingAttachments; with draftId, the draft is removed once Resend accepts the message. Audited.
  * @summary Send or reply from the team mailbox (staff)
  */
 export const SendInboxEmailBody = zod.object({
@@ -12247,6 +12248,15 @@ export const SendInboxEmailBody = zod.object({
   "subject": zod.string(),
   "text": zod.string(),
   "inReplyTo": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "content": zod.string().describe('The file\'s bytes, base64-encoded.')
+})).optional().describe('Up to 10 files, 10 MB in all (PDF, JPG, PNG, WEBP, TXT, CSV), checked like other uploads; pictures are rebuilt from their pixels.'),
+  "existingAttachments": zod.array(zod.object({
+  "messageId": zod.string(),
+  "attachmentId": zod.string()
+})).optional().describe('Files already on a message, in the order shown. The draft\'s own files are kept as they are; files from other messages (forwarding; received files come from Resend) are checked and stored again like new attachments. They count toward the 10 files and 10 MB.'),
+  "draftId": zod.string().optional().describe('The draft being sent (the caller\'s own); removed once Resend accepts the message.'),
   "idempotencyKey": zod.string().optional().describe('One per message being written (8–100 letters, digits, or dashes). Repeating a send with the same key sends once and returns the same message.')
 })
 
@@ -12267,10 +12277,11 @@ export const SendInboxEmailResponse = zod.object({
   "id": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().nullable()
+  "size": zod.number().nullable(),
+  "downloadable": zod.boolean().describe('True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds).')
 })),
   "status": zod.string().nullable(),
-  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash', 'drafts']),
   "read": zod.boolean(),
   "sentBy": zod.string().nullable(),
   "at": zod.string()
@@ -12278,7 +12289,82 @@ export const SendInboxEmailResponse = zod.object({
 
 
 /**
- * Needs inbox.send. Folder inbox, sent, archive, or trash.
+ * Any active staff member (another person's draft answers 404). Files attached here come from this server (checked against their SHA-256); received attachments are fetched from Resend through its signed link (503 without the Resend key, 502 if Resend fails), sent as a download, and never stored. Every download is audited.
+ * @summary Download an email attachment (staff)
+ */
+export const GetInboxAttachmentParams = zod.object({
+  "id": zod.coerce.string().uuid(),
+  "attachmentId": zod.coerce.string()
+})
+
+export const GetInboxAttachmentResponse = zod.unknown()
+
+
+/**
+ * Needs inbox.send. Creates a draft (no id; 201) or replaces the caller's own draft (200; 404 if it was sent or discarded). Addresses may be incomplete. New files are checked like attachments on send; existingAttachments keeps the draft's own files or carries files from other messages. Files the draft no longer has are deleted. Seen only by its author; not audited.
+ * @summary Save a draft (staff)
+ */
+export const SaveInboxDraftBody = zod.object({
+  "id": zod.string().optional().describe('The draft to replace; leave out to create one.'),
+  "to": zod.string().optional(),
+  "cc": zod.string().optional(),
+  "bcc": zod.string().optional(),
+  "subject": zod.string().optional(),
+  "text": zod.string().optional(),
+  "inReplyTo": zod.string().optional(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "content": zod.string()
+})).optional().describe('New files, as on send.'),
+  "existingAttachments": zod.array(zod.object({
+  "messageId": zod.string(),
+  "attachmentId": zod.string()
+})).optional().describe('Files already on a message, in the order shown. The draft\'s own files are kept as they are; files from other messages (forwarding; received files come from Resend) are checked and stored again like new attachments. They count toward the 10 files and 10 MB.')
+})
+
+export const SaveInboxDraftResponse = zod.object({
+  "id": zod.string(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "resendId": zod.string().nullable(),
+  "messageId": zod.string().nullable(),
+  "inReplyTo": zod.string().nullable(),
+  "from": zod.string(),
+  "to": zod.array(zod.string()),
+  "cc": zod.array(zod.string()),
+  "bcc": zod.array(zod.string()).describe('Outbound only, who was Bcc\'d; empty for received mail.'),
+  "subject": zod.string(),
+  "text": zod.string().nullable(),
+  "html": zod.string().nullable(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().nullable(),
+  "downloadable": zod.boolean().describe('True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds).')
+})),
+  "status": zod.string().nullable(),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash', 'drafts']),
+  "read": zod.boolean(),
+  "sentBy": zod.string().nullable(),
+  "at": zod.string()
+})
+
+
+/**
+ * Needs inbox.send. Deletes the caller's own draft and its files for good.
+ * @summary Discard a draft (staff)
+ */
+export const DeleteInboxDraftParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const DeleteInboxDraftResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Needs inbox.send. Folder inbox, sent, archive, or trash. Drafts can't be moved (400).
  * @summary Move a message or mark it read (staff)
  */
 export const UpdateInboxMessageParams = zod.object({
@@ -12307,10 +12393,11 @@ export const UpdateInboxMessageResponse = zod.object({
   "id": zod.string(),
   "filename": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().nullable()
+  "size": zod.number().nullable(),
+  "downloadable": zod.boolean().describe('True when the file opens with getInboxAttachment (files attached here, and received files Resend still holds).')
 })),
   "status": zod.string().nullable(),
-  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash']),
+  "folder": zod.enum(['inbox', 'sent', 'archive', 'trash', 'drafts']),
   "read": zod.boolean(),
   "sentBy": zod.string().nullable(),
   "at": zod.string()

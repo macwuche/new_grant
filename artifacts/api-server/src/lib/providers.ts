@@ -27,6 +27,29 @@ export type ReceivedEmail = {
   message_id?: string; created_at: string; attachments?: { id: string; filename: string; content_type: string; size?: number }[];
 };
 
+export type ReceivedAttachment = { id: string; filename: string; content_type: string; size?: number; download_url: string; expires_at?: string };
+
+/**
+ * Downloads a file from a link a provider gave us (Resend's signed attachment
+ * links): https only, no credentials sent, at most `maxBytes`.
+ */
+export async function downloadFile(fetchImpl: Fetch, url: string, maxBytes: number, label: string): Promise<ProviderResult<Buffer>> {
+  let target: URL;
+  try { target = new URL(url); } catch { return { ok: false, status: 0, error: `${label} gave an unusable download link.` }; }
+  if (target.protocol !== "https:") return { ok: false, status: 0, error: `${label} gave a download link that isn't https.` };
+  try {
+    const res = await fetchImpl(target.toString(), { signal: AbortSignal.timeout(30_000), redirect: "follow" });
+    if (!res.ok) return { ok: false, status: res.status, error: `${label} download ${res.status}: ${res.statusText}`.slice(0, 400) };
+    const declared = Number(res.headers.get("content-length") ?? NaN);
+    if (Number.isFinite(declared) && declared > maxBytes) return { ok: false, status: 413, error: `The file is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.` };
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length > maxBytes) return { ok: false, status: 413, error: `The file is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.` };
+    return { ok: true, data: bytes };
+  } catch (err) {
+    return { ok: false, status: 0, error: `Couldn't download from ${label}: ${(err as Error).message}`.slice(0, 400) };
+  }
+}
+
 export function resendApi(apiKey: string, fetchImpl: Fetch = fetch) {
   const base = "https://api.resend.com";
   const headers = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
@@ -38,10 +61,12 @@ export function resendApi(apiKey: string, fetchImpl: Fetch = fetch) {
     getDomain: (id: string) => call<ResendDomain>(fetchImpl, `${base}/domains/${encodeURIComponent(id)}`, { headers }, "Resend"),
     verifyDomain: (id: string) => call<{ id: string }>(fetchImpl, `${base}/domains/${encodeURIComponent(id)}/verify`, { method: "POST", headers }, "Resend"),
     getReceivedEmail: (id: string) => call<ReceivedEmail>(fetchImpl, `${base}/emails/receiving/${encodeURIComponent(id)}`, { headers }, "Resend"),
-    send: (email: { from: string; to: string[]; cc?: string[]; bcc?: string[]; subject: string; text: string; html?: string; replyTo?: string; headers?: Record<string, string> }, idempotencyKey?: string) =>
+    /** A received attachment: Resend answers with a signed `download_url` that expires after about an hour. */
+    getReceivedAttachment: (emailId: string, attachmentId: string) => call<ReceivedAttachment>(fetchImpl, `${base}/emails/receiving/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}`, { headers }, "Resend"),
+    send: (email: { from: string; to: string[]; cc?: string[]; bcc?: string[]; subject: string; text: string; html?: string; replyTo?: string; headers?: Record<string, string>; attachments?: { filename: string; content: string }[] }, idempotencyKey?: string) =>
       call<{ id: string }>(fetchImpl, `${base}/emails`, {
         method: "POST", headers: { ...headers, ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}) },
-        body: JSON.stringify({ from: email.from, to: email.to, ...(email.cc?.length ? { cc: email.cc } : {}), ...(email.bcc?.length ? { bcc: email.bcc } : {}), subject: email.subject, text: email.text, ...(email.html ? { html: email.html } : {}), ...(email.replyTo ? { reply_to: email.replyTo } : {}), ...(email.headers ? { headers: email.headers } : {}) }),
+        body: JSON.stringify({ from: email.from, to: email.to, ...(email.cc?.length ? { cc: email.cc } : {}), ...(email.bcc?.length ? { bcc: email.bcc } : {}), subject: email.subject, text: email.text, ...(email.html ? { html: email.html } : {}), ...(email.replyTo ? { reply_to: email.replyTo } : {}), ...(email.headers ? { headers: email.headers } : {}), ...(email.attachments?.length ? { attachments: email.attachments } : {}) }),
       }, "Resend"),
   };
 }
